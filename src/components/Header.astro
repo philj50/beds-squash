@@ -1,0 +1,235 @@
+---
+import { NAV, SITE, url } from '@/lib/site';
+
+const base = import.meta.env.BASE_URL.replace(/\/+$/, '');
+const current = Astro.url.pathname.replace(base, '') || '/';
+const isActive = (href: string) => (href === '/' ? current === '/' : current.startsWith(href));
+---
+
+<header class="site-header">
+  <div class="container bar">
+    <a class="brand" href={url('/')} aria-label={`${SITE.name} home`}>
+      <img src={url('/brand/logo-192.png')} alt="" width="48" height="48" />
+      <span class="brand__text">
+        <span class="brand__name">Beds Squash</span>
+        <span class="brand__sub">Bedfordshire Squash &amp; Racketball Association</span>
+      </span>
+    </a>
+
+    <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav" data-menu-toggle>
+      <span class="menu-btn__bars" aria-hidden="true"></span>
+      <span class="sr-only">Menu</span>
+    </button>
+
+    <nav id="site-nav" class="nav" aria-label="Primary">
+      <ul>
+        {
+          NAV.map((item) => (
+            <li>
+              <a href={url(item.href)} aria-current={isActive(item.href) ? 'page' : undefined}>
+                {item.label}
+              </a>
+            </li>
+          ))
+        }
+        <li class="nav__cta">
+          <a class="btn btn--primary btn--sm" href={SITE.leagueMaster} target="_blank" rel="noopener" title="Fixtures, results and tables on League Master">
+            Tables ↗
+          </a>
+        </li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<script>
+  const btn = document.querySelector<HTMLButtonElement>('[data-menu-toggle]');
+  const nav = document.getElementById('site-nav');
+  btn?.addEventListener('click', () => {
+    const open = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', String(!open));
+    nav?.classList.toggle('is-open', !open);
+    document.body.classList.toggle('nav-open', !open);
+  });
+</script>
+
+<style>
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(15, 17, 21, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 72px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    text-decoration: none;
+    color: var(--text);
+  }
+  .brand img {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .brand__text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.05;
+  }
+  .brand__name {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  .brand__sub {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+  }
+
+  .nav ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+  }
+  .nav a:not(.btn) {
+    display: block;
+    padding: 0.5rem 0.55rem;
+    color: var(--ink-200);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+    border-radius: 6px;
+    position: relative;
+    white-space: nowrap;
+  }
+  .nav a:not(.btn):hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.05);
+  }
+  .nav a[aria-current='page'] {
+    color: var(--accent);
+  }
+  .nav a[aria-current='page']::after {
+    content: '';
+    position: absolute;
+    left: 0.65rem;
+    right: 0.65rem;
+    bottom: 2px;
+    height: 2px;
+    background: var(--accent);
+    border-radius: 1px;
+  }
+  .nav__cta {
+    margin-left: 0.5rem;
+  }
+  .nav .btn {
+    white-space: nowrap;
+  }
+
+  .menu-btn {
+    display: none;
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .menu-btn__bars,
+  .menu-btn__bars::before,
+  .menu-btn__bars::after {
+    display: block;
+    width: 22px;
+    height: 2px;
+    background: var(--text);
+    position: relative;
+    transition: transform 0.2s ease;
+  }
+  .menu-btn__bars::before,
+  .menu-btn__bars::after {
+    content: '';
+    position: absolute;
+    left: 0;
+  }
+  .menu-btn__bars::before {
+    top: -7px;
+  }
+  .menu-btn__bars::after {
+    top: 7px;
+  }
+  .menu-btn[aria-expanded='true'] .menu-btn__bars {
+    background: transparent;
+  }
+  .menu-btn[aria-expanded='true'] .menu-btn__bars::before {
+    transform: translateY(7px) rotate(45deg);
+  }
+  .menu-btn[aria-expanded='true'] .menu-btn__bars::after {
+    transform: translateY(-7px) rotate(-45deg);
+  }
+
+  @media (max-width: 1540px) {
+    .brand__sub {
+      display: none;
+    }
+  }
+  @media (max-width: 1240px) {
+    .menu-btn {
+      display: inline-flex;
+    }
+    .nav {
+      display: none;
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 100%;
+      background: var(--ink-900);
+      border-bottom: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 0.75rem var(--gutter) 1.25rem;
+      max-height: calc(100dvh - 72px);
+      overflow: auto;
+    }
+    .nav.is-open {
+      display: block;
+    }
+    .nav ul {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0;
+    }
+    .nav a:not(.btn) {
+      padding: 0.8rem 0.5rem;
+      font-size: 1.1rem;
+      border-bottom: 1px solid var(--border);
+      border-radius: 0;
+    }
+    .nav a[aria-current='page']::after {
+      display: none;
+    }
+    .nav__cta {
+      margin: 1rem 0 0;
+    }
+  }
+</style>

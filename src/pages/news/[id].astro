@@ -1,0 +1,79 @@
+---
+import { render } from 'astro:content';
+import Base from '@/layouts/Base.astro';
+import NewsCard from '@/components/NewsCard.astro';
+import { getNews } from '@/lib/content';
+import { CATEGORY_LABEL, formatDate, url } from '@/lib/site';
+
+export async function getStaticPaths() {
+  const posts = await getNews();
+  return posts.map((post) => ({ params: { id: post.id }, props: { post } }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+const { title, date, summary, image, imageAlt, category } = post.data;
+const more = (await getNews()).filter((p) => p.id !== post.id).slice(0, 3);
+---
+
+<Base title={title} description={summary} image={image ? url(image) : undefined} type="article">
+  <article>
+    <header class="page-hero">
+      <div class="container narrow">
+        <a class="back" href={url('/news/')}>← All news</a>
+        <div class="card__meta" style="margin-bottom:.75rem">
+          <span class="pill">{CATEGORY_LABEL[category] ?? category}</span>
+          <time datetime={date.toISOString()}>{formatDate(date)}</time>
+        </div>
+        <h1>{title}</h1>
+        {summary && <p class="lede">{summary}</p>}
+      </div>
+    </header>
+    {
+      image && (
+        <div class="container narrow" style="margin-top:2rem">
+          <img class="hero-img" src={url(image)} alt={imageAlt ?? ''} />
+        </div>
+      )
+    }
+    <div class="container narrow section prose">
+      <Content />
+    </div>
+  </article>
+
+  {
+    more.length > 0 && (
+      <section class="section" style="border-top:1px solid var(--border)">
+        <div class="container">
+          <div class="section-head">
+            <h2>More news</h2>
+            <a href={url('/news/')}>All news →</a>
+          </div>
+          <div class="grid grid--3">
+            {more.map((p) => (
+              <NewsCard post={p} />
+            ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+</Base>
+
+<style>
+  .back {
+    display: inline-block;
+    margin-bottom: 1rem;
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .back:hover {
+    color: var(--accent);
+  }
+  .hero-img {
+    border-radius: var(--radius);
+    width: 100%;
+    max-height: 560px;
+    object-fit: cover;
+  }
+</style>

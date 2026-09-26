@@ -1,0 +1,82 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import { CATEGORY_LABEL, formatDate, url } from '@/lib/site';
+
+interface Props {
+  post: CollectionEntry<'news'>;
+  large?: boolean;
+}
+const { post, large = false } = Astro.props;
+const { title, date, summary, image, imageAlt, category } = post.data;
+const href = url(`/news/${post.id}/`);
+---
+
+<article class:list={['card', 'news-card', { 'news-card--large': large }]}>
+  <a href={href} class="news-card__media" aria-hidden="true" tabindex="-1">
+    {
+      image ? (
+        <img class="card__img" src={url(image)} alt={imageAlt ?? ''} loading="lazy" decoding="async" />
+      ) : (
+        <div class="card__img placeholder">
+          <img src={url('/brand/logo-192.png')} alt="" width="96" height="96" />
+        </div>
+      )
+    }
+  </a>
+  <div class="card__body">
+    <div class="card__meta">
+      <span class="pill">{CATEGORY_LABEL[category] ?? category}</span>
+      <time datetime={date.toISOString()}>{formatDate(date)}</time>
+    </div>
+    <h3 class="card__title"><a href={href}>{title}</a></h3>
+    {summary && <p class="summary">{summary}</p>}
+  </div>
+</article>
+
+<style>
+  .news-card__media {
+    display: block;
+  }
+  .placeholder {
+    display: grid;
+    place-items: center;
+    background:
+      radial-gradient(circle at 30% 30%, rgba(242, 183, 5, 0.12), transparent 50%),
+      var(--ink-700);
+  }
+  .placeholder img {
+    opacity: 0.5;
+    width: 96px;
+    height: 96px;
+  }
+  .summary {
+    color: var(--ink-200);
+    margin: 0;
+    font-size: 0.95rem;
+  }
+  .news-card--large {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+  }
+  .news-card--large .card__img {
+    height: 100%;
+    aspect-ratio: auto;
+    min-height: 260px;
+  }
+  .news-card--large .card__body {
+    padding: 1.75rem;
+    align-self: center;
+  }
+  .news-card--large .card__title {
+    font-size: 2rem;
+  }
+  @media (max-width: 720px) {
+    .news-card--large {
+      grid-template-columns: 1fr;
+    }
+    .news-card--large .card__img {
+      aspect-ratio: 16 / 9;
+      min-height: 0;
+    }
+  }
+</style>

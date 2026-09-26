@@ -1,0 +1,94 @@
+---
+import Base from '@/layouts/Base.astro';
+import ContentPage from '@/components/ContentPage.astro';
+import { getCommittee } from '@/lib/content';
+import { url } from '@/lib/site';
+
+const committee = await getCommittee();
+---
+
+<Base title="About Beds SRA" description="About the Bedfordshire Squash & Racketball Association — what we do, our committee and how to get involved.">
+  <ContentPage id="about" eyebrow="The association" fallbackTitle="About">
+    <div slot="aside" class="stack">
+      <div class="card">
+        <div class="card__body">
+          <h3>Committee</h3>
+          <ul class="people">
+            {
+              committee.map((m) => (
+                <li>
+                  {m.data.photo ? (
+                    <img src={url(m.data.photo)} alt="" width="48" height="48" loading="lazy" />
+                  ) : (
+                    <span class="avatar" aria-hidden="true">
+                      {m.data.name
+                        .split(' ')
+                        .map((p) => p[0])
+                        .join('')
+                        .slice(0, 2)}
+                    </span>
+                  )}
+                  <span>
+                    <strong>{m.data.name}</strong>
+                    <br />
+                    <span class="muted">{m.data.role}</span>
+                    {m.data.email && (
+                      <>
+                        <br />
+                        <a href={`mailto:${m.data.email}`}>{m.data.email}</a>
+                      </>
+                    )}
+                  </span>
+                </li>
+              ))
+            }
+          </ul>
+          <a class="btn btn--ghost btn--sm" href={url('/contact/')}>Contact us</a>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card__body">
+          <h3>Governance</h3>
+          <p class="muted">Minutes, the constitution, safeguarding policy and codes of conduct are all published on the <a href={url('/documents/')}>Documents</a> page.</p>
+        </div>
+      </div>
+    </div>
+  </ContentPage>
+</Base>
+
+<style>
+  .people {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1.25rem;
+  }
+  .people li {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.95rem;
+    line-height: 1.4;
+  }
+  .people li:last-child {
+    border-bottom: 0;
+  }
+  .people img,
+  .avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    object-fit: cover;
+  }
+  .avatar {
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, var(--gold-500), var(--red-500));
+    color: var(--ink-950);
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.1rem;
+  }
+</style>

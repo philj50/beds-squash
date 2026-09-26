@@ -1,0 +1,90 @@
+---
+import { getEntry, render } from 'astro:content';
+import Base from '@/layouts/Base.astro';
+import PageHero from '@/components/PageHero.astro';
+import { getClubs, getDocuments } from '@/lib/content';
+import { SITE, url } from '@/lib/site';
+
+const page = await getEntry('pages', 'leagues');
+const Content = page ? (await render(page)).Content : null;
+const clubs = (await getClubs()).filter((c) => c.data.leagueClub);
+const rules = (await getDocuments()).filter((d) => d.data.category === 'league-rules');
+const LM = SITE.leagueMaster.replace(/\/$/, '');
+---
+
+<Base title="Leagues" description="Bedfordshire Squash Winter League, Summer League and League Cup — divisions, scoring, rules and links to fixtures and tables on League Master.">
+  <PageHero eyebrow="Team squash" title={page?.data.title ?? 'Leagues'} lede={page?.data.intro}>
+    <div class="hero-actions">
+      <a class="btn btn--primary" href={SITE.leagueMaster} target="_blank" rel="noopener">Fixtures, results &amp; tables ↗</a>
+      {rules[0] && <a class="btn btn--ghost" href={url(`/documents/${rules[0].id}/`)}>League rules</a>}
+    </div>
+  </PageHero>
+
+  <section class="section">
+    <div class="container layout">
+      <div class="prose">{Content && <Content />}</div>
+      <aside class="side stack">
+        <div class="card">
+          <div class="card__body">
+            <h3>League Master</h3>
+            <p class="muted">All league data lives on League Master. Quick links:</p>
+            <ul class="links">
+              <li><a href={`${LM}/cgi-county/icounty.exe/showdivlist`} target="_blank" rel="noopener">Division tables</a></li>
+              <li><a href={`${LM}/cgi-county/icounty.exe/showclublist`} target="_blank" rel="noopener">Clubs</a></li>
+              <li><a href={`${LM}/cgi-county/icounty.exe/showteamlist`} target="_blank" rel="noopener">Teams</a></li>
+              <li><a href={`${LM}/cgi-county/icounty.exe/showtournamentlist`} target="_blank" rel="noopener">Cup draws</a></li>
+              <li><a href={`${LM}/cgi-county/icounty.exe/showlogin`} target="_blank" rel="noopener">Captains: enter a result</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card__body">
+            <h3>Clubs in the league</h3>
+            <ul class="links">
+              {
+                clubs.map((c) => (
+                  <li>
+                    <a href={url(`/clubs/${c.id}/`)}>{c.data.name}</a>
+                    <span class="muted"> · {c.data.teams.length} team{c.data.teams.length === 1 ? '' : 's'}</span>
+                  </li>
+                ))
+              }
+            </ul>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .hero-actions {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-top: 1.25rem;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 2.5rem;
+    align-items: start;
+  }
+  .links {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .links li {
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .links li:last-child {
+    border-bottom: 0;
+  }
+  @media (max-width: 900px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

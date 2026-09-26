@@ -1,0 +1,125 @@
+---
+import { getEntry, render } from 'astro:content';
+import Base from '@/layouts/Base.astro';
+import EventCard from '@/components/EventCard.astro';
+import { getEvents, getUpcomingEvents } from '@/lib/content';
+import { CATEGORY_LABEL, SOURCE_LABEL, formatRange, formatTime, isoDate, url } from '@/lib/site';
+
+export async function getStaticPaths() {
+  const events = await getEvents();
+  return events.map((event) => ({ params: { id: event.id }, props: { event } }));
+}
+
+const { event } = Astro.props;
+const { Content } = await render(event);
+const { title, start, end, allDay, venue, club, source, category, link, entryForm, image, cancelled } = event.data;
+const clubEntry = club ? await getEntry('clubs', club) : undefined;
+const others = (await getUpcomingEvents()).filter((e) => e.id !== event.id).slice(0, 3);
+
+// Google Calendar quick-add link
+const gcalDates = allDay
+  ? `${isoDate(start).replace(/-/g, '')}/${isoDate(new Date((end ?? start).getTime() + 86400000)).replace(/-/g, '')}`
+  : `${start.toISOString().replace(/[-:]|\.\d{3}/g, '')}/${(end ?? new Date(start.getTime() + 2 * 3600000)).toISOString().replace(/[-:]|\.\d{3}/g, '')}`;
+const gcal = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${gcalDates}&location=${encodeURIComponent(venue ?? '')}&details=${encodeURIComponent(new URL(url(`/events/${event.id}/`), Astro.site).href)}`;
+---
+
+<Base title={title} description={`${formatRange(start, end)}${venue ? ` · ${venue}` : ''}`} image={image ? url(image) : undefined} type="article">
+  <article>
+    <header class="page-hero">
+      <div class="container narrow">
+        <a class="back" href={url('/events/')}>← All events</a>
+        <div class="card__meta" style="margin-bottom:.75rem">
+          <span class:list={['pill', { 'pill--red': source === 'england-squash' }]}>{SOURCE_LABEL[source]}</span>
+          <span class="pill pill--muted">{CATEGORY_LABEL[category]}</span>
+          {cancelled && <span class="pill pill--red">Cancelled</span>}
+        </div>
+        <h1>{title}</h1>
+        <p class="lede when">
+          <strong>{formatRange(start, end)}</strong>{!allDay && ` · ${formatTime(start)}`}
+          {venue && <span> · {venue}</span>}
+        </p>
+        <div class="actions">
+          {entryForm && <a class="btn btn--primary btn--sm" href={url(entryForm)}>Entry form</a>}
+          {link && <a class="btn btn--ghost btn--sm" href={link} target="_blank" rel="noopener">More details ↗</a>}
+          <a class="btn btn--ghost btn--sm" href={gcal} target="_blank" rel="noopener">Add to Google Calendar</a>
+        </div>
+      </div>
+    </header>
+
+    <div class="container narrow section">
+      {image && <img class="hero-img" src={url(image)} alt="" style="margin-bottom:2rem" />}
+      <div class="prose">
+        <Content />
+      </div>
+      {
+        clubEntry && (
+          <aside class="venue">
+            <span class="eyebrow">Venue</span>
+            <h3>{clubEntry.data.venue}</h3>
+            <p>
+              {clubEntry.data.address}, {clubEntry.data.postcode}
+            </p>
+            <a href={url(`/clubs/${clubEntry.id}/`)}>Club details &amp; map →</a>
+          </aside>
+        )
+      }
+    </div>
+  </article>
+
+  {
+    others.length > 0 && (
+      <section class="section" style="border-top:1px solid var(--border)">
+        <div class="container">
+          <div class="section-head">
+            <h2>Also coming up</h2>
+            <a href={url('/events/')}>Full calendar →</a>
+          </div>
+          <div class="grid grid--3">
+            {others.map((e) => (
+              <EventCard event={e} compact />
+            ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+</Base>
+
+<style>
+  .back {
+    display: inline-block;
+    margin-bottom: 1rem;
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .back:hover {
+    color: var(--accent);
+  }
+  .when strong {
+    color: var(--accent);
+  }
+  .actions {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-top: 1.25rem;
+  }
+  .hero-img {
+    border-radius: var(--radius);
+    width: 100%;
+  }
+  .venue {
+    margin-top: 2.5rem;
+    padding: 1.25rem 1.5rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .venue h3 {
+    margin-bottom: 0.25rem;
+  }
+  .venue p {
+    color: var(--ink-200);
+    margin-bottom: 0.5rem;
+  }
+</style>

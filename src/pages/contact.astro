@@ -1,0 +1,95 @@
+---
+import Base from '@/layouts/Base.astro';
+import PageHero from '@/components/PageHero.astro';
+import { getCommittee } from '@/lib/content';
+import { SITE, url } from '@/lib/site';
+
+const committee = await getCommittee();
+---
+
+<Base title="Contact" description="Contact the Bedfordshire Squash & Racketball Association — committee, league queries, juniors, county teams and website content.">
+  <PageHero eyebrow="Get in touch" title="Contact" lede="Questions about leagues, tournaments, juniors, county teams — or news and photos for this site. We'd love to hear from you." />
+
+  <section class="section">
+    <div class="container layout">
+      <div class="stack" style="--stack:1.5rem">
+        <div class="card">
+          <div class="card__body">
+            <h3>Email the association</h3>
+            <p><a class="big" href={`mailto:${SITE.email}`}>{SITE.email}</a></p>
+            <p class="muted">For general enquiries, league questions and website content (news, results, photos, events).</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card__body">
+            <h3>Facebook</h3>
+            <p><a href={SITE.facebook} target="_blank" rel="noopener">Beds SRA Facebook group ↗</a></p>
+            <p class="muted">The quickest way to keep up with day-to-day county chatter, last-minute fixture changes and photos.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card__body">
+            <h3>Send us content</h3>
+            <p class="muted">
+              This site is only as good as what's on it. Club news, tournament entry forms, team reports, junior results,
+              photos — send them over and we'll publish them. Events from the
+              <a href={SITE.englandSquashEvents} target="_blank" rel="noopener">England Squash calendar</a> that are relevant to Beds players are welcome too.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h2>Committee</h2>
+        <ul class="people">
+          {
+            committee.map((m) => (
+              <li>
+                <strong>{m.data.name}</strong>
+                <span class="muted">{m.data.role}</span>
+                {m.data.email && <a href={`mailto:${m.data.email}`}>{m.data.email}</a>}
+              </li>
+            ))
+          }
+        </ul>
+        <p class="muted small">
+          Committee roles can be updated in the <a href={url('/admin/')}>CMS</a>. We're always looking for volunteers — see <a href={url('/about/')}>About</a>.
+        </p>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .layout {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 3rem;
+    align-items: start;
+  }
+  .big {
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    font-weight: 700;
+    word-break: break-all;
+  }
+  .people {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1rem;
+  }
+  .people li {
+    display: flex;
+    flex-direction: column;
+    padding: 0.8rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .small {
+    font-size: 0.9rem;
+  }
+  @media (max-width: 900px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

@@ -1,0 +1,133 @@
+---
+import Base from '@/layouts/Base.astro';
+import PageHero from '@/components/PageHero.astro';
+import { getDocuments, getMinutes } from '@/lib/content';
+import { DOC_CATEGORY_LABEL, formatDate, url } from '@/lib/site';
+
+const docs = await getDocuments();
+const minutes = await getMinutes();
+const byCategory = new Map<string, typeof docs>();
+for (const d of docs) byCategory.set(d.data.category, [...(byCategory.get(d.data.category) ?? []), d]);
+const order = ['constitution', 'league-rules', 'safeguarding', 'code-of-conduct', 'forms', 'other'];
+const TYPE_LABEL: Record<string, string> = { agm: 'AGM', committee: 'Committee', egm: 'EGM', other: 'Meeting' };
+---
+
+<Base title="Documents & Minutes" description="Beds SRA meeting minutes, AGM minutes, constitution, league rules, safeguarding policies, codes of conduct and forms.">
+  <PageHero eyebrow="Governance" title="Documents & minutes" lede="Meeting minutes, the county constitution, league rules, safeguarding policies, codes of conduct and forms." />
+
+  <section class="section">
+    <div class="container layout">
+      <div>
+        <div class="section-head"><h2>Meeting minutes</h2></div>
+        {
+          minutes.length > 0 ? (
+            <ul class="doclist">
+              {minutes.map((m) => (
+                <li>
+                  <div>
+                    <span class="pill pill--muted">{TYPE_LABEL[m.data.type]}</span>
+                    <strong>{m.data.title}</strong>
+                    {m.data.summary && <span class="muted"> — {m.data.summary}</span>}
+                    <br />
+                    <time class="muted" datetime={m.data.date.toISOString()}>
+                      {formatDate(m.data.date)}
+                    </time>
+                  </div>
+                  <div class="actions">
+                    {m.body?.trim() && <a class="btn btn--ghost btn--sm" href={url(`/documents/minutes/${m.id}/`)}>Read</a>}
+                    {m.data.file && (
+                      <a class="btn btn--primary btn--sm" href={url(m.data.file)} target="_blank" rel="noopener">
+                        PDF
+                      </a>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p class="notice">No minutes published yet.</p>
+          )
+        }
+      </div>
+
+      <div>
+        {
+          order
+            .filter((c) => byCategory.has(c))
+            .map((c) => (
+              <div class="cat">
+                <h2 class="cat__title">{DOC_CATEGORY_LABEL[c]}</h2>
+                <ul class="doclist doclist--compact">
+                  {byCategory.get(c)!.map((d) => (
+                    <li>
+                      <div>
+                        <strong>
+                          <a href={url(`/documents/${d.id}/`)}>{d.data.title}</a>
+                        </strong>
+                        {d.data.summary && <span class="muted small"> — {d.data.summary}</span>}
+                      </div>
+                      {d.data.file && (
+                        <a class="btn btn--ghost btn--sm" href={url(d.data.file)} target="_blank" rel="noopener">
+                          PDF
+                        </a>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))
+        }
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .layout {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 3rem;
+    align-items: start;
+  }
+  .doclist {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .doclist li {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: center;
+    padding: 0.9rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .doclist .pill {
+    margin-right: 0.5rem;
+  }
+  .doclist--compact li {
+    padding: 0.6rem 0;
+    font-size: 0.95rem;
+  }
+  .actions {
+    display: flex;
+    gap: 0.4rem;
+    flex-shrink: 0;
+  }
+  .cat + .cat {
+    margin-top: 2rem;
+  }
+  .cat__title {
+    font-size: 1.3rem;
+    color: var(--accent);
+    margin-bottom: 0.25rem;
+  }
+  .small {
+    font-size: 0.9rem;
+  }
+  @media (max-width: 900px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

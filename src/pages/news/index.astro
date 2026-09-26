@@ -1,0 +1,74 @@
+---
+import Base from '@/layouts/Base.astro';
+import PageHero from '@/components/PageHero.astro';
+import NewsCard from '@/components/NewsCard.astro';
+import { getNews } from '@/lib/content';
+import { CATEGORY_LABEL } from '@/lib/site';
+
+const posts = await getNews();
+const categories = [...new Set(posts.map((p) => p.data.category))];
+---
+
+<Base title="News" description="News from Bedfordshire Squash — tournaments, leagues, juniors, county teams and England Squash updates.">
+  <PageHero eyebrow="Latest" title="News" lede="Reports, results and announcements from around the county." />
+  <section class="section">
+    <div class="container">
+      {
+        categories.length > 1 && (
+          <div class="filters" role="group" aria-label="Filter by category">
+            <button class="pill is-active" data-filter="all" type="button">All</button>
+            {categories.map((c) => (
+              <button class="pill" data-filter={c} type="button">
+                {CATEGORY_LABEL[c] ?? c}
+              </button>
+            ))}
+          </div>
+        )
+      }
+      <div class="grid grid--3" data-news-grid>
+        {
+          posts.map((p) => (
+            <div data-category={p.data.category}>
+              <NewsCard post={p} />
+            </div>
+          ))
+        }
+      </div>
+      {posts.length === 0 && <p class="notice">No news yet.</p>}
+    </div>
+  </section>
+</Base>
+
+<script>
+  const buttons = document.querySelectorAll<HTMLButtonElement>('[data-filter]');
+  const items = document.querySelectorAll<HTMLElement>('[data-news-grid] > [data-category]');
+  buttons.forEach((b) =>
+    b.addEventListener('click', () => {
+      buttons.forEach((x) => x.classList.toggle('is-active', x === b));
+      const f = b.dataset.filter;
+      items.forEach((it) => (it.hidden = f !== 'all' && it.dataset.category !== f));
+    }),
+  );
+</script>
+
+<style>
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .filters .pill {
+    cursor: pointer;
+    background: transparent;
+    color: var(--ink-200);
+    border-color: var(--border-strong);
+    padding: 0.4rem 0.9rem;
+    font-size: 0.85rem;
+  }
+  .filters .pill.is-active {
+    background: var(--accent);
+    color: var(--ink-950);
+    border-color: var(--accent);
+  }
+</style>

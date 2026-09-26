@@ -1,0 +1,136 @@
+---
+import Base from '@/layouts/Base.astro';
+import PageHero from '@/components/PageHero.astro';
+import EventCard from '@/components/EventCard.astro';
+import { getUpcomingEvents, getPastEvents } from '@/lib/content';
+import { SITE, SOURCE_LABEL, url } from '@/lib/site';
+
+const upcoming = await getUpcomingEvents();
+const past = (await getPastEvents()).slice(0, 12);
+
+// Group upcoming by month
+const byMonth = new Map<string, typeof upcoming>();
+for (const e of upcoming) {
+  const key = new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric' }).format(e.data.start);
+  byMonth.set(key, [...(byMonth.get(key) ?? []), e]);
+}
+const sources = [...new Set(upcoming.map((e) => e.data.source))];
+---
+
+<Base title="Events" description="What's on in Bedfordshire squash: county tournaments, league dates, junior events, county weekends and key England Squash dates.">
+  <PageHero eyebrow="Calendar" title="Events" lede="County tournaments, league dates, juniors, county weekends and key England Squash dates — all in one place.">
+    <div class="hero-actions">
+      <a class="btn btn--primary btn--sm" href={url('/events.ics')}>Subscribe (.ics)</a>
+      <a class="btn btn--ghost btn--sm" href={SITE.englandSquashEvents} target="_blank" rel="noopener">England Squash calendar ↗</a>
+    </div>
+  </PageHero>
+
+  <section class="section">
+    <div class="container">
+      {
+        sources.length > 1 && (
+          <div class="filters" role="group" aria-label="Filter by source">
+            <button class="pill is-active" data-filter="all" type="button">All</button>
+            {sources.map((s) => (
+              <button class="pill" data-filter={s} type="button">
+                {SOURCE_LABEL[s]}
+              </button>
+            ))}
+          </div>
+        )
+      }
+
+      {
+        upcoming.length === 0 && (
+          <p class="notice">
+            No upcoming events listed yet. Committee members can add events in the <a href={url('/admin/')}>CMS</a>.
+          </p>
+        )
+      }
+
+      {
+        [...byMonth.entries()].map(([month, events]) => (
+          <div class="month" data-month>
+            <h2 class="month__title">{month}</h2>
+            <div class="grid grid--2">
+              {events.map((e) => (
+                <div data-source={e.data.source}>
+                  <EventCard event={e} />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  {
+    past.length > 0 && (
+      <section class="section" style="border-top:1px solid var(--border)">
+        <div class="container">
+          <div class="section-head">
+            <h2>Recent events</h2>
+          </div>
+          <div class="grid grid--3">
+            {past.map((e) => (
+              <EventCard event={e} compact />
+            ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+</Base>
+
+<script>
+  const buttons = document.querySelectorAll<HTMLButtonElement>('[data-filter]');
+  const items = document.querySelectorAll<HTMLElement>('[data-source]');
+  const months = document.querySelectorAll<HTMLElement>('[data-month]');
+  buttons.forEach((b) =>
+    b.addEventListener('click', () => {
+      buttons.forEach((x) => x.classList.toggle('is-active', x === b));
+      const f = b.dataset.filter;
+      items.forEach((it) => (it.hidden = f !== 'all' && it.dataset.source !== f));
+      months.forEach((m) => (m.hidden = [...m.querySelectorAll<HTMLElement>('[data-source]')].every((i) => i.hidden)));
+    }),
+  );
+</script>
+
+<style>
+  .hero-actions {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-top: 1.25rem;
+  }
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .filters .pill {
+    cursor: pointer;
+    background: transparent;
+    color: var(--ink-200);
+    border-color: var(--border-strong);
+    padding: 0.4rem 0.9rem;
+    font-size: 0.85rem;
+  }
+  .filters .pill.is-active {
+    background: var(--accent);
+    color: var(--ink-950);
+    border-color: var(--accent);
+  }
+  .month + .month {
+    margin-top: 2.5rem;
+  }
+  .month__title {
+    font-size: 1.4rem;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+  }
+</style>

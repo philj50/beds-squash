@@ -1,0 +1,49 @@
+---
+import Base from '@/layouts/Base.astro';
+import PageHero from '@/components/PageHero.astro';
+import { getGalleries } from '@/lib/content';
+import { formatDate, url } from '@/lib/site';
+
+const galleries = await getGalleries();
+---
+
+<Base title="Gallery" description="Photos from Bedfordshire squash events — County Closed finals, county weekends, junior events and more.">
+  <PageHero eyebrow="Photos" title="Gallery" lede="Pictures from county tournaments, county weekends and junior events." />
+  <section class="section">
+    <div class="container">
+      {
+        galleries.length === 0 ? (
+          <p class="notice">
+            No photo albums yet. Committee members can add one in the <a href={url('/admin/')}>CMS</a> under Galleries.
+          </p>
+        ) : (
+          <div class="grid grid--3">
+            {galleries.map((g) => {
+              const cover = g.data.cover ?? g.data.images[0]?.src;
+              return (
+                <article class="card album">
+                  <a href={url(`/gallery/${g.id}/`)} aria-hidden="true" tabindex="-1">
+                    {cover ? (
+                      <img class="card__img" src={url(cover)} alt="" loading="lazy" decoding="async" />
+                    ) : (
+                      <div class="card__img" />
+                    )}
+                  </a>
+                  <div class="card__body">
+                    <div class="card__meta">
+                      <time datetime={g.data.date.toISOString()}>{formatDate(g.data.date)}</time>
+                      <span>· {g.data.images.length} photos</span>
+                    </div>
+                    <h3 class="card__title">
+                      <a href={url(`/gallery/${g.id}/`)}>{g.data.title}</a>
+                    </h3>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )
+      }
+    </div>
+  </section>
+</Base>

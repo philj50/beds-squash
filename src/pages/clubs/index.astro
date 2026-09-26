@@ -1,0 +1,125 @@
+---
+import Base from '@/layouts/Base.astro';
+import PageHero from '@/components/PageHero.astro';
+import ClubMap from '@/components/ClubMap.astro';
+import { getClubs } from '@/lib/content';
+import { toMapClubs } from '@/lib/geo';
+import { url } from '@/lib/site';
+
+const clubs = await getClubs();
+const mapClubs = await toMapClubs(clubs);
+const leagueClubs = clubs.filter((c) => c.data.leagueClub);
+const venues = clubs.filter((c) => !c.data.leagueClub);
+---
+
+<Base title="Clubs & courts" description="Every squash club and pay-and-play court in Bedfordshire and Milton Keynes, with an interactive map, teams, court counts and contact details.">
+  <PageHero eyebrow="Where to play" title="Clubs & courts" lede="Every club in the Bedfordshire leagues plus pay-and-play courts across the county. Click a marker for details." />
+
+  <section class="section section--tight">
+    <div class="container">
+      <ClubMap clubs={mapClubs} height="560px" />
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="section-head">
+        <h2>League clubs</h2>
+        <span class="muted">{leagueClubs.length} clubs</span>
+      </div>
+      <div class="grid grid--3">
+        {
+          leagueClubs.map((c) => (
+            <article class="card club">
+              {c.data.image ? (
+                <img class="card__img" src={url(c.data.image)} alt="" loading="lazy" decoding="async" />
+              ) : (
+                <div class="club__band">
+                  <span>{c.data.town ?? 'Bedfordshire'}</span>
+                </div>
+              )}
+              <div class="card__body">
+                <h3 class="card__title">
+                  <a href={url(`/clubs/${c.id}/`)}>{c.data.name}</a>
+                </h3>
+                <p class="club__venue">
+                  {c.data.venue}
+                  <br />
+                  <span class="muted">
+                    {c.data.address}, {c.data.postcode}
+                  </span>
+                </p>
+                <div class="card__meta">
+                  {c.data.courts && <span class="pill pill--muted">{c.data.courts} courts</span>}
+                  {c.data.teams.length > 0 && (
+                    <span class="pill">
+                      {c.data.teams.length} team{c.data.teams.length === 1 ? '' : 's'}
+                    </span>
+                  )}
+                  {c.data.tags.includes('juniors') && <span class="pill pill--muted">Juniors</span>}
+                  {c.data.tags.includes('racketball') && <span class="pill pill--muted">Squash 57</span>}
+                </div>
+              </div>
+            </article>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  {
+    venues.length > 0 && (
+      <section class="section" style="border-top:1px solid var(--border)">
+        <div class="container">
+          <div class="section-head">
+            <h2>Pay &amp; play courts</h2>
+          </div>
+          <p class="muted" style="max-width:70ch">
+            Leisure centres with squash courts you can book without membership — ideal for a first hit. No team here yet?
+            Get a few players together and <a href={url('/contact/')}>talk to us</a> about entering the league.
+          </p>
+          <div class="grid grid--3">
+            {venues.map((c) => (
+              <article class="card">
+                <div class="card__body">
+                  <h3 class="card__title">
+                    <a href={url(`/clubs/${c.id}/`)}>{c.data.name}</a>
+                  </h3>
+                  <p class="club__venue muted">
+                    {c.data.address}, {c.data.postcode}
+                  </p>
+                  <div class="card__meta">
+                    {c.data.courts && <span class="pill pill--muted">{c.data.courts} courts</span>}
+                    <span class="pill pill--red">Pay &amp; play</span>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+</Base>
+
+<style>
+  .club__band {
+    height: 88px;
+    display: flex;
+    align-items: flex-end;
+    padding: 0.75rem 1.25rem;
+    background:
+      linear-gradient(135deg, rgba(242, 183, 5, 0.25), rgba(215, 38, 61, 0.15)),
+      repeating-linear-gradient(-55deg, transparent 0 14px, rgba(255, 255, 255, 0.04) 14px 16px);
+    font-family: var(--font-display);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    color: var(--ink-100);
+  }
+  .club__venue {
+    font-size: 0.95rem;
+    margin: 0 0 0.75rem;
+    line-height: 1.45;
+  }
+</style>

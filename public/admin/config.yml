@@ -1,0 +1,326 @@
+# Decap CMS configuration — https://decapcms.org/docs/configuration-options/
+#
+# Editors log in with their GitHub account (they must be collaborators on the repo).
+# Saving in the CMS commits straight to the repo, which triggers the GitHub Pages build.
+#
+# AUTH: the GitHub backend needs a small OAuth relay. See README → "Enable the CMS login".
+# Until that is set up, run `npm run cms` locally and open http://localhost:4321/beds-squash/admin/
+# (local_backend below lets the CMS talk to the local proxy without any login).
+
+backend:
+  name: github
+  repo: philj50/beds-squash
+  branch: main
+  # Uncomment and set once your OAuth relay is deployed (see README):
+  # base_url: https://beds-squash-auth.<your-account>.workers.dev
+  # auth_endpoint: /auth
+  commit_messages:
+    create: 'content: add {{collection}} "{{slug}}"'
+    update: 'content: update {{collection}} "{{slug}}"'
+    delete: 'content: delete {{collection}} "{{slug}}"'
+    uploadMedia: 'media: upload "{{path}}"'
+    deleteMedia: 'media: delete "{{path}}"'
+
+local_backend: true
+
+site_url: https://philj50.github.io/beds-squash
+display_url: https://philj50.github.io/beds-squash
+logo_url: https://philj50.github.io/beds-squash/brand/logo-192.png
+
+# Editorial workflow lets editors save drafts and have a second person approve before publishing.
+# Comment out for direct publishing.
+publish_mode: editorial_workflow
+
+media_folder: public/uploads
+public_folder: /uploads
+
+slug:
+  encoding: unicode
+  clean_accents: true
+  sanitize_replacement: '-'
+
+collections:
+  # ---------------------------------------------------------------- NEWS
+  - name: news
+    label: News
+    label_singular: News post
+    folder: src/content/news
+    create: true
+    slug: '{{year}}-{{month}}-{{day}}-{{slug}}'
+    media_folder: /public/uploads/news
+    public_folder: /uploads/news
+    summary: '{{date | date("DD MMM YYYY")}} — {{title}}'
+    sortable_fields: [date, title]
+    view_filters:
+      - label: Featured
+        field: featured
+        pattern: true
+    fields:
+      - { label: Title, name: title, widget: string }
+      - { label: Date, name: date, widget: datetime, format: 'YYYY-MM-DD', time_format: false, date_format: 'DD/MM/YYYY' }
+      - { label: Summary, name: summary, widget: text, required: false, hint: 'One or two sentences shown on cards and in search results (max 280 characters).' }
+      - label: Category
+        name: category
+        widget: select
+        default: county
+        options:
+          - { label: County, value: county }
+          - { label: Juniors, value: juniors }
+          - { label: Leagues, value: leagues }
+          - { label: Tournaments, value: tournaments }
+          - { label: England Squash, value: england-squash }
+          - { label: Clubs, value: clubs }
+          - { label: Squash 57 / Racketball, value: racketball }
+      - { label: Image, name: image, widget: image, required: false, hint: 'Landscape photos work best (16:9). Keep under ~1MB.' }
+      - { label: Image description, name: imageAlt, widget: string, required: false, hint: 'Describe the photo for screen readers.' }
+      - { label: Featured on home page, name: featured, widget: boolean, default: false }
+      - { label: Draft (hide from site), name: draft, widget: boolean, default: false }
+      - { label: Body, name: body, widget: markdown }
+
+  # ---------------------------------------------------------------- EVENTS
+  - name: events
+    label: Events
+    label_singular: Event
+    folder: src/content/events
+    create: true
+    slug: '{{start | date("YYYY-MM")}}-{{slug}}'
+    media_folder: /public/uploads/events
+    public_folder: /uploads/events
+    summary: '{{start | date("DD MMM YYYY")}} — {{title}}'
+    sortable_fields: [start, title]
+    view_groups:
+      - label: Source
+        field: source
+    fields:
+      - { label: Title, name: title, widget: string }
+      - { label: Start, name: start, widget: datetime, format: 'YYYY-MM-DD', time_format: false, date_format: 'DD/MM/YYYY', hint: 'For timed events, untick "All day" and use the time field below.' }
+      - { label: End (optional), name: end, widget: datetime, format: 'YYYY-MM-DD', time_format: false, date_format: 'DD/MM/YYYY', required: false }
+      - { label: All day, name: allDay, widget: boolean, default: true }
+      - { label: Venue, name: venue, widget: string, required: false, hint: 'e.g. Club Towers, Bedford' }
+      - label: Club (link to club page)
+        name: club
+        widget: relation
+        collection: clubs
+        search_fields: [name, venue, town]
+        value_field: '{{slug}}'
+        display_fields: [name]
+        required: false
+      - label: Source
+        name: source
+        widget: select
+        default: county
+        options:
+          - { label: Beds SRA (county), value: county }
+          - { label: Club event, value: club }
+          - { label: England Squash, value: england-squash }
+          - { label: Inter-County, value: inter-county }
+      - label: Category
+        name: category
+        widget: select
+        default: other
+        options:
+          - { label: Tournament, value: tournament }
+          - { label: League, value: league }
+          - { label: Juniors, value: juniors }
+          - { label: Masters, value: masters }
+          - { label: Meeting / AGM, value: meeting }
+          - { label: Coaching, value: coaching }
+          - { label: Social, value: social }
+          - { label: Squash 57 / Racketball, value: racketball }
+          - { label: Other, value: other }
+      - { label: External link, name: link, widget: string, required: false, hint: 'e.g. the England Squash event page or club tournament page.' }
+      - { label: Entry form (PDF), name: entryForm, widget: file, required: false, media_folder: /public/uploads/documents, public_folder: /uploads/documents }
+      - { label: Image, name: image, widget: image, required: false }
+      - { label: Cancelled, name: cancelled, widget: boolean, default: false }
+      - { label: Draft (hide from site), name: draft, widget: boolean, default: false }
+      - { label: Details, name: body, widget: markdown, required: false }
+
+  # ---------------------------------------------------------------- CLUBS
+  - name: clubs
+    label: Clubs & venues
+    label_singular: Club
+    folder: src/content/clubs
+    create: true
+    slug: '{{slug}}'
+    media_folder: /public/uploads/clubs
+    public_folder: /uploads/clubs
+    identifier_field: name
+    summary: '{{name}} — {{venue}}'
+    sortable_fields: [order, name, town]
+    fields:
+      - { label: Club name, name: name, widget: string }
+      - { label: Venue, name: venue, widget: string, hint: 'Name of the building / centre' }
+      - { label: Address, name: address, widget: string, hint: 'Street and town, without the postcode' }
+      - { label: Postcode, name: postcode, widget: string, hint: 'Used to place the marker on the map if latitude/longitude are left blank.' }
+      - { label: Town, name: town, widget: string, required: false }
+      - { label: Latitude, name: lat, widget: number, value_type: float, required: false, hint: 'Optional. Right-click on Google Maps → copy the first number.' }
+      - { label: Longitude, name: lng, widget: number, value_type: float, required: false, hint: 'Optional. Second number from Google Maps.' }
+      - { label: Number of courts, name: courts, widget: number, value_type: int, required: false, min: 0 }
+      - { label: Website, name: website, widget: string, required: false }
+      - { label: Online booking link, name: bookingUrl, widget: string, required: false }
+      - { label: Phone, name: phone, widget: string, required: false }
+      - { label: Email, name: email, widget: string, required: false }
+      - { label: Facebook page, name: facebook, widget: string, required: false }
+      - { label: League teams, name: teams, widget: list, required: false, hint: 'One per line, e.g. "Club Towers 1 (Division 1)"', field: { label: Team, name: team, widget: string } }
+      - label: Tags
+        name: tags
+        widget: select
+        multiple: true
+        required: false
+        options:
+          - { label: Squash, value: squash }
+          - { label: Squash 57 / Racketball, value: racketball }
+          - { label: Juniors, value: juniors }
+          - { label: Coaching, value: coaching }
+          - { label: Pay & play, value: pay-and-play }
+          - { label: Members club, value: members-club }
+          - { label: Leisure centre, value: leisure-centre }
+      - { label: Photo, name: image, widget: image, required: false }
+      - { label: Plays in the Bedfordshire league, name: leagueClub, widget: boolean, default: true, hint: 'Untick for pay-and-play venues with no league team.' }
+      - { label: Sort order, name: order, widget: number, value_type: int, default: 100, hint: 'Lower numbers appear first.' }
+      - { label: Description, name: body, widget: markdown, required: false }
+
+  # ---------------------------------------------------------------- MINUTES
+  - name: minutes
+    label: Meeting minutes
+    label_singular: Minutes
+    folder: src/content/minutes
+    create: true
+    slug: '{{date | date("YYYY-MM-DD")}}-{{type}}'
+    media_folder: /public/uploads/minutes
+    public_folder: /uploads/minutes
+    summary: '{{date | date("DD MMM YYYY")}} — {{title}}'
+    sortable_fields: [date]
+    fields:
+      - { label: Title, name: title, widget: string, hint: 'e.g. "AGM – 12 November 2026"' }
+      - { label: Meeting date, name: date, widget: datetime, format: 'YYYY-MM-DD', time_format: false, date_format: 'DD/MM/YYYY' }
+      - label: Type
+        name: type
+        widget: select
+        default: committee
+        options:
+          - { label: AGM, value: agm }
+          - { label: Committee meeting, value: committee }
+          - { label: EGM, value: egm }
+          - { label: Other, value: other }
+      - { label: PDF file, name: file, widget: file, required: false }
+      - { label: Summary, name: summary, widget: string, required: false }
+      - { label: Minutes text (optional, instead of or as well as the PDF), name: body, widget: markdown, required: false }
+
+  # ---------------------------------------------------------------- DOCUMENTS
+  - name: documents
+    label: Documents & policies
+    label_singular: Document
+    folder: src/content/documents
+    create: true
+    slug: '{{slug}}'
+    media_folder: /public/uploads/documents
+    public_folder: /uploads/documents
+    summary: '{{title}}'
+    sortable_fields: [order, title]
+    fields:
+      - { label: Title, name: title, widget: string }
+      - label: Category
+        name: category
+        widget: select
+        options:
+          - { label: Constitution, value: constitution }
+          - { label: Safeguarding, value: safeguarding }
+          - { label: Code of conduct, value: code-of-conduct }
+          - { label: League rules, value: league-rules }
+          - { label: Forms, value: forms }
+          - { label: Other, value: other }
+      - { label: PDF file, name: file, widget: file, required: false }
+      - { label: Last updated, name: updated, widget: datetime, format: 'YYYY-MM-DD', time_format: false, date_format: 'DD/MM/YYYY', required: false }
+      - { label: Summary, name: summary, widget: string, required: false }
+      - { label: Sort order, name: order, widget: number, value_type: int, default: 100 }
+      - { label: 'Text (optional, shown on the page)', name: body, widget: markdown, required: false }
+
+  # ---------------------------------------------------------------- GALLERIES
+  - name: galleries
+    label: Photo galleries
+    label_singular: Gallery
+    folder: src/content/galleries
+    create: true
+    slug: '{{date | date("YYYY-MM")}}-{{slug}}'
+    media_folder: /public/uploads/gallery
+    public_folder: /uploads/gallery
+    summary: '{{date | date("DD MMM YYYY")}} — {{title}}'
+    sortable_fields: [date, title]
+    fields:
+      - { label: Title, name: title, widget: string }
+      - { label: Date, name: date, widget: datetime, format: 'YYYY-MM-DD', time_format: false, date_format: 'DD/MM/YYYY' }
+      - { label: Cover image, name: cover, widget: image, required: false, hint: 'If blank, the first photo is used.' }
+      - { label: Photo credit, name: credit, widget: string, required: false }
+      - label: Photos
+        name: images
+        widget: list
+        summary: '{{fields.caption}}'
+        fields:
+          - { label: Photo, name: src, widget: image }
+          - { label: Description (for screen readers), name: alt, widget: string, default: '' }
+          - { label: Caption, name: caption, widget: string, required: false }
+      - { label: Intro text, name: body, widget: markdown, required: false }
+
+  # ---------------------------------------------------------------- HONOURS
+  - name: honours
+    label: Honours board
+    label_singular: Honours entry
+    folder: src/content/honours
+    create: true
+    slug: '{{event}}-{{year}}'
+    media_folder: /public/uploads/documents
+    public_folder: /uploads/documents
+    identifier_field: event
+    summary: '{{event}} {{year}}'
+    sortable_fields: [year, event]
+    fields:
+      - { label: Event, name: event, widget: string, default: 'Beds Closed', hint: 'e.g. Beds Closed, League Cup, Over 50s Cup, Junior Open' }
+      - { label: Year, name: year, widget: number, value_type: int }
+      - label: Results
+        name: results
+        widget: list
+        summary: '{{fields.category}}: {{fields.winner}}'
+        fields:
+          - { label: Category, name: category, widget: string, hint: 'e.g. Open A Grade, Ladies, O45' }
+          - { label: Winner, name: winner, widget: string }
+          - { label: Runner-up, name: runnerUp, widget: string, required: false }
+          - { label: Score, name: score, widget: string, required: false }
+      - { label: Full results / report (PDF), name: report, widget: file, required: false }
+      - { label: Notes, name: body, widget: markdown, required: false }
+
+  # ---------------------------------------------------------------- COMMITTEE
+  - name: committee
+    label: Committee
+    label_singular: Committee member
+    folder: src/content/committee
+    create: true
+    slug: '{{slug}}'
+    media_folder: /public/uploads/committee
+    public_folder: /uploads/committee
+    identifier_field: name
+    summary: '{{role}} — {{name}}'
+    sortable_fields: [order, name]
+    fields:
+      - { label: Name, name: name, widget: string }
+      - { label: Role, name: role, widget: string, hint: 'e.g. Chairman, Secretary, Treasurer, Junior Development' }
+      - { label: Public email, name: email, widget: string, required: false, hint: 'Only add an address that is fine to publish.' }
+      - { label: Photo, name: photo, widget: image, required: false }
+      - { label: Sort order, name: order, widget: number, value_type: int, default: 100 }
+
+  # ---------------------------------------------------------------- PAGES
+  - name: pages
+    label: Pages
+    label_singular: Page
+    folder: src/content/pages
+    create: false
+    delete: false
+    slug: '{{slug}}'
+    media_folder: /public/uploads/pages
+    public_folder: /uploads/pages
+    summary: '{{title}}'
+    fields:
+      - { label: Title, name: title, widget: string }
+      - { label: Intro, name: intro, widget: text, required: false, hint: 'Shown under the page heading.' }
+      - { label: Last updated, name: updated, widget: datetime, format: 'YYYY-MM-DD', time_format: false, date_format: 'DD/MM/YYYY', required: false }
+      - { label: Body, name: body, widget: markdown }

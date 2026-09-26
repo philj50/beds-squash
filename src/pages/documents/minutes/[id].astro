@@ -1,0 +1,40 @@
+---
+import { render } from 'astro:content';
+import Base from '@/layouts/Base.astro';
+import PageHero from '@/components/PageHero.astro';
+import { getMinutes } from '@/lib/content';
+import { formatDate, url } from '@/lib/site';
+
+export async function getStaticPaths() {
+  const minutes = await getMinutes();
+  return minutes.map((m) => ({ params: { id: m.id }, props: { m } }));
+}
+
+const { m } = Astro.props;
+const { Content } = await render(m);
+const TYPE_LABEL: Record<string, string> = { agm: 'AGM minutes', committee: 'Committee minutes', egm: 'EGM minutes', other: 'Minutes' };
+---
+
+<Base title={m.data.title} description={m.data.summary ?? `${m.data.title} — ${TYPE_LABEL[m.data.type]}`} noindex>
+  <PageHero eyebrow={TYPE_LABEL[m.data.type]} title={m.data.title} lede={m.data.summary}>
+    <p class="muted" style="margin-top:.5rem">{formatDate(m.data.date)}</p>
+    <div class="actions">
+      {m.data.file && <a class="btn btn--primary" href={url(m.data.file)} target="_blank" rel="noopener">Download PDF</a>}
+      <a class="btn btn--ghost" href={url('/documents/')}>All minutes</a>
+    </div>
+  </PageHero>
+  <section class="section">
+    <div class="container narrow prose">
+      {m.body?.trim() ? <Content /> : <p class="notice">These minutes are available as a PDF download above.</p>}
+    </div>
+  </section>
+</Base>
+
+<style>
+  .actions {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+  }
+</style>

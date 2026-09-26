@@ -1,0 +1,36 @@
+---
+import Base from '@/layouts/Base.astro';
+import { url } from '@/lib/site';
+---
+
+<Base title="Page not found" noindex>
+  <section class="section">
+    <div class="container narrow nf">
+      <span class="eyebrow">Stroke to your opponent</span>
+      <h1>404 — Out of court</h1>
+      <p class="lede">That page doesn't exist, or it moved when we rebuilt the site.</p>
+      <div class="actions">
+        <a class="btn btn--primary" href={url('/')}>Back to the home page</a>
+        <a class="btn btn--ghost" href={url('/clubs/')}>Find a club</a>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .nf {
+    padding: 4rem 0;
+    text-align: center;
+  }
+  .nf .lede {
+    color: var(--ink-200);
+    font-size: 1.2rem;
+  }
+  .actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 1.5rem;
+  }
+</style>

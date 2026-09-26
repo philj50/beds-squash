@@ -1,0 +1,8 @@
+# Normalise line endings so the site builds identically on Windows and Linux CI
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.pdf binary
+*.ico binary

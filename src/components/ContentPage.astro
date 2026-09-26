@@ -1,0 +1,51 @@
+---
+/** Renders an entry from the `pages` collection with a hero and prose body. */
+import { getEntry, render } from 'astro:content';
+import PageHero from '@/components/PageHero.astro';
+import { formatDate } from '@/lib/site';
+
+interface Props {
+  id: string;
+  eyebrow?: string;
+  fallbackTitle: string;
+}
+const { id, eyebrow, fallbackTitle } = Astro.props;
+const page = await getEntry('pages', id);
+const Content = page ? (await render(page)).Content : null;
+---
+
+<PageHero eyebrow={eyebrow} title={page?.data.title ?? fallbackTitle} lede={page?.data.intro}>
+  <slot name="hero" />
+</PageHero>
+<section class="section">
+  <div class="container layout">
+    <div class="prose">
+      {Content ? <Content /> : <p class="notice">This page hasn't been written yet. Add it in the CMS under Pages.</p>}
+      {page?.data.updated && <p class="muted small">Last updated {formatDate(page.data.updated)}</p>}
+    </div>
+    <aside class="side">
+      <slot name="aside" />
+    </aside>
+  </div>
+</section>
+
+<style>
+  .layout {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 2.5rem;
+    align-items: start;
+  }
+  .layout:has(.side:empty) {
+    grid-template-columns: minmax(0, 800px);
+  }
+  .small {
+    font-size: 0.85rem;
+    margin-top: 2rem;
+  }
+  @media (max-width: 900px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

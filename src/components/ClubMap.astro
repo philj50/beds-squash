@@ -1,0 +1,218 @@
+---
+/**
+ * Interactive map of clubs/venues using Leaflet + OpenStreetMap tiles (no API key needed).
+ * Pass `clubs` with lat/lng already resolved (see src/lib/geo.ts).
+ */
+import { url } from '@/lib/site';
+
+export interface MapClub {
+  id: string;
+  name: string;
+  venue: string;
+  town?: string;
+  postcode: string;
+  lat: number;
+  lng: number;
+  courts?: number;
+  leagueClub: boolean;
+}
+
+interface Props {
+  clubs: MapClub[];
+  height?: string;
+  focus?: string; // club id to centre on
+}
+const { clubs, height = '520px', focus } = Astro.props;
+const payload = clubs.map((c) => ({ ...c, href: url(`/clubs/${c.id}/`) }));
+---
+
+<div class="club-map" style={`--h:${height}`}>
+  <div class="club-map__canvas" data-club-map data-focus={focus ?? ''}></div>
+  <script type="application/json" data-clubs set:html={JSON.stringify(payload)} />
+  <div class="club-map__legend">
+    <span><i class="dot dot--league"></i> League club</span>
+    <span><i class="dot dot--venue"></i> Pay &amp; play courts</span>
+  </div>
+</div>
+
+<script>
+  import L from 'leaflet';
+  import 'leaflet/dist/leaflet.css';
+
+  type Club = {
+    id: string;
+    name: string;
+    venue: string;
+    town?: string;
+    postcode: string;
+    lat: number;
+    lng: number;
+    courts?: number;
+    leagueClub: boolean;
+    href: string;
+  };
+
+  const init = () => {
+    document.querySelectorAll<HTMLElement>('[data-club-map]').forEach((el) => {
+      if (el.dataset.ready) return;
+      el.dataset.ready = '1';
+      const json = el.parentElement?.querySelector('[data-clubs]')?.textContent ?? '[]';
+      const clubs: Club[] = JSON.parse(json);
+      const focusId = el.dataset.focus;
+
+      const map = L.map(el, { scrollWheelZoom: false, zoomControl: true });
+      // Standard OSM tiles (no API key). A CSS filter on `.club-map .leaflet-tile-pane`
+      // turns them into a dark basemap that matches the site theme.
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19,
+        className: 'osm-dark',
+      }).addTo(map);
+
+      const icon = (league: boolean) =>
+        L.divIcon({
+          className: '',
+          html: `<span class="pin ${league ? 'pin--league' : 'pin--venue'}"></span>`,
+          iconSize: [22, 22],
+          iconAnchor: [11, 11],
+          popupAnchor: [0, -12],
+        });
+
+      const bounds = L.latLngBounds([]);
+      clubs.forEach((c) => {
+        const m = L.marker([c.lat, c.lng], { icon: icon(c.leagueClub), title: c.name }).addTo(map);
+        m.bindPopup(
+          `<strong>${c.name}</strong><br>${c.venue}${c.town ? `, ${c.town}` : ''} ${c.postcode}` +
+            (c.courts ? `<br>${c.courts} court${c.courts === 1 ? '' : 's'}` : '') +
+            `<br><a href="${c.href}">Club details →</a>`,
+        );
+        bounds.extend([c.lat, c.lng]);
+        if (focusId && c.id === focusId) {
+          setTimeout(() => m.openPopup(), 300);
+        }
+      });
+
+      if (focusId) {
+        const c = clubs.find((x) => x.id === focusId);
+        if (c) map.setView([c.lat, c.lng], 14);
+        else if (bounds.isValid()) map.fitBounds(bounds, { padding: [40, 40] });
+      } else if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [40, 40] });
+      } else {
+        map.setView([52.05, -0.5], 10);
+      }
+
+      // Enable scroll zoom once the user has clicked on the map
+      map.once('click', () => map.scrollWheelZoom.enable());
+    });
+  };
+
+  init();
+  document.addEventListener('astro:page-load', init);
+</script>
+
+<style is:global>
+  .club-map {
+    position: relative;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid var(--border-strong);
+    background: var(--ink-800);
+  }
+  .club-map__canvas {
+    height: var(--h);
+    width: 100%;
+    background: var(--ink-800);
+    z-index: 0;
+  }
+  /* Dark-mode treatment for standard OSM raster tiles */
+  .club-map .osm-dark {
+    filter: invert(1) hue-rotate(190deg) brightness(0.8) contrast(0.95) saturate(0.55);
+  }
+  .club-map__legend {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    z-index: 500;
+    display: flex;
+    gap: 1rem;
+    background: rgba(15, 17, 21, 0.85);
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    padding: 0.4rem 0.9rem;
+    font-size: 0.8rem;
+    color: var(--ink-100);
+    backdrop-filter: blur(6px);
+  }
+  .club-map__legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .dot--league,
+  .pin--league {
+    background: var(--gold-500);
+    box-shadow: 0 0 0 3px rgba(242, 183, 5, 0.3);
+  }
+  .dot--venue,
+  .pin--venue {
+    background: var(--red-500);
+    box-shadow: 0 0 0 3px rgba(215, 38, 61, 0.3);
+  }
+  .pin {
+    display: block;
+    width: 18px;
+    height: 18px;
+    margin: 2px;
+    border-radius: 50%;
+    border: 2px solid var(--ink-950);
+    transition: transform 0.15s ease;
+  }
+  .leaflet-marker-icon:hover .pin {
+    transform: scale(1.25);
+  }
+  .leaflet-container {
+    font-family: var(--font-body);
+  }
+  .leaflet-popup-content-wrapper,
+  .leaflet-popup-tip {
+    background: var(--ink-800);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+    box-shadow: var(--shadow);
+  }
+  .leaflet-popup-content {
+    margin: 0.85rem 1rem;
+    line-height: 1.5;
+    font-size: 0.9rem;
+  }
+  .leaflet-popup-content a {
+    color: var(--gold-400);
+    font-weight: 600;
+  }
+  .leaflet-container a.leaflet-popup-close-button {
+    color: var(--ink-300);
+  }
+  .leaflet-bar a {
+    background: var(--ink-800);
+    color: var(--text);
+    border-bottom-color: var(--border-strong);
+  }
+  .leaflet-bar a:hover {
+    background: var(--ink-700);
+  }
+  .leaflet-control-attribution {
+    background: rgba(15, 17, 21, 0.75) !important;
+    color: var(--ink-300) !important;
+    font-size: 10px;
+  }
+  .leaflet-control-attribution a {
+    color: var(--ink-200) !important;
+  }
+</style>

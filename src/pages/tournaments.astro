@@ -1,0 +1,196 @@
+---
+import { render } from 'astro:content';
+import Base from '@/layouts/Base.astro';
+import PageHero from '@/components/PageHero.astro';
+import EventCard from '@/components/EventCard.astro';
+import { getHonours, getUpcomingEvents } from '@/lib/content';
+import { url } from '@/lib/site';
+
+const tournaments = (await getUpcomingEvents()).filter((e) => ['tournament', 'masters', 'juniors'].includes(e.data.category));
+const honoursRaw = await getHonours();
+const honours = await Promise.all(
+  honoursRaw.map(async (h) => ({ ...h, Note: h.body?.trim() ? (await render(h)).Content : null })),
+);
+const byEvent = new Map<string, typeof honours>();
+for (const h of honours) byEvent.set(h.data.event, [...(byEvent.get(h.data.event) ?? []), h]);
+---
+
+<Base title="Tournaments & Honours" description="Bedfordshire County Closed Championships, League Cup and other county tournaments, plus the honours board of past champions.">
+  <PageHero eyebrow="Compete" title="Tournaments" lede="The County Closed, League Cup, Over 50s Cup and junior opens — plus the honours board of past champions." />
+
+  <section class="section">
+    <div class="container">
+      <div class="section-head">
+        <h2>Upcoming tournaments</h2>
+        <a href={url('/events/')}>All events →</a>
+      </div>
+      {
+        tournaments.length > 0 ? (
+          <div class="grid grid--2">
+            {tournaments.map((e) => (
+              <EventCard event={e} />
+            ))}
+          </div>
+        ) : (
+          <p class="notice">No tournaments scheduled yet — check back soon.</p>
+        )
+      }
+    </div>
+  </section>
+
+  <section class="section" style="border-top:1px solid var(--border)">
+    <div class="container">
+      <div class="grid grid--3 comps">
+        <div class="card"><div class="card__body">
+          <span class="eyebrow">January</span>
+          <h3>County Closed</h3>
+          <p class="muted">The county championships: Open A/B/C grades, Ladies grades, Over 55s and plates. Open to anyone who lives, works or plays in Bedfordshire.</p>
+        </div></div>
+        <div class="card"><div class="card__body">
+          <span class="eyebrow">Winter season</span>
+          <h3>League Cup</h3>
+          <p class="muted">Knockout cup for all league teams, run alongside the Winter League with the final in spring. Draws on League Master.</p>
+        </div></div>
+        <div class="card"><div class="card__body">
+          <span class="eyebrow">Masters</span>
+          <h3>Over 50s Cup</h3>
+          <p class="muted">A team competition for the county's masters players. Contact the committee if your club would like to enter.</p>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="honours" style="border-top:1px solid var(--border)">
+    <div class="container">
+      <div class="section-head">
+        <h2>Honours board</h2>
+      </div>
+      {
+        honours.length === 0 && (
+          <p class="notice">Past champions will be listed here.</p>
+        )
+      }
+      {
+        [...byEvent.entries()].map(([event, years]) => (
+          <div class="honours">
+            <h3 class="honours__event">{event}</h3>
+            <div class="honours__years">
+              {years.map((h) => (
+                <details class="year" open={h === years[0]}>
+                  <summary>
+                    <span class="year__num">{h.data.year}</span>
+                    <span class="muted">
+                      {h.data.results.length} result{h.data.results.length === 1 ? '' : 's'}
+                    </span>
+                  </summary>
+                  {h.Note && (
+                    <div class="prose year__note">
+                      <h.Note />
+                    </div>
+                  )}
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Category</th>
+                        <th>Winner</th>
+                        <th>Runner-up</th>
+                        <th>Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {h.data.results.map((r) => (
+                        <tr>
+                          <td>{r.category}</td>
+                          <td class="winner">{r.winner}</td>
+                          <td>{r.runnerUp ?? '—'}</td>
+                          <td class="muted">{r.score ?? ''}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {h.data.report && (
+                    <a href={url(h.data.report)}>Full report / results (PDF)</a>
+                  )}
+                </details>
+              ))}
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+</Base>
+
+<style>
+  .comps h3 {
+    margin-bottom: 0.4rem;
+  }
+  .honours + .honours {
+    margin-top: 2.5rem;
+  }
+  .honours__event {
+    color: var(--accent);
+  }
+  .year {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-card);
+    margin-bottom: 0.75rem;
+  }
+  .year summary {
+    cursor: pointer;
+    padding: 0.9rem 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    list-style: none;
+  }
+  .year summary::-webkit-details-marker {
+    display: none;
+  }
+  .year__num {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 800;
+  }
+  .year__note {
+    padding: 0 1.25rem;
+    font-size: 0.95rem;
+    color: var(--text-muted);
+  }
+  .year__note :global(p) {
+    margin-bottom: 0.75rem;
+  }
+  .year table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+  }
+  .year th,
+  .year td {
+    padding: 0.6rem 1.25rem;
+    text-align: left;
+    border-top: 1px solid var(--border);
+  }
+  .year th {
+    font-family: var(--font-display);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+  .winner {
+    font-weight: 600;
+    color: var(--gold-400);
+  }
+  .year > a {
+    display: inline-block;
+    margin: 0.75rem 1.25rem 1rem;
+  }
+  @media (max-width: 640px) {
+    .year th:nth-child(4),
+    .year td:nth-child(4) {
+      display: none;
+    }
+  }
+</style>

@@ -1,0 +1,40 @@
+---
+import Base from '@/layouts/Base.astro';
+import ContentPage from '@/components/ContentPage.astro';
+import EventCard from '@/components/EventCard.astro';
+import { getNews, getUpcomingEvents } from '@/lib/content';
+import { url } from '@/lib/site';
+
+const weekends = (await getUpcomingEvents()).filter((e) => e.data.source === 'inter-county' || e.data.category === 'masters').slice(0, 4);
+const reports = (await getNews()).filter((n) => n.data.category === 'county').slice(0, 4);
+---
+
+<Base title="County Teams" description="Bedfordshire county squash teams — seniors and masters in the England Squash Inter-County Championships, county weekends and reports.">
+  <ContentPage id="county-teams" eyebrow="Represent Beds" fallbackTitle="County Teams">
+    <div slot="aside" class="stack">
+      <div class="card"><div class="card__body">
+        <h3>County weekends</h3>
+        {weekends.length > 0 ? <div class="stack" style="--stack:.75rem">{weekends.map((e) => <EventCard event={e} compact />)}</div> : <p class="muted">Dates for the next county weekends will appear here.</p>}
+      </div></div>
+      <div class="card"><div class="card__body">
+        <h3>Reports</h3>
+        {reports.length > 0 ? <ul class="links">{reports.map((r) => <li><a href={url(`/news/${r.id}/`)}>{r.data.title}</a></li>)}</ul> : <p class="muted">No reports yet.</p>}
+      </div></div>
+    </div>
+  </ContentPage>
+</Base>
+
+<style>
+  .links {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .links li {
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .links li:last-child {
+    border-bottom: 0;
+  }
+</style>

@@ -1,0 +1,387 @@
+---
+import Base from '@/layouts/Base.astro';
+import NewsCard from '@/components/NewsCard.astro';
+import EventCard from '@/components/EventCard.astro';
+import ClubMap from '@/components/ClubMap.astro';
+import { getNews, getUpcomingEvents, getClubs } from '@/lib/content';
+import { toMapClubs } from '@/lib/geo';
+import { SITE, url } from '@/lib/site';
+
+const news = await getNews();
+const featured = news.find((p) => p.data.featured) ?? news[0];
+const latest = news.filter((p) => p.id !== featured?.id).slice(0, 3);
+const upcoming = (await getUpcomingEvents()).slice(0, 4);
+const clubs = await getClubs();
+const mapClubs = await toMapClubs(clubs);
+const leagueClubs = clubs.filter((c) => c.data.leagueClub);
+const totalCourts = clubs.reduce((n, c) => n + (c.data.courts ?? 0), 0);
+const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
+---
+
+<Base>
+  <!-- HERO -->
+  <section class="hero">
+    <div class="container hero__inner">
+      <div class="hero__copy">
+        <span class="eyebrow">Bedfordshire Squash &amp; Racketball Association</span>
+        <h1>
+          Squash in <span class="hl">Bedfordshire</span>.<br />
+          Find a court. Join a team. Play.
+        </h1>
+        <p class="lede">
+          The county home of squash and Squash 57 — leagues, tournaments, juniors, county teams and every club and
+          court from Luton to Bedford.
+        </p>
+        <div class="hero__cta">
+          <a class="btn btn--primary" href={url('/clubs/')}>Find a club near you</a>
+          <a class="btn btn--ghost" href={url('/events/')}>What's on</a>
+        </div>
+        <ul class="stats" aria-label="County at a glance">
+          <li><strong>{leagueClubs.length}</strong><span>league clubs</span></li>
+          <li><strong>{totalTeams}</strong><span>league teams</span></li>
+          <li><strong>{totalCourts}+</strong><span>courts</span></li>
+          <li><strong>2</strong><span>divisions</span></li>
+        </ul>
+      </div>
+      <div class="hero__art" aria-hidden="true">
+        <img src={url('/brand/logo.png')} alt="" width="420" height="420" fetchpriority="high" />
+        <div class="hero__streak hero__streak--gold"></div>
+        <div class="hero__streak hero__streak--red"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- QUICK LINKS -->
+  <section class="section section--tight">
+    <div class="container quick">
+      <a href={SITE.leagueMaster} target="_blank" rel="noopener" class="quick__item">
+        <span class="quick__icon">🏆</span>
+        <span><strong>League tables</strong><small>Fixtures &amp; results on League Master ↗</small></span>
+      </a>
+      <a href={url('/tournaments/')} class="quick__item">
+        <span class="quick__icon">🎯</span>
+        <span><strong>County Closed</strong><small>Entry, draws &amp; honours board</small></span>
+      </a>
+      <a href={url('/juniors/')} class="quick__item">
+        <span class="quick__icon">⚡</span>
+        <span><strong>Juniors</strong><small>County squad, ladder &amp; coaching</small></span>
+      </a>
+      <a href={url('/documents/')} class="quick__item">
+        <span class="quick__icon">📄</span>
+        <span><strong>Minutes &amp; policies</strong><small>AGM minutes, constitution, safeguarding</small></span>
+      </a>
+    </div>
+  </section>
+
+  <!-- NEWS -->
+  {
+    featured && (
+      <section class="section">
+        <div class="container">
+          <div class="section-head">
+            <h2>Latest news</h2>
+            <a href={url('/news/')}>All news →</a>
+          </div>
+          <div class="stack" style="--stack: 1.25rem">
+            <NewsCard post={featured} large />
+            {latest.length > 0 && (
+              <div class="grid grid--3">
+                {latest.map((p) => (
+                  <NewsCard post={p} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  <!-- EVENTS -->
+  <section class="section events-band">
+    <div class="container">
+      <div class="section-head">
+        <h2>Coming up</h2>
+        <a href={url('/events/')}>Full calendar →</a>
+      </div>
+      {
+        upcoming.length > 0 ? (
+          <div class="grid grid--2">
+            {upcoming.map((e) => (
+              <EventCard event={e} />
+            ))}
+          </div>
+        ) : (
+          <p class="notice">No upcoming events listed yet. Check back soon or see the England Squash calendar.</p>
+        )
+      }
+      <p class="muted small">
+        Includes county events, club tournaments and key <a href={SITE.englandSquashEvents} target="_blank" rel="noopener">England Squash</a> dates.
+        <a href={url('/events.ics')}>Subscribe to the calendar</a>.
+      </p>
+    </div>
+  </section>
+
+  <!-- MAP -->
+  <section class="section">
+    <div class="container">
+      <div class="section-head">
+        <h2>Clubs &amp; courts</h2>
+        <a href={url('/clubs/')}>All clubs →</a>
+      </div>
+      <ClubMap clubs={mapClubs} height="460px" />
+      <div class="club-chips">
+        {
+          leagueClubs.map((c) => (
+            <a class="chip" href={url(`/clubs/${c.id}/`)}>
+              {c.data.name}
+              {c.data.town && <small>{c.data.town}</small>}
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="section">
+    <div class="container cta">
+      <div>
+        <span class="eyebrow">Get involved</span>
+        <h2>New to squash? Returning after a break?</h2>
+        <p>
+          Every club in the county welcomes new players, and most teams are looking for members. Pay-and-play courts
+          are available across Bedford, Luton, Biggleswade, Flitwick and Leighton Buzzard.
+        </p>
+      </div>
+      <div class="cta__actions">
+        <a class="btn btn--primary" href={url('/clubs/')}>Find your nearest court</a>
+        <a class="btn btn--ghost" href={url('/contact/')}>Contact the committee</a>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .hero {
+    position: relative;
+    overflow: hidden;
+    border-bottom: 1px solid var(--border);
+    background:
+      radial-gradient(900px 500px at 85% 20%, rgba(242, 183, 5, 0.12), transparent 60%),
+      repeating-linear-gradient(-55deg, transparent 0 38px, rgba(255, 255, 255, 0.02) 38px 40px);
+  }
+  .hero__inner {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    align-items: center;
+    gap: 2rem;
+    padding: clamp(3rem, 8vw, 6rem) 0 clamp(2.5rem, 6vw, 4.5rem);
+  }
+  .hero h1 {
+    margin-bottom: 1rem;
+  }
+  .hl {
+    color: var(--accent);
+  }
+  .lede {
+    font-size: clamp(1.05rem, 1.6vw, 1.3rem);
+    color: var(--ink-200);
+    max-width: 58ch;
+  }
+  .hero__cta {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin: 1.5rem 0 2rem;
+  }
+  .stats {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+  }
+  .stats li {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.1;
+  }
+  .stats strong {
+    font-family: var(--font-display);
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: var(--accent);
+  }
+  .stats span {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .hero__art {
+    position: relative;
+    display: grid;
+    place-items: center;
+  }
+  .hero__art img {
+    width: min(100%, 420px);
+    height: auto;
+    filter: drop-shadow(0 30px 60px rgba(0, 0, 0, 0.6));
+    position: relative;
+    z-index: 1;
+    animation: float 8s ease-in-out infinite;
+  }
+  .hero__streak {
+    position: absolute;
+    height: 14px;
+    border-radius: 999px;
+    filter: blur(1px);
+    opacity: 0.9;
+  }
+  .hero__streak--gold {
+    width: 70%;
+    left: -20%;
+    top: 62%;
+    background: linear-gradient(90deg, transparent, var(--gold-500));
+    transform: rotate(-18deg);
+  }
+  .hero__streak--red {
+    width: 55%;
+    left: -15%;
+    top: 72%;
+    height: 10px;
+    background: linear-gradient(90deg, transparent, var(--red-500));
+    transform: rotate(-18deg);
+  }
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  .quick {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+    gap: 1rem;
+  }
+  .quick__item {
+    display: flex;
+    gap: 0.9rem;
+    align-items: center;
+    padding: 1rem 1.1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    text-decoration: none;
+    transition:
+      border-color 0.2s,
+      transform 0.2s;
+  }
+  .quick__item:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+  .quick__icon {
+    font-size: 1.6rem;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    background: rgba(242, 183, 5, 0.1);
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+  .quick__item strong {
+    display: block;
+    font-family: var(--font-display);
+    text-transform: uppercase;
+    font-size: 1.1rem;
+    letter-spacing: 0.03em;
+  }
+  .quick__item small {
+    color: var(--text-muted);
+    display: block;
+  }
+
+  .events-band {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .small {
+    font-size: 0.9rem;
+    margin: 1.25rem 0 0;
+  }
+
+  .club-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+  .chip {
+    display: inline-flex;
+    flex-direction: column;
+    padding: 0.5rem 0.9rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    color: var(--text);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.95rem;
+    line-height: 1.2;
+  }
+  .chip small {
+    color: var(--text-muted);
+    font-weight: 400;
+    font-size: 0.75rem;
+  }
+  .chip:hover {
+    border-color: var(--accent);
+  }
+
+  .cta {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 2rem;
+    align-items: center;
+    padding: clamp(1.5rem, 4vw, 3rem);
+    border-radius: var(--radius);
+    background:
+      linear-gradient(135deg, rgba(242, 183, 5, 0.14), rgba(215, 38, 61, 0.1)),
+      var(--ink-800);
+    border: 1px solid var(--border-strong);
+  }
+  .cta p {
+    color: var(--ink-200);
+    margin: 0;
+  }
+  .cta__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: flex-start;
+  }
+
+  @media (max-width: 900px) {
+    .hero__inner {
+      grid-template-columns: 1fr;
+    }
+    .hero__art {
+      order: -1;
+    }
+    .hero__art img {
+      width: min(60%, 260px);
+    }
+    .cta {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

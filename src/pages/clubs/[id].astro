@@ -1,0 +1,189 @@
+---
+import { render } from 'astro:content';
+import Base from '@/layouts/Base.astro';
+import ClubMap from '@/components/ClubMap.astro';
+import EventCard from '@/components/EventCard.astro';
+import { getClubs, getUpcomingEvents } from '@/lib/content';
+import { toMapClubs } from '@/lib/geo';
+import { SITE, url } from '@/lib/site';
+
+export async function getStaticPaths() {
+  const clubs = await getClubs();
+  return clubs.map((club) => ({ params: { id: club.id }, props: { club } }));
+}
+
+const { club } = Astro.props;
+const { Content } = await render(club);
+const d = club.data;
+const mapClubs = await toMapClubs([club]);
+const events = (await getUpcomingEvents()).filter((e) => e.data.club === club.id).slice(0, 3);
+const directions = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${d.venue}, ${d.address}, ${d.postcode}`)}`;
+const TAG_LABEL: Record<string, string> = {
+  squash: 'Squash',
+  racketball: 'Squash 57',
+  juniors: 'Juniors',
+  coaching: 'Coaching',
+  'pay-and-play': 'Pay & play',
+  'members-club': 'Members club',
+  'leisure-centre': 'Leisure centre',
+};
+---
+
+<Base title={d.name} description={`${d.name} — ${d.venue}, ${d.address}, ${d.postcode}. ${d.courts ? `${d.courts} courts. ` : ''}Squash in ${d.town ?? 'Bedfordshire'}.`}>
+  <header class="page-hero">
+    <div class="container">
+      <a class="back" href={url('/clubs/')}>← All clubs</a>
+      <span class="eyebrow">{d.leagueClub ? 'League club' : 'Pay & play courts'}{d.town && ` · ${d.town}`}</span>
+      <h1>{d.name}</h1>
+      <p class="lede">{d.venue} · {d.address}, {d.postcode}</p>
+      <div class="tags">{d.tags.map((t) => <span class="pill pill--muted">{TAG_LABEL[t] ?? t}</span>)}</div>
+    </div>
+  </header>
+
+  <section class="section">
+    <div class="container layout">
+      <div class="main">
+        {d.image && <img class="club-img" src={url(d.image)} alt="" />}
+        <div class="prose">
+          <Content />
+        </div>
+
+        {
+          d.teams.length > 0 && (
+            <div class="teams">
+              <h2>League teams</h2>
+              <ul>
+                {d.teams.map((t) => (
+                  <li>{t}</li>
+                ))}
+              </ul>
+              <a href={SITE.leagueMaster} target="_blank" rel="noopener">
+                Fixtures &amp; results on League Master ↗
+              </a>
+            </div>
+          )
+        }
+
+        {
+          events.length > 0 && (
+            <div class="teams">
+              <h2>Events here</h2>
+              <div class="grid grid--2">
+                {events.map((e) => (
+                  <EventCard event={e} compact />
+                ))}
+              </div>
+            </div>
+          )
+        }
+      </div>
+
+      <aside class="side">
+        <ClubMap clubs={mapClubs} height="300px" focus={club.id} />
+        <div class="info card">
+          <div class="card__body">
+            <h3>Venue</h3>
+            <address>
+              {d.venue}<br />
+              {d.address}<br />
+              {d.postcode}
+            </address>
+            <dl>
+              {d.courts !== undefined && (<><dt>Courts</dt><dd>{d.courts}</dd></>)}
+              {d.phone && (<><dt>Phone</dt><dd><a href={`tel:${d.phone.replace(/\s+/g, '')}`}>{d.phone}</a></dd></>)}
+              {d.email && (<><dt>Email</dt><dd><a href={`mailto:${d.email}`}>{d.email}</a></dd></>)}
+              {d.website && (<><dt>Website</dt><dd><a href={d.website} target="_blank" rel="noopener">{new URL(d.website).hostname.replace(/^www\./, '')} ↗</a></dd></>)}
+              {d.facebook && (<><dt>Facebook</dt><dd><a href={d.facebook} target="_blank" rel="noopener">Facebook page ↗</a></dd></>)}
+            </dl>
+            <div class="actions">
+              {d.bookingUrl && <a class="btn btn--primary btn--sm" href={d.bookingUrl} target="_blank" rel="noopener">Book a court</a>}
+              <a class="btn btn--ghost btn--sm" href={directions} target="_blank" rel="noopener">Directions</a>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .back {
+    display: inline-block;
+    margin-bottom: 1rem;
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .back:hover {
+    color: var(--accent);
+  }
+  .tags {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 2.5rem;
+    align-items: start;
+  }
+  .club-img {
+    border-radius: var(--radius);
+    margin-bottom: 1.5rem;
+  }
+  .teams {
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+  .teams h2 {
+    font-size: 1.6rem;
+  }
+  .teams ul {
+    padding-left: 1.2rem;
+    color: var(--ink-100);
+  }
+  .side {
+    position: sticky;
+    top: 90px;
+    display: grid;
+    gap: 1rem;
+  }
+  .info h3 {
+    margin-bottom: 0.5rem;
+  }
+  address {
+    font-style: normal;
+    color: var(--ink-100);
+    margin-bottom: 1rem;
+    line-height: 1.5;
+  }
+  dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.35rem 1rem;
+    margin: 0 0 1.25rem;
+    font-size: 0.95rem;
+  }
+  dt {
+    color: var(--text-muted);
+  }
+  dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+  .actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  @media (max-width: 900px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+    .side {
+      position: static;
+    }
+  }
+</style>
