@@ -27,7 +27,12 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
           <div class="card__body stack">
             <label>Your name <input name="display_name" required autocomplete="name" minlength="2" /></label>
             <label>Email <input name="email" type="email" required autocomplete="email" /></label>
-            <label>Password <input name="password" type="password" required minlength="8" autocomplete="new-password" /></label>
+            <label>Password <input name="password" type="password" required minlength="12" autocomplete="new-password" data-new-password /></label>
+            <div class="pw-tools">
+              <button class="btn btn--ghost btn--sm" type="button" data-suggest-password>Suggest a strong password</button>
+              <button class="btn btn--ghost btn--sm" type="button" data-toggle-password>Show</button>
+            </div>
+            <p class="muted small">At least 12 characters. If you use a suggested one, save it in your browser or password manager.</p>
             <label class="check"><input name="adult" type="checkbox" required /> I am 18 or over</label>
             <button class="btn btn--primary" type="submit">Create captain account</button>
           </div>
@@ -81,6 +86,36 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       root.querySelector<HTMLElement>('[data-form="register"]')!.hidden = tab !== 'register';
       root.querySelector<HTMLElement>('[data-form="sign-in"]')!.hidden = tab !== 'sign-in';
     });
+  });
+
+  const newPassword = root.querySelector<HTMLInputElement>('[data-new-password]')!;
+  const toggleButton = root.querySelector<HTMLButtonElement>('[data-toggle-password]')!;
+
+  const strongPassword = (length = 20) => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*?-_';
+    const limit = 256 - (256 % chars.length);
+    let out = '';
+    while (out.length < length) {
+      const bytes = crypto.getRandomValues(new Uint8Array(length * 2));
+      for (const byte of bytes) {
+        if (byte < limit && out.length < length) out += chars[byte % chars.length];
+      }
+    }
+    return out;
+  };
+
+  root.querySelector('[data-suggest-password]')!.addEventListener('click', () => {
+    newPassword.value = strongPassword();
+    newPassword.type = 'text';
+    toggleButton.textContent = 'Hide';
+    newPassword.focus();
+    newPassword.select();
+  });
+
+  toggleButton.addEventListener('click', () => {
+    const show = newPassword.type === 'password';
+    newPassword.type = show ? 'text' : 'password';
+    toggleButton.textContent = show ? 'Hide' : 'Show';
   });
 
   root.querySelector<HTMLFormElement>('[data-form="register"]')!.addEventListener('submit', async (event) => {
@@ -281,6 +316,15 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   }
   .check input {
     width: auto;
+  }
+  .pw-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .small {
+    font-size: 0.85rem;
+    margin: 0;
   }
   .who {
     margin-bottom: 0.5rem;
