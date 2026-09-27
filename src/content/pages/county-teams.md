@@ -1,18 +1,23 @@
 ---
 title: County Teams
-intro: Bedfordshire teams compete in the England Squash Inter-County Championships at senior and masters level.
+intro: Bedfordshire teams compete in the England Squash Inter-County Championships. Steve Davies is county captain.
+updated: 2026-09-23
 ---
 
 ## Seniors
 
-Bedfordshire enters men's and women's teams in the Inter-County Championships, played over county weekends each season.
+The senior county season is now a short one: one weekend, then a further round for teams that go through.
+
+This season Bedfordshire won **5–0 at home to Leicestershire** and lost **0–5 to Northamptonshire**, so did not go through. The next round is in February.
+
+## Racketball
+
+The racketball county team beat Lincolnshire.
 
 ## Masters
 
-The county fields Masters teams (O35, O45 and other age groups depending on player availability). County weekends are a great way to play competitive squash against players from neighbouring counties.
+The county fields Masters teams when players are available. County weekends are a way to play competitive squash against neighbouring counties.
 
 ## Want to play for Beds?
 
-If you play in the Bedfordshire leagues and would like to be considered for a county team, contact the county captain via the [contact page](/contact/).
-
-> **Committee:** add current captains, selection criteria, upcoming county weekend dates (also add these to [Events](/events/)) and reports from recent weekends as [News](/news/).
+If you play in the Bedfordshire leagues and would like to be considered, contact [Steve Davies](/contact/), the county captain.

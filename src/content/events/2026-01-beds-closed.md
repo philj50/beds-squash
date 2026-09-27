@@ -1,7 +1,7 @@
 ---
 title: Bedfordshire County Closed Championships 2026
-start: 2026-01-15
-end: 2026-01-18
+start: 2026-01-08
+end: 2026-01-11
 allDay: true
 venue: Club Towers, Bedford
 club: club-towers

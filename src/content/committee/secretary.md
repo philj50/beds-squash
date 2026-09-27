@@ -1,5 +1,5 @@
 ---
 name: Phil Jenkins
-role: Secretary & Development Officer
+role: Secretary
 order: 20
 ---

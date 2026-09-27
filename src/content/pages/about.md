@@ -18,4 +18,4 @@ Bedfordshire squash covers Bedford, Luton, Dunstable, Biggleswade, Flitwick and 
 
 ## Get involved
 
-The association is run entirely by volunteers. If you can help with coaching, refereeing, organising events, junior development or looking after this website, please [get in touch](/contact/).
+The association is run entirely by volunteers. Officers were elected at the AGM on 23 September 2026 — see the committee on this page. If you can help with coaching, refereeing, organising events, junior development or looking after this website, please [get in touch](/contact/).

@@ -1,5 +1,5 @@
 ---
-name: Garry Milner
+name: Ryan Pescod
 role: Chairman
 order: 10
 ---
