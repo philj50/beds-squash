@@ -1,0 +1,126 @@
+---
+/**
+ * First-visit cookie choice.
+ * The preference itself is a necessary cookie. "Allow" also permits the
+ * OpenStreetMap tiles used by the club map, which can set their own cookie.
+ */
+const base = import.meta.env.BASE_URL || '/';
+---
+
+<div class="cookie-notice" id="cookie-notice" hidden>
+  <div class="cookie-notice__backdrop"></div>
+  <div
+    class="cookie-notice__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="cookie-notice-title"
+    aria-describedby="cookie-notice-text"
+  >
+    <p class="eyebrow" id="cookie-notice-title">Cookies</p>
+    <p id="cookie-notice-text">
+      This site stores one cookie to remember your choice. The club map loads images from OpenStreetMap, which may set
+      a cookie of its own. We do not use advertising or analytics cookies.
+    </p>
+    <div class="cookie-notice__actions">
+      <button class="btn btn--primary" type="button" data-cookie-choice="all">Allow cookies</button>
+      <button class="btn btn--ghost" type="button" data-cookie-choice="essential">Essential only</button>
+    </div>
+  </div>
+</div>
+
+<script is:inline define:vars={{ base }}>
+  const NAME = 'beds_cookies';
+  const MAX_AGE = 60 * 60 * 24 * 180;
+  const root = document.getElementById('cookie-notice');
+  const panel = root?.querySelector('[role="dialog"]');
+
+  const read = () => {
+    const match = document.cookie.match(new RegExp('(?:^|; )' + NAME + '=([^;]+)'));
+    return match ? decodeURIComponent(match[1]) : '';
+  };
+
+  window.bedsCookieChoice = read;
+
+  const write = (value) => {
+    const secure = location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = `${NAME}=${encodeURIComponent(value)}; Path=${base}; Max-Age=${MAX_AGE}; SameSite=Lax${secure}`;
+    window.dispatchEvent(new CustomEvent('beds:cookies', { detail: value }));
+  };
+
+  const open = () => {
+    if (!root || !panel) return;
+    root.hidden = false;
+    const first = panel.querySelector('button');
+    first?.focus();
+  };
+
+  const close = () => {
+    if (root) root.hidden = true;
+  };
+
+  document.addEventListener('click', (event) => {
+    const choice = event.target.closest('[data-cookie-choice]');
+    if (choice) {
+      const value = choice.getAttribute('data-cookie-choice');
+      if (value === 'all' || value === 'essential') {
+        write(value);
+        close();
+      }
+      return;
+    }
+    if (event.target.closest('[data-cookie-settings]')) open();
+  });
+
+  panel?.addEventListener('keydown', (event) => {
+    if (event.key !== 'Tab' || !panel) return;
+    const buttons = [...panel.querySelectorAll('button')];
+    const first = buttons[0];
+    const last = buttons[buttons.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
+
+  if (!read()) open();
+</script>
+
+<style>
+  .cookie-notice[hidden] {
+    display: none;
+  }
+  .cookie-notice__backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 9, 12, 0.72);
+    z-index: 80;
+  }
+  .cookie-notice__panel {
+    position: fixed;
+    z-index: 81;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: min(32rem, calc(100% - 2rem));
+    background: var(--ink-800);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 1.5rem 1.5rem 1.25rem;
+  }
+  .cookie-notice__panel p {
+    margin: 0 0 1rem;
+  }
+  .cookie-notice__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+  .cookie-notice__actions .btn {
+    font-family: inherit;
+  }
+</style>

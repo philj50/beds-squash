@@ -50,7 +50,7 @@ const year = new Date().getFullYear();
   <div class="container bottom">
     <span>© {year} {SITE.legalName}</span>
     <span>
-      <a href={url('/documents/')}>Policies</a>
+      <a href={url('/documents/')}>Policies</a> · <button type="button" data-cookie-settings>Cookies</button>
     </span>
   </div>
 </footer>
@@ -133,8 +133,17 @@ const year = new Date().getFullYear();
     color: var(--text-muted);
     font-size: 0.85rem;
   }
-  .bottom a {
+  .bottom a,
+  .bottom button {
     color: var(--text-muted);
+  }
+  .bottom button {
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    cursor: pointer;
+    text-decoration: underline;
   }
   @media (max-width: 800px) {
     .grid {

@@ -6,6 +6,7 @@ import '@fontsource/barlow-condensed/800.css';
 import '@/styles/global.css';
 import Header from '@/components/Header.astro';
 import Footer from '@/components/Footer.astro';
+import CookieNotice from '@/components/CookieNotice.astro';
 import JsonLd from '@/components/JsonLd.astro';
 import { SITE, url } from '@/lib/site';
 import { breadcrumbs, graph, organization, website } from '@/lib/seo';
@@ -83,6 +84,7 @@ const structured = graph(
       <slot />
     </main>
     <Footer />
+    <CookieNotice />
   </body>
 </html>
 
