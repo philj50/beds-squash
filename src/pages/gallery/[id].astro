@@ -15,7 +15,15 @@ const { Content } = await render(g);
 const cover = g.data.cover ?? g.data.images[0]?.src;
 ---
 
-<Base title={g.data.title} description={`Photos: ${g.data.title} (${formatDate(g.data.date)})`} image={cover ? url(cover) : undefined}>
+<Base
+  title={g.data.title}
+  description={`Photos: ${g.data.title} (${formatDate(g.data.date)})`}
+  image={cover ? url(cover) : undefined}
+  crumbs={[
+    { name: 'Gallery', path: '/gallery/' },
+    { name: g.data.title, path: `/gallery/${g.id}/` },
+  ]}
+>
   <PageHero eyebrow={formatDate(g.data.date)} title={g.data.title}>
     <a class="back" href={url('/gallery/')}>← All albums</a>
     {g.data.credit && <p class="muted">Photos: {g.data.credit}</p>}

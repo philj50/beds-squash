@@ -12,7 +12,7 @@ const rules = (await getDocuments()).filter((d) => d.data.category === 'league-r
 const LM = SITE.leagueMaster.replace(/\/$/, '');
 ---
 
-<Base title="Leagues" description="Bedfordshire Squash Winter League, Summer League and League Cup — divisions, scoring, rules and links to fixtures and tables on League Master.">
+<Base title="Bedfordshire squash leagues" description="Bedfordshire Squash Winter League, Summer League and League Cup — divisions, scoring, fees and links to fixtures and tables." crumbs={[{ name: 'Leagues', path: '/leagues/' }]}>
   <PageHero eyebrow="Team squash" title={page?.data.title ?? 'Leagues'} lede={page?.data.intro}>
     <div class="hero-actions">
       <a class="btn btn--primary" href={SITE.leagueMaster} target="_blank" rel="noopener">Fixtures, results &amp; tables ↗</a>
@@ -33,7 +33,6 @@ const LM = SITE.leagueMaster.replace(/\/$/, '');
               <li><a href={`${LM}/cgi-county/icounty.exe/showclublist`} target="_blank" rel="noopener">Clubs</a></li>
               <li><a href={`${LM}/cgi-county/icounty.exe/showteamlist`} target="_blank" rel="noopener">Teams</a></li>
               <li><a href={`${LM}/cgi-county/icounty.exe/showtournamentlist`} target="_blank" rel="noopener">Cup draws</a></li>
-              <li><a href={`${LM}/cgi-county/icounty.exe/showlogin`} target="_blank" rel="noopener">Captains: enter a result</a></li>
             </ul>
           </div>
         </div>

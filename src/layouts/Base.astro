@@ -6,7 +6,9 @@ import '@fontsource/barlow-condensed/800.css';
 import '@/styles/global.css';
 import Header from '@/components/Header.astro';
 import Footer from '@/components/Footer.astro';
+import JsonLd from '@/components/JsonLd.astro';
 import { SITE, url } from '@/lib/site';
+import { breadcrumbs, graph, organization, website } from '@/lib/seo';
 
 interface Props {
   title?: string;
@@ -14,14 +16,31 @@ interface Props {
   image?: string;
   type?: 'website' | 'article';
   noindex?: boolean;
+  published?: Date;
+  crumbs?: { name: string; path: string }[];
+  jsonLd?: object | object[];
 }
 
-const { title, description = SITE.description, image = url('/brand/og-default.png'), type = 'website', noindex = false } =
-  Astro.props;
+const {
+  title,
+  description = SITE.description,
+  image = url('/brand/og-default.png'),
+  type = 'website',
+  noindex = false,
+  published,
+  crumbs,
+  jsonLd,
+} = Astro.props;
 
 const fullTitle = title ? `${title} · ${SITE.name}` : `${SITE.name} — ${SITE.tagline}`;
 const canonical = new URL(Astro.url.pathname, Astro.site);
 const ogImage = new URL(image, Astro.site);
+const structured = graph(
+  organization(Astro.site),
+  website(Astro.site),
+  ...(crumbs?.length ? [breadcrumbs(Astro.site, crumbs)] : []),
+  ...(jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : []),
+);
 ---
 
 <!doctype html>
@@ -40,14 +59,17 @@ const ogImage = new URL(image, Astro.site);
     <link rel="alternate" type="text/calendar" title={`${SITE.name} events`} href={url('/events.ics')} />
     <link rel="alternate" type="application/rss+xml" title={`${SITE.name} news`} href={url('/rss.xml')} />
     <meta name="theme-color" content="#0f1115" />
-    {noindex && <meta name="robots" content="noindex" />}
+    <meta name="robots" content={noindex ? 'noindex, nofollow' : 'index, follow'} />
 
+    <meta property="og:locale" content="en_GB" />
     <meta property="og:site_name" content={SITE.name} />
     <meta property="og:type" content={type} />
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
     <meta property="og:image" content={ogImage} />
+    {published && <meta property="article:published_time" content={published.toISOString()} />}
+    <JsonLd data={structured} />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={fullTitle} />
     <meta name="twitter:description" content={description} />

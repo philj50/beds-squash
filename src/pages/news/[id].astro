@@ -4,6 +4,7 @@ import Base from '@/layouts/Base.astro';
 import NewsCard from '@/components/NewsCard.astro';
 import { getNews } from '@/lib/content';
 import { CATEGORY_LABEL, formatDate, url } from '@/lib/site';
+import { abs, organizationId } from '@/lib/seo';
 
 export async function getStaticPaths() {
   const posts = await getNews();
@@ -16,7 +17,27 @@ const { title, date, summary, image, imageAlt, category } = post.data;
 const more = (await getNews()).filter((p) => p.id !== post.id).slice(0, 3);
 ---
 
-<Base title={title} description={summary} image={image ? url(image) : undefined} type="article">
+<Base
+  title={title}
+  description={summary}
+  image={image ? url(image) : undefined}
+  type="article"
+  published={date}
+  crumbs={[
+    { name: 'News', path: '/news/' },
+    { name: title, path: `/news/${post.id}/` },
+  ]}
+  jsonLd={{
+    '@type': 'NewsArticle',
+    headline: title,
+    description: summary,
+    datePublished: date.toISOString(),
+    image: image ? abs(Astro.site, image) : abs(Astro.site, '/brand/og-default.png'),
+    mainEntityOfPage: abs(Astro.site, `/news/${post.id}/`),
+    author: { '@id': organizationId(Astro.site) },
+    publisher: { '@id': organizationId(Astro.site) },
+  }}
+>
   <article>
     <header class="page-hero">
       <div class="container narrow">

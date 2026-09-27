@@ -4,6 +4,7 @@ import Base from '@/layouts/Base.astro';
 import EventCard from '@/components/EventCard.astro';
 import { getEvents, getUpcomingEvents } from '@/lib/content';
 import { CATEGORY_LABEL, SOURCE_LABEL, formatRange, formatTime, isoDate, url } from '@/lib/site';
+import { abs, organizationId } from '@/lib/seo';
 
 export async function getStaticPaths() {
   const events = await getEvents();
@@ -23,7 +24,28 @@ const gcalDates = allDay
 const gcal = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${gcalDates}&location=${encodeURIComponent(venue ?? '')}&details=${encodeURIComponent(new URL(url(`/events/${event.id}/`), Astro.site).href)}`;
 ---
 
-<Base title={title} description={`${formatRange(start, end)}${venue ? ` · ${venue}` : ''}`} image={image ? url(image) : undefined} type="article">
+<Base
+  title={title}
+  description={`${title} — ${formatRange(start, end)}${venue ? ` at ${venue}` : ''}. A Bedfordshire squash event.`}
+  image={image ? url(image) : undefined}
+  type="article"
+  published={start}
+  crumbs={[
+    { name: 'Events', path: '/events/' },
+    { name: title, path: `/events/${event.id}/` },
+  ]}
+  jsonLd={{
+    '@type': 'Event',
+    name: title,
+    startDate: start.toISOString(),
+    endDate: (end ?? start).toISOString(),
+    eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+    eventStatus: cancelled ? 'https://schema.org/EventCancelled' : 'https://schema.org/EventScheduled',
+    location: { '@type': 'Place', name: venue ?? 'Bedfordshire' },
+    organizer: { '@id': organizationId(Astro.site) },
+    url: abs(Astro.site, `/events/${event.id}/`),
+  }}
+>
   <article>
     <header class="page-hero">
       <div class="container narrow">

@@ -17,7 +17,7 @@ for (const e of upcoming) {
 const sources = [...new Set(upcoming.map((e) => e.data.source))];
 ---
 
-<Base title="Events" description="What's on in Bedfordshire squash: county tournaments, league dates, junior events, county weekends and key England Squash dates.">
+<Base title="Bedfordshire squash events" description="What's on in Bedfordshire squash: county tournaments, league dates, junior events, county weekends and key England Squash dates." crumbs={[{ name: 'Events', path: '/events/' }]}>
   <PageHero eyebrow="Calendar" title="Events" lede="County tournaments, league dates, juniors, county weekends and key England Squash dates — all in one place.">
     <div class="hero-actions">
       <a class="btn btn--primary btn--sm" href={url('/events.ics')}>Subscribe (.ics)</a>
@@ -43,7 +43,7 @@ const sources = [...new Set(upcoming.map((e) => e.data.source))];
       {
         upcoming.length === 0 && (
           <p class="notice">
-            No upcoming events listed yet. Committee members can add events in the <a href={url('/admin/')}>CMS</a>.
+            No upcoming events listed yet. Check back as the season dates are confirmed.
           </p>
         )
       }

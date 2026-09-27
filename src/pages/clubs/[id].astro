@@ -6,6 +6,7 @@ import EventCard from '@/components/EventCard.astro';
 import { getClubs, getUpcomingEvents } from '@/lib/content';
 import { toMapClubs } from '@/lib/geo';
 import { SITE, url } from '@/lib/site';
+import { abs } from '@/lib/seo';
 
 export async function getStaticPaths() {
   const clubs = await getClubs();
@@ -29,7 +30,31 @@ const TAG_LABEL: Record<string, string> = {
 };
 ---
 
-<Base title={d.name} description={`${d.name} — ${d.venue}, ${d.address}, ${d.postcode}. ${d.courts ? `${d.courts} courts. ` : ''}Squash in ${d.town ?? 'Bedfordshire'}.`}>
+<Base
+  title={`${d.name} squash`}
+  description={`${d.name} at ${d.venue}, ${d.address}, ${d.postcode}. ${d.courts ? `${d.courts} squash courts. ` : ''}Squash in ${d.town ?? 'Bedfordshire'}.`}
+  crumbs={[
+    { name: 'Clubs', path: '/clubs/' },
+    { name: d.name, path: `/clubs/${club.id}/` },
+  ]}
+  jsonLd={{
+    '@type': 'SportsActivityLocation',
+    name: d.name,
+    url: abs(Astro.site, `/clubs/${club.id}/`),
+    sport: 'Squash',
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: `${d.venue}, ${d.address}`,
+      postalCode: d.postcode,
+      addressLocality: d.town,
+      addressCountry: 'GB',
+    },
+    ...(d.lat != null && d.lng != null
+      ? { geo: { '@type': 'GeoCoordinates', latitude: d.lat, longitude: d.lng } }
+      : {}),
+    ...(d.phone ? { telephone: d.phone } : {}),
+  }}
+>
   <header class="page-hero">
     <div class="container">
       <a class="back" href={url('/clubs/')}>← All clubs</a>

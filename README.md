@@ -46,7 +46,10 @@ GitHub Actions → GitHub Pages. No database, no server, no hosting bill.
 4. Register a domain (`bedfordshiresquash.co.uk`, `bedssquash.co.uk`, `bedssquash.org.uk` were all available on 26 Sep 2026) and point it at GitHub Pages.
 5. Ask the owner of beds-sra.co.uk to add a "we've moved" banner/link, update the England Squash county page and the Facebook group with the new address.
 
-**Phase 3 — Nice to have**
+**Section 2 — members (not started)**
+Player accounts, personal fixtures, availability and captain tools stay off this site until the public pages have been used and checked. Do not add logins, registration or a members area to the public site.
+
+**Later, still public**
 - Pull England Squash news/events automatically (their site blocks scraping; would need an official feed or a manual monthly sweep).
 - Junior ladder / results tables as a content collection.
 - Club box-league links and "find a partner" board.

@@ -15,7 +15,14 @@ const { Content } = await render(doc);
 const hasBody = Boolean(doc.body?.trim());
 ---
 
-<Base title={doc.data.title} description={doc.data.summary ?? `${doc.data.title} — ${DOC_CATEGORY_LABEL[doc.data.category]}`}>
+<Base
+  title={doc.data.title}
+  description={doc.data.summary ?? `${doc.data.title} — ${DOC_CATEGORY_LABEL[doc.data.category]} published by Bedfordshire Squash.`}
+  crumbs={[
+    { name: 'Documents', path: '/documents/' },
+    { name: doc.data.title, path: `/documents/${doc.id}/` },
+  ]}
+>
   <PageHero eyebrow={DOC_CATEGORY_LABEL[doc.data.category]} title={doc.data.title} lede={doc.data.summary}>
     <div class="actions">
       {doc.data.file && <a class="btn btn--primary" href={url(doc.data.file)} target="_blank" rel="noopener">Download PDF</a>}

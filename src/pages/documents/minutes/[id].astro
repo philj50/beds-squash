@@ -4,6 +4,7 @@ import Base from '@/layouts/Base.astro';
 import PageHero from '@/components/PageHero.astro';
 import { getMinutes } from '@/lib/content';
 import { formatDate, url } from '@/lib/site';
+import { organizationId } from '@/lib/seo';
 
 export async function getStaticPaths() {
   const minutes = await getMinutes();
@@ -15,7 +16,22 @@ const { Content } = await render(m);
 const TYPE_LABEL: Record<string, string> = { agm: 'AGM minutes', committee: 'Committee minutes', egm: 'EGM minutes', other: 'Minutes' };
 ---
 
-<Base title={m.data.title} description={m.data.summary ?? `${m.data.title} — ${TYPE_LABEL[m.data.type]}`} noindex>
+<Base
+  title={m.data.title}
+  description={m.data.summary ?? `${m.data.title} — ${TYPE_LABEL[m.data.type]} of the Bedfordshire Squash & Racketball Association.`}
+  published={m.data.date}
+  crumbs={[
+    { name: 'Documents', path: '/documents/' },
+    { name: m.data.title, path: `/documents/minutes/${m.id}/` },
+  ]}
+  jsonLd={{
+    '@type': 'DigitalDocument',
+    name: m.data.title,
+    description: m.data.summary,
+    datePublished: m.data.date.toISOString(),
+    publisher: { '@id': organizationId(Astro.site) },
+  }}
+>
   <PageHero eyebrow={TYPE_LABEL[m.data.type]} title={m.data.title} lede={m.data.summary}>
     <p class="muted" style="margin-top:.5rem">{formatDate(m.data.date)}</p>
     <div class="actions">

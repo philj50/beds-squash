@@ -9,7 +9,7 @@ const weekends = (await getUpcomingEvents()).filter((e) => e.data.source === 'in
 const reports = (await getNews()).filter((n) => n.data.category === 'county').slice(0, 4);
 ---
 
-<Base title="County Teams" description="Bedfordshire county squash teams — seniors and masters in the England Squash Inter-County Championships, county weekends and reports.">
+<Base title="Bedfordshire county squash teams" description="Bedfordshire county squash teams in the England Squash Inter-County Championships, including senior results and the racketball county team." crumbs={[{ name: 'County Teams', path: '/county-teams/' }]}>
   <ContentPage id="county-teams" eyebrow="Represent Beds" fallbackTitle="County Teams">
     <div slot="aside" class="stack">
       <div class="card"><div class="card__body">

@@ -10,7 +10,7 @@ const juniorClubs = (await getClubs()).filter((c) => c.data.tags.includes('junio
 const safeguarding = (await getDocuments()).filter((d) => d.data.category === 'safeguarding' || d.data.category === 'code-of-conduct');
 ---
 
-<Base title="Juniors" description="Junior squash in Bedfordshire: county squad programme, junior ladder, coaching venues, inter-county competition and safeguarding.">
+<Base title="Junior squash in Bedfordshire" description="Junior squash in Bedfordshire: county squads, age groups, the Junior County Closed, coaching venues and safeguarding." crumbs={[{ name: 'Juniors', path: '/juniors/' }]}>
   <ContentPage id="juniors" eyebrow="Under 19s" fallbackTitle="Juniors">
     <div slot="aside" class="stack">
       <div class="card"><div class="card__body">

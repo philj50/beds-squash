@@ -9,7 +9,7 @@ const posts = await getNews();
 const categories = [...new Set(posts.map((p) => p.data.category))];
 ---
 
-<Base title="News" description="News from Bedfordshire Squash — tournaments, leagues, juniors, county teams and England Squash updates.">
+<Base title="Bedfordshire squash news" description="News from Bedfordshire Squash — tournaments, leagues, juniors, county teams and England Squash updates." crumbs={[{ name: 'News', path: '/news/' }]}>
   <PageHero eyebrow="Latest" title="News" lede="Reports, results and announcements from around the county." />
   <section class="section">
     <div class="container">

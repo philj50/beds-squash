@@ -12,7 +12,7 @@ const leagueClubs = clubs.filter((c) => c.data.leagueClub);
 const venues = clubs.filter((c) => !c.data.leagueClub);
 ---
 
-<Base title="Clubs & courts" description="Every squash club and pay-and-play court in Bedfordshire and Milton Keynes, with an interactive map, teams, court counts and contact details.">
+<Base title="Squash clubs in Bedfordshire" description="Every squash club and pay-and-play court in Bedfordshire and Milton Keynes, with an interactive map, teams, court counts and contact details." crumbs={[{ name: 'Clubs', path: '/clubs/' }]}>
   <PageHero eyebrow="Where to play" title="Clubs & courts" lede="Every club in the Bedfordshire leagues plus pay-and-play courts across the county. Click a marker for details." />
 
   <section class="section section--tight">

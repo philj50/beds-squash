@@ -15,7 +15,7 @@ const byEvent = new Map<string, typeof honours>();
 for (const h of honours) byEvent.set(h.data.event, [...(byEvent.get(h.data.event) ?? []), h]);
 ---
 
-<Base title="Tournaments & Honours" description="Bedfordshire County Closed Championships, League Cup and other county tournaments, plus the honours board of past champions.">
+<Base title="Bedfordshire County Closed" description="Bedfordshire County Closed Championships, the League Cup and the honours board of county champions." crumbs={[{ name: 'Tournaments', path: '/tournaments/' }]}>
   <PageHero eyebrow="Compete" title="Tournaments" lede="The County Closed, League Cup, Over 50s Cup and junior opens — plus the honours board of past champions." />
 
   <section class="section">

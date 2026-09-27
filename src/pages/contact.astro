@@ -7,7 +7,7 @@ import { SITE, url } from '@/lib/site';
 const committee = await getCommittee();
 ---
 
-<Base title="Contact" description="Contact the Bedfordshire Squash & Racketball Association — committee, league queries, juniors, county teams and website content.">
+<Base title="Contact Beds SRA" description="Contact the Bedfordshire Squash & Racketball Association — committee, league queries, juniors and county teams." crumbs={[{ name: 'Contact', path: '/contact/' }]}>
   <PageHero eyebrow="Get in touch" title="Contact" lede="Questions about leagues, tournaments, juniors, county teams — or news and photos for this site. We'd love to hear from you." />
 
   <section class="section">
@@ -53,7 +53,7 @@ const committee = await getCommittee();
           }
         </ul>
         <p class="muted small">
-          Committee roles can be updated in the <a href={url('/admin/')}>CMS</a>. We're always looking for volunteers — see <a href={url('/about/')}>About</a>.
+          We're always looking for volunteers — see <a href={url('/about/')}>About</a>.
         </p>
       </div>
     </div>

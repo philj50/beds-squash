@@ -7,14 +7,14 @@ import { formatDate, url } from '@/lib/site';
 const galleries = await getGalleries();
 ---
 
-<Base title="Gallery" description="Photos from Bedfordshire squash events — County Closed finals, county weekends, junior events and more.">
+<Base title="Bedfordshire squash photos" description="Photos from Bedfordshire squash events — County Closed finals, county weekends, junior events and more." crumbs={[{ name: 'Gallery', path: '/gallery/' }]}>
   <PageHero eyebrow="Photos" title="Gallery" lede="Pictures from county tournaments, county weekends and junior events." />
   <section class="section">
     <div class="container">
       {
         galleries.length === 0 ? (
           <p class="notice">
-            No photo albums yet. Committee members can add one in the <a href={url('/admin/')}>CMS</a> under Galleries.
+            Photos from county events will appear here.
           </p>
         ) : (
           <div class="grid grid--3">
