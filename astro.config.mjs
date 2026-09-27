@@ -21,7 +21,11 @@ export default defineConfig({
   trailingSlash: 'ignore',
   // Keep HTML-aware whitespace handling (Astro 7 defaults to JSX-style stripping)
   compressHTML: true,
-  integrations: [sitemap()],
+  integrations: [
+    sitemap({
+      filter: (page) => !page.includes('/captains'),
+    }),
+  ],
   markdown: {
     // Unified pipeline so we can rewrite root-relative links in editor-written Markdown
     processor: unified({

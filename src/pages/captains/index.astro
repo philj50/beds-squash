@@ -1,0 +1,309 @@
+---
+import Base from '@/layouts/Base.astro';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
+---
+
+<Base
+  title="Captain test"
+  description="Test area for Bedfordshire squash captains to register a squad."
+  noindex
+>
+  <section class="section">
+    <div class="container captain" id="captain-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
+      <p class="test-flag">Test mode. This is not linked from the public site. Player details are visible only to the captain who added them.</p>
+      <h1>Captain registration</h1>
+      <p class="lede">
+        Create a captain account, name your team, then add the players on it. Players do not need their own login for this test, and nobody is emailed yet.
+      </p>
+      <p class="status" data-status role="status"></p>
+
+      <div data-panel="signed-out">
+        <div class="tabs" role="tablist">
+          <button class="btn btn--primary btn--sm" type="button" data-tab="register">Register</button>
+          <button class="btn btn--ghost btn--sm" type="button" data-tab="sign-in">Sign in</button>
+        </div>
+
+        <form class="card" data-form="register">
+          <div class="card__body stack">
+            <label>Your name <input name="display_name" required autocomplete="name" minlength="2" /></label>
+            <label>Email <input name="email" type="email" required autocomplete="email" /></label>
+            <label>Password <input name="password" type="password" required minlength="8" autocomplete="new-password" /></label>
+            <label class="check"><input name="adult" type="checkbox" required /> I am 18 or over</label>
+            <button class="btn btn--primary" type="submit">Create captain account</button>
+          </div>
+        </form>
+
+        <form class="card" data-form="sign-in" hidden>
+          <div class="card__body stack">
+            <label>Email <input name="email" type="email" required autocomplete="email" /></label>
+            <label>Password <input name="password" type="password" required autocomplete="current-password" /></label>
+            <button class="btn btn--primary" type="submit">Sign in</button>
+          </div>
+        </form>
+      </div>
+
+      <div data-panel="signed-in" hidden>
+        <p class="who" data-who></p>
+        <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
+
+        <form class="card" data-form="squad">
+          <div class="card__body stack">
+            <h2>Your team</h2>
+            <label>Team name <input name="name" required minlength="2" maxlength="80" placeholder="Club Towers 1" /></label>
+            <button class="btn btn--primary" type="submit">Save team</button>
+          </div>
+        </form>
+
+        <div data-squads></div>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+
+  const root = document.getElementById('captain-app');
+  if (!root) throw new Error('captain app missing');
+  const supabase = createClient(root.dataset.url!, root.dataset.key!);
+  const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
+  const signedOut = root.querySelector<HTMLElement>('[data-panel="signed-out"]')!;
+  const signedIn = root.querySelector<HTMLElement>('[data-panel="signed-in"]')!;
+  const squadHost = root.querySelector<HTMLElement>('[data-squads]')!;
+
+  const setStatus = (message: string) => {
+    statusEl.textContent = message;
+  };
+
+  root.querySelectorAll<HTMLButtonElement>('[data-tab]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const tab = button.dataset.tab;
+      root.querySelector<HTMLElement>('[data-form="register"]')!.hidden = tab !== 'register';
+      root.querySelector<HTMLElement>('[data-form="sign-in"]')!.hidden = tab !== 'sign-in';
+    });
+  });
+
+  root.querySelector<HTMLFormElement>('[data-form="register"]')!.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget as HTMLFormElement;
+    const data = new FormData(form);
+    setStatus('Creating account…');
+    const { data: result, error } = await supabase.auth.signUp({
+      email: String(data.get('email')),
+      password: String(data.get('password')),
+      options: {
+        data: { display_name: String(data.get('display_name')).trim() },
+        emailRedirectTo: window.location.href,
+      },
+    });
+    if (error) {
+      setStatus(error.message);
+      return;
+    }
+    if (!result.session) {
+      setStatus('Account created. Check your email and confirm it, then sign in.');
+      return;
+    }
+    form.reset();
+    await showSession();
+  });
+
+  root.querySelector<HTMLFormElement>('[data-form="sign-in"]')!.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget as HTMLFormElement);
+    setStatus('Signing in…');
+    const { error } = await supabase.auth.signInWithPassword({
+      email: String(data.get('email')),
+      password: String(data.get('password')),
+    });
+    setStatus(error ? error.message : '');
+    if (!error) await showSession();
+  });
+
+  root.querySelector('[data-sign-out]')!.addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    await showSession();
+  });
+
+  root.querySelector<HTMLFormElement>('[data-form="squad"]')!.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget as HTMLFormElement;
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData.user;
+    if (!user) return;
+    const name = String(new FormData(form).get('name')).trim();
+    const { error } = await supabase.from('captain_squads').insert({ captain_id: user.id, name });
+    if (error) {
+      setStatus(error.message);
+      return;
+    }
+    form.reset();
+    setStatus('');
+    await showSession();
+  });
+
+  squadHost.addEventListener('submit', async (event) => {
+    const form = event.target as HTMLFormElement;
+    if (!form.matches('[data-form="player"]')) return;
+    event.preventDefault();
+    const data = new FormData(form);
+    const email = String(data.get('email') ?? '').trim();
+    const phone = String(data.get('phone') ?? '').trim();
+    const { error } = await supabase.from('squad_players').insert({
+      squad_id: Number(form.dataset.squadId),
+      display_name: String(data.get('display_name')).trim(),
+      email: email || null,
+      phone: phone || null,
+    });
+    if (error) {
+      setStatus(error.message);
+      return;
+    }
+    form.reset();
+    setStatus('');
+    await showSession();
+  });
+
+  squadHost.addEventListener('click', async (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-remove-player]');
+    if (!button) return;
+    const { error } = await supabase.from('squad_players').delete().eq('id', Number(button.dataset.removePlayer));
+    if (error) setStatus(error.message);
+    else await showSession();
+  });
+
+  async function showSession() {
+    const { data } = await supabase.auth.getSession();
+    const session = data.session;
+    signedOut.hidden = Boolean(session);
+    signedIn.hidden = !session;
+    if (!session) {
+      squadHost.replaceChildren();
+      return;
+    }
+    const name = session.user.user_metadata?.display_name || session.user.email;
+    root.querySelector('[data-who]')!.textContent = `Signed in as ${name}`;
+
+    const { data: squads, error } = await supabase
+      .from('captain_squads')
+      .select('id, name, squad_players (id, display_name, email, phone)')
+      .order('created_at', { ascending: true });
+    if (error) {
+      setStatus(error.message);
+      return;
+    }
+    squadHost.replaceChildren(
+      ...(squads ?? []).map((squad) => {
+        const card = document.createElement('article');
+        card.className = 'card';
+        const players = (squad.squad_players ?? []) as { id: number; display_name: string; email: string | null; phone: string | null }[];
+        const list = players
+          .map(
+            (player) =>
+              `<li><strong>${escapeHtml(player.display_name)}</strong>` +
+              `${player.email ? `<span class="muted"> ${escapeHtml(player.email)}</span>` : ''}` +
+              `${player.phone ? `<span class="muted"> ${escapeHtml(player.phone)}</span>` : ''}` +
+              ` <button class="btn btn--ghost btn--sm" type="button" data-remove-player="${player.id}">Remove</button></li>`,
+          )
+          .join('');
+        card.innerHTML = `
+          <div class="card__body">
+            <h2>${escapeHtml(squad.name)}</h2>
+            <ul class="players">${list || '<li class="muted">No players yet.</li>'}</ul>
+            <form class="stack player-form" data-form="player" data-squad-id="${squad.id}">
+              <h3>Add a player</h3>
+              <label>Name <input name="display_name" required minlength="2" maxlength="80" /></label>
+              <label>Email <input name="email" type="email" /></label>
+              <label>Phone <input name="phone" type="tel" /></label>
+              <button class="btn btn--primary btn--sm" type="submit">Add player</button>
+            </form>
+          </div>`;
+        return card;
+      }),
+    );
+  }
+
+  function escapeHtml(value: string) {
+    return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
+  }
+
+  showSession();
+</script>
+
+<style>
+  .captain {
+    max-width: 720px;
+  }
+  .test-flag {
+    border: 1px solid var(--gold-500);
+    color: var(--gold-400);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem 1rem;
+    margin: 0 0 1.25rem;
+  }
+  .lede {
+    color: var(--ink-200);
+  }
+  .status:empty {
+    display: none;
+  }
+  .status {
+    margin: 1rem 0;
+    color: var(--gold-400);
+  }
+  .tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .stack {
+    display: grid;
+    gap: 0.75rem;
+  }
+  label {
+    display: grid;
+    gap: 0.3rem;
+    font-size: 0.9rem;
+  }
+  .check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  input {
+    width: 100%;
+    background: var(--ink-900);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 0.65rem 0.75rem;
+    font: inherit;
+  }
+  .check input {
+    width: auto;
+  }
+  .who {
+    margin-bottom: 0.5rem;
+  }
+  .players {
+    list-style: none;
+    margin: 0 0 1rem;
+    padding: 0;
+  }
+  .players li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .player-form {
+    margin-top: 1rem;
+  }
+  [data-squads] {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+</style>

@@ -8,6 +8,7 @@ export const GET: APIRoute = ({ site }) => {
   const body = `User-agent: *
 Allow: /
 Disallow: ${base}/admin/
+Disallow: ${base}/captains/
 
 Sitemap: ${sitemap}
 `;
