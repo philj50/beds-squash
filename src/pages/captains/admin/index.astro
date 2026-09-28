@@ -58,6 +58,44 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
 
           <h2>Registered accounts</h2>
           <ul class="people" data-people></ul>
+
+          <h2>Roles</h2>
+          <p class="muted small">
+            Admin covers every club and team. A club captain covers every team at that club. A team captain covers the players on that team. Anyone without an account is the public.
+          </p>
+          <form class="card" data-form="role">
+            <div class="card__body stack">
+              <label>
+                Person
+                <select name="profile_id" required data-role-person>
+                  <option value="">Choose an account</option>
+                </select>
+              </label>
+              <label>
+                Role
+                <select name="role" required data-role-level>
+                  <option value="admin">Admin</option>
+                  <option value="club_captain">Club captain</option>
+                  <option value="team_captain">Team captain</option>
+                  <option value="team_player">Team player</option>
+                </select>
+              </label>
+              <label data-role-club-field hidden>
+                Club
+                <select name="club_slug" data-role-club>
+                  <option value="">Choose a club</option>
+                </select>
+              </label>
+              <label data-role-team-field hidden>
+                Team
+                <select name="team_id" data-role-team>
+                  <option value="">Choose a team</option>
+                </select>
+              </label>
+              <button class="btn btn--primary" type="submit">Add role</button>
+            </div>
+          </form>
+          <ul class="people" data-roles></ul>
         </div>
       </div>
     </div>
@@ -68,6 +106,22 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
   import { createClient } from '@supabase/supabase-js';
 
   type Person = { id: string; display_name: string; email: string | null; is_admin: boolean };
+  type Club = { slug: string; name: string };
+  type OrgTeam = { id: number; club_slug: string; name: string; division: string | null };
+  type Membership = {
+    id: number;
+    role: 'admin' | 'club_captain' | 'team_captain' | 'team_player';
+    club_slug: string | null;
+    team_id: number | null;
+    profiles: { display_name: string; email: string | null } | { display_name: string; email: string | null }[] | null;
+    teams: { name: string; division: string | null } | { name: string; division: string | null }[] | null;
+  };
+  const roleLabel: Record<Membership['role'], string> = {
+    admin: 'Admin',
+    club_captain: 'Club captain',
+    team_captain: 'Team captain',
+    team_player: 'Team player',
+  };
   type Contact = {
     leaguemaster_team_id: string;
     season: string;
@@ -97,6 +151,15 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
   const denied = root.querySelector<HTMLElement>('[data-denied]')!;
   const teamsHost = root.querySelector<HTMLElement>('[data-teams]')!;
   const peopleHost = root.querySelector<HTMLElement>('[data-people]')!;
+  const rolesHost = root.querySelector<HTMLElement>('[data-roles]')!;
+  const rolePerson = root.querySelector<HTMLSelectElement>('[data-role-person]')!;
+  const roleLevel = root.querySelector<HTMLSelectElement>('[data-role-level]')!;
+  const roleClubField = root.querySelector<HTMLElement>('[data-role-club-field]')!;
+  const roleTeamField = root.querySelector<HTMLElement>('[data-role-team-field]')!;
+  const roleClub = root.querySelector<HTMLSelectElement>('[data-role-club]')!;
+  const roleTeam = root.querySelector<HTMLSelectElement>('[data-role-team]')!;
+  let clubs: Club[] = [];
+  let orgTeams: OrgTeam[] = [];
   const teamSelect = root.querySelector<HTMLSelectElement>('[data-team-select]')!;
   const chosen = root.querySelector<HTMLElement>('[data-chosen]')!;
   let contacts: Contact[] = [];
@@ -131,6 +194,56 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
     });
     setStatus(error ? error.message : '');
     if (!error) await showSession();
+  });
+
+  const showRoleFields = () => {
+    const role = roleLevel.value;
+    roleClubField.hidden = role === 'admin';
+    roleTeamField.hidden = role === 'admin' || role === 'club_captain';
+    roleClub.required = role !== 'admin';
+    roleTeam.required = role === 'team_captain' || role === 'team_player';
+    const options = orgTeams.filter((team) => !roleClub.value || team.club_slug === roleClub.value);
+    const current = roleTeam.value;
+    roleTeam.replaceChildren(new Option('Choose a team', ''));
+    for (const team of options) {
+      const division = team.division ? ` — ${team.division}` : '';
+      roleTeam.append(new Option(`${team.name}${division}`, String(team.id)));
+    }
+    if (options.some((team) => String(team.id) === current)) roleTeam.value = current;
+  };
+
+  roleLevel.addEventListener('change', showRoleFields);
+  roleClub.addEventListener('change', showRoleFields);
+
+  root.querySelector<HTMLFormElement>('[data-form="role"]')!.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const role = roleLevel.value as Membership['role'];
+    const row: { profile_id: string; role: Membership['role']; club_slug?: string; team_id?: number } = {
+      profile_id: rolePerson.value,
+      role,
+    };
+    if (role === 'club_captain') row.club_slug = roleClub.value;
+    if (role === 'team_captain' || role === 'team_player') row.team_id = Number(roleTeam.value);
+    setStatus('Saving role…');
+    const { error } = await supabase.from('memberships').insert(row);
+    if (error) {
+      setStatus(error.code === '23505' ? 'That person already has this role.' : error.message);
+      return;
+    }
+    setStatus('Role saved.');
+    await showSession();
+  });
+
+  rolesHost.addEventListener('click', async (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-remove-role]');
+    if (!button) return;
+    const { error } = await supabase.from('memberships').delete().eq('id', Number(button.dataset.removeRole));
+    if (error) {
+      setStatus(error.message);
+      return;
+    }
+    setStatus('Role removed.');
+    await showSession();
   });
 
   root.querySelector('[data-sign-out]')!.addEventListener('click', async () => {
@@ -220,22 +333,35 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
     denied.hidden = allowed;
     if (!allowed) return;
 
-    const [{ data: squads, error: squadError }, { data: people, error: peopleError }, { data: listed, error: listError }] = await Promise.all([
+    const [
+      { data: squads, error: squadError },
+      { data: people, error: peopleError },
+      { data: listed, error: listError },
+      { data: clubRows, error: clubError },
+      { data: orgRows, error: orgError },
+      { data: roleRows, error: roleError },
+    ] = await Promise.all([
       supabase
         .from('captain_squads')
         .select('id, name, captain_email, captain_id, leaguemaster_team_id, profiles(display_name)')
         .order('name', { ascending: true }),
       supabase.from('profiles').select('id, display_name, email, is_admin').order('display_name', { ascending: true }),
       supabase.from('league_captain_contacts').select('leaguemaster_team_id, season, name, division, contact_name, email, reserve_name, reserve_email').order('name', { ascending: true }),
+      supabase.from('clubs').select('slug, name').order('name', { ascending: true }),
+      supabase.from('teams').select('id, club_slug, name, division').order('name', { ascending: true }),
+      supabase.from('memberships').select('id, role, club_slug, team_id, profiles(display_name, email), teams(name, division)').order('role', { ascending: true }),
     ]);
-    if (squadError || peopleError || listError) {
-      setStatus(squadError?.message || peopleError?.message || listError?.message || 'Could not load teams.');
+    if (squadError || peopleError || listError || clubError || orgError || roleError) {
+      setStatus(squadError?.message || peopleError?.message || listError?.message || clubError?.message || orgError?.message || roleError?.message || 'Could not load teams.');
       return;
     }
 
     contacts = (listed ?? []) as Contact[];
+    clubs = (clubRows ?? []) as Club[];
+    orgTeams = (orgRows ?? []) as OrgTeam[];
     const teamRows = (squads ?? []) as Squad[];
     const accounts = (people ?? []) as Person[];
+    const memberships = (roleRows ?? []) as Membership[];
     const taken = new Set(teamRows.map((squad) => squad.leaguemaster_team_id).filter(Boolean));
 
     teamSelect.replaceChildren(new Option('Choose a team', ''));
@@ -287,6 +413,37 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
           `${person.is_admin ? ' <span class="pill">Admin</span>' : ''}` +
           `<span class="muted"> ${escapeHtml(person.email || 'No email')}</span>` +
           `<span class="muted"> — ${escapeHtml(teamText)}</span>`;
+        return item;
+      }),
+    );
+
+    const chosenPerson = rolePerson.value;
+    rolePerson.replaceChildren(new Option('Choose an account', ''));
+    for (const person of accounts) {
+      rolePerson.append(new Option(person.display_name || person.email || 'Unnamed', person.id));
+    }
+    if (accounts.some((person) => person.id === chosenPerson)) rolePerson.value = chosenPerson;
+
+    const chosenClub = roleClub.value;
+    roleClub.replaceChildren(new Option('Choose a club', ''));
+    for (const club of clubs) roleClub.append(new Option(club.name, club.slug));
+    if (clubs.some((club) => club.slug === chosenClub)) roleClub.value = chosenClub;
+    showRoleFields();
+
+    const one = (value: { display_name?: string; email?: string | null; name?: string; division?: string | null } | { display_name?: string; email?: string | null; name?: string; division?: string | null }[] | null) =>
+      Array.isArray(value) ? value[0] : value;
+    rolesHost.replaceChildren(
+      ...memberships.map((membership) => {
+        const person = one(membership.profiles);
+        const team = one(membership.teams);
+        const club = clubs.find((item) => item.slug === membership.club_slug);
+        const where = team ? `${team.name}${team.division ? `, ${team.division}` : ''}` : club?.name ?? 'All clubs';
+        const item = document.createElement('li');
+        item.innerHTML =
+          `<strong>${escapeHtml(roleLabel[membership.role])}</strong>` +
+          `<span class="muted"> ${escapeHtml(person?.display_name || person?.email || 'Unknown')}</span>` +
+          `<span class="muted"> — ${escapeHtml(where)}</span>` +
+          ` <button class="btn btn--ghost btn--sm" type="button" data-remove-role="${membership.id}">Remove</button>`;
         return item;
       }),
     );
