@@ -54,7 +54,20 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
           </nav>
 
           <h2 id="overview">Clubs</h2>
-          <div class="overview-list" data-overview></div>
+          <div class="overview-box">
+            <table class="overview">
+              <thead>
+                <tr>
+                  <th>Club</th>
+                  <th>Club contact</th>
+                  <th>Team</th>
+                  <th>Division</th>
+                  <th>Team captain</th>
+                </tr>
+              </thead>
+              <tbody data-overview></tbody>
+            </table>
+          </div>
 
           <h2 id="edit">Edit</h2>
           <p class="muted small">Leave a field blank if you do not have it yet. Saving does not send a message.</p>
@@ -513,8 +526,7 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
     const dash = '—';
     const contactLine = (club: Club) =>
       [club.contact_name, club.contact_email].filter(Boolean).join(' · ') || dash;
-    const head = `<thead><tr><th>Club</th><th>Club contact</th><th>Team</th><th>Division</th><th>Team captain</th></tr></thead>`;
-    const boxes = clubs.map((club) => {
+    const groups = clubs.map((club) => {
       const clubTeams = winterTeams
         .filter((team) => team.club_slug === club.slug)
         .sort((a, b) => (a.division ?? '').localeCompare(b.division ?? '') || a.name.localeCompare(b.name));
@@ -530,9 +542,9 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
                 return `<tr>${lead}<td>${escapeHtml(team.name)}</td><td>${escapeHtml(team.division || dash)}</td><td>${escapeHtml(team.captain_email || dash)}</td></tr>`;
               })
               .join('');
-      return `<section class="club-box"><table class="overview">${head}<tbody>${rows}</tbody></table></section>`;
+      return rows.replace('<tr>', '<tr class="club-start">');
     });
-    overviewHost.innerHTML = boxes.join('') || `<section class="club-box"><p class="muted small">No clubs yet.</p></section>`;
+    overviewHost.innerHTML = groups.join('') || `<tr><td colspan="5">No clubs yet.</td></tr>`;
     clubMenu.replaceChildren(
       ...clubs.map((club) => {
         const link = document.createElement('a');
@@ -742,20 +754,18 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
   .club {
     scroll-margin-top: 11rem;
   }
-  .overview-list {
-    display: grid;
-    gap: 0.85rem;
-    margin: 0 0 1.75rem;
-  }
-  .club-box {
-    border: 1px solid var(--gold-500);
+  .overview-box {
+    border: 2px solid var(--gold-500);
     border-radius: var(--radius);
     background: var(--ink-800);
-    overflow: hidden;
+    overflow-x: auto;
+    margin: 0 0 1.75rem;
   }
-  .club-box > p {
-    margin: 0;
-    padding: 0.75rem 1rem;
+  .overview tr.club-start td {
+    border-top: 2px solid rgba(255, 255, 255, 0.4);
+  }
+  .overview {
+    border-style: hidden;
   }
   .overview {
     width: 100%;
