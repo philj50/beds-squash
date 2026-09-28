@@ -142,6 +142,7 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
     name: string;
     division: string | null;
     leaguemaster_team_id: string | null;
+    captain_name: string | null;
     captain_email: string | null;
     last_season: string | null;
   };
@@ -420,6 +421,7 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
           club_slug: club.slug,
           name,
           division: blank(data.get('division')),
+          captain_name: blank(data.get('captain_name')),
           captain_email: email,
           last_season: SEASON,
         })
@@ -460,7 +462,9 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
     if (!form.matches('[data-form="captain-email"]')) return;
     const team = orgTeams.find((item) => item.id === Number(form.dataset.teamId));
     if (!team) return;
-    const email = blank(new FormData(form).get('captain_email'))?.toLowerCase() ?? null;
+    const data = new FormData(form);
+    const email = blank(data.get('captain_email'))?.toLowerCase() ?? null;
+    const captainName = blank(data.get('captain_name'));
     const existing = squads.find((squad) => squad.team_id === team.id);
     if (!email && existing) {
       try {
@@ -474,7 +478,7 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
       }
     }
     setStatus('Saving team captain…');
-    const { error: teamError } = await supabase.from('teams').update({ captain_email: email }).eq('id', team.id);
+    const { error: teamError } = await supabase.from('teams').update({ captain_name: captainName, captain_email: email }).eq('id', team.id);
     if (teamError) {
       setStatus(teamError.message);
       return;
@@ -548,7 +552,7 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
         .order('name', { ascending: true }),
       supabase.from('profiles').select('id, display_name, email, is_admin').order('display_name', { ascending: true }),
       supabase.from('clubs').select('slug, name, contact_name, contact_email').order('name', { ascending: true }),
-      supabase.from('teams').select('id, club_slug, name, division, leaguemaster_team_id, captain_email, last_season').order('name', { ascending: true }),
+      supabase.from('teams').select('id, club_slug, name, division, leaguemaster_team_id, captain_name, captain_email, last_season').order('name', { ascending: true }),
       supabase.from('memberships').select('id, role, club_slug, team_id, profiles(display_name, email), teams(name, division)').order('role', { ascending: true }),
     ]);
     if (squadError || peopleError || clubError || orgError || roleError) {
@@ -588,7 +592,7 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
                   index === 0
                     ? `<td rowspan="${clubTeams.length}">${clubLink(club)}</td><td rowspan="${clubTeams.length}">${escapeHtml(contactLine(club))}</td>`
                     : '';
-                return `<tr>${lead}<td class="col-team">${escapeHtml(team.name)}</td><td class="col-division">${escapeHtml(team.division || dash)}</td><td>${escapeHtml(team.captain_email || dash)}</td></tr>`;
+                return `<tr>${lead}<td class="col-team">${escapeHtml(team.name)}</td><td class="col-division">${escapeHtml(team.division || dash)}</td><td>${escapeHtml([team.captain_name, team.captain_email].filter(Boolean).join(' · ') || dash)}</td></tr>`;
               })
               .join('');
       return rows.replace('<tr>', '<tr class="club-start">');
@@ -621,15 +625,21 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
           ? clubTeams.map((team) => {
               const squad = squads.find((item) => item.team_id === team.id);
               const who = squad ? matchedName(squad) : accountName(team.captain_email);
-              const state = !team.captain_email
-                ? 'No captain email yet'
+              const state = !team.captain_name && !team.captain_email
+                ? 'No captain yet'
                 : who
                   ? `Matched to ${who}`
-                  : 'Saved. This address has not registered yet';
+                  : team.captain_email
+                    ? 'Saved. This address has not registered yet'
+                    : 'Name saved. No email yet';
               return `
                 <form class="team-form stack" data-form="captain-email" data-team-id="${team.id}">
                   <h4>${escapeHtml(team.name)}</h4>
                   <p class="${who ? 'matched' : 'waiting'}">${escapeHtml(state)}${team.division ? ` · ${escapeHtml(team.division)}` : ''}</p>
+                  <label>
+                    Team captain
+                    <input name="captain_name" autocomplete="off" value="${escapeHtml(team.captain_name ?? '')}" />
+                  </label>
                   <label>
                     Team captain email
                     <input type="email" name="captain_email" autocomplete="off" value="${escapeHtml(team.captain_email ?? '')}" />
@@ -653,6 +663,7 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
                 <option>Division 2</option>
               </select>
             </label>
+            <label>Team captain <input name="captain_name" maxlength="80" autocomplete="off" /></label>
             <label>Team captain email <input type="email" name="captain_email" autocomplete="off" /></label>
             <div class="actions">
               <button class="btn btn--sm" type="submit">Add team</button>
