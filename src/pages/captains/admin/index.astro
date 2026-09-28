@@ -6,17 +6,17 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
 ---
 
 <Base
-  title="Team setup"
-  description="Match Bedfordshire squash teams to captain accounts."
+  title="Clubs and captains"
+  description="Edit club contacts and team captain emails."
   noindex
 >
   <section class="section">
     <div class="container setup" id="setup-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
       <p class="test-flag">Test mode. This page is not linked from the public site.</p>
-      <h1>Team setup</h1>
+      <h1>Clubs and captains</h1>
       <p class="lede">
-        Choose a team from the current League Master list. The captain email is the one published against that team.
-        When they register on the <a href={captainsHref}>captain page</a> with that email, the team appears for them.
+        Each club has a contact you can edit, then the captain for each of its Winter 2026/27 teams.
+        Saving does not send a message. When a captain registers on the <a href={captainsHref}>captain page</a>, their team appears for them.
       </p>
       <p class="status" data-status role="status"></p>
 
@@ -39,21 +39,8 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
         <p data-denied hidden>This account cannot set up teams.</p>
 
         <div data-admin hidden>
-          <form class="card" data-form="new">
-            <div class="card__body stack">
-              <h2>Add a team</h2>
-              <label>
-                League Master team
-                <select name="leaguemaster_team_id" required data-team-select>
-                  <option value="">Choose a team</option>
-                </select>
-              </label>
-              <p class="muted small" data-chosen>The list is the Winter 2026/27 teams. A team with no email on League Master cannot be chosen.</p>
-              <button class="btn btn--primary" type="submit">Add team</button>
-            </div>
-          </form>
-
-          <h2>Teams</h2>
+          <h2>Clubs</h2>
+          <p class="muted small">Leave a field blank if you do not have it yet. Saving does not send a message.</p>
           <div data-teams></div>
 
           <h2>Registered accounts</h2>
@@ -106,8 +93,16 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
   import { createClient } from '@supabase/supabase-js';
 
   type Person = { id: string; display_name: string; email: string | null; is_admin: boolean };
-  type Club = { slug: string; name: string };
-  type OrgTeam = { id: number; club_slug: string; name: string; division: string | null };
+  type Club = { slug: string; name: string; contact_name: string | null; contact_email: string | null };
+  type OrgTeam = {
+    id: number;
+    club_slug: string;
+    name: string;
+    division: string | null;
+    leaguemaster_team_id: string | null;
+    captain_email: string | null;
+    last_season: string | null;
+  };
   type Membership = {
     id: number;
     role: 'admin' | 'club_captain' | 'team_captain' | 'team_player';
@@ -121,16 +116,6 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
     club_captain: 'Club captain',
     team_captain: 'Team captain',
     team_player: 'Team player',
-  };
-  type Contact = {
-    leaguemaster_team_id: string;
-    season: string;
-    name: string;
-    division: string;
-    contact_name: string;
-    email: string | null;
-    reserve_name: string;
-    reserve_email: string | null;
   };
   type Squad = {
     id: number;
@@ -160,9 +145,7 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
   const roleTeam = root.querySelector<HTMLSelectElement>('[data-role-team]')!;
   let clubs: Club[] = [];
   let orgTeams: OrgTeam[] = [];
-  const teamSelect = root.querySelector<HTMLSelectElement>('[data-team-select]')!;
-  const chosen = root.querySelector<HTMLElement>('[data-chosen]')!;
-  let contacts: Contact[] = [];
+  let squads: Squad[] = [];
 
   const setStatus = (message: string) => {
     statusEl.textContent = message;
@@ -172,16 +155,6 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
     if (error.code === '23505' && error.message.includes('lm_team')) return 'That team is already added.';
     if (error.code === '23505') return 'That captain already has a team with this name.';
     return error.message;
-  };
-
-  const assignedEmail = (team: Contact) => team.email || team.reserve_email || '';
-
-  const optionLabel = (team: Contact) => {
-    const place = `${team.name} — ${team.division}`;
-    if (team.email) return `${place} — ${team.contact_name} (${team.email})`;
-    if (team.reserve_email) return `${place} — ${team.reserve_name}, reserve (${team.reserve_email})`;
-    const who = team.contact_name ? `${team.contact_name}, ` : '';
-    return `${place} — ${who}no email on League Master`;
   };
 
   root.querySelector<HTMLFormElement>('[data-form="sign-in"]')!.addEventListener('submit', async (event) => {
@@ -251,53 +224,73 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
     await showSession();
   });
 
-  teamSelect.addEventListener('change', () => {
-    const team = contacts.find((item) => item.leaguemaster_team_id === teamSelect.value);
-    if (!team) {
-      chosen.textContent = 'The list is the Winter 2026/27 teams. A team with no email on League Master cannot be chosen.';
-      return;
-    }
-    const email = assignedEmail(team);
-    const via = team.email ? team.contact_name : `${team.reserve_name} (reserve contact)`;
-    chosen.textContent = email
-      ? `${team.name} will be matched to ${via}, ${email}.`
-      : `${team.name} has no email on League Master, so it cannot be added.`;
-  });
+  const blank = (value: FormDataEntryValue | null) => {
+    const text = String(value ?? '').trim();
+    return text ? text : null;
+  };
 
-  root.querySelector<HTMLFormElement>('[data-form="new"]')!.addEventListener('submit', async (event) => {
+  teamsHost.addEventListener('submit', async (event) => {
+    const form = event.target as HTMLFormElement;
     event.preventDefault();
-    const team = contacts.find((item) => item.leaguemaster_team_id === teamSelect.value);
-    const email = team ? assignedEmail(team) : '';
-    if (!team || !email) {
-      setStatus('Choose a team that has an email on League Master.');
+    if (form.matches('[data-form="club-contact"]')) {
+      const club = clubs.find((item) => item.slug === form.dataset.club);
+      if (!club) return;
+      const data = new FormData(form);
+      const contactEmail = blank(data.get('contact_email'))?.toLowerCase() ?? null;
+      setStatus('Saving club contact…');
+      const { error } = await supabase
+        .from('clubs')
+        .update({ contact_name: blank(data.get('contact_name')), contact_email: contactEmail })
+        .eq('slug', club.slug);
+      setStatus(error ? error.message : 'Club contact saved. Nothing was sent.');
+      if (!error) await showSession();
       return;
     }
-    setStatus('Saving team…');
-    const { error } = await supabase.from('captain_squads').insert({
-      name: team.name,
-      captain_email: email,
-      leaguemaster_team_id: team.leaguemaster_team_id,
-    });
-    if (error) {
-      setStatus(friendly(error));
+    if (!form.matches('[data-form="captain-email"]')) return;
+    const team = orgTeams.find((item) => item.id === Number(form.dataset.teamId));
+    if (!team) return;
+    const email = blank(new FormData(form).get('captain_email'))?.toLowerCase() ?? null;
+    const existing = squads.find((squad) => squad.leaguemaster_team_id === team.leaguemaster_team_id);
+    if (!email && existing) {
+      const { count, error: countError } = await supabase
+        .from('squad_players')
+        .select('id', { count: 'exact', head: true })
+        .eq('squad_id', existing.id);
+      if (countError) {
+        setStatus(countError.message);
+        return;
+      }
+      if (count) {
+        setStatus(`${team.name} already has players, so the captain email was left in place.`);
+        return;
+      }
+    }
+    setStatus('Saving team captain…');
+    const { error: teamError } = await supabase.from('teams').update({ captain_email: email }).eq('id', team.id);
+    if (teamError) {
+      setStatus(teamError.message);
       return;
     }
-    teamSelect.value = '';
-    setStatus('Team saved.');
-    await showSession();
-  });
-
-  teamsHost.addEventListener('click', async (event) => {
-    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-remove]');
-    if (!button) return;
-    const name = button.dataset.teamName || 'this team';
-    if (!window.confirm(`Remove ${name}? Players on it will be removed too.`)) return;
-    const { error } = await supabase.from('captain_squads').delete().eq('id', Number(button.dataset.remove));
-    if (error) {
-      setStatus(error.message);
-      return;
+    if (email) {
+      const { error } = existing
+        ? await supabase.from('captain_squads').update({ captain_email: email, name: team.name }).eq('id', existing.id)
+        : await supabase.from('captain_squads').insert({
+            name: team.name,
+            captain_email: email,
+            leaguemaster_team_id: team.leaguemaster_team_id,
+          });
+      if (error) {
+        setStatus(friendly(error));
+        return;
+      }
+    } else if (existing) {
+      const { error } = await supabase.from('captain_squads').delete().eq('id', existing.id);
+      if (error) {
+        setStatus(error.message);
+        return;
+      }
     }
-    setStatus('Team removed.');
+    setStatus('Team captain saved. Nothing was sent.');
     await showSession();
   });
 
@@ -334,9 +327,8 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
     if (!allowed) return;
 
     const [
-      { data: squads, error: squadError },
+      { data: squadRows, error: squadError },
       { data: people, error: peopleError },
-      { data: listed, error: listError },
       { data: clubRows, error: clubError },
       { data: orgRows, error: orgError },
       { data: roleRows, error: roleError },
@@ -346,61 +338,89 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
         .select('id, name, captain_email, captain_id, leaguemaster_team_id, profiles(display_name)')
         .order('name', { ascending: true }),
       supabase.from('profiles').select('id, display_name, email, is_admin').order('display_name', { ascending: true }),
-      supabase.from('league_captain_contacts').select('leaguemaster_team_id, season, name, division, contact_name, email, reserve_name, reserve_email').order('name', { ascending: true }),
-      supabase.from('clubs').select('slug, name').order('name', { ascending: true }),
-      supabase.from('teams').select('id, club_slug, name, division').order('name', { ascending: true }),
+      supabase.from('clubs').select('slug, name, contact_name, contact_email').order('name', { ascending: true }),
+      supabase.from('teams').select('id, club_slug, name, division, leaguemaster_team_id, captain_email, last_season').order('name', { ascending: true }),
       supabase.from('memberships').select('id, role, club_slug, team_id, profiles(display_name, email), teams(name, division)').order('role', { ascending: true }),
     ]);
-    if (squadError || peopleError || listError || clubError || orgError || roleError) {
-      setStatus(squadError?.message || peopleError?.message || listError?.message || clubError?.message || orgError?.message || roleError?.message || 'Could not load teams.');
+    if (squadError || peopleError || clubError || orgError || roleError) {
+      setStatus(squadError?.message || peopleError?.message || clubError?.message || orgError?.message || roleError?.message || 'Could not load teams.');
       return;
     }
 
-    contacts = (listed ?? []) as Contact[];
     clubs = (clubRows ?? []) as Club[];
     orgTeams = (orgRows ?? []) as OrgTeam[];
-    const teamRows = (squads ?? []) as Squad[];
+    squads = (squadRows ?? []) as Squad[];
+    const teamRows = squads;
     const accounts = (people ?? []) as Person[];
     const memberships = (roleRows ?? []) as Membership[];
-    const taken = new Set(teamRows.map((squad) => squad.leaguemaster_team_id).filter(Boolean));
+    const winterTeams = orgTeams.filter((team) => team.last_season === 'Winter 2026/27');
 
-    teamSelect.replaceChildren(new Option('Choose a team', ''));
-    for (const team of contacts) {
-      const email = assignedEmail(team);
-      const option = new Option(optionLabel(team), team.leaguemaster_team_id);
-      option.disabled = !email || taken.has(team.leaguemaster_team_id);
-      teamSelect.append(option);
-    }
-    chosen.textContent = contacts[0]
-      ? `The list is the ${contacts[0].season} teams on League Master. A team with no email there cannot be chosen.`
-      : 'No League Master teams are loaded.';
+    const accountName = (email: string | null) => {
+      if (!email) return '';
+      const account = accounts.find((person) => person.email?.toLowerCase() === email.toLowerCase());
+      return account?.display_name || '';
+    };
 
     teamsHost.replaceChildren(
-      ...teamRows.map((squad) => {
+      ...clubs.map((club) => {
+        const clubTeams = winterTeams
+          .filter((team) => team.club_slug === club.slug)
+          .sort((a, b) => (a.division ?? '').localeCompare(b.division ?? '') || a.name.localeCompare(b.name));
+        const contactWho = accountName(club.contact_email);
+        const contactState = !club.contact_email
+          ? 'No club contact yet'
+          : contactWho
+            ? `Matched to ${contactWho}`
+            : 'Saved. This address has not registered yet';
+        const teamForms = clubTeams.length
+          ? clubTeams.map((team) => {
+              const squad = squads.find((item) => item.leaguemaster_team_id === team.leaguemaster_team_id);
+              const who = squad ? matchedName(squad) : accountName(team.captain_email);
+              const state = !team.captain_email
+                ? 'No captain email yet'
+                : who
+                  ? `Matched to ${who}`
+                  : 'Saved. This address has not registered yet';
+              return `
+                <form class="team-form stack" data-form="captain-email" data-team-id="${team.id}">
+                  <h4>${escapeHtml(team.name)}</h4>
+                  <p class="${who ? 'matched' : 'waiting'}">${escapeHtml(state)}${team.division ? ` · ${escapeHtml(team.division)}` : ''}</p>
+                  <label>
+                    Team captain email
+                    <input type="email" name="captain_email" autocomplete="off" value="${escapeHtml(team.captain_email ?? '')}" />
+                  </label>
+                  <div class="actions">
+                    <button class="btn btn--sm" type="submit">Save team captain</button>
+                  </div>
+                </form>`;
+            }).join('')
+          : '<p class="muted small">No team in the winter league.</p>';
         const card = document.createElement('article');
-        card.className = 'card';
-        const who = matchedName(squad);
-        const source = contacts.find((team) => team.leaguemaster_team_id === squad.leaguemaster_team_id);
-        const state = who ? `Matched to ${who}` : 'Waiting for this email to register';
-        const fromList = source ? `${source.division}` : 'Not from the League Master list';
+        card.className = 'card club';
         card.innerHTML = `
           <div class="card__body stack">
-            <h3>${escapeHtml(squad.name)}</h3>
-            <p class="${who ? 'matched' : 'waiting'}">${escapeHtml(state)}</p>
-            <p class="muted small">${escapeHtml(squad.captain_email)} · ${escapeHtml(fromList)}</p>
-            <div class="actions">
-              <button class="btn btn--ghost btn--sm" type="button" data-remove="${squad.id}" data-team-name="${escapeHtml(squad.name)}">Remove</button>
-            </div>
+            <h3>${escapeHtml(club.name)}</h3>
+            <form class="stack" data-form="club-contact" data-club="${escapeHtml(club.slug)}">
+              <h4>Club contact</h4>
+              <p class="${contactWho ? 'matched' : 'waiting'}">${escapeHtml(contactState)}</p>
+              <label>
+                Name
+                <input name="contact_name" autocomplete="off" value="${escapeHtml(club.contact_name ?? '')}" />
+              </label>
+              <label>
+                Email
+                <input type="email" name="contact_email" autocomplete="off" value="${escapeHtml(club.contact_email ?? '')}" />
+              </label>
+              <div class="actions">
+                <button class="btn btn--sm" type="submit">Save club contact</button>
+              </div>
+            </form>
+            <h4>Team captains</h4>
+            ${teamForms}
           </div>`;
         return card;
       }),
     );
-    if (teamRows.length === 0) {
-      const empty = document.createElement('p');
-      empty.className = 'muted';
-      empty.textContent = 'No teams yet.';
-      teamsHost.replaceChildren(empty);
-    }
 
     peopleHost.replaceChildren(
       ...accounts.map((person) => {
@@ -516,6 +536,14 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
     display: grid;
     gap: 1rem;
     margin: 0 0 1.5rem;
+  }
+  .club h3,
+  .club h4 {
+    margin: 0;
+  }
+  .team-form {
+    border-top: 1px solid var(--border);
+    padding-top: 0.75rem;
   }
   .matched,
   .waiting {
