@@ -39,13 +39,27 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
         <p data-denied hidden>This account cannot set up teams.</p>
 
         <div data-admin hidden>
-          <h2>Clubs</h2>
+          <nav class="page-menu" aria-label="On this page">
+            <div class="page-menu__row">
+              <span class="page-menu__label">Sections</span>
+              <a href="#overview">Overview</a>
+              <a href="#add-club">Add a club</a>
+              <a href="#accounts">Accounts</a>
+              <a href="#roles">Roles</a>
+            </div>
+            <div class="page-menu__row">
+              <span class="page-menu__label">Clubs</span>
+              <div class="page-menu__clubs" data-club-menu></div>
+            </div>
+          </nav>
+
+          <h2 id="overview">Clubs</h2>
           <div class="overview-list" data-overview></div>
 
-          <h2>Edit</h2>
+          <h2 id="edit">Edit</h2>
           <p class="muted small">Leave a field blank if you do not have it yet. Saving does not send a message.</p>
           <div data-teams></div>
-          <form class="card" data-form="new-club">
+          <form class="card" id="add-club" data-form="new-club">
             <div class="card__body stack">
               <h3>Add a club</h3>
               <label>Club name <input name="name" required minlength="2" maxlength="80" autocomplete="off" /></label>
@@ -55,10 +69,10 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
             </div>
           </form>
 
-          <h2>Registered accounts</h2>
+          <h2 id="accounts">Registered accounts</h2>
           <ul class="people" data-people></ul>
 
-          <h2>Roles</h2>
+          <h2 id="roles">Roles</h2>
           <p class="muted small">
             Admin covers every club and team. A club captain covers every team at that club. A team captain covers the players on that team. Anyone without an account is the public.
           </p>
@@ -149,6 +163,7 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
   const denied = root.querySelector<HTMLElement>('[data-denied]')!;
   const teamsHost = root.querySelector<HTMLElement>('[data-teams]')!;
   const overviewHost = root.querySelector<HTMLElement>('[data-overview]')!;
+  const clubMenu = root.querySelector<HTMLElement>('[data-club-menu]')!;
   const peopleHost = root.querySelector<HTMLElement>('[data-people]')!;
   const rolesHost = root.querySelector<HTMLElement>('[data-roles]')!;
   const rolePerson = root.querySelector<HTMLSelectElement>('[data-role-person]')!;
@@ -518,6 +533,14 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
       return `<section class="club-box"><table class="overview">${head}<tbody>${rows}</tbody></table></section>`;
     });
     overviewHost.innerHTML = boxes.join('') || `<section class="club-box"><p class="muted small">No clubs yet.</p></section>`;
+    clubMenu.replaceChildren(
+      ...clubs.map((club) => {
+        const link = document.createElement('a');
+        link.href = `#club-${club.slug}`;
+        link.textContent = club.name;
+        return link;
+      }),
+    );
 
     teamsHost.replaceChildren(
       ...clubs.map((club) => {
@@ -573,6 +596,7 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
           </form>`;
         const card = document.createElement('article');
         card.className = 'card club';
+        card.id = `club-${club.slug}`;
         card.innerHTML = `
           <div class="card__body stack">
             <div class="club__head">
@@ -659,6 +683,64 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
 <style>
   .setup {
     max-width: 960px;
+  }
+  .page-menu {
+    position: sticky;
+    top: 73px;
+    z-index: 40;
+    display: grid;
+    gap: 0.55rem;
+    margin: 0 0 1.25rem;
+    padding: 0.7rem 0.85rem;
+    background: rgba(22, 26, 33, 0.96);
+    border: 1px solid var(--gold-500);
+    border-radius: var(--radius);
+  }
+  .page-menu__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 0.55rem;
+  }
+  .page-menu__label {
+    color: var(--gold-400);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    min-width: 4.5rem;
+  }
+  .page-menu a {
+    color: var(--paper);
+    text-decoration: none;
+    font-size: 0.88rem;
+  }
+  .page-menu__row > a {
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: var(--radius-sm);
+    padding: 0.2rem 0.55rem;
+  }
+  .page-menu a:hover {
+    color: var(--gold-400);
+    border-color: var(--gold-500);
+  }
+  .page-menu__clubs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .page-menu__clubs a {
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 999px;
+    padding: 0.15rem 0.6rem;
+  }
+  #overview,
+  #edit,
+  #add-club,
+  #accounts,
+  #roles,
+  .club {
+    scroll-margin-top: 11rem;
   }
   .overview-list {
     display: grid;
