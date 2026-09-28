@@ -40,6 +40,22 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
 
         <div data-admin hidden>
           <h2>Clubs</h2>
+          <div class="table-wrap">
+            <table class="overview">
+              <thead>
+                <tr>
+                  <th>Club</th>
+                  <th>Club contact</th>
+                  <th>Team</th>
+                  <th>Division</th>
+                  <th>Team captain</th>
+                </tr>
+              </thead>
+              <tbody data-overview></tbody>
+            </table>
+          </div>
+
+          <h2>Edit</h2>
           <p class="muted small">Leave a field blank if you do not have it yet. Saving does not send a message.</p>
           <div data-teams></div>
           <form class="card" data-form="new-club">
@@ -145,6 +161,7 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
   const adminPanel = root.querySelector<HTMLElement>('[data-admin]')!;
   const denied = root.querySelector<HTMLElement>('[data-denied]')!;
   const teamsHost = root.querySelector<HTMLElement>('[data-teams]')!;
+  const overviewHost = root.querySelector<HTMLElement>('[data-overview]')!;
   const peopleHost = root.querySelector<HTMLElement>('[data-people]')!;
   const rolesHost = root.querySelector<HTMLElement>('[data-roles]')!;
   const rolePerson = root.querySelector<HTMLSelectElement>('[data-role-person]')!;
@@ -491,6 +508,32 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
       return account?.display_name || '';
     };
 
+    const dash = '—';
+    const contactLine = (club: Club) =>
+      [club.contact_name, club.contact_email].filter(Boolean).join(' · ') || dash;
+    const overviewRows: string[] = [];
+    for (const club of clubs) {
+      const clubTeams = winterTeams
+        .filter((team) => team.club_slug === club.slug)
+        .sort((a, b) => (a.division ?? '').localeCompare(b.division ?? '') || a.name.localeCompare(b.name));
+      if (clubTeams.length === 0) {
+        overviewRows.push(
+          `<tr><td>${escapeHtml(club.name)}</td><td>${escapeHtml(contactLine(club))}</td><td>${dash}</td><td>${dash}</td><td>${dash}</td></tr>`,
+        );
+        continue;
+      }
+      clubTeams.forEach((team, index) => {
+        const lead =
+          index === 0
+            ? `<td rowspan="${clubTeams.length}">${escapeHtml(club.name)}</td><td rowspan="${clubTeams.length}">${escapeHtml(contactLine(club))}</td>`
+            : '';
+        overviewRows.push(
+          `<tr>${lead}<td>${escapeHtml(team.name)}</td><td>${escapeHtml(team.division || dash)}</td><td>${escapeHtml(team.captain_email || dash)}</td></tr>`,
+        );
+      });
+    }
+    overviewHost.innerHTML = overviewRows.join('') || `<tr><td colspan="5">No clubs yet.</td></tr>`;
+
     teamsHost.replaceChildren(
       ...clubs.map((club) => {
         const clubTeams = winterTeams
@@ -630,7 +673,30 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
 
 <style>
   .setup {
-    max-width: 720px;
+    max-width: 960px;
+  }
+  .table-wrap {
+    overflow-x: auto;
+    margin: 0 0 1.75rem;
+  }
+  .overview {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  .overview th,
+  .overview td {
+    text-align: left;
+    vertical-align: top;
+    padding: 0.45rem 0.65rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .overview th {
+    color: var(--gold-400);
+    font-weight: 600;
+  }
+  .overview td[rowspan] {
+    border-right: 1px solid var(--border);
   }
   .test-flag {
     border: 1px solid var(--gold-500);
