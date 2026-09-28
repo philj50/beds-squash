@@ -42,6 +42,15 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
           <h2>Clubs</h2>
           <p class="muted small">Leave a field blank if you do not have it yet. Saving does not send a message.</p>
           <div data-teams></div>
+          <form class="card" data-form="new-club">
+            <div class="card__body stack">
+              <h3>Add a club</h3>
+              <label>Club name <input name="name" required minlength="2" maxlength="80" autocomplete="off" /></label>
+              <label>Contact name <input name="contact_name" maxlength="80" autocomplete="off" /></label>
+              <label>Contact email <input name="contact_email" type="email" autocomplete="off" /></label>
+              <button class="btn btn--primary" type="submit">Add club</button>
+            </div>
+          </form>
 
           <h2>Registered accounts</h2>
           <ul class="people" data-people></ul>
@@ -123,6 +132,7 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
     captain_email: string;
     captain_id: string | null;
     leaguemaster_team_id: string | null;
+    team_id: number | null;
     profiles: { display_name: string } | { display_name: string }[] | null;
   };
 
@@ -229,9 +239,131 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
     return text ? text : null;
   };
 
+  const SEASON = 'Winter 2026/27';
+
+  const slugify = (name: string) =>
+    name
+      .toLowerCase()
+      .replace(/&/g, ' and ')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+  const playerCount = async (squadId: number) => {
+    const { count, error } = await supabase
+      .from('squad_players')
+      .select('id', { count: 'exact', head: true })
+      .eq('squad_id', squadId);
+    if (error) throw error;
+    return count ?? 0;
+  };
+
+  root.querySelector<HTMLFormElement>('[data-form="new-club"]')!.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget as HTMLFormElement;
+    const data = new FormData(form);
+    const name = String(data.get('name') ?? '').trim();
+    const slug = slugify(name);
+    if (!slug) {
+      setStatus('Give the club a name with letters or numbers.');
+      return;
+    }
+    if (clubs.some((club) => club.slug === slug)) {
+      setStatus(`${name} is already listed.`);
+      return;
+    }
+    setStatus('Adding club…');
+    const { error } = await supabase.from('clubs').insert({
+      slug,
+      name,
+      contact_name: blank(data.get('contact_name')),
+      contact_email: blank(data.get('contact_email'))?.toLowerCase() ?? null,
+    });
+    if (error) {
+      setStatus(error.code === '23505' ? `${name} is already listed.` : error.message);
+      return;
+    }
+    form.reset();
+    setStatus(`${name} added.`);
+    await showSession();
+  });
+
+  teamsHost.addEventListener('click', async (event) => {
+    const target = event.target as HTMLElement;
+    const removeClub = target.closest<HTMLButtonElement>('[data-remove-club]');
+    if (removeClub) {
+      const club = clubs.find((item) => item.slug === removeClub.dataset.removeClub);
+      if (!club) return;
+      const teamCount = orgTeams.filter((team) => team.club_slug === club.slug).length;
+      const teamNote = teamCount ? ` Its ${teamCount} team${teamCount === 1 ? '' : 's'}, their captains, players and roles go too.` : '';
+      if (!window.confirm(`Remove ${club.name}?${teamNote}`)) return;
+      setStatus('Removing club…');
+      const { error } = await supabase.from('clubs').delete().eq('slug', club.slug);
+      setStatus(error ? error.message : `${club.name} removed.`);
+      if (!error) await showSession();
+      return;
+    }
+    const removeTeam = target.closest<HTMLButtonElement>('[data-remove-team]');
+    if (removeTeam) {
+      const team = orgTeams.find((item) => item.id === Number(removeTeam.dataset.removeTeam));
+      if (!team) return;
+      const squad = squads.find((item) => item.team_id === team.id);
+      let players = 0;
+      if (squad) {
+        try {
+          players = await playerCount(squad.id);
+        } catch (error) {
+          setStatus((error as Error).message);
+          return;
+        }
+      }
+      const note = players ? ` Its ${players} player${players === 1 ? '' : 's'} and any roles go too.` : ' Any roles on it go too.';
+      if (!window.confirm(`Remove ${team.name}?${note}`)) return;
+      setStatus('Removing team…');
+      const { error } = await supabase.from('teams').delete().eq('id', team.id);
+      setStatus(error ? error.message : `${team.name} removed.`);
+      if (!error) await showSession();
+    }
+  });
+
   teamsHost.addEventListener('submit', async (event) => {
     const form = event.target as HTMLFormElement;
     event.preventDefault();
+    if (form.matches('[data-form="new-team"]')) {
+      const club = clubs.find((item) => item.slug === form.dataset.club);
+      if (!club) return;
+      const data = new FormData(form);
+      const name = String(data.get('name') ?? '').trim();
+      const email = blank(data.get('captain_email'))?.toLowerCase() ?? null;
+      setStatus('Adding team…');
+      const { data: inserted, error } = await supabase
+        .from('teams')
+        .insert({
+          club_slug: club.slug,
+          name,
+          division: blank(data.get('division')),
+          captain_email: email,
+          last_season: SEASON,
+        })
+        .select('id')
+        .single();
+      if (error) {
+        setStatus(error.code === '23505' ? `${club.name} already has a team called ${name}.` : error.message);
+        return;
+      }
+      if (email && inserted) {
+        const { error: squadError } = await supabase
+          .from('captain_squads')
+          .insert({ name, captain_email: email, team_id: inserted.id });
+        if (squadError) {
+          setStatus(friendly(squadError));
+          return;
+        }
+      }
+      form.reset();
+      setStatus(`${name} added. Nothing was sent.`);
+      await showSession();
+      return;
+    }
     if (form.matches('[data-form="club-contact"]')) {
       const club = clubs.find((item) => item.slug === form.dataset.club);
       if (!club) return;
@@ -250,18 +382,15 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
     const team = orgTeams.find((item) => item.id === Number(form.dataset.teamId));
     if (!team) return;
     const email = blank(new FormData(form).get('captain_email'))?.toLowerCase() ?? null;
-    const existing = squads.find((squad) => squad.leaguemaster_team_id === team.leaguemaster_team_id);
+    const existing = squads.find((squad) => squad.team_id === team.id);
     if (!email && existing) {
-      const { count, error: countError } = await supabase
-        .from('squad_players')
-        .select('id', { count: 'exact', head: true })
-        .eq('squad_id', existing.id);
-      if (countError) {
-        setStatus(countError.message);
-        return;
-      }
-      if (count) {
-        setStatus(`${team.name} already has players, so the captain email was left in place.`);
+      try {
+        if (await playerCount(existing.id)) {
+          setStatus(`${team.name} already has players, so the captain email was left in place.`);
+          return;
+        }
+      } catch (error) {
+        setStatus((error as Error).message);
         return;
       }
     }
@@ -278,6 +407,7 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
             name: team.name,
             captain_email: email,
             leaguemaster_team_id: team.leaguemaster_team_id,
+            team_id: team.id,
           });
       if (error) {
         setStatus(friendly(error));
@@ -335,7 +465,7 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
     ] = await Promise.all([
       supabase
         .from('captain_squads')
-        .select('id, name, captain_email, captain_id, leaguemaster_team_id, profiles(display_name)')
+        .select('id, name, captain_email, captain_id, leaguemaster_team_id, team_id, profiles(display_name)')
         .order('name', { ascending: true }),
       supabase.from('profiles').select('id, display_name, email, is_admin').order('display_name', { ascending: true }),
       supabase.from('clubs').select('slug, name, contact_name, contact_email').order('name', { ascending: true }),
@@ -353,7 +483,7 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
     const teamRows = squads;
     const accounts = (people ?? []) as Person[];
     const memberships = (roleRows ?? []) as Membership[];
-    const winterTeams = orgTeams.filter((team) => team.last_season === 'Winter 2026/27');
+    const winterTeams = orgTeams.filter((team) => team.last_season === SEASON);
 
     const accountName = (email: string | null) => {
       if (!email) return '';
@@ -374,7 +504,7 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
             : 'Saved. This address has not registered yet';
         const teamForms = clubTeams.length
           ? clubTeams.map((team) => {
-              const squad = squads.find((item) => item.leaguemaster_team_id === team.leaguemaster_team_id);
+              const squad = squads.find((item) => item.team_id === team.id);
               const who = squad ? matchedName(squad) : accountName(team.captain_email);
               const state = !team.captain_email
                 ? 'No captain email yet'
@@ -391,15 +521,36 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
                   </label>
                   <div class="actions">
                     <button class="btn btn--sm" type="submit">Save team captain</button>
+                    <button class="btn btn--ghost btn--sm" type="button" data-remove-team="${team.id}">Remove team</button>
                   </div>
                 </form>`;
             }).join('')
           : '<p class="muted small">No team in the winter league.</p>';
+        const newTeam = `
+          <form class="team-form stack" data-form="new-team" data-club="${escapeHtml(club.slug)}">
+            <h4>Add a team</h4>
+            <label>Team name <input name="name" required minlength="2" maxlength="80" autocomplete="off" placeholder="${escapeHtml(club.name)} ${clubTeams.length + 1}" /></label>
+            <label>
+              Division
+              <select name="division">
+                <option value="">Not set</option>
+                <option>Division 1</option>
+                <option>Division 2</option>
+              </select>
+            </label>
+            <label>Team captain email <input type="email" name="captain_email" autocomplete="off" /></label>
+            <div class="actions">
+              <button class="btn btn--sm" type="submit">Add team</button>
+            </div>
+          </form>`;
         const card = document.createElement('article');
         card.className = 'card club';
         card.innerHTML = `
           <div class="card__body stack">
-            <h3>${escapeHtml(club.name)}</h3>
+            <div class="club__head">
+              <h3>${escapeHtml(club.name)}</h3>
+              <button class="btn btn--ghost btn--sm" type="button" data-remove-club="${escapeHtml(club.slug)}">Remove club</button>
+            </div>
             <form class="stack" data-form="club-contact" data-club="${escapeHtml(club.slug)}">
               <h4>Club contact</h4>
               <p class="${contactWho ? 'matched' : 'waiting'}">${escapeHtml(contactState)}</p>
@@ -417,6 +568,7 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
             </form>
             <h4>Team captains</h4>
             ${teamForms}
+            ${newTeam}
           </div>`;
         return card;
       }),
@@ -540,6 +692,12 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
   .club h3,
   .club h4 {
     margin: 0;
+  }
+  .club__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
   }
   .team-form {
     border-top: 1px solid var(--border);
