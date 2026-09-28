@@ -39,53 +39,55 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
         <p data-denied hidden>This account cannot set up teams.</p>
 
         <div data-admin hidden>
-          <nav class="page-menu" aria-label="On this page">
-            <div class="page-menu__row">
-              <span class="page-menu__label">Sections</span>
-              <a href="#overview">Overview</a>
-              <a href="#add-club">Add a club</a>
-              <a href="#accounts">Accounts</a>
-              <a href="#roles">Roles</a>
-            </div>
-            <div class="page-menu__row">
-              <span class="page-menu__label">Clubs</span>
-              <div class="page-menu__clubs" data-club-menu></div>
-            </div>
+          <nav class="admin-tabs" aria-label="Admin sections">
+            <button type="button" data-tab-button="overview">Overview</button>
+            <button type="button" data-tab-button="clubs">Clubs</button>
+            <button type="button" data-tab-button="accounts">Accounts</button>
+            <button type="button" data-tab-button="roles">Roles</button>
           </nav>
 
-          <h2 id="overview">Clubs</h2>
-          <div class="overview-box">
-            <table class="overview">
-              <thead>
-                <tr>
-                  <th>Club</th>
-                  <th>Club contact</th>
-                  <th>Team</th>
-                  <th>Division</th>
-                  <th>Team captain</th>
-                </tr>
-              </thead>
-              <tbody data-overview></tbody>
-            </table>
-          </div>
-
-          <h2 id="edit">Edit</h2>
-          <p class="muted small">Leave a field blank if you do not have it yet. Saving does not send a message.</p>
-          <div data-teams></div>
-          <form class="card" id="add-club" data-form="new-club">
-            <div class="card__body stack">
-              <h3>Add a club</h3>
-              <label>Club name <input name="name" required minlength="2" maxlength="80" autocomplete="off" /></label>
-              <label>Contact name <input name="contact_name" maxlength="80" autocomplete="off" /></label>
-              <label>Contact email <input name="contact_email" type="email" autocomplete="off" /></label>
-              <button class="btn btn--primary" type="submit">Add club</button>
+          <section class="admin-panel" data-tab="overview">
+            <h2>Overview</h2>
+            <p class="muted small">Every club, its contact, and the captain of each Winter 2026/27 team. Choose a club name to edit it.</p>
+            <div class="overview-box">
+              <table class="overview">
+                <thead>
+                  <tr>
+                    <th>Club</th>
+                    <th>Club contact</th>
+                    <th>Team</th>
+                    <th>Division</th>
+                    <th>Team captain</th>
+                  </tr>
+                </thead>
+                <tbody data-overview></tbody>
+              </table>
             </div>
-          </form>
+          </section>
 
-          <h2 id="accounts">Registered accounts</h2>
-          <ul class="people" data-people></ul>
+          <section class="admin-panel" data-tab="clubs" hidden>
+            <h2>Clubs</h2>
+            <nav class="club-menu" aria-label="Clubs" data-club-menu></nav>
+            <p class="muted small">Leave a field blank if you do not have it yet. Saving does not send a message.</p>
+            <div data-teams></div>
+            <form class="card" data-form="new-club" data-club-panel="new" hidden>
+              <div class="card__body stack">
+                <h3>Add a club</h3>
+                <label>Club name <input name="name" required minlength="2" maxlength="80" autocomplete="off" /></label>
+                <label>Contact name <input name="contact_name" maxlength="80" autocomplete="off" /></label>
+                <label>Contact email <input name="contact_email" type="email" autocomplete="off" /></label>
+                <button class="btn btn--primary" type="submit">Add club</button>
+              </div>
+            </form>
+          </section>
 
-          <h2 id="roles">Roles</h2>
+          <section class="admin-panel" data-tab="accounts" hidden>
+            <h2>Registered accounts</h2>
+            <ul class="people" data-people></ul>
+          </section>
+
+          <section class="admin-panel" data-tab="roles" hidden>
+          <h2>Roles</h2>
           <p class="muted small">
             Admin covers every club and team. A club captain covers every team at that club. A team captain covers the players on that team. Anyone without an account is the public.
           </p>
@@ -122,6 +124,7 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
             </div>
           </form>
           <ul class="people" data-roles></ul>
+          </section>
         </div>
       </div>
     </div>
@@ -185,6 +188,49 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
   const roleTeamField = root.querySelector<HTMLElement>('[data-role-team-field]')!;
   const roleClub = root.querySelector<HTMLSelectElement>('[data-role-club]')!;
   const roleTeam = root.querySelector<HTMLSelectElement>('[data-role-team]')!;
+  const newClubForm = root.querySelector<HTMLFormElement>('[data-form="new-club"]')!;
+  const tabs = ['overview', 'clubs', 'accounts', 'roles'] as const;
+  type Tab = (typeof tabs)[number];
+  let currentClub = '';
+
+  const showTab = (tab: Tab) => {
+    for (const panel of root.querySelectorAll<HTMLElement>('[data-tab]')) panel.hidden = panel.dataset.tab !== tab;
+    for (const button of root.querySelectorAll<HTMLButtonElement>('[data-tab-button]')) {
+      button.setAttribute('aria-current', button.dataset.tabButton === tab ? 'page' : 'false');
+    }
+    history.replaceState(null, '', `#${tab}`);
+  };
+
+  const showClub = (slug: string) => {
+    currentClub = slug;
+    for (const card of teamsHost.querySelectorAll<HTMLElement>('[data-club-card]')) {
+      card.hidden = card.dataset.clubCard !== slug;
+    }
+    newClubForm.hidden = slug !== 'new';
+    for (const link of clubMenu.querySelectorAll<HTMLButtonElement>('[data-pick-club]')) {
+      link.setAttribute('aria-current', link.dataset.pickClub === slug ? 'true' : 'false');
+    }
+  };
+
+  root.addEventListener('click', (event) => {
+    const target = event.target as HTMLElement;
+    const tabButton = target.closest<HTMLButtonElement>('[data-tab-button]');
+    if (tabButton) {
+      showTab(tabButton.dataset.tabButton as Tab);
+      return;
+    }
+    const pick = target.closest<HTMLButtonElement>('[data-pick-club]');
+    if (pick) {
+      showClub(pick.dataset.pickClub!);
+      return;
+    }
+    const open = target.closest<HTMLButtonElement>('[data-open-club]');
+    if (open) {
+      showTab('clubs');
+      showClub(open.dataset.openClub!);
+    }
+  });
+
   let clubs: Club[] = [];
   let orgTeams: OrgTeam[] = [];
   let squads: Squad[] = [];
@@ -289,7 +335,7 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
     return count ?? 0;
   };
 
-  root.querySelector<HTMLFormElement>('[data-form="new-club"]')!.addEventListener('submit', async (event) => {
+  newClubForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = event.currentTarget as HTMLFormElement;
     const data = new FormData(form);
@@ -316,6 +362,7 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
     }
     form.reset();
     setStatus(`${name} added.`);
+    currentClub = slug;
     await showSession();
   });
 
@@ -526,18 +573,20 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
     const dash = '—';
     const contactLine = (club: Club) =>
       [club.contact_name, club.contact_email].filter(Boolean).join(' · ') || dash;
+    const clubLink = (club: Club) =>
+      `<button class="link-button" type="button" data-open-club="${escapeHtml(club.slug)}">${escapeHtml(club.name)}</button>`;
     const groups = clubs.map((club) => {
       const clubTeams = winterTeams
         .filter((team) => team.club_slug === club.slug)
         .sort((a, b) => (a.division ?? '').localeCompare(b.division ?? '') || a.name.localeCompare(b.name));
       const rows =
         clubTeams.length === 0
-          ? `<tr><td>${escapeHtml(club.name)}</td><td>${escapeHtml(contactLine(club))}</td><td>${dash}</td><td>${dash}</td><td>${dash}</td></tr>`
+          ? `<tr><td>${clubLink(club)}</td><td>${escapeHtml(contactLine(club))}</td><td>${dash}</td><td>${dash}</td><td>${dash}</td></tr>`
           : clubTeams
               .map((team, index) => {
                 const lead =
                   index === 0
-                    ? `<td rowspan="${clubTeams.length}">${escapeHtml(club.name)}</td><td rowspan="${clubTeams.length}">${escapeHtml(contactLine(club))}</td>`
+                    ? `<td rowspan="${clubTeams.length}">${clubLink(club)}</td><td rowspan="${clubTeams.length}">${escapeHtml(contactLine(club))}</td>`
                     : '';
                 return `<tr>${lead}<td>${escapeHtml(team.name)}</td><td>${escapeHtml(team.division || dash)}</td><td>${escapeHtml(team.captain_email || dash)}</td></tr>`;
               })
@@ -545,13 +594,16 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
       return rows.replace('<tr>', '<tr class="club-start">');
     });
     overviewHost.innerHTML = groups.join('') || `<tr><td colspan="5">No clubs yet.</td></tr>`;
+    const pickButton = (slug: string, label: string) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.pickClub = slug;
+      button.textContent = label;
+      return button;
+    };
     clubMenu.replaceChildren(
-      ...clubs.map((club) => {
-        const link = document.createElement('a');
-        link.href = `#club-${club.slug}`;
-        link.textContent = club.name;
-        return link;
-      }),
+      ...clubs.map((club) => pickButton(club.slug, club.name)),
+      pickButton('new', '+ Add a club'),
     );
 
     teamsHost.replaceChildren(
@@ -608,7 +660,7 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
           </form>`;
         const card = document.createElement('article');
         card.className = 'card club';
-        card.id = `club-${club.slug}`;
+        card.dataset.clubCard = club.slug;
         card.innerHTML = `
           <div class="card__body stack">
             <div class="club__head">
@@ -637,6 +689,9 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
         return card;
       }),
     );
+
+    if (currentClub !== 'new' && !clubs.some((club) => club.slug === currentClub)) currentClub = clubs[0]?.slug ?? 'new';
+    showClub(currentClub);
 
     peopleHost.replaceChildren(
       ...accounts.map((person) => {
@@ -689,129 +744,154 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
     return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
   }
 
+  const startTab = location.hash.slice(1) as Tab;
+  showTab(tabs.includes(startTab) ? startTab : 'overview');
   showSession();
 </script>
 
-<style>
-  .setup {
-    max-width: 960px;
+<style is:global>
+  #setup-app {
+    max-width: 1040px;
   }
-  .page-menu {
-    position: sticky;
-    top: 73px;
-    z-index: 40;
-    display: grid;
-    gap: 0.55rem;
-    margin: 0 0 1.25rem;
-    padding: 0.7rem 0.85rem;
-    background: rgba(22, 26, 33, 0.96);
-    border: 1px solid var(--gold-500);
-    border-radius: var(--radius);
-  }
-  .page-menu__row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.4rem 0.55rem;
-  }
-  .page-menu__label {
-    color: var(--gold-400);
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    min-width: 4.5rem;
-  }
-  .page-menu a {
-    color: var(--paper);
-    text-decoration: none;
-    font-size: 0.88rem;
-  }
-  .page-menu__row > a {
-    border: 1px solid rgba(255, 255, 255, 0.22);
-    border-radius: var(--radius-sm);
-    padding: 0.2rem 0.55rem;
-  }
-  .page-menu a:hover {
-    color: var(--gold-400);
-    border-color: var(--gold-500);
-  }
-  .page-menu__clubs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-  }
-  .page-menu__clubs a {
-    border: 1px solid rgba(255, 255, 255, 0.22);
-    border-radius: 999px;
-    padding: 0.15rem 0.6rem;
-  }
-  #overview,
-  #edit,
-  #add-club,
-  #accounts,
-  #roles,
-  .club {
-    scroll-margin-top: 11rem;
-  }
-  .overview-box {
-    border: 2px solid var(--gold-500);
-    border-radius: var(--radius);
-    background: var(--ink-800);
-    overflow-x: auto;
-    margin: 0 0 1.75rem;
-  }
-  .overview tr.club-start td {
-    border-top: 2px solid rgba(255, 255, 255, 0.4);
-  }
-  .overview {
-    border-style: hidden;
-  }
-  .overview {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.9rem;
-  }
-  .overview th,
-  .overview td {
-    text-align: left;
-    vertical-align: top;
-    padding: 0.5rem 0.7rem;
-    border: 1px solid rgba(255, 255, 255, 0.22);
-  }
-  .overview th {
-    color: var(--gold-400);
-    font-weight: 600;
-    background: var(--ink-700);
-  }
-  .test-flag {
+  #setup-app .test-flag {
     border: 1px solid var(--gold-500);
     color: var(--gold-400);
     border-radius: var(--radius-sm);
     padding: 0.75rem 1rem;
     margin: 0 0 1.25rem;
   }
-  .lede {
+  #setup-app .lede {
     color: var(--ink-200);
   }
-  .status:empty {
+  #setup-app .status:empty {
     display: none;
   }
-  .status {
+  #setup-app .status {
     margin: 1rem 0;
     color: var(--gold-400);
   }
-  .stack {
+  #setup-app .who {
+    margin-bottom: 0.5rem;
+  }
+
+  #setup-app .admin-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    margin: 0 0 1.5rem;
+    border-bottom: 2px solid var(--gold-500);
+  }
+  #setup-app .admin-tabs button {
+    background: transparent;
+    color: var(--ink-200);
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    padding: 0.7rem 1.25rem;
+    margin-bottom: -2px;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #setup-app .admin-tabs button:hover {
+    color: var(--gold-400);
+  }
+  #setup-app .admin-tabs button[aria-current='page'] {
+    background: var(--ink-800);
+    color: var(--gold-400);
+    border-color: var(--gold-500);
+    border-bottom: 2px solid var(--ink-800);
+  }
+  #setup-app .admin-panel > h2 {
+    margin-top: 0;
+  }
+
+  #setup-app .club-menu {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0 0 1rem;
+  }
+  #setup-app .club-menu button {
+    background: var(--ink-800);
+    color: var(--paper);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 999px;
+    padding: 0.35rem 0.85rem;
+    font: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+  #setup-app .club-menu button:hover {
+    border-color: var(--gold-500);
+  }
+  #setup-app .club-menu button[aria-current='true'] {
+    background: var(--gold-500);
+    border-color: var(--gold-500);
+    color: var(--ink-950);
+    font-weight: 600;
+  }
+
+  #setup-app .overview-box {
+    border: 2px solid var(--gold-500);
+    border-radius: var(--radius);
+    background: var(--ink-800);
+    overflow-x: auto;
+    margin: 0 0 1.75rem;
+  }
+  #setup-app .overview {
+    width: 100%;
+    border-collapse: collapse;
+    border-style: hidden;
+    font-size: 0.92rem;
+  }
+  #setup-app .overview th,
+  #setup-app .overview td {
+    text-align: left;
+    vertical-align: top;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+  #setup-app .overview th {
+    color: var(--gold-400);
+    font-weight: 700;
+    background: var(--ink-700);
+    white-space: nowrap;
+  }
+  #setup-app .overview tbody tr:nth-child(odd) td {
+    background: rgba(255, 255, 255, 0.02);
+  }
+  #setup-app .overview tr.club-start td {
+    border-top: 2px solid var(--gold-600);
+  }
+  #setup-app .overview td[rowspan] {
+    background: var(--ink-800);
+  }
+  #setup-app .link-button {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--gold-400);
+    font: inherit;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+  }
+  #setup-app .link-button:hover {
+    text-decoration: underline;
+  }
+
+  #setup-app .stack {
     display: grid;
     gap: 0.75rem;
   }
-  label {
+  #setup-app label {
     display: grid;
     gap: 0.3rem;
     font-size: 0.9rem;
   }
-  input,
-  select {
+  #setup-app input,
+  #setup-app select {
     width: 100%;
     background: var(--ink-900);
     color: var(--text);
@@ -820,62 +900,62 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
     padding: 0.65rem 0.75rem;
     font: inherit;
   }
-  .small {
+  #setup-app .small {
     font-size: 0.85rem;
-    margin: 0;
+    margin: 0 0 1rem;
   }
-  .who {
-    margin-bottom: 0.5rem;
-  }
-  .actions {
+  #setup-app .actions {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
     margin: 0 0 1rem;
   }
-  .card .actions {
+  #setup-app .card .actions {
     margin: 0;
   }
-  [data-teams] {
+  #setup-app [data-teams] {
     display: grid;
     gap: 1rem;
     margin: 0 0 1.5rem;
   }
-  .club h3,
-  .club h4 {
+  #setup-app .club {
+    border: 2px solid var(--gold-500);
+  }
+  #setup-app .club h3,
+  #setup-app .club h4 {
     margin: 0;
   }
-  .club__head {
+  #setup-app .club__head {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
   }
-  .team-form {
-    border-top: 1px solid var(--border);
-    padding-top: 0.75rem;
+  #setup-app .team-form {
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+    padding-top: 0.9rem;
   }
-  .matched,
-  .waiting {
+  #setup-app .matched,
+  #setup-app .waiting {
     margin: 0;
     font-size: 0.9rem;
   }
-  .matched {
+  #setup-app .matched {
     color: var(--gold-400);
   }
-  .waiting {
+  #setup-app .waiting {
     color: var(--ink-200);
   }
-  .people {
+  #setup-app .people {
     list-style: none;
     margin: 0;
     padding: 0;
   }
-  .people li {
+  #setup-app .people li {
     padding: 0.55rem 0;
     border-bottom: 1px solid var(--border);
   }
-  .pill {
+  #setup-app .pill {
     display: inline-block;
     border: 1px solid var(--gold-500);
     color: var(--gold-400);
