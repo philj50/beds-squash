@@ -18,7 +18,7 @@ const crumbs = [
   <PageHero
     eyebrow="Winter and summer"
     title="Tables and fixtures"
-    lede="Published results for previous seasons, and the fixtures for the season now in progress. This page is for reading only — captains enter scores on League Master."
+    lede="Published results for previous seasons, and the fixtures for the season now in progress. Click a team for its matches, or a score for the match card. This page is for reading only — captains enter scores on League Master."
   >
     <div class="hero-actions">
       <a class="btn btn--ghost" href={url('/leagues/')}>League rules</a>
@@ -53,6 +53,8 @@ const crumbs = [
   type Fixture = {
     id: number;
     division_id: number;
+    home_team_id: number;
+    away_team_id: number;
     starts_at: string;
     status: string;
     home_points: number | null;
@@ -62,7 +64,15 @@ const crumbs = [
     home: { name: string } | null;
     away: { name: string } | null;
   };
+  type Rubber = {
+    position: number;
+    home_player: string | null;
+    away_player: string | null;
+    score: string | null;
+    winner: string | null;
+  };
   type Standing = {
+    id: number;
     name: string;
     played: number;
     won: number;
@@ -129,9 +139,10 @@ const crumbs = [
   }
 
   function standingsFor(teams: Team[], fixtures: Fixture[]): Standing[] {
-    const rows = new Map<string, Standing>();
+    const rows = new Map<number, Standing>();
     for (const team of teams) {
-      rows.set(team.name, {
+      rows.set(team.id, {
+        id: team.id,
         name: team.name,
         played: 0,
         won: 0,
@@ -144,8 +155,8 @@ const crumbs = [
     }
     for (const fixture of fixtures) {
       if (!hasScore(fixture)) continue;
-      const home = rows.get(fixture.home?.name ?? '');
-      const away = rows.get(fixture.away?.name ?? '');
+      const home = rows.get(fixture.home_team_id);
+      const away = rows.get(fixture.away_team_id);
       if (!home || !away) continue;
       const hp = fixture.home_points ?? 0;
       const ap = fixture.away_points ?? 0;
@@ -188,18 +199,62 @@ const crumbs = [
     return '\u2014';
   }
 
-  function renderBoard(division: Division, teams: Team[], fixtures: Fixture[]) {
+  function resultFor(fixture: Fixture, teamId: number): 'W' | 'D' | 'L' | null {
+    if (!hasScore(fixture)) return null;
+    const isHome = fixture.home_team_id === teamId;
+    const mine = (isHome ? fixture.home_points : fixture.away_points) ?? 0;
+    const theirs = (isHome ? fixture.away_points : fixture.home_points) ?? 0;
+    if (mine > theirs) return 'W';
+    if (mine < theirs) return 'L';
+    return 'D';
+  }
+
+  function renderRubbers(fixture: Fixture, rubbers: Rubber[] | null): string {
+    if (rubbers === null) return '<p class="muted detail-note">Loading match card…</p>';
+    if (!rubbers.length) {
+      return `<p class="muted detail-note">${hasScore(fixture) ? 'No match card has been published for this match.' : 'Not played yet.'}</p>`;
+    }
+    const rows = rubbers
+      .map((rubber) => {
+        const homeWon = rubber.winner === 'home';
+        const awayWon = rubber.winner === 'away';
+        const walkover = /walkover/i.test(`${rubber.home_player ?? ''} ${rubber.away_player ?? ''}`) || rubber.score == null;
+        return `<tr>
+          <td class="num">${rubber.position}</td>
+          <td class="player ${homeWon ? 'is-win' : ''}">${escapeHtml(rubber.home_player ?? '\u2014')}</td>
+          <td class="score">${walkover && !rubber.score ? '<span class="muted">walkover</span>' : escapeHtml(rubber.score ?? '\u2014')}</td>
+          <td class="player away ${awayWon ? 'is-win' : ''}">${escapeHtml(rubber.away_player ?? '\u2014')}</td>
+        </tr>`;
+      })
+      .join('');
+    return `<table class="rubbers">
+      <caption class="sr-only">Match card</caption>
+      <thead><tr><th class="num">#</th><th>${escapeHtml(fixture.home?.name ?? 'Home')}</th><th>Games</th><th class="away">${escapeHtml(fixture.away?.name ?? 'Away')}</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  }
+
+  function renderBoard(
+    division: Division,
+    teams: Team[],
+    fixtures: Fixture[],
+    focusTeamId: number | null,
+    openFixtureId: number | null,
+    rubbers: Map<number, Rubber[]>,
+  ) {
     if (!boardEl) return;
     const table = standingsFor(teams, fixtures);
     const played = fixtures.filter(hasScore).length;
-    const head = `<div class="board-head"><h2>${escapeHtml(division.name)}</h2><p>${escapeHtml(division.scoring ?? 'League')} · ${played} result${played === 1 ? '' : 's'} · ordered by points, then game difference</p></div>`;
+    const focus = focusTeamId ? teams.find((team) => team.id === focusTeamId) ?? null : null;
+    const head = `<div class="board-head"><h2>${escapeHtml(division.name)}</h2><p>${escapeHtml(division.scoring ?? 'League')} · ${played} result${played === 1 ? '' : 's'} · ordered by points, then game difference · click a team for its matches</p></div>`;
     const rows = table
       .map((row, index) => {
         const diff = row.gamesFor - row.gamesAgainst;
         const withdrawn = /withdrawn/i.test(row.name);
-        return `<tr class="${index === 0 && row.played ? 'is-leader' : ''} ${withdrawn ? 'is-withdrawn' : ''}">
+        const isFocus = row.id === focusTeamId;
+        return `<tr class="team-row ${index === 0 && row.played ? 'is-leader' : ''} ${withdrawn ? 'is-withdrawn' : ''} ${isFocus ? 'is-focus' : ''}" data-team="${row.id}">
           <td class="num">${index + 1}</td>
-          <th scope="row">${escapeHtml(row.name)}</th>
+          <th scope="row"><button type="button" class="team-btn" data-team-btn="${row.id}" aria-pressed="${isFocus}">${escapeHtml(row.name)}</button></th>
           <td class="num">${row.played}</td>
           <td class="num">${row.won}</td>
           <td class="num">${row.drawn}</td>
@@ -210,8 +265,9 @@ const crumbs = [
         </tr>`;
       })
       .join('');
-    const fixtureRows = [...fixtures]
-      .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
+    const sorted = [...fixtures].sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+    const shown = focus ? sorted.filter((fixture) => fixture.home_team_id === focus.id || fixture.away_team_id === focus.id) : sorted;
+    const fixtureRows = shown
       .map((fixture) => {
         const when = new Date(fixture.starts_at);
         const games =
@@ -220,14 +276,47 @@ const crumbs = [
             : '';
         const homeWin = hasScore(fixture) && (fixture.home_points ?? 0) > (fixture.away_points ?? 0);
         const awayWin = hasScore(fixture) && (fixture.away_points ?? 0) > (fixture.home_points ?? 0);
-        return `<tr>
+        const isOpen = fixture.id === openFixtureId;
+        const outcome = focus ? resultFor(fixture, focus.id) : null;
+        const detail = isOpen
+          ? `<tr class="fx-detail"><td colspan="5">${renderRubbers(fixture, rubbers.get(fixture.id) ?? null)}</td></tr>`
+          : '';
+        return `<tr class="fx-row ${isOpen ? 'is-open' : ''}" data-fixture="${fixture.id}">
           <td class="when"><time datetime="${fixture.starts_at}">${dateFmt.format(when)}<span>${timeFmt.format(when)}</span></time></td>
-          <td class="side ${homeWin ? 'is-win' : ''}">${escapeHtml(fixture.home?.name ?? 'Home')}</td>
-          <td class="score">${scoreLabel(fixture)}${games}</td>
-          <td class="side away ${awayWin ? 'is-win' : ''}">${escapeHtml(fixture.away?.name ?? 'Away')}</td>
-        </tr>`;
+          <td class="side ${homeWin ? 'is-win' : ''} ${focus && fixture.home_team_id === focus.id ? 'is-focus' : ''}">${escapeHtml(fixture.home?.name ?? 'Home')}</td>
+          <td class="score"><button type="button" class="score-btn" data-fixture-btn="${fixture.id}" aria-expanded="${isOpen}" title="${isOpen ? 'Hide match card' : 'Show match card'}">${scoreLabel(fixture)}${games}</button></td>
+          <td class="side away ${awayWin ? 'is-win' : ''} ${focus && fixture.away_team_id === focus.id ? 'is-focus' : ''}">${escapeHtml(fixture.away?.name ?? 'Away')}</td>
+          <td class="outcome">${outcome ? `<span class="form form--${outcome.toLowerCase()}">${outcome}</span>` : ''}</td>
+        </tr>${detail}`;
       })
       .join('');
+    let fixtureHead = `<div class="board-head"><h2>Fixtures</h2><p>${fixtures.length} match${fixtures.length === 1 ? '' : 'es'} · home team first · click a score for the match card</p></div>`;
+    if (focus) {
+      const record = shown.reduce(
+        (acc, fixture) => {
+          const outcome = resultFor(fixture, focus.id);
+          if (outcome === 'W') acc.w += 1;
+          else if (outcome === 'D') acc.d += 1;
+          else if (outcome === 'L') acc.l += 1;
+          return acc;
+        },
+        { w: 0, d: 0, l: 0 },
+      );
+      const form = shown
+        .filter(hasScore)
+        .map((fixture) => resultFor(fixture, focus.id))
+        .filter((outcome): outcome is 'W' | 'D' | 'L' => outcome !== null)
+        .map((outcome) => `<span class="form form--${outcome.toLowerCase()}">${outcome}</span>`)
+        .join('');
+      fixtureHead = `<div class="board-head board-head--focus">
+        <div>
+          <h2>${escapeHtml(focus.name)}</h2>
+          <p>${shown.length} match${shown.length === 1 ? '' : 'es'} · won ${record.w}${record.d ? `, drawn ${record.d}` : ''}, lost ${record.l}</p>
+          ${form ? `<div class="form-strip" aria-label="Results in order">${form}</div>` : ''}
+        </div>
+        <button type="button" class="btn btn--ghost btn--sm" data-show-all>Show all fixtures</button>
+      </div>`;
+    }
     boardEl.innerHTML = `
       <article class="card standings-card">
         <div class="card__body">
@@ -253,16 +342,16 @@ const crumbs = [
           </div>
         </div>
       </article>
-      <article class="card fixtures-card">
+      <article class="card fixtures-card" id="fixtures">
         <div class="card__body">
-          <div class="board-head"><h2>Fixtures</h2><p>${fixtures.length} match${fixtures.length === 1 ? '' : 'es'} · home team first</p></div>
+          ${fixtureHead}
           <div class="table-wrap">
             <table class="fixtures">
               <caption class="sr-only">${escapeHtml(division.name)} fixtures</caption>
               <thead>
-                <tr><th>Date</th><th>Home</th><th>Score</th><th>Away</th></tr>
+                <tr><th>Date</th><th>Home</th><th class="score">Score</th><th class="away">Away</th><th></th></tr>
               </thead>
-              <tbody>${fixtureRows || '<tr><td colspan="4">No fixtures published for this division.</td></tr>'}</tbody>
+              <tbody>${fixtureRows || '<tr><td colspan="5">No fixtures published for this division.</td></tr>'}</tbody>
             </table>
           </div>
         </div>
@@ -278,6 +367,20 @@ const crumbs = [
     let divisions: Division[] = [];
     let teams: Team[] = [];
     let fixtures: Fixture[] = [];
+    let focusTeamId: number | null = null;
+    let openFixtureId: number | null = null;
+    const rubberCache = new Map<number, Rubber[]>();
+
+    async function loadRubbers(fixtureId: number) {
+      if (rubberCache.has(fixtureId)) return;
+      const { data, error } = await supabase
+        .from('rubbers')
+        .select('position, home_player, away_player, score, winner')
+        .eq('fixture_id', fixtureId)
+        .order('position');
+      if (error) throw error;
+      rubberCache.set(fixtureId, (data ?? []) as Rubber[]);
+    }
 
     function seasonsInKind(value: 'winter' | 'summer'): Season[] {
       return seasons.filter((season) => kindOf(season.name) === value);
@@ -334,7 +437,7 @@ const crumbs = [
         supabase
           .from('fixtures')
           .select(
-            'id, division_id, starts_at, status, home_points, away_points, home_games, away_games, home:league_teams!fixtures_home_team_id_fkey(name), away:league_teams!fixtures_away_team_id_fkey(name)',
+            'id, division_id, home_team_id, away_team_id, starts_at, status, home_points, away_points, home_games, away_games, home:league_teams!fixtures_home_team_id_fkey(name), away:league_teams!fixtures_away_team_id_fkey(name)',
           )
           .in('division_id', ids)
           .order('starts_at'),
@@ -377,10 +480,48 @@ const crumbs = [
       showDivisions(divisions, division.id);
       const divisionTeams = teams.filter((team) => team.division_id === division.id);
       const divisionFixtures = fixtures.filter((fixture) => fixture.division_id === division.id);
-      renderBoard(division, divisionTeams, divisionFixtures);
+      if (focusTeamId && !divisionTeams.some((team) => team.id === focusTeamId)) focusTeamId = null;
+      if (openFixtureId && !divisionFixtures.some((fixture) => fixture.id === openFixtureId)) openFixtureId = null;
+      renderBoard(division, divisionTeams, divisionFixtures, focusTeamId, openFixtureId, rubberCache);
       setStatus('');
-      history.replaceState(null, '', `#${season.id}/${division.id}`);
+      const parts = [season.id, division.id, focusTeamId ? `t${focusTeamId}` : '', openFixtureId ? `m${openFixtureId}` : ''].filter(Boolean);
+      history.replaceState(null, '', `#${parts.join('/')}`);
     }
+
+    async function openFixture(id: number | null) {
+      openFixtureId = id;
+      paint();
+      if (id === null || rubberCache.has(id)) return;
+      try {
+        await loadRubbers(id);
+      } catch {
+        rubberCache.set(id, []);
+      }
+      if (openFixtureId === id) paint();
+    }
+
+    boardEl.addEventListener('click', (event) => {
+      const target = event.target as HTMLElement;
+      const teamButton = target.closest<HTMLButtonElement>('[data-team-btn]');
+      if (teamButton) {
+        const id = Number(teamButton.dataset.teamBtn);
+        focusTeamId = focusTeamId === id ? null : id;
+        openFixtureId = null;
+        paint();
+        if (focusTeamId) document.getElementById('fixtures')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+      if (target.closest('[data-show-all]')) {
+        focusTeamId = null;
+        paint();
+        return;
+      }
+      const fixtureButton = target.closest<HTMLButtonElement>('[data-fixture-btn]');
+      if (fixtureButton) {
+        const id = Number(fixtureButton.dataset.fixtureBtn);
+        void openFixture(openFixtureId === id ? null : id);
+      }
+    });
 
     async function selectSeason(id: number) {
       const season = seasons.find((item) => item.id === id);
@@ -388,6 +529,8 @@ const crumbs = [
       const nextKind = kindOf(season.name);
       if (nextKind) kind = nextKind;
       seasonId = season.id;
+      focusTeamId = null;
+      openFixtureId = null;
       await loadSeason(season.id);
       divisionId = divisions[0]?.id ?? 0;
       paint();
@@ -415,6 +558,8 @@ const crumbs = [
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-division]');
       if (!button) return;
       divisionId = Number(button.dataset.division);
+      focusTeamId = null;
+      openFixtureId = null;
       paint();
     });
 
@@ -425,8 +570,11 @@ const crumbs = [
         .order('starts_on', { ascending: false });
       if (error) throw error;
       seasons = (data ?? []).filter((season) => kindOf(season.name));
-      const hash = location.hash.replace('#', '');
-      const [hashSeason, hashDivision] = hash.split('/').map((part) => Number(part));
+      const hashParts = location.hash.replace('#', '').split('/');
+      const hashSeason = Number(hashParts[0]);
+      const hashDivision = Number(hashParts[1]);
+      const hashTeam = Number(hashParts.find((part) => /^t\d+$/.test(part))?.slice(1));
+      const hashMatch = Number(hashParts.find((part) => /^m\d+$/.test(part))?.slice(1));
       const today = new Date().toISOString().slice(0, 10);
       const completed = seasons.filter((season) => season.ends_on.slice(0, 10) < today);
       const initial = seasons.find((season) => season.id === hashSeason) ?? completed[0] ?? seasons[0];
@@ -438,7 +586,9 @@ const crumbs = [
         seasonId = initial.id;
         await loadSeason(initial.id);
         divisionId = divisions.some((division) => division.id === hashDivision) ? hashDivision : (divisions[0]?.id ?? 0);
-        paint();
+        focusTeamId = hashTeam || null;
+        if (hashMatch) await openFixture(hashMatch);
+        else paint();
       }
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'The tables could not be loaded.');
@@ -596,6 +746,139 @@ const crumbs = [
   }
   #results-app .fixtures .is-win {
     color: var(--gold-400);
+  }
+  #results-app .fixtures thead th.score,
+  #results-app .fixtures thead th.away {
+    text-align: center;
+  }
+  #results-app .fixtures thead th.away {
+    text-align: right;
+  }
+  #results-app .fixtures .side.is-focus {
+    font-weight: 700;
+  }
+  #results-app .team-btn,
+  #results-app .score-btn {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    color: inherit;
+    font: inherit;
+    text-align: inherit;
+    cursor: pointer;
+  }
+  #results-app .team-btn {
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    text-underline-offset: 3px;
+    transition: text-decoration-color 0.15s;
+  }
+  #results-app .team-row:hover .team-btn,
+  #results-app .team-btn:focus-visible {
+    text-decoration-color: var(--gold-400);
+  }
+  #results-app tr.is-focus > th,
+  #results-app tr.is-focus > td {
+    background: rgba(242, 183, 5, 0.1);
+  }
+  #results-app tr.is-focus .team-btn {
+    color: var(--gold-400);
+    text-decoration-color: var(--gold-400);
+  }
+  #results-app .score-btn {
+    display: inline-block;
+    min-width: 3.6rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    font-weight: 700;
+    text-align: center;
+    transition:
+      background 0.15s,
+      border-color 0.15s;
+  }
+  #results-app .score-btn:hover,
+  #results-app .score-btn:focus-visible,
+  #results-app tr.is-open .score-btn {
+    background: var(--ink-700);
+    border-color: var(--border-strong);
+  }
+  #results-app .outcome {
+    width: 2.2rem;
+    text-align: right;
+  }
+  #results-app .form {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--ink-950);
+    background: var(--ink-300);
+  }
+  #results-app .form--w {
+    background: var(--gold-400);
+  }
+  #results-app .form--l {
+    background: var(--red-500);
+    color: #fff;
+  }
+  #results-app .form-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.5rem;
+  }
+  #results-app .board-head--focus {
+    align-items: flex-start;
+  }
+  #results-app .board-head--focus h2 {
+    color: var(--gold-400);
+  }
+  #results-app tr.fx-detail > td {
+    padding: 0.4rem 0.45rem 1rem 2.5rem;
+    background: rgba(255, 255, 255, 0.02);
+  }
+  #results-app .detail-note {
+    margin: 0.35rem 0;
+    font-size: 0.9rem;
+  }
+  #results-app .rubbers {
+    width: auto;
+    min-width: min(100%, 36rem);
+    font-size: 0.9rem;
+  }
+  #results-app .rubbers th,
+  #results-app .rubbers td {
+    padding: 0.35rem 0.6rem;
+  }
+  #results-app .rubbers thead th {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+  #results-app .rubbers thead th.away,
+  #results-app .rubbers .player.away {
+    text-align: right;
+  }
+  #results-app .rubbers .score {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  #results-app .rubbers .player.is-win {
+    color: var(--gold-400);
+    font-weight: 600;
+  }
+  @media (max-width: 640px) {
+    #results-app tr.fx-detail > td {
+      padding-left: 0.45rem;
+    }
   }
   #results-app .sr-only {
     position: absolute;
