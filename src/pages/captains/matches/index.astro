@@ -12,7 +12,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     <div class="container" id="match-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
       <h1>Matches</h1>
       <p class="lede">
-        Fixtures come from League Master each morning. Pick a match, mark who is in or out, then set the playing order. Nothing is emailed.
+        Fixtures come from League Master each morning. Switch between this season and last season, pick a match, mark who is in or out, then set the playing order. Nothing is emailed.
       </p>
       <p class="status" data-status role="status"></p>
 
@@ -40,6 +40,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
           </div>
         </div>
 
+        <nav class="season-menu" data-season-menu aria-label="Season" hidden></nav>
         <nav class="team-menu" data-team-menu aria-label="Teams"></nav>
 
         <div class="layout" data-layout hidden>
@@ -57,6 +58,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 <script>
   import { createClient } from '@supabase/supabase-js';
 
+  type Season = { id: number; name: string; starts_on: string | null };
   type Squad = { id: number; name: string; team_id: number | null };
   type LeagueTeam = { id: number; name: string; club_slug: string | null; team_id: number | null };
   type Fixture = {
@@ -85,6 +87,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   const signedIn = root.querySelector<HTMLElement>('[data-panel="signed-in"]')!;
   const unassigned = root.querySelector<HTMLElement>('[data-unassigned]')!;
   const adminLink = root.querySelector<HTMLElement>('[data-admin-link]')!;
+  const seasonMenu = root.querySelector<HTMLElement>('[data-season-menu]')!;
   const teamMenu = root.querySelector<HTMLElement>('[data-team-menu]')!;
   const layout = root.querySelector<HTMLElement>('[data-layout]')!;
   const fixtureList = root.querySelector<HTMLElement>('[data-fixtures]')!;
@@ -92,6 +95,8 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
   const POSITIONS = 6;
   let userId = '';
+  let seasons: Season[] = [];
+  let currentSeason: Season | null = null;
   let squads: Squad[] = [];
   let clubNames = new Map<string, string>();
   let currentSquad: Squad | null = null;
@@ -124,6 +129,13 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   root.querySelector('[data-sign-out]')!.addEventListener('click', async () => {
     await supabase.auth.signOut();
     await showSession();
+  });
+
+  seasonMenu.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-pick-season]');
+    if (!button || !currentSquad) return;
+    const season = seasons.find((s) => s.id === Number(button.dataset.pickSeason));
+    if (season) void pickSeason(season);
   });
 
   teamMenu.addEventListener('click', (event) => {
@@ -253,15 +265,18 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     const { data: me } = await supabase.from('profiles').select('is_admin').eq('id', session.user.id).maybeSingle();
     adminLink.hidden = !me?.is_admin;
 
-    const [{ data: squadRows, error }, { data: clubRows }] = await Promise.all([
+    const [{ data: squadRows, error }, { data: clubRows }, { data: seasonRows }] = await Promise.all([
       supabase.from('captain_squads').select('id, name, team_id').not('team_id', 'is', null).order('name'),
       supabase.from('clubs').select('slug, name'),
+      supabase.from('league_seasons').select('id, name, starts_on').order('starts_on', { ascending: false }),
     ]);
     if (error) {
       setStatus(error.message);
       return;
     }
     squads = (squadRows ?? []) as Squad[];
+    // The two latest seasons: this winter, then last winter as the worked example.
+    seasons = ((seasonRows ?? []) as Season[]).slice(0, 2);
     clubNames = new Map((clubRows ?? []).map((c: { slug: string; name: string }) => [c.slug, c.name]));
     unassigned.hidden = squads.length > 0;
     layout.hidden = squads.length === 0;
@@ -275,23 +290,63 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       button.textContent = squad.name;
       teamMenu.append(button);
     }
+    renderSeasonMenu();
     if (squads.length) {
-      const wanted = Number(location.hash.replace('#squad-', ''));
-      await pickSquad(squads.find((s) => s.id === wanted) ?? squads[0]);
+      const hash = location.hash.replace('#', '');
+      const [seasonPart, squadPart] = hash.split('/');
+      const wantedSeason = seasons.find((s) => s.id === Number(seasonPart));
+      const wantedSquad = Number(squadPart ?? seasonPart);
+      // No choice in the link: open on last season, which is the worked example.
+      currentSeason = wantedSeason ?? seasons[1] ?? seasons[0] ?? null;
+      await pickSquad(squads.find((s) => s.id === wantedSquad) ?? squads[0]);
     }
+  }
+
+  function seasonLabel(season: Season, index: number) {
+    if (index === 0) return 'This season';
+    if (index === 1) return 'Last season';
+    return season.name;
+  }
+
+  function renderSeasonMenu() {
+    seasonMenu.replaceChildren();
+    seasonMenu.hidden = seasons.length < 2;
+    seasons.forEach((season, index) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'pill';
+      button.dataset.pickSeason = String(season.id);
+      button.innerHTML = `${esc(seasonLabel(season, index))} <span class="pill__sub">${esc(season.name)}</span>`;
+      seasonMenu.append(button);
+    });
+    markSeason();
+  }
+
+  function markSeason() {
+    seasonMenu.querySelectorAll<HTMLButtonElement>('[data-pick-season]').forEach((b) => {
+      b.classList.toggle('pill--active', Number(b.dataset.pickSeason) === currentSeason?.id);
+    });
+  }
+
+  async function pickSeason(season: Season) {
+    currentSeason = season;
+    markSeason();
+    if (currentSquad) await pickSquad(currentSquad);
   }
 
   async function pickSquad(squad: Squad) {
     currentSquad = squad;
-    history.replaceState(null, '', `#squad-${squad.id}`);
+    history.replaceState(null, '', `#${currentSeason?.id ?? ''}/${squad.id}`);
     teamMenu.querySelectorAll<HTMLButtonElement>('[data-pick-squad]').forEach((b) => {
       b.classList.toggle('pill--active', Number(b.dataset.pickSquad) === squad.id);
     });
-    const { data: leagueTeams } = await supabase.from('league_teams').select('id').eq('team_id', squad.team_id);
+    let teamQuery = supabase.from('league_teams').select('id, divisions!inner(season_id)').eq('team_id', squad.team_id);
+    if (currentSeason) teamQuery = teamQuery.eq('divisions.season_id', currentSeason.id);
+    const { data: leagueTeams } = await teamQuery;
     const ids = (leagueTeams ?? []).map((t: { id: number }) => t.id);
     if (!ids.length) {
       fixtures = [];
-      fixtureList.innerHTML = '<li class="muted">No fixtures found for this team yet.</li>';
+      fixtureList.innerHTML = `<li class="muted">No fixtures for this team in ${esc(currentSeason?.name ?? 'this season')}.</li>`;
       matchHost.innerHTML = '';
       return;
     }
@@ -353,7 +408,13 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       fixture.status === 'played'
         ? supabase.from('rubbers').select('position, home_player, away_player, score, winner').eq('fixture_id', fixture.id).order('position')
         : Promise.resolve({ data: [] as Rubber[] }),
-      supabase.from('nominations').select('period, position, player_name').eq('team_id', squad.team_id).order('period').order('position'),
+      supabase
+        .from('nominations')
+        .select('period, position, player_name')
+        .eq('team_id', squad.team_id)
+        .eq('season', currentSeason?.name ?? '')
+        .order('period')
+        .order('position'),
     ]);
     players = (playersRes.data ?? []) as Player[];
     const avail = new Map(((availRes.data ?? []) as Availability[]).map((a) => [a.squad_player_id, a.status]));
@@ -499,11 +560,25 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     gap: 0.5rem;
     margin: 0 0 1rem;
   }
+  #match-app .season-menu,
   #match-app .team-menu {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
-    margin: 0 0 1.25rem;
+    margin: 0 0 1rem;
+  }
+  #match-app .season-menu .pill {
+    display: grid;
+    text-align: left;
+    border-radius: var(--radius-sm);
+    padding: 0.45rem 0.9rem;
+  }
+  #match-app .pill__sub {
+    font-size: 0.75rem;
+    color: var(--ink-200);
+  }
+  #match-app .pill--active .pill__sub {
+    color: var(--gold-400);
   }
   #match-app .pill {
     border: 1px solid var(--border-strong);
