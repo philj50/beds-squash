@@ -54,9 +54,9 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
   <!-- QUICK LINKS -->
   <section class="section section--tight">
     <div class="container quick">
-      <a href={SITE.leagueMaster} target="_blank" rel="noopener" class="quick__item">
+      <a href={url('/leagues/results/')} class="quick__item">
         <span class="quick__icon">🏆</span>
-        <span><strong>League tables</strong><small>Fixtures &amp; results on League Master ↗</small></span>
+        <span><strong>League tables</strong><small>Winter and summer fixtures and results</small></span>
       </a>
       <a href={url('/tournaments/')} class="quick__item">
         <span class="quick__icon">🎯</span>

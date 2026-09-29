@@ -29,4 +29,4 @@ The 2026 AGM recorded the 2025/26 winners as **Shenley** (Division 1) and **Open
 
 ## Fixtures, results & tables
 
-All fixtures, results and league tables live on **League Master**. Team captains enter results there after each match.
+Winter and summer tables and fixtures are published on this site. The pages are for reading: team captains enter results on **League Master**, and those results are copied across.

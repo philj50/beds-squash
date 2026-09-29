@@ -33,8 +33,8 @@ const isActive = (href: string) => (href === '/' ? current === '/' : current.sta
           ))
         }
         <li class="nav__cta">
-          <a class="btn btn--primary btn--sm" href={SITE.leagueMaster} target="_blank" rel="noopener" title="Fixtures, results and tables on League Master">
-            Tables ↗
+          <a class="btn btn--primary btn--sm" href={url('/leagues/results/')} aria-current={current.startsWith('/leagues/results') ? 'page' : undefined} title="League tables and fixtures">
+            Tables
           </a>
         </li>
       </ul>

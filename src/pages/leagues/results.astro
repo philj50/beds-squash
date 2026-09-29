@@ -1,0 +1,610 @@
+---
+import Base from '@/layouts/Base.astro';
+import PageHero from '@/components/PageHero.astro';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
+import { SITE, url } from '@/lib/site';
+
+const crumbs = [
+  { name: 'Leagues', path: '/leagues/' },
+  { name: 'Tables and fixtures', path: '/leagues/results/' },
+];
+---
+
+<Base
+  title="League tables and fixtures"
+  description="Read-only Bedfordshire Squash league tables and fixtures for the winter and summer leagues."
+  crumbs={crumbs}
+>
+  <PageHero
+    eyebrow="Winter and summer"
+    title="Tables and fixtures"
+    lede="Published results for previous seasons, and the fixtures for the season now in progress. This page is for reading only — captains enter scores on League Master."
+  >
+    <div class="hero-actions">
+      <a class="btn btn--ghost" href={url('/leagues/')}>League rules</a>
+      <a class="btn btn--ghost" href={SITE.leagueMaster} target="_blank" rel="noopener">League Master ↗</a>
+    </div>
+  </PageHero>
+
+  <section class="section">
+    <div class="container">
+      <div
+        id="results-app"
+        data-url={SUPABASE_URL}
+        data-key={SUPABASE_PUBLISHABLE_KEY}
+      >
+        <p data-status>Loading tables…</p>
+        <div class="kind-row" data-kinds hidden></div>
+        <div class="season-row" data-seasons hidden></div>
+        <p class="season-meta" data-meta hidden></p>
+        <div class="div-row" data-divisions hidden></div>
+        <div data-board></div>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+
+  type Season = { id: number; name: string; starts_on: string; ends_on: string };
+  type Division = { id: number; name: string; scoring: string | null };
+  type Team = { id: number; name: string; division_id: number };
+  type Fixture = {
+    id: number;
+    division_id: number;
+    starts_at: string;
+    status: string;
+    home_points: number | null;
+    away_points: number | null;
+    home_games: number | null;
+    away_games: number | null;
+    home: { name: string } | null;
+    away: { name: string } | null;
+  };
+  type Standing = {
+    name: string;
+    played: number;
+    won: number;
+    drawn: number;
+    lost: number;
+    gamesFor: number;
+    gamesAgainst: number;
+    points: number;
+  };
+
+  const root = document.getElementById('results-app');
+  const statusEl = root?.querySelector<HTMLElement>('[data-status]');
+  const kindsEl = root?.querySelector<HTMLElement>('[data-kinds]');
+  const seasonsEl = root?.querySelector<HTMLElement>('[data-seasons]');
+  const metaEl = root?.querySelector<HTMLElement>('[data-meta]');
+  const divisionsEl = root?.querySelector<HTMLElement>('[data-divisions]');
+  const boardEl = root?.querySelector<HTMLElement>('[data-board]');
+
+  const dateFmt = new Intl.DateTimeFormat('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'Europe/London',
+  });
+  const timeFmt = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Europe/London',
+  });
+  const dayFmt = new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'Europe/London',
+  });
+
+  function setStatus(message: string) {
+    if (!statusEl) return;
+    statusEl.hidden = !message;
+    statusEl.textContent = message;
+  }
+
+  function kindOf(name: string): 'winter' | 'summer' | null {
+    if (/^winter\b/i.test(name)) return 'winter';
+    if (/^summer\b/i.test(name)) return 'summer';
+    return null;
+  }
+
+  function shortName(name: string): string {
+    return name.replace(/^Winter\s+/i, '').replace(/^Summer League\s+/i, '');
+  }
+
+  function escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function hasScore(fixture: Fixture): boolean {
+    return fixture.home_points != null && fixture.away_points != null;
+  }
+
+  function standingsFor(teams: Team[], fixtures: Fixture[]): Standing[] {
+    const rows = new Map<string, Standing>();
+    for (const team of teams) {
+      rows.set(team.name, {
+        name: team.name,
+        played: 0,
+        won: 0,
+        drawn: 0,
+        lost: 0,
+        gamesFor: 0,
+        gamesAgainst: 0,
+        points: 0,
+      });
+    }
+    for (const fixture of fixtures) {
+      if (!hasScore(fixture)) continue;
+      const home = rows.get(fixture.home?.name ?? '');
+      const away = rows.get(fixture.away?.name ?? '');
+      if (!home || !away) continue;
+      const hp = fixture.home_points ?? 0;
+      const ap = fixture.away_points ?? 0;
+      home.played += 1;
+      away.played += 1;
+      home.points += hp;
+      away.points += ap;
+      home.gamesFor += fixture.home_games ?? 0;
+      home.gamesAgainst += fixture.away_games ?? 0;
+      away.gamesFor += fixture.away_games ?? 0;
+      away.gamesAgainst += fixture.home_games ?? 0;
+      if (hp > ap) {
+        home.won += 1;
+        away.lost += 1;
+      } else if (hp < ap) {
+        away.won += 1;
+        home.lost += 1;
+      } else {
+        home.drawn += 1;
+        away.drawn += 1;
+      }
+    }
+    return [...rows.values()].sort((a, b) => {
+      const points = b.points - a.points;
+      if (points) return points;
+      const diff = b.gamesFor - b.gamesAgainst - (a.gamesFor - a.gamesAgainst);
+      if (diff) return diff;
+      const games = b.gamesFor - a.gamesFor;
+      if (games) return games;
+      return a.name.localeCompare(b.name, 'en-GB');
+    });
+  }
+
+  function scoreLabel(fixture: Fixture): string {
+    if (hasScore(fixture)) return `${fixture.home_points}\u2013${fixture.away_points}`;
+    if (fixture.status === 'scheduled') return 'v';
+    if (fixture.status === 'postponed') return 'PP';
+    if (fixture.status === 'cancelled') return 'Canc';
+    if (fixture.status === 'walkover') return 'W/O';
+    return '\u2014';
+  }
+
+  function renderBoard(division: Division, teams: Team[], fixtures: Fixture[]) {
+    if (!boardEl) return;
+    const table = standingsFor(teams, fixtures);
+    const played = fixtures.filter(hasScore).length;
+    const head = `<div class="board-head"><h2>${escapeHtml(division.name)}</h2><p>${escapeHtml(division.scoring ?? 'League')} · ${played} result${played === 1 ? '' : 's'} · ordered by points, then game difference</p></div>`;
+    const rows = table
+      .map((row, index) => {
+        const diff = row.gamesFor - row.gamesAgainst;
+        const withdrawn = /withdrawn/i.test(row.name);
+        return `<tr class="${index === 0 && row.played ? 'is-leader' : ''} ${withdrawn ? 'is-withdrawn' : ''}">
+          <td class="num">${index + 1}</td>
+          <th scope="row">${escapeHtml(row.name)}</th>
+          <td class="num">${row.played}</td>
+          <td class="num">${row.won}</td>
+          <td class="num">${row.drawn}</td>
+          <td class="num">${row.lost}</td>
+          <td class="num">${row.gamesFor}\u2013${row.gamesAgainst}</td>
+          <td class="num">${diff > 0 ? '+' : ''}${diff}</td>
+          <td class="num pts">${row.points}</td>
+        </tr>`;
+      })
+      .join('');
+    const fixtureRows = [...fixtures]
+      .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
+      .map((fixture) => {
+        const when = new Date(fixture.starts_at);
+        const games =
+          fixture.home_games != null && fixture.away_games != null
+            ? `<span class="games">${fixture.home_games}\u2013${fixture.away_games}</span>`
+            : '';
+        const homeWin = hasScore(fixture) && (fixture.home_points ?? 0) > (fixture.away_points ?? 0);
+        const awayWin = hasScore(fixture) && (fixture.away_points ?? 0) > (fixture.home_points ?? 0);
+        return `<tr>
+          <td class="when"><time datetime="${fixture.starts_at}">${dateFmt.format(when)}<span>${timeFmt.format(when)}</span></time></td>
+          <td class="side ${homeWin ? 'is-win' : ''}">${escapeHtml(fixture.home?.name ?? 'Home')}</td>
+          <td class="score">${scoreLabel(fixture)}${games}</td>
+          <td class="side away ${awayWin ? 'is-win' : ''}">${escapeHtml(fixture.away?.name ?? 'Away')}</td>
+        </tr>`;
+      })
+      .join('');
+    boardEl.innerHTML = `
+      <article class="card standings-card">
+        <div class="card__body">
+          ${head}
+          <div class="table-wrap">
+            <table class="standings">
+              <caption class="sr-only">${escapeHtml(division.name)} table</caption>
+              <thead>
+                <tr>
+                  <th class="num">Pos</th>
+                  <th>Team</th>
+                  <th class="num" title="Played">P</th>
+                  <th class="num" title="Won">W</th>
+                  <th class="num" title="Drawn">D</th>
+                  <th class="num" title="Lost">L</th>
+                  <th class="num" title="Games for and against">Games</th>
+                  <th class="num" title="Game difference">+/-</th>
+                  <th class="num" title="Points">Pts</th>
+                </tr>
+              </thead>
+              <tbody>${rows || '<tr><td colspan="9">No teams in this division.</td></tr>'}</tbody>
+            </table>
+          </div>
+        </div>
+      </article>
+      <article class="card fixtures-card">
+        <div class="card__body">
+          <div class="board-head"><h2>Fixtures</h2><p>${fixtures.length} match${fixtures.length === 1 ? '' : 'es'} · home team first</p></div>
+          <div class="table-wrap">
+            <table class="fixtures">
+              <caption class="sr-only">${escapeHtml(division.name)} fixtures</caption>
+              <thead>
+                <tr><th>Date</th><th>Home</th><th>Score</th><th>Away</th></tr>
+              </thead>
+              <tbody>${fixtureRows || '<tr><td colspan="4">No fixtures published for this division.</td></tr>'}</tbody>
+            </table>
+          </div>
+        </div>
+      </article>`;
+  }
+
+  if (root && kindsEl && seasonsEl && metaEl && divisionsEl && boardEl) {
+    const supabase = createClient(root.dataset.url!, root.dataset.key!);
+    let seasons: Season[] = [];
+    let kind: 'winter' | 'summer' = 'winter';
+    let seasonId = 0;
+    let divisionId = 0;
+    let divisions: Division[] = [];
+    let teams: Team[] = [];
+    let fixtures: Fixture[] = [];
+
+    function seasonsInKind(value: 'winter' | 'summer'): Season[] {
+      return seasons.filter((season) => kindOf(season.name) === value);
+    }
+
+    function showKind(value: 'winter' | 'summer') {
+      kindsEl.hidden = false;
+      kindsEl.innerHTML = (['winter', 'summer'] as const)
+        .map((item) => {
+          const count = seasonsInKind(item).length;
+          return `<button type="button" class="kind-btn ${item === value ? 'is-on' : ''}" data-kind="${item}" ${count ? '' : 'disabled'}>${item === 'winter' ? 'Winter' : 'Summer'}<span>${count}</span></button>`;
+        })
+        .join('');
+    }
+
+    function showSeasons(list: Season[], current: number) {
+      seasonsEl.hidden = false;
+      seasonsEl.innerHTML = list
+        .map(
+          (season) =>
+            `<button type="button" class="season-btn ${season.id === current ? 'is-on' : ''}" data-season="${season.id}">${escapeHtml(shortName(season.name))}</button>`,
+        )
+        .join('');
+    }
+
+    function showDivisions(list: Division[], current: number) {
+      divisionsEl.hidden = list.length < 2;
+      divisionsEl.innerHTML = list
+        .map(
+          (division) =>
+            `<button type="button" class="div-btn ${division.id === current ? 'is-on' : ''}" data-division="${division.id}">${escapeHtml(division.name)}</button>`,
+        )
+        .join('');
+    }
+
+    async function loadSeason(id: number) {
+      setStatus('Loading tables…');
+      boardEl.innerHTML = '';
+      const { data: divisionRows, error: divisionError } = await supabase
+        .from('divisions')
+        .select('id, name, scoring')
+        .eq('season_id', id)
+        .order('name');
+      if (divisionError) throw divisionError;
+      divisions = divisionRows ?? [];
+      const ids = divisions.map((division) => division.id);
+      if (!ids.length) {
+        teams = [];
+        fixtures = [];
+        return;
+      }
+      const [teamResult, fixtureResult] = await Promise.all([
+        supabase.from('league_teams').select('id, name, division_id').in('division_id', ids).order('name'),
+        supabase
+          .from('fixtures')
+          .select(
+            'id, division_id, starts_at, status, home_points, away_points, home_games, away_games, home:league_teams!fixtures_home_team_id_fkey(name), away:league_teams!fixtures_away_team_id_fkey(name)',
+          )
+          .in('division_id', ids)
+          .order('starts_at'),
+      ]);
+      if (teamResult.error) throw teamResult.error;
+      if (fixtureResult.error) throw fixtureResult.error;
+      teams = teamResult.data ?? [];
+      fixtures = (fixtureResult.data ?? []).map((row) => {
+        const home = Array.isArray(row.home) ? row.home[0] : row.home;
+        const away = Array.isArray(row.away) ? row.away[0] : row.away;
+        return { ...row, home: home ?? null, away: away ?? null } as Fixture;
+      });
+    }
+
+    function paint() {
+      const season = seasons.find((item) => item.id === seasonId);
+      const inKind = seasonsInKind(kind);
+      showKind(kind);
+      showSeasons(inKind, seasonId);
+      if (!season) {
+        metaEl.hidden = true;
+        divisionsEl.hidden = true;
+        boardEl.innerHTML = '';
+        setStatus('No seasons published yet.');
+        return;
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      const ends = season.ends_on.slice(0, 10);
+      const inProgress = ends >= today;
+      metaEl.hidden = false;
+      metaEl.textContent = `${dayFmt.format(new Date(`${season.starts_on.slice(0, 10)}T12:00:00`))} – ${dayFmt.format(new Date(`${ends}T12:00:00`))}${inProgress ? ' · in progress' : ''}`;
+      const division = divisions.find((item) => item.id === divisionId) ?? divisions[0];
+      if (!division) {
+        divisionsEl.hidden = true;
+        boardEl.innerHTML = '<p class="muted">No divisions published for this season.</p>';
+        setStatus('');
+        return;
+      }
+      divisionId = division.id;
+      showDivisions(divisions, division.id);
+      const divisionTeams = teams.filter((team) => team.division_id === division.id);
+      const divisionFixtures = fixtures.filter((fixture) => fixture.division_id === division.id);
+      renderBoard(division, divisionTeams, divisionFixtures);
+      setStatus('');
+      history.replaceState(null, '', `#${season.id}/${division.id}`);
+    }
+
+    async function selectSeason(id: number) {
+      const season = seasons.find((item) => item.id === id);
+      if (!season) return;
+      const nextKind = kindOf(season.name);
+      if (nextKind) kind = nextKind;
+      seasonId = season.id;
+      await loadSeason(season.id);
+      divisionId = divisions[0]?.id ?? 0;
+      paint();
+    }
+
+    kindsEl.addEventListener('click', (event) => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-kind]');
+      if (!button || button.disabled) return;
+      const next = button.dataset.kind === 'summer' ? 'summer' : 'winter';
+      const list = seasonsInKind(next);
+      if (!list.length) return;
+      kind = next;
+      const today = new Date().toISOString().slice(0, 10);
+      const completed = list.find((season) => season.ends_on.slice(0, 10) < today);
+      void selectSeason((completed ?? list[0]).id);
+    });
+
+    seasonsEl.addEventListener('click', (event) => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-season]');
+      if (!button) return;
+      void selectSeason(Number(button.dataset.season));
+    });
+
+    divisionsEl.addEventListener('click', (event) => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-division]');
+      if (!button) return;
+      divisionId = Number(button.dataset.division);
+      paint();
+    });
+
+    try {
+      const { data, error } = await supabase
+        .from('league_seasons')
+        .select('id, name, starts_on, ends_on')
+        .order('starts_on', { ascending: false });
+      if (error) throw error;
+      seasons = (data ?? []).filter((season) => kindOf(season.name));
+      const hash = location.hash.replace('#', '');
+      const [hashSeason, hashDivision] = hash.split('/').map((part) => Number(part));
+      const today = new Date().toISOString().slice(0, 10);
+      const completed = seasons.filter((season) => season.ends_on.slice(0, 10) < today);
+      const initial = seasons.find((season) => season.id === hashSeason) ?? completed[0] ?? seasons[0];
+      if (!initial) {
+        setStatus('No seasons published yet.');
+      } else {
+        const nextKind = kindOf(initial.name);
+        if (nextKind) kind = nextKind;
+        seasonId = initial.id;
+        await loadSeason(initial.id);
+        divisionId = divisions.some((division) => division.id === hashDivision) ? hashDivision : (divisions[0]?.id ?? 0);
+        paint();
+      }
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'The tables could not be loaded.');
+    }
+  }
+</script>
+
+<style>
+  .hero-actions {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-top: 1.25rem;
+  }
+</style>
+
+<style is:global>
+  #results-app .kind-row,
+  #results-app .season-row,
+  #results-app .div-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  #results-app .kind-row {
+    margin-bottom: 0.85rem;
+  }
+  #results-app .season-row,
+  #results-app .div-row {
+    margin-bottom: 1rem;
+  }
+  #results-app .kind-btn,
+  #results-app .season-btn,
+  #results-app .div-btn {
+    appearance: none;
+    border: 1px solid var(--border-strong);
+    background: transparent;
+    color: var(--text);
+    border-radius: 999px;
+    padding: 0.45rem 0.9rem;
+    font: inherit;
+    cursor: pointer;
+  }
+  #results-app .kind-btn {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0.55rem 1.1rem;
+  }
+  #results-app .kind-btn span {
+    margin-left: 0.45rem;
+    color: var(--text-muted);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    letter-spacing: 0;
+  }
+  #results-app .kind-btn.is-on,
+  #results-app .season-btn.is-on,
+  #results-app .div-btn.is-on {
+    background: var(--gold-400);
+    color: var(--ink-950);
+    border-color: var(--gold-400);
+  }
+  #results-app .kind-btn.is-on span {
+    color: var(--ink-700);
+  }
+  #results-app .kind-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  #results-app .season-meta {
+    color: var(--text-muted);
+    margin: 0 0 1rem;
+  }
+  #results-app .standings-card,
+  #results-app .fixtures-card {
+    margin-bottom: 1.25rem;
+  }
+  #results-app .board-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: baseline;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+  }
+  #results-app .board-head h2 {
+    font-family: var(--font-display);
+    font-size: 1.8rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    margin: 0;
+  }
+  #results-app .board-head p {
+    margin: 0;
+    color: var(--text-muted);
+  }
+  #results-app .table-wrap {
+    overflow-x: auto;
+  }
+  #results-app table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+  }
+  #results-app th,
+  #results-app td {
+    padding: 0.55rem 0.45rem;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: middle;
+  }
+  #results-app thead th {
+    font-family: var(--font-display);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--gold-400);
+    font-weight: 600;
+  }
+  #results-app .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  #results-app .pts {
+    font-weight: 700;
+  }
+  #results-app tr.is-leader th {
+    color: var(--gold-400);
+  }
+  #results-app tr.is-withdrawn th {
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  #results-app .fixtures .when span {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+  #results-app .fixtures .score {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  #results-app .fixtures .games {
+    display: block;
+    font-weight: 500;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+  #results-app .fixtures .side.away {
+    text-align: right;
+  }
+  #results-app .fixtures .is-win {
+    color: var(--gold-400);
+  }
+  #results-app .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+  }
+</style>

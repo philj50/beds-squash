@@ -15,8 +15,9 @@ const LM = SITE.leagueMaster.replace(/\/$/, '');
 <Base title="Bedfordshire squash leagues" description="Bedfordshire Squash Winter League, Summer League and League Cup — divisions, scoring, fees and links to fixtures and tables." crumbs={[{ name: 'Leagues', path: '/leagues/' }]}>
   <PageHero eyebrow="Team squash" title={page?.data.title ?? 'Leagues'} lede={page?.data.intro}>
     <div class="hero-actions">
-      <a class="btn btn--primary" href={SITE.leagueMaster} target="_blank" rel="noopener">Fixtures, results &amp; tables ↗</a>
+      <a class="btn btn--primary" href={url('/leagues/results/')}>Tables &amp; fixtures</a>
       {rules[0] && <a class="btn btn--ghost" href={url(`/documents/${rules[0].id}/`)}>League rules</a>}
+      <a class="btn btn--ghost" href={SITE.leagueMaster} target="_blank" rel="noopener">League Master ↗</a>
     </div>
   </PageHero>
 
@@ -27,7 +28,7 @@ const LM = SITE.leagueMaster.replace(/\/$/, '');
         <div class="card">
           <div class="card__body">
             <h3>League Master</h3>
-            <p class="muted">All league data lives on League Master. Quick links:</p>
+            <p class="muted">Tables and fixtures are published here. Captains still enter scores on League Master:</p>
             <ul class="links">
               <li><a href={`${LM}/cgi-county/icounty.exe/showdivlist`} target="_blank" rel="noopener">Division tables</a></li>
               <li><a href={`${LM}/cgi-county/icounty.exe/showclublist`} target="_blank" rel="noopener">Clubs</a></li>
