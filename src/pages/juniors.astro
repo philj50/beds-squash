@@ -14,6 +14,11 @@ const safeguarding = (await getDocuments()).filter((d) => d.data.category === 's
   <ContentPage id="juniors" eyebrow="Under 19s" fallbackTitle="Juniors">
     <div slot="aside" class="stack">
       <div class="card"><div class="card__body">
+        <h3>Junior County Closed</h3>
+        <p>November. Parents enter a player online. The page includes a QR code to print.</p>
+        <a class="btn btn--primary btn--sm" href={url('/juniors/closed/')}>Enter</a>
+      </div></div>
+      <div class="card"><div class="card__body">
         <h3>Junior events</h3>
         {events.length > 0 ? <div class="stack" style="--stack:.75rem">{events.map((e) => <EventCard event={e} compact />)}</div> : <p class="muted">No junior events listed yet. <a href={url('/events/')}>See all events</a>.</p>}
       </div></div>

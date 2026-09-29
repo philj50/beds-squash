@@ -1,0 +1,216 @@
+---
+import Base from '@/layouts/Base.astro';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
+import { url } from '@/lib/site';
+---
+
+<Base title="Junior County Closed entries" description="Organiser list of Junior County Closed entries." noindex>
+  <section class="section">
+    <div class="container entries" id="entries-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
+      <h1>Junior County Closed entries</h1>
+      <p class="lede">Player details stay on this page. They are not published, and saving or removing an entry does not send an email.</p>
+      <p class="status" data-status role="status"></p>
+
+      <div data-panel="signed-out">
+        <form class="card" data-form="sign-in">
+          <div class="card__body stack">
+            <label>Email <input name="email" type="email" required autocomplete="email" /></label>
+            <label>Password <input name="password" type="password" required autocomplete="current-password" /></label>
+            <button class="btn btn--primary" type="submit">Sign in</button>
+          </div>
+        </form>
+      </div>
+
+      <div data-panel="signed-in" hidden>
+        <p class="who" data-who></p>
+        <p class="actions">
+          <a class="btn btn--ghost btn--sm" href={url('/juniors/closed/')}>Entry page</a>
+          <a class="btn btn--ghost btn--sm" href={url('/captains/admin/')}>Admin</a>
+          <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
+        </p>
+        <p data-denied hidden>This account cannot see entries.</p>
+        <div data-list hidden></div>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+  import { AGE_CATEGORIES } from '@/lib/junior-age';
+
+  type Entry = {
+    id: number;
+    player_first_name: string;
+    player_last_name: string;
+    date_of_birth: string;
+    age_category: string;
+    draw: string;
+    club: string;
+    guardian_name: string;
+    guardian_email: string;
+    guardian_phone: string;
+    emergency_name: string;
+    emergency_phone: string;
+    notes: string | null;
+    created_at: string;
+  };
+
+  const root = document.getElementById('entries-app');
+  if (!root) throw new Error('entries app missing');
+  const supabase = createClient(root.dataset.url!, root.dataset.key!);
+  const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
+  const signedOut = root.querySelector<HTMLElement>('[data-panel="signed-out"]')!;
+  const signedIn = root.querySelector<HTMLElement>('[data-panel="signed-in"]')!;
+  const list = root.querySelector<HTMLElement>('[data-list]')!;
+  const denied = root.querySelector<HTMLElement>('[data-denied]')!;
+
+  const escapeHtml = (value: string) =>
+    value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
+
+  const when = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+  root.querySelector<HTMLFormElement>('[data-form="sign-in"]')!.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget as HTMLFormElement);
+    statusEl.textContent = 'Signing in…';
+    const { error } = await supabase.auth.signInWithPassword({
+      email: String(data.get('email')),
+      password: String(data.get('password')),
+    });
+    statusEl.textContent = error ? error.message : '';
+    if (!error) await showSession();
+  });
+
+  root.querySelector('[data-sign-out]')!.addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    await showSession();
+  });
+
+  list.addEventListener('click', async (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-remove]');
+    if (!button) return;
+    const name = button.dataset.name ?? 'this player';
+    if (!confirm(`Remove ${name} from the entry list?`)) return;
+    const { error } = await supabase.from('junior_entries').delete().eq('id', Number(button.dataset.remove));
+    if (error) statusEl.textContent = error.message;
+    else await showSession();
+  });
+
+  async function showSession() {
+    const { data } = await supabase.auth.getSession();
+    const session = data.session;
+    signedOut.hidden = Boolean(session);
+    signedIn.hidden = !session;
+    if (!session) {
+      list.hidden = true;
+      denied.hidden = true;
+      return;
+    }
+    root.querySelector('[data-who]')!.textContent = `Signed in as ${session.user.email ?? 'organiser'}`;
+    const { data: me } = await supabase.from('profiles').select('is_admin').eq('id', session.user.id).maybeSingle();
+    if (!me?.is_admin) {
+      denied.hidden = false;
+      list.hidden = true;
+      return;
+    }
+    denied.hidden = true;
+    const { data: rows, error } = await supabase
+      .from('junior_entries')
+      .select('id, player_first_name, player_last_name, date_of_birth, age_category, draw, club, guardian_name, guardian_email, guardian_phone, emergency_name, emergency_phone, notes, created_at')
+      .order('player_last_name');
+    if (error) {
+      statusEl.textContent = error.message;
+      return;
+    }
+    const entries = (rows ?? []) as Entry[];
+    list.hidden = false;
+    list.replaceChildren(
+      ...AGE_CATEGORIES.flatMap((category) =>
+        (['Boys', 'Girls'] as const).map((draw) => {
+          const group = entries.filter((entry) => entry.age_category === category && entry.draw === draw);
+          const section = document.createElement('section');
+          section.innerHTML = `
+            <h2>${escapeHtml(category)} · ${draw} <span class="muted">(${group.length})</span></h2>
+            ${
+              group.length
+                ? `<div class="table-wrap"><table>
+                    <thead><tr><th>Player</th><th>Born</th><th>Club</th><th>Parent</th><th>Emergency</th><th>Notes</th><th></th></tr></thead>
+                    <tbody>${group
+                      .map((entry) => {
+                        const player = `${entry.player_first_name} ${entry.player_last_name}`;
+                        return `<tr>
+                          <td>${escapeHtml(player)}</td>
+                          <td>${escapeHtml(when.format(new Date(`${entry.date_of_birth}T12:00:00`)))}</td>
+                          <td>${escapeHtml(entry.club)}</td>
+                          <td>${escapeHtml(entry.guardian_name)}<br><span class="muted">${escapeHtml(entry.guardian_email)}</span><br><span class="muted">${escapeHtml(entry.guardian_phone)}</span></td>
+                          <td>${escapeHtml(entry.emergency_name)}<br><span class="muted">${escapeHtml(entry.emergency_phone)}</span></td>
+                          <td>${escapeHtml(entry.notes ?? '')}</td>
+                          <td><button class="btn btn--ghost btn--sm" type="button" data-remove="${entry.id}" data-name="${escapeHtml(player)}">Remove</button></td>
+                        </tr>`;
+                      })
+                      .join('')}</tbody>
+                  </table></div>`
+                : '<p class="muted">No entries.</p>'
+            }`;
+          return section;
+        }),
+      ),
+    );
+  }
+
+  showSession();
+</script>
+
+<style is:global>
+  #entries-app {
+    max-width: 72rem;
+  }
+  #entries-app .lede {
+    color: var(--ink-200);
+  }
+  #entries-app .stack {
+    display: grid;
+    gap: 0.75rem;
+  }
+  #entries-app label {
+    display: grid;
+    gap: 0.3rem;
+    font-size: 0.9rem;
+  }
+  #entries-app input {
+    width: 100%;
+    background: var(--ink-900);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 0.65rem 0.75rem;
+    font: inherit;
+  }
+  #entries-app .status:empty {
+    display: none;
+  }
+  #entries-app .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  #entries-app h2 {
+    margin-top: 1.5rem;
+  }
+  #entries-app .table-wrap {
+    overflow-x: auto;
+  }
+  #entries-app table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  #entries-app th,
+  #entries-app td {
+    text-align: left;
+    vertical-align: top;
+    padding: 0.45rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+</style>

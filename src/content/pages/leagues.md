@@ -13,8 +13,6 @@ The main league runs through the winter with two divisions. The September 2026 A
 | Division 1 | PAR to 11, best of 5 | SquashLevels order, within 250 points |
 | Division 2 | PAR to 15, best of 5 | SquashLevels order, within 250 points. Cap of 2500 |
 
-A player may play up to three matches above their place in either half of the season. If a team asks to rearrange a fixture and then wins that match, the five bonus points for the win are removed.
-
 ## Summer League
 
 A shorter league between May and August. Entry is **£50 per team**.

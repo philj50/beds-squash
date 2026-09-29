@@ -3,6 +3,7 @@ import Base from '@/layouts/Base.astro';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 const captainsHref = `${import.meta.env.BASE_URL}captains/`;
+const juniorEntriesHref = `${import.meta.env.BASE_URL}juniors/closed/entries/`;
 ---
 
 <Base
@@ -35,6 +36,7 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
         <p class="actions">
           <a class="btn btn--ghost btn--sm" href={captainsHref}>Captain page</a>
           <a class="btn btn--ghost btn--sm" href={`${captainsHref}matches/`}>Matches</a>
+          <a class="btn btn--ghost btn--sm" href={juniorEntriesHref}>Junior entries</a>
           <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
         </p>
         <p data-denied hidden>This account cannot set up teams.</p>

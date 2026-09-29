@@ -23,7 +23,7 @@ export default defineConfig({
   compressHTML: true,
   integrations: [
     sitemap({
-      filter: (page) => !page.includes('/captains'),
+      filter: (page) => !page.includes('/captains') && !page.includes('/juniors/closed/entries'),
     }),
   ],
   markdown: {
