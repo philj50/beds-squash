@@ -1,0 +1,728 @@
+---
+import Base from '@/layouts/Base.astro';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
+---
+
+<Base
+  title="Matches"
+  description="Fixtures, availability and team selection for Bedfordshire squash captains."
+  noindex
+>
+  <section class="section">
+    <div class="container" id="match-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
+      <h1>Matches</h1>
+      <p class="lede">
+        Fixtures come from League Master each morning. Pick a match, mark who is in or out, then set the playing order. Nothing is emailed.
+      </p>
+      <p class="status" data-status role="status"></p>
+
+      <form class="card" data-form="sign-in">
+        <div class="card__body stack">
+          <h2>Sign in</h2>
+          <label>Email <input name="email" type="email" required autocomplete="email" /></label>
+          <label>Password <input name="password" type="password" required autocomplete="current-password" /></label>
+          <button class="btn btn--primary" type="submit">Sign in</button>
+        </div>
+      </form>
+
+      <div data-panel="signed-in" hidden>
+        <p class="who" data-who></p>
+        <p class="actions">
+          <a class="btn btn--ghost btn--sm" href={`${import.meta.env.BASE_URL}captains/`}>Squad</a>
+          <a class="btn btn--ghost btn--sm" data-admin-link hidden href={`${import.meta.env.BASE_URL}captains/admin/`}>Clubs and captains</a>
+          <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
+        </p>
+
+        <div class="card" data-unassigned hidden>
+          <div class="card__body">
+            <h2>No team yet</h2>
+            <p class="muted">An admin matches your account to a team. When that is done your fixtures appear here.</p>
+          </div>
+        </div>
+
+        <nav class="team-menu" data-team-menu aria-label="Teams"></nav>
+
+        <div class="layout" data-layout hidden>
+          <aside class="fixture-list">
+            <h2 class="h-small">Fixtures</h2>
+            <ol class="fixtures" data-fixtures></ol>
+          </aside>
+          <section class="match" data-match></section>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+
+  type Squad = { id: number; name: string; team_id: number | null };
+  type LeagueTeam = { id: number; name: string; club_slug: string | null; team_id: number | null };
+  type Fixture = {
+    id: number;
+    starts_at: string;
+    status: string;
+    home_points: number | null;
+    away_points: number | null;
+    home_games: number | null;
+    away_games: number | null;
+    home: LeagueTeam;
+    away: LeagueTeam;
+    divisions: { name: string; scoring: string | null } | null;
+  };
+  type Player = { id: number; display_name: string; email: string | null; phone: string | null };
+  type Availability = { id: number; squad_player_id: number; status: 'in' | 'out' | 'maybe' };
+  type Selection = { id: number; squad_player_id: number; position: number };
+  type Rubber = { position: number; home_player: string | null; away_player: string | null; score: string | null; winner: string };
+  type Nomination = { period: number; position: number; player_name: string };
+
+  const root = document.getElementById('match-app');
+  if (!root) throw new Error('match app missing');
+  const supabase = createClient(root.dataset.url!, root.dataset.key!);
+  const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
+  const signInForm = root.querySelector<HTMLFormElement>('[data-form="sign-in"]')!;
+  const signedIn = root.querySelector<HTMLElement>('[data-panel="signed-in"]')!;
+  const unassigned = root.querySelector<HTMLElement>('[data-unassigned]')!;
+  const adminLink = root.querySelector<HTMLElement>('[data-admin-link]')!;
+  const teamMenu = root.querySelector<HTMLElement>('[data-team-menu]')!;
+  const layout = root.querySelector<HTMLElement>('[data-layout]')!;
+  const fixtureList = root.querySelector<HTMLElement>('[data-fixtures]')!;
+  const matchHost = root.querySelector<HTMLElement>('[data-match]')!;
+
+  const POSITIONS = 6;
+  let userId = '';
+  let squads: Squad[] = [];
+  let clubNames = new Map<string, string>();
+  let currentSquad: Squad | null = null;
+  let fixtures: Fixture[] = [];
+  let currentFixture: Fixture | null = null;
+  let players: Player[] = [];
+
+  const setStatus = (message: string) => {
+    statusEl.textContent = message;
+  };
+  const esc = (value: string | null | undefined) =>
+    String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
+  const fmtDate = (iso: string) =>
+    new Date(iso).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const isPast = (fixture: Fixture) => new Date(fixture.starts_at).getTime() < Date.now() - 6 * 3600_000;
+  const ours = (fixture: Fixture) => (fixture.home.team_id === currentSquad?.team_id ? 'home' : 'away');
+
+  signInForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const data = new FormData(signInForm);
+    setStatus('Signing in…');
+    const { error } = await supabase.auth.signInWithPassword({
+      email: String(data.get('email')),
+      password: String(data.get('password')),
+    });
+    setStatus(error ? error.message : '');
+    if (!error) await showSession();
+  });
+
+  root.querySelector('[data-sign-out]')!.addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    await showSession();
+  });
+
+  teamMenu.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-pick-squad]');
+    if (!button) return;
+    const squad = squads.find((s) => s.id === Number(button.dataset.pickSquad));
+    if (squad) void pickSquad(squad);
+  });
+
+  fixtureList.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-pick-fixture]');
+    if (!button) return;
+    const fixture = fixtures.find((f) => f.id === Number(button.dataset.pickFixture));
+    if (fixture) void pickFixture(fixture);
+  });
+
+  matchHost.addEventListener('click', async (event) => {
+    const target = event.target as HTMLElement;
+    const availButton = target.closest<HTMLButtonElement>('[data-avail]');
+    if (availButton && currentFixture) {
+      await setAvailability(Number(availButton.dataset.player), availButton.dataset.avail as Availability['status'] | 'clear');
+      return;
+    }
+    const nomButton = target.closest<HTMLButtonElement>('[data-add-nomination]');
+    if (nomButton && currentSquad) {
+      const { error } = await supabase
+        .from('squad_players')
+        .insert({ squad_id: currentSquad.id, display_name: nomButton.dataset.addNomination });
+      if (error) setStatus(error.message);
+      else await refreshMatch();
+      return;
+    }
+    const clearButton = target.closest<HTMLButtonElement>('[data-clear-selection]');
+    if (clearButton && currentFixture && currentSquad) {
+      const { error } = await supabase
+        .from('selections')
+        .delete()
+        .eq('fixture_id', currentFixture.id)
+        .eq('squad_id', currentSquad.id);
+      if (error) setStatus(error.message);
+      else await refreshMatch();
+    }
+  });
+
+  matchHost.addEventListener('change', async (event) => {
+    const select = (event.target as HTMLElement).closest<HTMLSelectElement>('[data-position]');
+    if (!select || !currentFixture || !currentSquad) return;
+    await setPosition(Number(select.dataset.position), select.value ? Number(select.value) : null);
+  });
+
+  matchHost.addEventListener('submit', async (event) => {
+    const form = event.target as HTMLFormElement;
+    if (!form.matches('[data-form="player"]') || !currentSquad) return;
+    event.preventDefault();
+    const data = new FormData(form);
+    const { error } = await supabase.from('squad_players').insert({
+      squad_id: currentSquad.id,
+      display_name: String(data.get('display_name')).trim(),
+    });
+    if (error) {
+      setStatus(error.message);
+      return;
+    }
+    form.reset();
+    await refreshMatch();
+  });
+
+  async function setAvailability(playerId: number, status: Availability['status'] | 'clear') {
+    if (!currentFixture) return;
+    setStatus('Saving…');
+    const { data: existing } = await supabase
+      .from('availability')
+      .select('id')
+      .eq('fixture_id', currentFixture.id)
+      .eq('squad_player_id', playerId)
+      .maybeSingle();
+    let error;
+    if (status === 'clear') {
+      if (existing) ({ error } = await supabase.from('availability').delete().eq('id', existing.id));
+    } else if (existing) {
+      ({ error } = await supabase.from('availability').update({ status, set_by: userId }).eq('id', existing.id));
+    } else {
+      ({ error } = await supabase
+        .from('availability')
+        .insert({ fixture_id: currentFixture.id, squad_player_id: playerId, status, set_by: userId }));
+    }
+    setStatus(error ? error.message : '');
+    if (!error) await refreshMatch();
+  }
+
+  async function setPosition(playerId: number, position: number | null) {
+    if (!currentFixture || !currentSquad) return;
+    setStatus('Saving…');
+    // Remove this player's existing slot and anyone already in the target slot.
+    let query = supabase
+      .from('selections')
+      .delete()
+      .eq('fixture_id', currentFixture.id)
+      .eq('squad_id', currentSquad.id);
+    query = position ? query.or(`squad_player_id.eq.${playerId},position.eq.${position}`) : query.eq('squad_player_id', playerId);
+    let { error } = await query;
+    if (!error && position) {
+      ({ error } = await supabase.from('selections').insert({
+        fixture_id: currentFixture.id,
+        squad_id: currentSquad.id,
+        squad_player_id: playerId,
+        position,
+      }));
+    }
+    setStatus(error ? error.message : '');
+    if (!error) await refreshMatch();
+  }
+
+  async function showSession() {
+    const { data } = await supabase.auth.getSession();
+    const session = data.session;
+    signInForm.hidden = Boolean(session);
+    signedIn.hidden = !session;
+    if (!session) {
+      teamMenu.replaceChildren();
+      layout.hidden = true;
+      unassigned.hidden = true;
+      return;
+    }
+    userId = session.user.id;
+    root!.querySelector('[data-who]')!.textContent = `Signed in as ${session.user.user_metadata?.display_name || session.user.email}`;
+    const { data: me } = await supabase.from('profiles').select('is_admin').eq('id', session.user.id).maybeSingle();
+    adminLink.hidden = !me?.is_admin;
+
+    const [{ data: squadRows, error }, { data: clubRows }] = await Promise.all([
+      supabase.from('captain_squads').select('id, name, team_id').not('team_id', 'is', null).order('name'),
+      supabase.from('clubs').select('slug, name'),
+    ]);
+    if (error) {
+      setStatus(error.message);
+      return;
+    }
+    squads = (squadRows ?? []) as Squad[];
+    clubNames = new Map((clubRows ?? []).map((c: { slug: string; name: string }) => [c.slug, c.name]));
+    unassigned.hidden = squads.length > 0;
+    layout.hidden = squads.length === 0;
+    teamMenu.replaceChildren();
+    teamMenu.hidden = squads.length < 2;
+    for (const squad of squads) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'pill';
+      button.dataset.pickSquad = String(squad.id);
+      button.textContent = squad.name;
+      teamMenu.append(button);
+    }
+    if (squads.length) {
+      const wanted = Number(location.hash.replace('#squad-', ''));
+      await pickSquad(squads.find((s) => s.id === wanted) ?? squads[0]);
+    }
+  }
+
+  async function pickSquad(squad: Squad) {
+    currentSquad = squad;
+    history.replaceState(null, '', `#squad-${squad.id}`);
+    teamMenu.querySelectorAll<HTMLButtonElement>('[data-pick-squad]').forEach((b) => {
+      b.classList.toggle('pill--active', Number(b.dataset.pickSquad) === squad.id);
+    });
+    const { data: leagueTeams } = await supabase.from('league_teams').select('id').eq('team_id', squad.team_id);
+    const ids = (leagueTeams ?? []).map((t: { id: number }) => t.id);
+    if (!ids.length) {
+      fixtures = [];
+      fixtureList.innerHTML = '<li class="muted">No fixtures found for this team yet.</li>';
+      matchHost.innerHTML = '';
+      return;
+    }
+    const { data: rows, error } = await supabase
+      .from('fixtures')
+      .select(
+        'id, starts_at, status, home_points, away_points, home_games, away_games, divisions (name, scoring), ' +
+          'home:league_teams!fixtures_home_team_id_fkey (id, name, club_slug, team_id), ' +
+          'away:league_teams!fixtures_away_team_id_fkey (id, name, club_slug, team_id)',
+      )
+      .or(`home_team_id.in.(${ids.join(',')}),away_team_id.in.(${ids.join(',')})`)
+      .order('starts_at');
+    if (error) {
+      setStatus(error.message);
+      return;
+    }
+    fixtures = (rows ?? []) as unknown as Fixture[];
+    renderFixtureList();
+    const next = fixtures.find((f) => !isPast(f)) ?? fixtures[fixtures.length - 1];
+    if (next) await pickFixture(next);
+    else matchHost.innerHTML = '<p class="muted">No fixtures yet.</p>';
+  }
+
+  function renderFixtureList() {
+    fixtureList.innerHTML = fixtures
+      .map((f) => {
+        const side = ours(f);
+        const opponent = side === 'home' ? f.away.name : f.home.name;
+        const past = isPast(f);
+        const score =
+          f.status === 'played' && f.home_points != null
+            ? ` <span class="score">${side === 'home' ? f.home_points : f.away_points}–${side === 'home' ? f.away_points : f.home_points}</span>`
+            : '';
+        return (
+          `<li><button type="button" class="fixture${past ? ' fixture--past' : ''}${f.id === currentFixture?.id ? ' fixture--active' : ''}" data-pick-fixture="${f.id}">` +
+          `<span class="fixture__date">${esc(fmtDate(f.starts_at))}</span>` +
+          `<span class="fixture__who">${side === 'home' ? 'v' : 'at'} ${esc(opponent)}${score}</span>` +
+          `${f.status !== 'scheduled' && f.status !== 'played' ? `<span class="tag">${esc(f.status)}</span>` : ''}` +
+          `</button></li>`
+        );
+      })
+      .join('');
+  }
+
+  async function pickFixture(fixture: Fixture) {
+    currentFixture = fixture;
+    renderFixtureList();
+    await refreshMatch();
+  }
+
+  async function refreshMatch() {
+    if (!currentFixture || !currentSquad) return;
+    const fixture = currentFixture;
+    const squad = currentSquad;
+    const [playersRes, availRes, selRes, rubberRes, nomRes] = await Promise.all([
+      supabase.from('squad_players').select('id, display_name, email, phone').eq('squad_id', squad.id).order('display_name'),
+      supabase.from('availability').select('id, squad_player_id, status').eq('fixture_id', fixture.id),
+      supabase.from('selections').select('id, squad_player_id, position').eq('fixture_id', fixture.id).eq('squad_id', squad.id),
+      fixture.status === 'played'
+        ? supabase.from('rubbers').select('position, home_player, away_player, score, winner').eq('fixture_id', fixture.id).order('position')
+        : Promise.resolve({ data: [] as Rubber[] }),
+      supabase.from('nominations').select('period, position, player_name').eq('team_id', squad.team_id).order('period').order('position'),
+    ]);
+    players = (playersRes.data ?? []) as Player[];
+    const avail = new Map(((availRes.data ?? []) as Availability[]).map((a) => [a.squad_player_id, a.status]));
+    const selected = new Map(((selRes.data ?? []) as Selection[]).map((s) => [s.squad_player_id, s.position]));
+    const rubbers = (rubberRes.data ?? []) as Rubber[];
+    const nominations = (nomRes.data ?? []) as Nomination[];
+
+    const side = ours(fixture);
+    const opponent = side === 'home' ? fixture.away : fixture.home;
+    const venue = clubNames.get(fixture.home.club_slug ?? '') ?? fixture.home.name;
+    const counts = { in: 0, out: 0, maybe: 0 };
+    for (const status of avail.values()) counts[status] += 1;
+    const order = [...selected.entries()].sort((a, b) => a[1] - b[1]);
+    const nameOf = (id: number) => players.find((p) => p.id === id)?.display_name ?? '?';
+    const known = new Set(players.map((p) => p.display_name.toLowerCase()));
+    const missingNoms = nominations.filter((n, i, all) => !known.has(n.player_name.toLowerCase()) && all.findIndex((x) => x.player_name.toLowerCase() === n.player_name.toLowerCase()) === i);
+
+    const rows = players
+      .map((p) => {
+        const status = avail.get(p.id);
+        const pos = selected.get(p.id);
+        const options = ['<option value="">–</option>']
+          .concat(Array.from({ length: POSITIONS }, (_, i) => `<option value="${i + 1}"${pos === i + 1 ? ' selected' : ''}>${i + 1}</option>`))
+          .join('');
+        const btn = (value: Availability['status'], label: string) =>
+          `<button type="button" class="avail avail--${value}${status === value ? ' avail--on' : ''}" data-avail="${value}" data-player="${p.id}">${label}</button>`;
+        return (
+          `<tr class="${status ? `row--${status}` : ''}">` +
+          `<td class="name">${esc(p.display_name)}</td>` +
+          `<td class="avail-cell">${btn('in', 'In')}${btn('maybe', 'Maybe')}${btn('out', 'Out')}` +
+          `${status ? `<button type="button" class="avail avail--clear" data-avail="clear" data-player="${p.id}" title="Clear">×</button>` : ''}</td>` +
+          `<td><select class="pos" data-position="${p.id}" aria-label="Position for ${esc(p.display_name)}">${options}</select></td>` +
+          `</tr>`
+        );
+      })
+      .join('');
+
+    matchHost.innerHTML = `
+      <header class="match__head">
+        <p class="eyebrow">${esc(fixture.divisions?.name ?? '')}${fixture.divisions?.scoring ? ` · ${esc(fixture.divisions.scoring)}` : ''}</p>
+        <h2>${esc(squad.name)} ${side === 'home' ? 'v' : 'at'} ${esc(opponent.name)}</h2>
+        <p class="meta">${esc(fmtDate(fixture.starts_at))} · ${side === 'home' ? 'Home' : 'Away'} at ${esc(venue)}${
+          fixture.status !== 'scheduled' ? ` · <span class="tag">${esc(fixture.status)}</span>` : ''
+        }</p>
+        ${
+          fixture.status === 'played' && fixture.home_points != null
+            ? `<p class="result">Result: ${esc(fixture.home.name)} ${fixture.home_points} – ${fixture.away_points} ${esc(fixture.away.name)}` +
+              `${fixture.home_games != null ? ` <span class="muted">(games ${fixture.home_games}–${fixture.away_games})</span>` : ''}</p>`
+            : ''
+        }
+      </header>
+      ${
+        rubbers.length
+          ? `<table class="rubbers"><thead><tr><th>#</th><th>${esc(fixture.home.name)}</th><th>${esc(fixture.away.name)}</th><th>Score</th></tr></thead><tbody>${rubbers
+              .map(
+                (r) =>
+                  `<tr><td>${r.position}</td><td class="${r.winner === 'home' ? 'won' : ''}">${esc(r.home_player)}</td>` +
+                  `<td class="${r.winner === 'away' ? 'won' : ''}">${esc(r.away_player)}</td><td>${esc(r.score)}</td></tr>`,
+              )
+              .join('')}</tbody></table>`
+          : ''
+      }
+      <div class="summary">
+        <span class="chip chip--in">${counts.in} in</span>
+        <span class="chip chip--maybe">${counts.maybe} maybe</span>
+        <span class="chip chip--out">${counts.out} out</span>
+        <span class="chip">${players.length - counts.in - counts.out - counts.maybe} no reply</span>
+      </div>
+      <table class="squad">
+        <thead><tr><th>Player</th><th>Availability</th><th>Order</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="3" class="muted">No players in this squad yet. Add them below.</td></tr>'}</tbody>
+      </table>
+      <div class="selection">
+        <h3>Team for this match</h3>
+        ${
+          order.length
+            ? `<ol class="team">${order.map(([id, pos]) => `<li><span class="num">${pos}</span> ${esc(nameOf(id))}</li>`).join('')}</ol>` +
+              `<button type="button" class="btn btn--ghost btn--sm" data-clear-selection>Clear team</button>`
+            : '<p class="muted">Use the Order column to pick who plays at each string.</p>'
+        }
+      </div>
+      <details class="extras">
+        <summary>Add players</summary>
+        <form class="player-form" data-form="player">
+          <label>Name <input name="display_name" required minlength="2" maxlength="80" /></label>
+          <button class="btn btn--primary btn--sm" type="submit">Add to squad</button>
+        </form>
+        ${
+          missingNoms.length
+            ? `<h4>On the League Master nomination list but not in your squad</h4><ul class="noms">${missingNoms
+                .map(
+                  (n) =>
+                    `<li>${esc(n.player_name)} <span class="muted">P${n.period} #${n.position}</span> ` +
+                    `<button type="button" class="btn btn--ghost btn--sm" data-add-nomination="${esc(n.player_name)}">Add</button></li>`,
+                )
+                .join('')}</ul>`
+            : nominations.length
+              ? '<p class="muted">Everyone on the League Master nomination list is already in this squad.</p>'
+              : '<p class="muted">League Master has not published a nomination list for this team yet. Names are pulled in automatically when it does.</p>'
+        }
+      </details>`;
+  }
+
+  showSession();
+</script>
+
+<style is:global>
+  #match-app .lede {
+    color: var(--ink-200);
+  }
+  #match-app .status:empty {
+    display: none;
+  }
+  #match-app .status {
+    margin: 1rem 0;
+    color: var(--gold-400);
+  }
+  #match-app .stack {
+    display: grid;
+    gap: 0.75rem;
+  }
+  #match-app label {
+    display: grid;
+    gap: 0.3rem;
+    font-size: 0.9rem;
+  }
+  #match-app input,
+  #match-app select {
+    width: 100%;
+    background: var(--ink-900);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 0.55rem 0.7rem;
+    font: inherit;
+  }
+  #match-app .who {
+    margin-bottom: 0.5rem;
+  }
+  #match-app .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0 0 1rem;
+  }
+  #match-app .team-menu {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0 0 1.25rem;
+  }
+  #match-app .pill {
+    border: 1px solid var(--border-strong);
+    background: transparent;
+    color: var(--text);
+    border-radius: 999px;
+    padding: 0.4rem 0.9rem;
+    font: inherit;
+    cursor: pointer;
+  }
+  #match-app .pill--active {
+    border-color: var(--gold-500);
+    color: var(--gold-400);
+  }
+  #match-app .layout {
+    display: grid;
+    grid-template-columns: minmax(220px, 300px) 1fr;
+    gap: 1.5rem;
+    align-items: start;
+  }
+  @media (max-width: 760px) {
+    #match-app .layout {
+      grid-template-columns: 1fr;
+    }
+  }
+  #match-app .h-small {
+    font-size: 1rem;
+    margin: 0 0 0.5rem;
+  }
+  #match-app .fixtures {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.35rem;
+    max-height: 70vh;
+    overflow: auto;
+  }
+  #match-app .fixture {
+    width: 100%;
+    text-align: left;
+    display: grid;
+    gap: 0.1rem;
+    background: var(--ink-900);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.7rem;
+    font: inherit;
+    cursor: pointer;
+  }
+  #match-app .fixture--past {
+    opacity: 0.6;
+  }
+  #match-app .fixture--active {
+    border-color: var(--gold-500);
+    opacity: 1;
+  }
+  #match-app .fixture__date {
+    font-size: 0.8rem;
+    color: var(--ink-200);
+  }
+  #match-app .score {
+    color: var(--gold-400);
+    margin-left: 0.3rem;
+  }
+  #match-app .tag {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--gold-400);
+  }
+  #match-app .match__head {
+    margin-bottom: 1rem;
+  }
+  #match-app .match__head h2 {
+    margin: 0.2rem 0;
+  }
+  #match-app .eyebrow,
+  #match-app .meta {
+    margin: 0;
+    color: var(--ink-200);
+    font-size: 0.9rem;
+  }
+  #match-app .result {
+    margin: 0.5rem 0 0;
+  }
+  #match-app .summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0 0 0.75rem;
+  }
+  #match-app .chip {
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    padding: 0.2rem 0.7rem;
+    font-size: 0.85rem;
+  }
+  #match-app .chip--in {
+    border-color: #3aa76d;
+  }
+  #match-app .chip--maybe {
+    border-color: var(--gold-500);
+  }
+  #match-app .chip--out {
+    border-color: #c25a5a;
+  }
+  #match-app table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1rem;
+  }
+  #match-app th,
+  #match-app td {
+    text-align: left;
+    padding: 0.45rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  #match-app th {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-200);
+  }
+  #match-app .avail-cell {
+    white-space: nowrap;
+  }
+  #match-app .avail {
+    border: 1px solid var(--border-strong);
+    background: transparent;
+    color: var(--text);
+    border-radius: var(--radius-sm);
+    padding: 0.3rem 0.6rem;
+    margin-right: 0.3rem;
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  #match-app .avail--in.avail--on {
+    background: #3aa76d;
+    border-color: #3aa76d;
+    color: #fff;
+  }
+  #match-app .avail--maybe.avail--on {
+    background: var(--gold-500);
+    border-color: var(--gold-500);
+    color: #111;
+  }
+  #match-app .avail--out.avail--on {
+    background: #c25a5a;
+    border-color: #c25a5a;
+    color: #fff;
+  }
+  #match-app .avail--clear {
+    padding: 0.3rem 0.5rem;
+  }
+  #match-app .pos {
+    width: 4.5rem;
+  }
+  #match-app .row--out .name {
+    color: var(--ink-200);
+    text-decoration: line-through;
+  }
+  #match-app .rubbers .won {
+    color: var(--gold-400);
+    font-weight: 600;
+  }
+  #match-app .selection {
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+  }
+  #match-app .selection h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+  }
+  #match-app .team {
+    list-style: none;
+    margin: 0 0 0.75rem;
+    padding: 0;
+    display: grid;
+    gap: 0.3rem;
+  }
+  #match-app .num {
+    display: inline-block;
+    min-width: 1.6rem;
+    text-align: center;
+    border: 1px solid var(--gold-500);
+    color: var(--gold-400);
+    border-radius: 999px;
+    font-size: 0.8rem;
+    margin-right: 0.3rem;
+  }
+  #match-app .extras summary {
+    cursor: pointer;
+    color: var(--gold-400);
+  }
+  #match-app .player-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 0.75rem;
+    margin: 0.75rem 0;
+  }
+  #match-app .player-form label {
+    flex: 1 1 220px;
+  }
+  #match-app .extras h4 {
+    margin: 1rem 0 0.5rem;
+    font-size: 0.95rem;
+  }
+  #match-app .noms {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.3rem;
+  }
+</style>

@@ -1,0 +1,36 @@
+name: Sync League Master
+
+on:
+  schedule:
+    # 06:00 UTC every day (07:00 UK in summer, 06:00 in winter)
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      season:
+        description: 'Season name to import (defaults to the current League Master season)'
+        required: false
+        type: string
+
+concurrency:
+  group: sync-leaguemaster
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Import fixtures, results and nominations
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -n "${{ inputs.season }}" ]; then
+            node scripts/sync-leaguemaster.mjs --season "${{ inputs.season }}"
+          else
+            node scripts/sync-leaguemaster.mjs
+          fi
