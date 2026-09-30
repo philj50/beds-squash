@@ -102,3 +102,11 @@ export async function callManageAccounts(
   }
   return null;
 }
+
+/** The original admin account, which cannot be deleted. Null if the function is unavailable. */
+export async function fetchProtectedAdmin(supabase: SupabaseClient): Promise<string | null> {
+  const { data, error } = await supabase.functions.invoke('manage-accounts', { body: { action: 'protected' } });
+  if (error || !data || typeof data !== 'object') return null;
+  const id = (data as { user_id?: unknown }).user_id;
+  return typeof id === 'string' && id ? id : null;
+}
