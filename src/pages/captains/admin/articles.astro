@@ -85,6 +85,7 @@ import { url } from '@/lib/site';
   const admin = root.querySelector<HTMLElement>('[data-admin]')!;
   const rows = root.querySelector<HTMLElement>('[data-rows]')!;
   const mode = root.querySelector<HTMLSelectElement>('[data-mode]')!;
+  const whoEl = root.querySelector<HTMLElement>('[data-who]')!;
 
   const escapeHtml = (value: string) =>
     value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
@@ -130,7 +131,7 @@ import { url } from '@/lib/site';
     admin.hidden = true;
     denied.hidden = true;
     if (!session) return;
-    root.querySelector('[data-who]')!.textContent = session.user.email ?? 'Signed in';
+    whoEl.textContent = session.user.email ?? 'Signed in';
     const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', session.user.id).maybeSingle();
     const { data: membership } = await supabase
       .from('memberships')

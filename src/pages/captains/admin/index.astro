@@ -237,6 +237,7 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
   const signedIn = root.querySelector<HTMLElement>('[data-panel="signed-in"]')!;
   const adminPanel = root.querySelector<HTMLElement>('[data-admin]')!;
   const denied = root.querySelector<HTMLElement>('[data-denied]')!;
+  const whoEl = root.querySelector<HTMLElement>('[data-who]')!;
   const teamsHost = root.querySelector<HTMLElement>('[data-teams]')!;
   const overviewHost = root.querySelector<HTMLElement>('[data-overview]')!;
   const clubMenu = root.querySelector<HTMLElement>('[data-club-menu]')!;
@@ -646,7 +647,7 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
       return;
     }
     const label = me?.display_name || session.user.email;
-    root.querySelector('[data-who]')!.textContent = `Signed in as ${label}`;
+    whoEl.textContent = `Signed in as ${label}`;
     const allowed = Boolean(me?.is_admin);
     adminPanel.hidden = !allowed;
     denied.hidden = allowed;

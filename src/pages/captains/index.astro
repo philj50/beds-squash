@@ -72,6 +72,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   const squadHost = root.querySelector<HTMLElement>('[data-squads]')!;
   const unassigned = root.querySelector<HTMLElement>('[data-unassigned]')!;
   const adminLink = root.querySelector<HTMLElement>('[data-admin-link]')!;
+  const whoEl = root.querySelector<HTMLElement>('[data-who]')!;
 
   const setStatus = (message: string) => {
     statusEl.textContent = message;
@@ -144,7 +145,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       return;
     }
     const name = session.user.user_metadata?.display_name || session.user.email;
-    root.querySelector('[data-who]')!.textContent = `Signed in as ${name}`;
+    whoEl.textContent = `Signed in as ${name}`;
     const { data: me } = await supabase.from('profiles').select('is_admin').eq('id', session.user.id).maybeSingle();
     adminLink.hidden = !me?.is_admin;
 

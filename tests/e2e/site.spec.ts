@@ -69,14 +69,14 @@ test.describe('Public site', () => {
 });
 
 test.describe('SEO and feeds', () => {
-  test('robots.txt blocks captain tools', async ({ request, baseURL }) => {
+  test('robots.txt blocks captain tools', async ({ request }) => {
     const res = await request.get('robots.txt');
     expect(res.ok()).toBeTruthy();
     const body = await res.text();
     expect(body).toMatch(/Disallow:.*captains/i);
   });
 
-  test('sitemap and RSS respond', async ({ request, baseURL }) => {
+  test('sitemap and RSS respond', async ({ request }) => {
     const sitemap = await request.get('sitemap-index.xml');
     expect(sitemap.ok()).toBeTruthy();
     const rss = await request.get('rss.xml');
@@ -84,7 +84,7 @@ test.describe('SEO and feeds', () => {
     expect(await rss.text()).toMatch(/<rss|<feed/i);
   });
 
-  test('events calendar download', async ({ request, baseURL }) => {
+  test('events calendar download', async ({ request }) => {
     const res = await request.get('events.ics');
     expect(res.ok()).toBeTruthy();
     expect(await res.text()).toMatch(/BEGIN:VCALENDAR/);

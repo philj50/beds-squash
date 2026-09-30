@@ -359,6 +359,11 @@ const crumbs = [
   }
 
   if (root && kindsEl && seasonsEl && metaEl && divisionsEl && boardEl) {
+    const kinds = kindsEl;
+    const seasonsNav = seasonsEl;
+    const meta = metaEl;
+    const divisionsNav = divisionsEl;
+    const board = boardEl;
     const supabase = createClient(root.dataset.url!, root.dataset.key!);
     let seasons: Season[] = [];
     let kind: 'winter' | 'summer' = 'winter';
@@ -387,8 +392,8 @@ const crumbs = [
     }
 
     function showKind(value: 'winter' | 'summer') {
-      kindsEl.hidden = false;
-      kindsEl.innerHTML = (['winter', 'summer'] as const)
+      kinds.hidden = false;
+      kinds.innerHTML = (['winter', 'summer'] as const)
         .map((item) => {
           const count = seasonsInKind(item).length;
           return `<button type="button" class="kind-btn ${item === value ? 'is-on' : ''}" data-kind="${item}" ${count ? '' : 'disabled'}>${item === 'winter' ? 'Winter' : 'Summer'}<span>${count}</span></button>`;
@@ -397,8 +402,8 @@ const crumbs = [
     }
 
     function showSeasons(list: Season[], current: number) {
-      seasonsEl.hidden = false;
-      seasonsEl.innerHTML = list
+      seasonsNav.hidden = false;
+      seasonsNav.innerHTML = list
         .map(
           (season) =>
             `<button type="button" class="season-btn ${season.id === current ? 'is-on' : ''}" data-season="${season.id}">${escapeHtml(shortName(season.name))}</button>`,
@@ -407,8 +412,8 @@ const crumbs = [
     }
 
     function showDivisions(list: Division[], current: number) {
-      divisionsEl.hidden = list.length < 2;
-      divisionsEl.innerHTML = list
+      divisionsNav.hidden = list.length < 2;
+      divisionsNav.innerHTML = list
         .map(
           (division) =>
             `<button type="button" class="div-btn ${division.id === current ? 'is-on' : ''}" data-division="${division.id}">${escapeHtml(division.name)}</button>`,
@@ -418,7 +423,7 @@ const crumbs = [
 
     async function loadSeason(id: number) {
       setStatus('Loading tables…');
-      boardEl.innerHTML = '';
+      board.innerHTML = '';
       const { data: divisionRows, error: divisionError } = await supabase
         .from('divisions')
         .select('id, name, scoring')
@@ -458,21 +463,21 @@ const crumbs = [
       showKind(kind);
       showSeasons(inKind, seasonId);
       if (!season) {
-        metaEl.hidden = true;
-        divisionsEl.hidden = true;
-        boardEl.innerHTML = '';
+        meta.hidden = true;
+        divisionsNav.hidden = true;
+        board.innerHTML = '';
         setStatus('No seasons published yet.');
         return;
       }
       const today = new Date().toISOString().slice(0, 10);
       const ends = season.ends_on.slice(0, 10);
       const inProgress = ends >= today;
-      metaEl.hidden = false;
-      metaEl.textContent = `${dayFmt.format(new Date(`${season.starts_on.slice(0, 10)}T12:00:00`))} – ${dayFmt.format(new Date(`${ends}T12:00:00`))}${inProgress ? ' · in progress' : ''}`;
+      meta.hidden = false;
+      meta.textContent = `${dayFmt.format(new Date(`${season.starts_on.slice(0, 10)}T12:00:00`))} – ${dayFmt.format(new Date(`${ends}T12:00:00`))}${inProgress ? ' · in progress' : ''}`;
       const division = divisions.find((item) => item.id === divisionId) ?? divisions[0];
       if (!division) {
-        divisionsEl.hidden = true;
-        boardEl.innerHTML = '<p class="muted">No divisions published for this season.</p>';
+        divisionsNav.hidden = true;
+        board.innerHTML = '<p class="muted">No divisions published for this season.</p>';
         setStatus('');
         return;
       }
@@ -500,7 +505,7 @@ const crumbs = [
       if (openFixtureId === id) paint();
     }
 
-    boardEl.addEventListener('click', (event) => {
+    board.addEventListener('click', (event) => {
       const target = event.target as HTMLElement;
       const teamButton = target.closest<HTMLButtonElement>('[data-team-btn]');
       if (teamButton) {
@@ -536,7 +541,7 @@ const crumbs = [
       paint();
     }
 
-    kindsEl.addEventListener('click', (event) => {
+    kinds.addEventListener('click', (event) => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-kind]');
       if (!button || button.disabled) return;
       const next = button.dataset.kind === 'summer' ? 'summer' : 'winter';
@@ -548,13 +553,13 @@ const crumbs = [
       void selectSeason((completed ?? list[0]).id);
     });
 
-    seasonsEl.addEventListener('click', (event) => {
+    seasonsNav.addEventListener('click', (event) => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-season]');
       if (!button) return;
       void selectSeason(Number(button.dataset.season));
     });
 
-    divisionsEl.addEventListener('click', (event) => {
+    divisionsNav.addEventListener('click', (event) => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-division]');
       if (!button) return;
       divisionId = Number(button.dataset.division);
