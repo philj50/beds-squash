@@ -152,7 +152,18 @@ Download the PDFs from the old Weebly site while it is still up and attach them 
 | `SQUASHLEVELS_EMAIL` | Daily SquashLevels sync |
 | `SQUASHLEVELS_PASSWORD` | Daily SquashLevels sync |
 | `SUPABASE_URL` | League import & SquashLevels sync |
-| `SUPABASE_SERVICE_ROLE_KEY` | League import & SquashLevels sync |
+| `SUPABASE_SERVICE_ROLE_KEY` | League import & SquashLevels sync — use the **Secret key** named `default` (`sb_secret_…`) from Supabase **Settings → API Keys** (not the publishable key) |
+| `NTFY_TOPIC` | Optional — [ntfy](https://ntfy.sh) topic name for daily OK/fail push (see below) |
+| `NTFY_TOKEN` | Optional — only if your ntfy topic is private (Bearer token) |
+
+### Daily push notification (ntfy)
+
+1. Install the **ntfy** app on your phone ([ntfy.sh](https://ntfy.sh)) or use the web UI.
+2. Pick a **private, unguessable topic** (e.g. `beds-squash-yourname-a1b2c3`) and subscribe to it in the app.
+3. GitHub → **Settings → Secrets → Actions** → add `NTFY_TOPIC` with that exact topic name (not the full URL).
+4. Optional: self-hosted server → add repository **Variable** `NTFY_SERVER` (e.g. `https://ntfy.example.com`). Optional private topic → secret `NTFY_TOKEN`.
+
+You get one notification after **League Master** (~06:00 UTC) and one after **SquashLevels** (~07:30 UTC). Failures use high priority. If `NTFY_TOPIC` is unset, workflows skip notify silently.
 
 Workflows: **Deploy to GitHub Pages** (build + post-deploy smoke tests), **Site tests** (`npm run check` + Playwright), **SquashLevels daily**, **Sync League Master**.
 

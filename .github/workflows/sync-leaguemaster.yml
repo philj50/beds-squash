@@ -25,12 +25,33 @@ jobs:
         with:
           node-version: 24
       - name: Import fixtures, results and nominations
+        id: import
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
+          set -o pipefail
           if [ -n "${{ inputs.season }}" ]; then
-            node scripts/sync-leaguemaster.mjs --season "${{ inputs.season }}"
+            node scripts/sync-leaguemaster.mjs --season "${{ inputs.season }}" | tee import.log
           else
-            node scripts/sync-leaguemaster.mjs
+            node scripts/sync-leaguemaster.mjs | tee import.log
           fi
+          tail -5 import.log > summary.txt || true
+      - name: Notify via ntfy
+        if: always()
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
+          NTFY_SERVER: ${{ vars.NTFY_SERVER }}
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ "$JOB_STATUS" = "success" ]; then
+            body="League Master import finished OK."
+            if [ -f summary.txt ]; then
+              body="$(cat summary.txt | tr '\n' ' ')"
+            fi
+          else
+            body="League Master import failed. Open the Actions run for logs."
+          fi
+          bash .github/scripts/ntfy-notify.sh "Beds Squash · League Master" "$body"

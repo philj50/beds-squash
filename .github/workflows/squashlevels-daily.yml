@@ -28,17 +28,37 @@ jobs:
         with:
           node-version: 24
       - name: Store ratings and write one article
+        id: daily
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SQUASHLEVELS_EMAIL: ${{ secrets.SQUASHLEVELS_EMAIL }}
           SQUASHLEVELS_PASSWORD: ${{ secrets.SQUASHLEVELS_PASSWORD }}
         run: |
+          set -o pipefail
           if [ -n "${{ inputs.date }}" ]; then
-            node scripts/squashlevels-daily.mjs --date "${{ inputs.date }}"
+            node scripts/squashlevels-daily.mjs --date "${{ inputs.date }}" | tee daily.log
           else
-            node scripts/squashlevels-daily.mjs
+            node scripts/squashlevels-daily.mjs | tee daily.log
           fi
+          summary="$(grep -E '^\{' daily.log | tail -1 || true)"
+          echo "summary=${summary}" >> "$GITHUB_OUTPUT"
+      - name: Notify via ntfy
+        if: always()
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
+          NTFY_SERVER: ${{ vars.NTFY_SERVER }}
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SUMMARY: ${{ steps.daily.outputs.summary }}
+        run: |
+          if [ "$JOB_STATUS" = "success" ]; then
+            body="${SUMMARY:-SquashLevels daily run finished OK.}"
+          else
+            body="SquashLevels daily run failed. Open the Actions run for logs."
+          fi
+          bash .github/scripts/ntfy-notify.sh "Beds Squash · SquashLevels" "$body"
       - name: Commit a published article
         run: |
           git add src/content/news
