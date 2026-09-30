@@ -1,0 +1,52 @@
+name: SquashLevels and match article
+
+on:
+  schedule:
+    # After the 06:00 League Master import. 07:30 UTC.
+    - cron: '30 7 * * *'
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Match date to use (YYYY-MM-DD). Leave blank for yesterday.'
+        required: false
+        type: string
+
+concurrency:
+  group: squashlevels-daily
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Store ratings and write one article
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SQUASHLEVELS_EMAIL: ${{ secrets.SQUASHLEVELS_EMAIL }}
+          SQUASHLEVELS_PASSWORD: ${{ secrets.SQUASHLEVELS_PASSWORD }}
+        run: |
+          if [ -n "${{ inputs.date }}" ]; then
+            node scripts/squashlevels-daily.mjs --date "${{ inputs.date }}"
+          else
+            node scripts/squashlevels-daily.mjs
+          fi
+      - name: Commit a published article
+        run: |
+          git add src/content/news
+          if git diff --cached --quiet; then
+            echo "No article to publish."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "Publish the daily league match article."
+            git push
+          fi

@@ -4,6 +4,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 const captainsHref = `${import.meta.env.BASE_URL}captains/`;
 const juniorEntriesHref = `${import.meta.env.BASE_URL}juniors/closed/entries/`;
+const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
 ---
 
 <Base
@@ -37,6 +38,7 @@ const juniorEntriesHref = `${import.meta.env.BASE_URL}juniors/closed/entries/`;
           <a class="btn btn--ghost btn--sm" href={captainsHref}>Captain page</a>
           <a class="btn btn--ghost btn--sm" href={`${captainsHref}matches/`}>Matches</a>
           <a class="btn btn--ghost btn--sm" href={juniorEntriesHref}>Junior entries</a>
+          <a class="btn btn--ghost btn--sm" href={articlesHref}>Match articles</a>
           <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
         </p>
         <p data-denied hidden>This account cannot set up teams.</p>

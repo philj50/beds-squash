@@ -1,0 +1,223 @@
+---
+import Base from '@/layouts/Base.astro';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
+import { url } from '@/lib/site';
+---
+
+<Base title="Match articles" description="Choose whether the daily league article publishes on its own." noindex>
+  <section class="section">
+    <div class="container articles" id="articles-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
+      <h1>Match articles</h1>
+      <p class="lede">
+        One article a day, and only when a league match was played. Automatic publishing is on to start with.
+        Switch to manual and a match waits here until you approve it. Nothing is emailed.
+      </p>
+      <p class="status" data-status role="status"></p>
+
+      <div data-panel="signed-out">
+        <form class="card" data-form="sign-in">
+          <div class="card__body stack">
+            <label>Email <input name="email" type="email" required autocomplete="email" /></label>
+            <label>Password <input name="password" type="password" required autocomplete="current-password" /></label>
+            <button class="btn btn--primary" type="submit">Sign in</button>
+          </div>
+        </form>
+      </div>
+
+      <div data-panel="signed-in" hidden>
+        <p class="who" data-who></p>
+        <p class="actions">
+          <a class="btn btn--ghost btn--sm" href={url('/captains/admin/')}>Admin</a>
+          <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
+        </p>
+        <p data-denied hidden>This account cannot change articles.</p>
+        <div data-admin hidden>
+          <form class="card" data-form="mode">
+            <div class="card__body stack">
+              <label>
+                Publishing
+                <select name="publication_mode" data-mode>
+                  <option value="auto">Automatic</option>
+                  <option value="manual">Manual — hold for approval</option>
+                </select>
+              </label>
+              <button class="btn btn--primary" type="submit">Save</button>
+            </div>
+          </form>
+          <h2>Recent articles</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Article</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody data-rows></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+
+  type Article = {
+    id: number;
+    article_on: string;
+    title: string;
+    status: 'held' | 'approved' | 'published';
+    slug: string;
+  };
+
+  const root = document.getElementById('articles-app');
+  if (!root) throw new Error('articles app missing');
+  const supabase = createClient(root.dataset.url!, root.dataset.key!);
+  const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
+  const signedOut = root.querySelector<HTMLElement>('[data-panel="signed-out"]')!;
+  const signedIn = root.querySelector<HTMLElement>('[data-panel="signed-in"]')!;
+  const denied = root.querySelector<HTMLElement>('[data-denied]')!;
+  const admin = root.querySelector<HTMLElement>('[data-admin]')!;
+  const rows = root.querySelector<HTMLElement>('[data-rows]')!;
+  const mode = root.querySelector<HTMLSelectElement>('[data-mode]')!;
+
+  const escapeHtml = (value: string) =>
+    value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
+
+  root.querySelector<HTMLFormElement>('[data-form="sign-in"]')!.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget as HTMLFormElement);
+    statusEl.textContent = 'Signing in…';
+    const { error } = await supabase.auth.signInWithPassword({
+      email: String(data.get('email')),
+      password: String(data.get('password')),
+    });
+    statusEl.textContent = error ? error.message : '';
+    if (!error) await showSession();
+  });
+
+  root.querySelector('[data-sign-out]')!.addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    await showSession();
+  });
+
+  root.querySelector<HTMLFormElement>('[data-form="mode"]')!.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    statusEl.textContent = 'Saving…';
+    const { error } = await supabase.rpc('set_article_publication_mode', { p_mode: mode.value });
+    statusEl.textContent = error ? error.message : 'Saved.';
+  });
+
+  rows.addEventListener('click', async (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-approve]');
+    if (!button) return;
+    statusEl.textContent = 'Approving…';
+    const { error } = await supabase.rpc('approve_match_article', { p_id: Number(button.dataset.approve) });
+    statusEl.textContent = error ? error.message : 'Approved. It will be published on the next daily run.';
+    if (!error) await showSession();
+  });
+
+  async function showSession() {
+    const { data } = await supabase.auth.getSession();
+    const session = data.session;
+    signedOut.hidden = Boolean(session);
+    signedIn.hidden = !session;
+    admin.hidden = true;
+    denied.hidden = true;
+    if (!session) return;
+    root.querySelector('[data-who]')!.textContent = session.user.email ?? 'Signed in';
+    const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', session.user.id).maybeSingle();
+    const { data: membership } = await supabase
+      .from('memberships')
+      .select('role')
+      .eq('profile_id', session.user.id)
+      .eq('role', 'admin')
+      .limit(1);
+    const isAdmin = Boolean(profile?.is_admin) || Boolean(membership?.length);
+    if (!isAdmin) {
+      denied.hidden = false;
+      return;
+    }
+    admin.hidden = false;
+    const { data: settings, error: settingsError } = await supabase.from('article_settings').select('publication_mode').eq('id', 1).single();
+    if (settingsError) statusEl.textContent = settingsError.message;
+    else mode.value = settings.publication_mode;
+    const { data: articles, error } = await supabase
+      .from('match_articles')
+      .select('id, article_on, title, status, slug')
+      .order('article_on', { ascending: false })
+      .limit(30);
+    if (error) {
+      statusEl.textContent = error.message;
+      return;
+    }
+    rows.innerHTML = (articles as Article[]).map((article) => {
+      const approve = article.status === 'held'
+        ? `<button class="btn btn--ghost btn--sm" type="button" data-approve="${article.id}">Approve</button>`
+        : '';
+      return `<tr><td>${escapeHtml(article.article_on)}</td><td>${escapeHtml(article.title)}</td><td>${escapeHtml(article.status)}</td><td>${approve}</td></tr>`;
+    }).join('') || '<tr><td colspan="4">No articles yet.</td></tr>';
+  }
+
+  showSession();
+</script>
+
+<style is:global>
+  #articles-app {
+    max-width: 52rem;
+  }
+  #articles-app .lede,
+  #articles-app .who {
+    color: var(--ink-200);
+  }
+  #articles-app .stack {
+    display: grid;
+    gap: 0.75rem;
+  }
+  #articles-app label {
+    display: grid;
+    gap: 0.3rem;
+    font-size: 0.9rem;
+  }
+  #articles-app input,
+  #articles-app select {
+    width: 100%;
+    background: var(--ink-900);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 0.65rem 0.75rem;
+    font: inherit;
+  }
+  #articles-app .status:empty {
+    display: none;
+  }
+  #articles-app .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  #articles-app h2 {
+    margin-top: 1.5rem;
+  }
+  #articles-app .table-wrap {
+    overflow-x: auto;
+  }
+  #articles-app table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  #articles-app th,
+  #articles-app td {
+    text-align: left;
+    vertical-align: top;
+    padding: 0.45rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+</style>
