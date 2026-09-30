@@ -44,7 +44,7 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
         </ul>
       </div>
       <div class="hero__art" aria-hidden="true">
-        <img src={url('/brand/logo.png')} alt="" width="420" height="420" fetchpriority="high" />
+        <img src={url('/brand/logo-navy.png')} alt="" width="420" height="248" fetchpriority="high" />
         <div class="hero__streak hero__streak--gold"></div>
         <div class="hero__streak hero__streak--red"></div>
       </div>
@@ -244,7 +244,7 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
     width: 70%;
     left: -20%;
     top: 62%;
-    background: linear-gradient(90deg, transparent, var(--gold-500));
+    background: linear-gradient(90deg, transparent, var(--accent));
     transform: rotate(-18deg);
   }
   .hero__streak--red {
@@ -252,7 +252,7 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
     left: -15%;
     top: 72%;
     height: 10px;
-    background: linear-gradient(90deg, transparent, var(--red-500));
+    background: linear-gradient(90deg, transparent, var(--accent-2));
     transform: rotate(-18deg);
   }
   @keyframes float {
@@ -294,7 +294,7 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
     height: 44px;
     display: grid;
     place-items: center;
-    background: rgba(242, 183, 5, 0.1);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
     border-radius: 10px;
     flex-shrink: 0;
   }

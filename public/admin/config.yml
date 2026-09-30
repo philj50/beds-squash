@@ -228,6 +228,7 @@ collections:
           - { label: Safeguarding, value: safeguarding }
           - { label: Code of conduct, value: code-of-conduct }
           - { label: League rules, value: league-rules }
+          - { label: Accounts, value: accounts }
           - { label: Forms, value: forms }
           - { label: Other, value: other }
       - { label: PDF file, name: file, widget: file, required: false }

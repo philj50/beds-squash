@@ -6,7 +6,7 @@ const year = new Date().getFullYear();
 <footer class="site-footer">
   <div class="container grid">
     <div class="about">
-      <img src={url('/brand/logo-192.png')} alt="" width="72" height="72" />
+      <img src={url('/brand/logo-navy.png')} alt="" width="193" height="114" />
       <p class="legal">{SITE.legalName}</p>
       <p class="muted">
         Affiliated to <a href={SITE.englandSquash} target="_blank" rel="noopener">England Squash</a>. Promoting squash
@@ -72,8 +72,12 @@ const year = new Date().getFullYear();
     gap: 2.5rem;
   }
   .about img {
-    border-radius: 50%;
+    display: block;
+    width: min(100%, 193px);
+    height: auto;
+    border-radius: 8px;
     margin-bottom: 0.75rem;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
   }
   .legal {
     font-family: var(--font-display);

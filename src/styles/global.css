@@ -1,6 +1,6 @@
 /* ------------------------------------------------------------------
    Bedfordshire Squash — design tokens & base styles
-   Palette: charcoal / gold / red (Bedfordshire county colours)
+   Brand: navy #003568 (BSR lockup), gold #F2B705 accents, blue #0065D1 secondary.
    ------------------------------------------------------------------ */
 
 :root {
@@ -29,6 +29,8 @@
   --text: var(--paper);
   --text-muted: var(--ink-300);
   --accent: var(--gold-500);
+  --accent-hover: var(--gold-400);
+  --accent-ink: var(--ink-950);
   --accent-2: var(--red-500);
   --link: var(--gold-400);
   --link-hover: #fff;
@@ -66,31 +68,35 @@ html[data-theme='light'] body {
 
 html[data-theme='navy'] {
   color-scheme: dark;
-  --ink-950: #050a12;
-  --ink-900: #0a1628;
-  --ink-800: #132238;
-  --ink-700: #1a2f4d;
-  --ink-600: #243d5c;
-  --ink-500: #5a7290;
-  --ink-300: #9eb0c9;
-  --ink-200: #c5d1e3;
-  --ink-100: #e8eef7;
+  --ink-950: #001a33;
+  --ink-900: #003568;
+  --ink-800: #0a4478;
+  --ink-700: #15558c;
+  --ink-600: #1f679e;
+  --ink-500: #6a93b8;
+  --ink-300: #a8c4db;
+  --ink-200: #cfe0ee;
+  --ink-100: #eaf3fa;
   --bg: var(--ink-900);
   --bg-elev: var(--ink-800);
   --bg-card: var(--ink-800);
-  --border: rgba(255, 255, 255, 0.1);
-  --border-strong: rgba(255, 255, 255, 0.2);
+  --border: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.22);
   --text: #fff;
-  --text-muted: #b8c5d9;
+  --text-muted: #c5d6e8;
+  --accent: var(--gold-500);
+  --accent-hover: var(--gold-400);
+  --accent-ink: var(--ink-950);
+  --accent-2: #0065d1;
   --link: #fff;
   --link-hover: var(--gold-400);
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --shadow: 0 10px 30px rgba(0, 26, 51, 0.45);
 }
 
 html[data-theme='navy'] body {
   background-image:
-    radial-gradient(1200px 600px at 80% -10%, rgba(255, 255, 255, 0.06), transparent 60%),
-    radial-gradient(800px 400px at -10% 10%, rgba(242, 183, 5, 0.1), transparent 60%);
+    radial-gradient(1200px 600px at 80% -10%, rgba(0, 101, 209, 0.22), transparent 60%),
+    radial-gradient(800px 400px at -10% 10%, rgba(242, 183, 5, 0.14), transparent 60%);
 }
 
 *,
@@ -250,11 +256,11 @@ p {
 }
 .btn--primary {
   background: var(--accent);
-  color: var(--ink-950);
+  color: var(--accent-ink);
 }
 .btn--primary:hover {
-  background: var(--gold-400);
-  color: var(--ink-950);
+  background: var(--accent-hover);
+  color: var(--accent-ink);
 }
 .btn--ghost {
   border-color: var(--border-strong);
@@ -398,6 +404,13 @@ p {
   border-collapse: collapse;
   margin: 1.5em 0;
   font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  overflow-x: auto;
+}
+.prose .accounts-table td:not(:first-child),
+.prose .accounts-table th:not(:first-child) {
+  text-align: right;
+  white-space: nowrap;
 }
 .prose th,
 .prose td {
