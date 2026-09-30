@@ -404,6 +404,13 @@ p {
   border-collapse: collapse;
   margin: 1.5em 0;
   font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  overflow-x: auto;
+}
+.prose .accounts-table td:not(:first-child),
+.prose .accounts-table th:not(:first-child) {
+  text-align: right;
+  white-space: nowrap;
 }
 .prose th,
 .prose td {

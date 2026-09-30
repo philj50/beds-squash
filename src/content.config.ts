@@ -94,7 +94,7 @@ const documents = defineCollection({
   loader: glob({ pattern: '**/[^_]*.md', base: './src/content/documents' }),
   schema: z.object({
     title: z.string(),
-    category: z.enum(['constitution', 'safeguarding', 'code-of-conduct', 'league-rules', 'forms', 'other']),
+    category: z.enum(['constitution', 'safeguarding', 'code-of-conduct', 'league-rules', 'forms', 'accounts', 'other']),
     file: uploadPath.optional(),
     updated: z.coerce.date().optional(),
     summary: z.string().optional(),

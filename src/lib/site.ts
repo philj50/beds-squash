@@ -92,5 +92,6 @@ export const DOC_CATEGORY_LABEL: Record<string, string> = {
   'code-of-conduct': 'Codes of Conduct',
   'league-rules': 'League Rules',
   forms: 'Forms',
+  accounts: 'Accounts',
   other: 'Other',
 };
