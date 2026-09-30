@@ -1,5 +1,6 @@
 ---
 import Base from '@/layouts/Base.astro';
+import ChangePassword from '@/components/ChangePassword.astro';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 const captainsHref = `${import.meta.env.BASE_URL}captains/`;
@@ -41,6 +42,7 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
           <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
         </p>
         <p data-denied hidden>This account cannot set up teams.</p>
+        <ChangePassword />
 
         <div data-admin hidden>
           <nav class="admin-tabs" aria-label="Admin sections">
@@ -87,8 +89,82 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
           </section>
 
           <section class="admin-panel" data-tab="accounts" hidden>
-            <h2>Registered accounts</h2>
-            <ul class="people" data-people></ul>
+            <h2>Accounts</h2>
+            <p class="muted small">
+              Create an account and choose the first password. No email is sent. That person signs in with it, then changes it themselves.
+            </p>
+            <form class="card" data-form="create-account">
+              <div class="card__body stack">
+                <h3>Add an account</h3>
+                <label>Name <input name="display_name" required minlength="2" maxlength="80" autocomplete="off" /></label>
+                <label>Email <input name="email" type="email" required autocomplete="off" /></label>
+                <label class="check">
+                  <input type="checkbox" name="is_admin" checked />
+                  County admin
+                </label>
+                <label>
+                  First password
+                  <span class="pw-field">
+                    <input name="password" type="password" required minlength="12" maxlength="72" autocomplete="new-password" />
+                    <button class="btn btn--ghost btn--sm" type="button" data-toggle-password>Show</button>
+                  </span>
+                </label>
+                <label>
+                  Confirm password
+                  <span class="pw-field">
+                    <input name="confirm_password" type="password" required minlength="12" maxlength="72" autocomplete="new-password" />
+                    <button class="btn btn--ghost btn--sm" type="button" data-toggle-password>Show</button>
+                  </span>
+                </label>
+                <p class="muted small">At least 12 characters, with a letter and a number.</p>
+                <div class="actions">
+                  <button class="btn btn--ghost btn--sm" type="button" data-suggest-password>Suggest a password</button>
+                  <button class="btn btn--primary" type="submit">Create account</button>
+                </div>
+              </div>
+            </form>
+            <h3>People</h3>
+            <div class="overview-box">
+              <table class="overview">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Teams</th>
+                    <th>Access</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody data-people></tbody>
+              </table>
+            </div>
+            <form class="card" data-form="set-password" hidden>
+              <div class="card__body stack">
+                <h3>Set a new password for <span data-password-who></span></h3>
+                <p class="muted small">They can change this after they sign in. Nothing is emailed.</p>
+                <input type="hidden" name="user_id" data-password-user />
+                <input type="hidden" name="email" data-password-email />
+                <label>
+                  New password
+                  <span class="pw-field">
+                    <input name="password" type="password" required minlength="12" maxlength="72" autocomplete="new-password" />
+                    <button class="btn btn--ghost btn--sm" type="button" data-toggle-password>Show</button>
+                  </span>
+                </label>
+                <label>
+                  Confirm password
+                  <span class="pw-field">
+                    <input name="confirm_password" type="password" required minlength="12" maxlength="72" autocomplete="new-password" />
+                    <button class="btn btn--ghost btn--sm" type="button" data-toggle-password>Show</button>
+                  </span>
+                </label>
+                <div class="actions">
+                  <button class="btn btn--ghost btn--sm" type="button" data-suggest-password>Suggest a password</button>
+                  <button class="btn btn--primary btn--sm" type="submit">Save password</button>
+                  <button class="btn btn--ghost btn--sm" type="button" data-cancel-password>Cancel</button>
+                </div>
+              </div>
+            </form>
           </section>
 
           <section class="admin-panel" data-tab="roles" hidden>
@@ -191,6 +267,7 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
 
 <script>
   import { createClient } from '@supabase/supabase-js';
+  import { bindPasswordToggles, callManageAccounts, fillSuggestedPassword, passwordIssue } from '@/lib/passwords';
 
   type Person = { id: string; display_name: string; email: string | null; is_admin: boolean };
   type Club = { slug: string; name: string; contact_name: string | null; contact_email: string | null };
@@ -359,6 +436,81 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
     return error.message;
   };
 
+  const createAccountForm = root.querySelector<HTMLFormElement>('[data-form="create-account"]')!;
+  const setPasswordForm = root.querySelector<HTMLFormElement>('[data-form="set-password"]')!;
+  const passwordWho = root.querySelector<HTMLElement>('[data-password-who]')!;
+  const passwordUser = root.querySelector<HTMLInputElement>('[data-password-user]')!;
+  const passwordEmail = root.querySelector<HTMLInputElement>('[data-password-email]')!;
+  bindPasswordToggles(root);
+  root.querySelectorAll<HTMLButtonElement>('[data-suggest-password]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const form = button.closest('form');
+      if (form) fillSuggestedPassword(form);
+    });
+  });
+
+  const passwordsMatch = (form: HTMLFormElement) => {
+    const data = new FormData(form);
+    const password = String(data.get('password') ?? '');
+    const confirm = String(data.get('confirm_password') ?? '');
+    const email = String(data.get('email') ?? '');
+    if (password !== confirm) return 'The passwords do not match.';
+    return passwordIssue(password, email);
+  };
+
+  createAccountForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const data = new FormData(createAccountForm);
+    const issue = passwordsMatch(createAccountForm);
+    if (issue) {
+      setStatus(issue);
+      return;
+    }
+    setStatus('Creating account…');
+    const message = await callManageAccounts(supabase, {
+      action: 'create',
+      display_name: String(data.get('display_name') ?? '').trim(),
+      email: String(data.get('email') ?? '').trim(),
+      password: String(data.get('password') ?? ''),
+      is_admin: data.get('is_admin') === 'on',
+    });
+    if (message) {
+      setStatus(message);
+      return;
+    }
+    createAccountForm.reset();
+    createAccountForm.querySelector<HTMLInputElement>('[name="is_admin"]')!.checked = true;
+    setStatus('Account created. Tell them the email and password. Nothing was emailed.');
+    await showSession();
+  });
+
+  setPasswordForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const issue = passwordsMatch(setPasswordForm);
+    if (issue) {
+      setStatus(issue);
+      return;
+    }
+    setStatus('Saving password…');
+    const message = await callManageAccounts(supabase, {
+      action: 'set-password',
+      user_id: passwordUser.value,
+      password: String(new FormData(setPasswordForm).get('password') ?? ''),
+    });
+    if (message) {
+      setStatus(message);
+      return;
+    }
+    setPasswordForm.hidden = true;
+    setPasswordForm.reset();
+    setStatus(`Password updated for ${passwordWho.textContent}. Nothing was emailed.`);
+  });
+
+  root.querySelector('[data-cancel-password]')!.addEventListener('click', () => {
+    setPasswordForm.hidden = true;
+    setPasswordForm.reset();
+  });
+
   root.querySelector<HTMLFormElement>('[data-form="sign-in"]')!.addEventListener('submit', async (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget as HTMLFormElement);
@@ -406,6 +558,40 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
       return;
     }
     setStatus('Role saved.');
+    await showSession();
+  });
+
+  peopleHost.addEventListener('click', async (event) => {
+    const target = event.target as HTMLElement;
+    const openPassword = target.closest<HTMLButtonElement>('[data-open-password]');
+    if (openPassword) {
+      const userId = openPassword.dataset.openPassword!;
+      const email = openPassword.dataset.passwordEmail ?? '';
+      passwordWho.textContent = openPassword.dataset.passwordName || 'this account';
+      setPasswordForm.hidden = false;
+      setPasswordForm.reset();
+      setPasswordForm.querySelectorAll<HTMLButtonElement>('[data-toggle-password]').forEach((button) => {
+        button.textContent = 'Show';
+      });
+      passwordUser.value = userId;
+      passwordEmail.value = email;
+      setPasswordForm.querySelector<HTMLInputElement>('[name="password"]')?.focus();
+      return;
+    }
+    const setAdmin = target.closest<HTMLButtonElement>('[data-set-admin]');
+    if (!setAdmin) return;
+    const makingAdmin = setAdmin.dataset.adminNext === 'true';
+    setStatus(makingAdmin ? 'Granting admin…' : 'Removing admin…');
+    const message = await callManageAccounts(supabase, {
+      action: 'set-admin',
+      user_id: setAdmin.dataset.setAdmin,
+      is_admin: makingAdmin,
+    });
+    if (message) {
+      setStatus(message);
+      return;
+    }
+    setStatus(makingAdmin ? 'Admin access granted.' : 'Admin access removed.');
     await showSession();
   });
 
@@ -819,19 +1005,33 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
     if (currentClub !== 'new' && !clubs.some((club) => club.slug === currentClub)) currentClub = clubs[0]?.slug ?? 'new';
     showClub(currentClub);
 
+    const selfId = session.user.id;
     peopleHost.replaceChildren(
-      ...accounts.map((person) => {
-        const item = document.createElement('li');
-        const email = person.email?.toLowerCase() ?? '';
-        const teams = teamRows.filter((squad) => squad.captain_email === email).map((squad) => squad.name);
-        const teamText = teams.length ? teams.join(', ') : 'No team yet';
-        item.innerHTML =
-          `<strong>${escapeHtml(person.display_name || 'Unnamed')}</strong>` +
-          `${person.is_admin ? ' <span class="pill">Admin</span>' : ''}` +
-          `<span class="muted"> ${escapeHtml(person.email || 'No email')}</span>` +
-          `<span class="muted"> — ${escapeHtml(teamText)}</span>`;
-        return item;
-      }),
+      ...(accounts.length
+        ? accounts.map((person) => {
+            const row = document.createElement('tr');
+            const email = person.email?.toLowerCase() ?? '';
+            const teams = teamRows.filter((squad) => squad.captain_email === email).map((squad) => squad.name);
+            const teamText = teams.length ? teams.join(', ') : '—';
+            const name = person.display_name || 'Unnamed';
+            const adminButton =
+              person.id === selfId
+                ? ''
+                : person.is_admin
+                  ? `<button class="btn btn--ghost btn--sm" type="button" data-set-admin="${person.id}" data-admin-next="false">Remove admin</button>`
+                  : `<button class="btn btn--ghost btn--sm" type="button" data-set-admin="${person.id}" data-admin-next="true">Make admin</button>`;
+            row.innerHTML =
+              `<td>${escapeHtml(name)}${person.id === selfId ? ' <span class="muted">(you)</span>' : ''}</td>` +
+              `<td>${escapeHtml(person.email || '—')}</td>` +
+              `<td>${escapeHtml(teamText)}</td>` +
+              `<td>${person.is_admin ? '<span class="pill">Admin</span>' : 'Member'}</td>` +
+              `<td class="col-action">` +
+              `<button class="btn btn--ghost btn--sm" type="button" data-open-password="${person.id}" data-password-name="${escapeHtml(name)}" data-password-email="${escapeHtml(person.email || '')}">Set password</button> ` +
+              adminButton +
+              `</td>`;
+            return row;
+          })
+        : [Object.assign(document.createElement('tr'), { innerHTML: '<td colspan="5">No accounts yet.</td>' })]),
     );
 
     const chosenPerson = rolePerson.value;
@@ -1111,6 +1311,31 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
   #setup-app .people li {
     padding: 0.55rem 0;
     border-bottom: 1px solid var(--border);
+  }
+  #setup-app .check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  #setup-app .check input {
+    width: auto;
+  }
+  #setup-app .pw-field {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+  }
+  #setup-app .pw-field input {
+    flex: 1;
+    min-width: 0;
+  }
+  #setup-app .overview .col-action {
+    width: 1%;
+    white-space: nowrap;
+    text-align: right;
+  }
+  #setup-app .overview .col-action .btn + .btn {
+    margin-left: 0.35rem;
   }
   #setup-app .pill {
     display: inline-block;

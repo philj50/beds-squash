@@ -1,5 +1,6 @@
 ---
 import Base from '@/layouts/Base.astro';
+import ChangePassword from '@/components/ChangePassword.astro';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 ---
 
@@ -12,9 +13,9 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     <div class="container captain" id="captain-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
       <h1>Club captains</h1>
       <p class="lede">
-        Sign in with the email the county admin linked to your team. Add players to your squad, mark availability on
+        Sign in with the email and password a county admin gave you. Add players to your squad, mark availability on
         <a href={`${import.meta.env.BASE_URL}captains/matches/`}>Matches</a>, and set the playing order before each fixture.
-        New self-registration is paused (no confirmation emails are sent).
+        You can change your own password after you sign in. New self-registration stays paused.
       </p>
       <p class="status" data-status role="status"></p>
 
@@ -27,7 +28,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
         <div class="card" data-form="register">
           <div class="card__body stack">
             <h2>Registration is paused</h2>
-            <p class="muted">Creating an account would email a confirmation link. That is switched off until the league is ready to invite people. Sign in if you already have an account.</p>
+            <p class="muted">A county admin creates your account and gives you a password. Sign in with that, then change the password yourself. No confirmation email is sent.</p>
           </div>
         </div>
 
@@ -56,6 +57,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
         </div>
 
         <div data-squads></div>
+        <ChangePassword />
       </div>
     </div>
   </section>
@@ -164,24 +166,34 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
         const card = document.createElement('article');
         card.className = 'card';
         const players = (squad.squad_players ?? []) as { id: number; display_name: string; email: string | null; phone: string | null }[];
-        const list = players
-          .map(
-            (player) =>
-              `<li><strong>${escapeHtml(player.display_name)}</strong>` +
-              `${player.email ? `<span class="muted"> ${escapeHtml(player.email)}</span>` : ''}` +
-              `${player.phone ? `<span class="muted"> ${escapeHtml(player.phone)}</span>` : ''}` +
-              ` <button class="btn btn--ghost btn--sm" type="button" data-remove-player="${player.id}">Remove</button></li>`,
-          )
-          .join('');
+        const rows = players.length
+          ? players
+              .map(
+                (player) =>
+                  `<tr>` +
+                  `<td>${escapeHtml(player.display_name)}</td>` +
+                  `<td>${player.email ? escapeHtml(player.email) : '<span class="muted">—</span>'}</td>` +
+                  `<td>${player.phone ? escapeHtml(player.phone) : '<span class="muted">—</span>'}</td>` +
+                  `<td class="col-action"><button class="btn btn--ghost btn--sm" type="button" data-remove-player="${player.id}">Remove</button></td>` +
+                  `</tr>`,
+              )
+              .join('')
+          : '<tr><td colspan="4" class="muted">No players yet.</td></tr>';
         card.innerHTML = `
           <div class="card__body">
             <h2>${escapeHtml(squad.name)}</h2>
-            <ul class="players">${list || '<li class="muted">No players yet.</li>'}</ul>
-            <form class="stack player-form" data-form="player" data-squad-id="${squad.id}">
-              <h3>Add a player</h3>
+            <div class="table-wrap">
+              <table class="squad-table">
+                <thead>
+                  <tr><th>Name</th><th>Email</th><th>Phone</th><th></th></tr>
+                </thead>
+                <tbody>${rows}</tbody>
+              </table>
+            </div>
+            <form class="player-form" data-form="player" data-squad-id="${squad.id}">
               <label>Name <input name="display_name" required minlength="2" maxlength="80" /></label>
-              <label>Email <input name="email" type="email" /></label>
-              <label>Phone <input name="phone" type="tel" /></label>
+              <label>Email <input name="email" type="email" autocomplete="off" /></label>
+              <label>Phone <input name="phone" type="tel" autocomplete="off" /></label>
               <button class="btn btn--primary btn--sm" type="submit">Add player</button>
             </form>
           </div>`;
@@ -199,7 +211,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 <style>
   .captain {
-    max-width: 720px;
+    max-width: 960px;
   }
   .test-flag {
     border: 1px solid var(--gold-500);
@@ -267,21 +279,49 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     gap: 0.5rem;
     margin: 0 0 1rem;
   }
-  .players {
-    list-style: none;
-    margin: 0 0 1rem;
-    padding: 0;
+  .table-wrap {
+    border: 2px solid var(--gold-500);
+    border-radius: var(--radius);
+    background: var(--ink-800);
+    overflow-x: auto;
+    margin: 0.75rem 0 1rem;
   }
-  .players li {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    align-items: center;
-    padding: 0.45rem 0;
-    border-bottom: 1px solid var(--border);
+  .squad-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+  }
+  .squad-table th,
+  .squad-table td {
+    text-align: left;
+    vertical-align: middle;
+    padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+  }
+  .squad-table th {
+    color: var(--gold-400);
+    font-weight: 700;
+    background: var(--ink-700);
+    white-space: nowrap;
+  }
+  .squad-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+  .squad-table .col-action {
+    width: 1%;
+    white-space: nowrap;
+    text-align: right;
   }
   .player-form {
-    margin-top: 1rem;
+    display: grid;
+    grid-template-columns: 1.3fr 1.4fr 0.9fr auto;
+    gap: 0.6rem;
+    align-items: end;
+  }
+  @media (max-width: 720px) {
+    .player-form {
+      grid-template-columns: 1fr;
+    }
   }
   [data-squads] {
     display: grid;
