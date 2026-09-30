@@ -1,7 +1,6 @@
 /* ------------------------------------------------------------------
    Bedfordshire Squash — design tokens & base styles
-   Brand: navy #003568, coral #FF5A3F, blue #0065D1 (BSR lockup)
-   Charcoal / gold / red remain for the optional county theme.
+   Brand: navy #003568 (BSR lockup), gold #F2B705 accents, blue #0065D1 secondary.
    ------------------------------------------------------------------ */
 
 :root {
@@ -78,9 +77,6 @@ html[data-theme='navy'] {
   --ink-300: #a8c4db;
   --ink-200: #cfe0ee;
   --ink-100: #eaf3fa;
-  --gold-500: #ff5a3f;
-  --gold-400: #ff7d68;
-  --gold-600: #e2472e;
   --bg: var(--ink-900);
   --bg-elev: var(--ink-800);
   --bg-card: var(--ink-800);
@@ -88,19 +84,19 @@ html[data-theme='navy'] {
   --border-strong: rgba(255, 255, 255, 0.22);
   --text: #fff;
   --text-muted: #c5d6e8;
-  --accent: #ff5a3f;
-  --accent-hover: #ff7d68;
-  --accent-ink: #fff;
+  --accent: var(--gold-500);
+  --accent-hover: var(--gold-400);
+  --accent-ink: var(--ink-950);
   --accent-2: #0065d1;
   --link: #fff;
-  --link-hover: #ff7d68;
+  --link-hover: var(--gold-400);
   --shadow: 0 10px 30px rgba(0, 26, 51, 0.45);
 }
 
 html[data-theme='navy'] body {
   background-image:
     radial-gradient(1200px 600px at 80% -10%, rgba(0, 101, 209, 0.22), transparent 60%),
-    radial-gradient(800px 400px at -10% 10%, rgba(255, 90, 63, 0.14), transparent 60%);
+    radial-gradient(800px 400px at -10% 10%, rgba(242, 183, 5, 0.14), transparent 60%);
 }
 
 *,
