@@ -1,5 +1,6 @@
 ---
 import Base from '@/layouts/Base.astro';
+import ChangePassword from '@/components/ChangePassword.astro';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 ---
 
@@ -32,6 +33,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
           <a class="btn btn--ghost btn--sm" data-admin-link hidden href={`${import.meta.env.BASE_URL}captains/admin/`}>Clubs and captains</a>
           <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
         </p>
+        <ChangePassword />
 
         <div class="card" data-unassigned hidden>
           <div class="card__body">
