@@ -770,7 +770,7 @@ async function main() {
       matches: matches.size,
       ratings: ratings.length,
       article: article?.slug ?? null,
-      prose: article?.proseSource ?? null,
+      prose: articleProse,
       mode,
     },
   };

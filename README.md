@@ -179,7 +179,7 @@ node scripts/backfill-squashlevels-articles.mjs --from 2026-08-01 --to 2026-08-3
 
 Match articles use a factual template by default. If `NVIDIA_API_KEY` is set (local `.env` or GitHub secret), the daily job asks NVIDIA NIM to rephrase using the same facts; on failure it falls back to the template. Toggle auto vs manual publish in **captains admin → Match articles**.
 
-Optional repo **Variable** `NVIDIA_MODEL` (default `meta/llama-3.3-70b-instruct`). The HorseRacing project `.env` does not define NVIDIA keys; create a key at [build.nvidia.com](https://build.nvidia.com).
+Optional repo **Variable** `NVIDIA_MODEL` (default `openai/gpt-oss-20b`). Older docs referenced `meta/llama-3.3-70b-instruct`, which NVIDIA retired (410). Create a key at [build.nvidia.com](https://build.nvidia.com) and enable the model you want before calling the API.
 
 ### Theme
 

@@ -4,7 +4,8 @@
  */
 
 const DEFAULT_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
-const DEFAULT_MODEL = 'meta/llama-3.3-70b-instruct';
+/** Enrolled on typical build.nvidia.com keys; llama-3.3-70b-instruct returns 410 (EOL). */
+const DEFAULT_MODEL = 'openai/gpt-oss-20b';
 
 function extractJson(text) {
   const trimmed = text.trim();
