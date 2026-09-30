@@ -1,11 +1,12 @@
-/** Site colour theme. Set PUBLIC_SITE_THEME=light or navy at build time (default: charcoal). */
+/** Site colour theme. Navy is default; set PUBLIC_SITE_THEME=default (charcoal) or light at build time. */
 
 export type SiteTheme = 'default' | 'light' | 'navy';
 
 export function siteTheme(): SiteTheme {
   const raw = import.meta.env.PUBLIC_SITE_THEME;
-  if (raw === 'light' || raw === 'navy') return raw;
-  return 'default';
+  if (raw === 'light') return 'light';
+  if (raw === 'default') return 'default';
+  return 'navy';
 }
 
 export const THEME_COLOR: Record<SiteTheme, string> = {

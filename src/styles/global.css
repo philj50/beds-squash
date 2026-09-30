@@ -43,7 +43,7 @@
   --gutter: clamp(1rem, 4vw, 2.5rem);
 }
 
-/* Optional themes: set PUBLIC_SITE_THEME=light or navy when building. */
+/* Themes: navy is default (see theme.ts). PUBLIC_SITE_THEME=light or default (charcoal). */
 html[data-theme='light'] {
   color-scheme: light;
   --bg: var(--paper);
@@ -66,9 +66,18 @@ html[data-theme='light'] body {
 
 html[data-theme='navy'] {
   color-scheme: dark;
-  --bg: #0a1628;
-  --bg-elev: #132238;
-  --bg-card: #132238;
+  --ink-950: #050a12;
+  --ink-900: #0a1628;
+  --ink-800: #132238;
+  --ink-700: #1a2f4d;
+  --ink-600: #243d5c;
+  --ink-500: #5a7290;
+  --ink-300: #9eb0c9;
+  --ink-200: #c5d1e3;
+  --ink-100: #e8eef7;
+  --bg: var(--ink-900);
+  --bg-elev: var(--ink-800);
+  --bg-card: var(--ink-800);
   --border: rgba(255, 255, 255, 0.1);
   --border-strong: rgba(255, 255, 255, 0.2);
   --text: #fff;
