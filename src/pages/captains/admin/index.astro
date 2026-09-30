@@ -49,6 +49,7 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
             <button type="button" data-tab-button="clubs">Clubs</button>
             <button type="button" data-tab-button="accounts">Accounts</button>
             <button type="button" data-tab-button="roles">Roles</button>
+            <button type="button" data-tab-button="traffic">Traffic</button>
           </nav>
 
           <section class="admin-panel" data-tab="overview">
@@ -130,6 +131,59 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
           </form>
           <ul class="people" data-roles></ul>
           </section>
+
+          <section class="admin-panel" data-tab="traffic" hidden>
+            <h2>Site traffic</h2>
+            <p class="muted small">
+              Anonymous counts from public pages (path and browser session only). Admin and captain tools are not tracked.
+            </p>
+            <p class="muted small" data-traffic-status hidden role="status"></p>
+            <div class="traffic-stats" data-traffic-stats hidden>
+              <dl class="traffic-kpis">
+                <div>
+                  <dt>Page views (7 days)</dt>
+                  <dd data-kpi="views-7">—</dd>
+                </div>
+                <div>
+                  <dt>Sessions (7 days)</dt>
+                  <dd data-kpi="sessions-7">—</dd>
+                </div>
+                <div>
+                  <dt>Page views (30 days)</dt>
+                  <dd data-kpi="views-30">—</dd>
+                </div>
+                <div>
+                  <dt>Sessions (30 days)</dt>
+                  <dd data-kpi="sessions-30">—</dd>
+                </div>
+              </dl>
+              <h3>Last 30 days</h3>
+              <div class="overview-box">
+                <table class="overview traffic-table">
+                  <thead>
+                    <tr>
+                      <th>Day</th>
+                      <th>Page views</th>
+                      <th>Sessions</th>
+                    </tr>
+                  </thead>
+                  <tbody data-traffic-by-day></tbody>
+                </table>
+              </div>
+              <h3>Top pages (30 days)</h3>
+              <div class="overview-box">
+                <table class="overview traffic-table">
+                  <thead>
+                    <tr>
+                      <th>Path</th>
+                      <th>Views</th>
+                    </tr>
+                  </thead>
+                  <tbody data-traffic-top></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     </div>
@@ -195,9 +249,62 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
   const roleClub = root.querySelector<HTMLSelectElement>('[data-role-club]')!;
   const roleTeam = root.querySelector<HTMLSelectElement>('[data-role-team]')!;
   const newClubForm = root.querySelector<HTMLFormElement>('[data-form="new-club"]')!;
-  const tabs = ['overview', 'clubs', 'accounts', 'roles'] as const;
+  const tabs = ['overview', 'clubs', 'accounts', 'roles', 'traffic'] as const;
   type Tab = (typeof tabs)[number];
   let currentClub = '';
+  let trafficLoaded = false;
+  const trafficStatus = root.querySelector<HTMLElement>('[data-traffic-status]')!;
+  const trafficStats = root.querySelector<HTMLElement>('[data-traffic-stats]')!;
+  const trafficByDay = root.querySelector<HTMLElement>('[data-traffic-by-day]')!;
+  const trafficTop = root.querySelector<HTMLElement>('[data-traffic-top]')!;
+
+  const formatDay = (iso: string) => {
+    const d = new Date(`${iso}T12:00:00`);
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  const loadTraffic = async () => {
+    trafficStatus.hidden = false;
+    trafficStatus.textContent = 'Loading traffic…';
+    trafficStats.hidden = true;
+    const { data, error } = await supabase.rpc('get_site_traffic_stats');
+    if (error) {
+      trafficStatus.textContent = error.message;
+      return;
+    }
+    const stats = data as {
+      total_7d: number;
+      total_30d: number;
+      sessions_7d: number;
+      sessions_30d: number;
+      by_day: { day: string; page_views: number; sessions: number }[];
+      top_pages: { path: string; page_views: number }[];
+    };
+    root.querySelector('[data-kpi="views-7"]')!.textContent = String(stats.total_7d ?? 0);
+    root.querySelector('[data-kpi="sessions-7"]')!.textContent = String(stats.sessions_7d ?? 0);
+    root.querySelector('[data-kpi="views-30"]')!.textContent = String(stats.total_30d ?? 0);
+    root.querySelector('[data-kpi="sessions-30"]')!.textContent = String(stats.sessions_30d ?? 0);
+    const days = stats.by_day ?? [];
+    trafficByDay.innerHTML =
+      days.length === 0
+        ? '<tr><td colspan="3">No data yet. Views appear after visitors browse public pages.</td></tr>'
+        : days
+            .map(
+              (row) =>
+                `<tr><td>${escapeHtml(formatDay(row.day))}</td><td>${row.page_views}</td><td>${row.sessions}</td></tr>`,
+            )
+            .join('');
+    const top = stats.top_pages ?? [];
+    trafficTop.innerHTML =
+      top.length === 0
+        ? '<tr><td colspan="2">No data yet.</td></tr>'
+        : top
+            .map((row) => `<tr><td><code>${escapeHtml(row.path)}</code></td><td>${row.page_views}</td></tr>`)
+            .join('');
+    trafficStatus.hidden = true;
+    trafficStats.hidden = false;
+    trafficLoaded = true;
+  };
 
   const showTab = (tab: Tab) => {
     for (const panel of root.querySelectorAll<HTMLElement>('[data-tab]')) panel.hidden = panel.dataset.tab !== tab;
@@ -205,6 +312,7 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
       button.setAttribute('aria-current', button.dataset.tabButton === tab ? 'page' : 'false');
     }
     history.replaceState(null, '', `#${tab}`);
+    if (tab === 'traffic' && !trafficLoaded) void loadTraffic();
   };
 
   const showClub = (slug: string) => {
@@ -544,6 +652,8 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
     denied.hidden = allowed;
     if (!allowed) return;
 
+    if (location.hash.slice(1) === 'traffic' && !trafficLoaded) void loadTraffic();
+
     const [
       { data: squadRows, error: squadError },
       { data: people, error: peopleError },
@@ -820,6 +930,32 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
   }
   #setup-app .admin-panel > h2 {
     margin-top: 0;
+  }
+
+  #setup-app .traffic-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 1rem;
+    margin: 0 0 1.5rem;
+  }
+  #setup-app .traffic-kpis dt {
+    font-size: 0.85rem;
+    color: var(--ink-300);
+    margin: 0 0 0.25rem;
+  }
+  #setup-app .traffic-kpis dd {
+    margin: 0;
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--gold-400);
+  }
+  #setup-app .traffic-table code {
+    font-size: 0.85rem;
+    word-break: break-all;
+  }
+  #setup-app .admin-panel h3 {
+    margin: 1.5rem 0 0.75rem;
+    font-size: 1.05rem;
   }
 
   #setup-app .club-menu {
