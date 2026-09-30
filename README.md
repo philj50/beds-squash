@@ -153,6 +153,7 @@ Download the PDFs from the old Weebly site while it is still up and attach them 
 | `SQUASHLEVELS_PASSWORD` | Daily SquashLevels sync |
 | `SUPABASE_URL` | League import & SquashLevels sync |
 | `SUPABASE_SERVICE_ROLE_KEY` | League import & SquashLevels sync — use the **Secret key** named `default` (`sb_secret_…`) from Supabase **Settings → API Keys** (not the publishable key) |
+| `NVIDIA_API_KEY` | Optional — [NVIDIA NIM](https://build.nvidia.com) API key for richer match articles (template fallback if unset or on error) |
 | `NTFY_TOPIC` | Optional — [ntfy](https://ntfy.sh) topic name for daily OK/fail push (see below) |
 | `NTFY_TOKEN` | Optional — only if your ntfy topic is private (Bearer token) |
 
@@ -176,7 +177,9 @@ node scripts/squashlevels-daily.mjs --date 2026-08-11
 node scripts/backfill-squashlevels-articles.mjs --from 2026-08-01 --to 2026-08-31
 ```
 
-Match articles are template-based (not AI). Toggle auto vs manual publish in **captains admin → Match articles**.
+Match articles use a factual template by default. If `NVIDIA_API_KEY` is set (local `.env` or GitHub secret), the daily job asks NVIDIA NIM to rephrase using the same facts; on failure it falls back to the template. Toggle auto vs manual publish in **captains admin → Match articles**.
+
+Optional repo **Variable** `NVIDIA_MODEL` (default `meta/llama-3.3-70b-instruct`). The HorseRacing project `.env` does not define NVIDIA keys; create a key at [build.nvidia.com](https://build.nvidia.com).
 
 ### Theme
 

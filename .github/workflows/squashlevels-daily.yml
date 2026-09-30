@@ -34,6 +34,8 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SQUASHLEVELS_EMAIL: ${{ secrets.SQUASHLEVELS_EMAIL }}
           SQUASHLEVELS_PASSWORD: ${{ secrets.SQUASHLEVELS_PASSWORD }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NVIDIA_MODEL: ${{ vars.NVIDIA_MODEL }}
         run: |
           set -o pipefail
           if [ -n "${{ inputs.date }}" ]; then

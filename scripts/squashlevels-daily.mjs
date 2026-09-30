@@ -15,8 +15,9 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { nvidiaArticle } from './lib/nvidia-article.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const NEWS_DIR = join(ROOT, 'src', 'content', 'news');
@@ -409,6 +410,64 @@ function articleFrom(choice) {
   };
 }
 
+function articleFacts(choice) {
+  const { rubber, homeBefore, awayBefore, homeAfter, awayAfter, upset } = choice;
+  const homeWon = rubber.winner === 'home';
+  const winner = homeWon ? rubber.home_player : rubber.away_player;
+  const loser = homeWon ? rubber.away_player : rubber.home_player;
+  const games = winnerGames(rubber.score, rubber.winner);
+  const points = gameScores(rubber.score).map(([home, away]) => `${home}-${away}`).join(', ');
+  let scorecardLink = null;
+  if (rubber.seasonId && rubber.divisionId && rubber.homeTeamId && rubber.fixtureId) {
+    scorecardLink = `/leagues/results/#${rubber.seasonId}/${rubber.divisionId}/t${rubber.homeTeamId}/m${rubber.fixtureId}`;
+  }
+  return {
+    date: rubber.playedOn,
+    dateLong: longDate(rubber.playedOn),
+    division: rubber.division,
+    season: rubber.season,
+    winner,
+    loser,
+    winnerTeam: homeWon ? rubber.homeTeam : rubber.awayTeam,
+    loserTeam: homeWon ? rubber.awayTeam : rubber.homeTeam,
+    gamesWon: games,
+    gamePoints: points,
+    homeTeam: rubber.homeTeam,
+    awayTeam: rubber.awayTeam,
+    squashLevelsBefore: { [rubber.home_player]: homeBefore, [rubber.away_player]: awayBefore },
+    squashLevelsAfter:
+      homeAfter !== null && awayAfter !== null
+        ? { [rubber.home_player]: homeAfter, [rubber.away_player]: awayAfter }
+        : null,
+    upset: Boolean(upset),
+    fixturePoints:
+      rubber.homePoints !== null && rubber.awayPoints !== null
+        ? { home: rubber.homePoints, away: rubber.awayPoints }
+        : null,
+    scorecardMarkdownLink: scorecardLink
+      ? `[league tables](${scorecardLink})`
+      : null,
+  };
+}
+
+async function buildArticle(choice) {
+  const template = articleFrom(choice);
+  if (!process.env.NVIDIA_API_KEY?.trim()) {
+    return { ...template, prose: 'template' };
+  }
+  try {
+    const ai = await nvidiaArticle(articleFacts(choice), template);
+    if (ai) {
+      console.error('article prose: NVIDIA NIM');
+      return { ...template, title: ai.title, summary: ai.summary, body: ai.body, prose: 'nvidia' };
+    }
+  } catch (error) {
+    console.error(`NVIDIA article failed: ${error instanceof Error ? error.message : error}`);
+  }
+  console.error('article prose: template (fallback)');
+  return { ...template, prose: 'template' };
+}
+
 function writeNews(article) {
   mkdirSync(NEWS_DIR, { recursive: true });
   const path = join(NEWS_DIR, `${article.slug}.md`);
@@ -677,10 +736,14 @@ async function main() {
   const existingFile = existsSync(join(NEWS_DIR, `${playedOn}-league-match.md`));
   const choice = chooseRubber(rubbers, names, [...matches.values()]);
   let article = null;
+  let articleProse = null;
   if (!choice) {
     console.error(`No close match with ratings on ${playedOn}. No article.`);
   } else {
-    article = { ...articleFrom(choice), status: mode === 'manual' ? 'held' : 'published' };
+    const draft = await buildArticle(choice);
+    const { prose, ...articleFields } = draft;
+    articleProse = prose ?? null;
+    article = { ...articleFields, status: mode === 'manual' ? 'held' : 'published' };
     if (article.status === 'published' && !existingFile) {
       console.error(`wrote ${writeNews(article)}`);
     } else if (article.status === 'published') {
@@ -707,6 +770,7 @@ async function main() {
       matches: matches.size,
       ratings: ratings.length,
       article: article?.slug ?? null,
+      prose: article?.proseSource ?? null,
       mode,
     },
   };
