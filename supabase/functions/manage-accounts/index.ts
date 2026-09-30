@@ -69,6 +69,9 @@ Deno.serve(async (req) => {
     display_name?: string;
     is_admin?: boolean;
     user_id?: string;
+    role?: string;
+    club_slug?: string;
+    team_id?: number;
   };
   try {
     body = await req.json();
@@ -76,14 +79,44 @@ Deno.serve(async (req) => {
     return json({ error: 'Invalid request.' }, 400);
   }
 
+  const protectedAdminId = async () => {
+    const { data: admins, error } = await admin.from('profiles').select('id').eq('is_admin', true);
+    if (error) return { id: null as string | null, error: error.message };
+    const adminIds = new Set((admins ?? []).map((row) => row.id as string));
+    let earliest: { id: string; created_at: string } | null = null;
+    for (let page = 1; page <= 20; page += 1) {
+      const { data, error: listError } = await admin.auth.admin.listUsers({ page, perPage: 200 });
+      if (listError) return { id: null, error: listError.message };
+      for (const user of data.users) {
+        if (!adminIds.has(user.id)) continue;
+        if (!earliest || user.created_at < earliest.created_at) earliest = { id: user.id, created_at: user.created_at };
+      }
+      if (data.users.length < 200) break;
+    }
+    return { id: earliest?.id ?? null, error: null as string | null };
+  };
+
+  if (body.action === 'protected') {
+    const found = await protectedAdminId();
+    if (found.error) return json({ error: found.error }, 500);
+    return json({ user_id: found.id });
+  }
+
   if (body.action === 'create') {
     const email = String(body.email ?? '').trim().toLowerCase();
     const password = String(body.password ?? '');
     const displayName = String(body.display_name ?? '').trim();
+    const role = String(body.role ?? (body.is_admin ? 'admin' : 'club_captain'));
+    const roles = ['admin', 'club_captain', 'team_captain', 'team_player'];
+    if (!roles.includes(role)) return json({ error: 'Choose a role.' }, 400);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'Enter a valid email.' }, 400);
     if (displayName.length < 2 || displayName.length > 80) return json({ error: 'Enter a name.' }, 400);
     const issue = passwordIssue(password, email);
     if (issue) return json({ error: issue }, 400);
+    const clubSlug = String(body.club_slug ?? '').trim();
+    const teamId = Number(body.team_id);
+    if (role === 'club_captain' && !clubSlug) return json({ error: 'Choose a club.' }, 400);
+    if ((role === 'team_captain' || role === 'team_player') && !Number.isInteger(teamId)) return json({ error: 'Choose a team.' }, 400);
 
     const { data: created, error } = await admin.auth.admin.createUser({
       email,
@@ -96,7 +129,7 @@ Deno.serve(async (req) => {
     const profile = {
       display_name: displayName,
       email,
-      is_admin: Boolean(body.is_admin),
+      is_admin: role === 'admin',
     };
     const { data: updated, error: updateError } = await admin
       .from('profiles')
@@ -109,10 +142,14 @@ Deno.serve(async (req) => {
       if (insertError) return json({ error: insertError.message }, 400);
     }
 
-    if (body.is_admin) {
-      const { error: roleError } = await admin.from('memberships').insert({ profile_id: created.user.id, role: 'admin' });
-      if (roleError && roleError.code !== '23505') return json({ error: roleError.message }, 400);
-    }
+    const membership: { profile_id: string; role: string; club_slug?: string; team_id?: number } = {
+      profile_id: created.user.id,
+      role,
+    };
+    if (role === 'club_captain') membership.club_slug = clubSlug;
+    if (role === 'team_captain' || role === 'team_player') membership.team_id = teamId;
+    const { error: roleError } = await admin.from('memberships').insert(membership);
+    if (roleError && roleError.code !== '23505') return json({ error: roleError.message }, 400);
     return json({ ok: true });
   }
 
@@ -132,6 +169,9 @@ Deno.serve(async (req) => {
     const userId = String(body.user_id ?? '');
     const isAdmin = Boolean(body.is_admin);
     if (!/^[0-9a-f-]{36}$/i.test(userId)) return json({ error: 'Choose an account.' }, 400);
+    const keeper = await protectedAdminId();
+    if (keeper.error) return json({ error: keeper.error }, 500);
+    if (!isAdmin && userId === keeper.id) return json({ error: 'The default admin cannot lose admin access.' }, 400);
     if (!isAdmin && userId === userData.user.id) return json({ error: 'You cannot remove your own admin access.' }, 400);
 
     const { error } = await admin.from('profiles').update({ is_admin: isAdmin }).eq('id', userId);
@@ -143,6 +183,19 @@ Deno.serve(async (req) => {
       const { error: roleError } = await admin.from('memberships').delete().eq('profile_id', userId).eq('role', 'admin');
       if (roleError) return json({ error: roleError.message }, 400);
     }
+    return json({ ok: true });
+  }
+
+  if (body.action === 'delete') {
+    const userId = String(body.user_id ?? '');
+    if (!/^[0-9a-f-]{36}$/i.test(userId)) return json({ error: 'Choose an account.' }, 400);
+    const keeper = await protectedAdminId();
+    if (keeper.error) return json({ error: keeper.error }, 500);
+    if (userId === keeper.id) return json({ error: 'The default admin cannot be deleted.' }, 400);
+    const { error: roleError } = await admin.from('memberships').delete().eq('profile_id', userId);
+    if (roleError) return json({ error: roleError.message }, 400);
+    const { error } = await admin.auth.admin.deleteUser(userId);
+    if (error) return json({ error: error.message }, 400);
     return json({ ok: true });
   }
 
