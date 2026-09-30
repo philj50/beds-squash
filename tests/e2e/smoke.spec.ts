@@ -13,7 +13,8 @@ test.beforeEach(async ({ context, baseURL }) => {
 });
 
 test('home page responds', async ({ page }) => {
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  // Leading "/" ignores baseURL path (GitHub Pages project site).
+  await page.goto('./', { waitUntil: 'domcontentloaded' });
   await expect(page).toHaveTitle(/Bedfordshire Squash/);
   await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible();
 });

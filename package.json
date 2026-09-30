@@ -9,7 +9,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "check": "astro check",
-    "test": "playwright test",
+    "test": "playwright test tests/e2e/site.spec.ts",
     "test:ui": "playwright test --ui",
     "test:smoke": "playwright test tests/e2e/smoke.spec.ts",
     "cms:proxy": "npx --yes decap-server",

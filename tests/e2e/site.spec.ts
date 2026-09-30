@@ -11,7 +11,8 @@ test.beforeEach(async ({ context, baseURL }) => {
 });
 
 async function open(page: import('@playwright/test').Page, path = '') {
-  await page.goto(path, { waitUntil: 'domcontentloaded' });
+  const relative = path.replace(/^\//, '') || './';
+  await page.goto(relative, { waitUntil: 'domcontentloaded' });
 }
 
 test.describe('Public site', () => {
