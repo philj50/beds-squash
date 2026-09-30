@@ -9,6 +9,7 @@ import Footer from '@/components/Footer.astro';
 import CookieNotice from '@/components/CookieNotice.astro';
 import JsonLd from '@/components/JsonLd.astro';
 import { SITE, url } from '@/lib/site';
+import { siteTheme, THEME_COLOR } from '@/lib/theme';
 import { breadcrumbs, graph, organization, website } from '@/lib/seo';
 
 interface Props {
@@ -33,6 +34,8 @@ const {
   jsonLd,
 } = Astro.props;
 
+const theme = siteTheme();
+
 const fullTitle = title ? `${title} · ${SITE.name}` : `${SITE.name} — ${SITE.tagline}`;
 const canonical = new URL(Astro.url.pathname, Astro.site);
 const ogImage = new URL(image, Astro.site);
@@ -45,7 +48,7 @@ const structured = graph(
 ---
 
 <!doctype html>
-<html lang="en-GB">
+<html lang="en-GB" data-theme={theme === 'default' ? undefined : theme}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -60,7 +63,7 @@ const structured = graph(
     <link rel="alternate" type="text/calendar" title={`${SITE.name} events`} href={url('/events.ics')} />
     <link rel="alternate" type="application/rss+xml" title={`${SITE.name} news`} href={url('/rss.xml')} />
     <meta name="msvalidate.01" content="849125E5D2F17B10DA10E4D88C5EEC3F" />
-    <meta name="theme-color" content="#0f1115" />
+    <meta name="theme-color" content={THEME_COLOR[theme]} />
     <meta name="robots" content={noindex ? 'noindex, nofollow' : 'index, follow'} />
 
     <meta property="og:locale" content="en_GB" />

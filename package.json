@@ -9,6 +9,9 @@
     "build": "astro build",
     "preview": "astro preview",
     "check": "astro check",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:smoke": "playwright test tests/e2e/smoke.spec.ts",
     "cms:proxy": "npx --yes decap-server",
     "astro": "astro"
   },
@@ -28,6 +31,7 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
+    "@playwright/test": "^1.55.0",
     "@types/leaflet": "^1.9.22",
     "typescript": "^6.0.0"
   },
