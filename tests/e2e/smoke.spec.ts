@@ -27,6 +27,11 @@ test('feeds and robots', async ({ request }) => {
   expect(await rss.text()).toMatch(/<rss|<feed/i);
 });
 
+test('SquashLevels page responds', async ({ page }) => {
+  await page.goto('leagues/ratings/', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(/SquashLevels/i);
+});
+
 test('published league match article', async ({ page }) => {
   await page.goto('news/2026-08-11-league-match/', { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { level: 1 })).toContainText('David Gibson');

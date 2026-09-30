@@ -4,16 +4,17 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 ---
 
 <Base
-  title="Captain test"
-  description="Test area for Bedfordshire squash captains to register a squad."
+  title="Club captains"
+  description="Sign in to manage your squad, fixtures, availability and team selection for Bedfordshire squash leagues."
   noindex
 >
   <section class="section">
     <div class="container captain" id="captain-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
-      <p class="test-flag">Test mode. This is not linked from the public site. Player details are visible only to the captain who added them.</p>
-      <h1>Captain registration</h1>
+      <h1>Club captains</h1>
       <p class="lede">
-        New accounts are paused, so this page does not send confirmation emails. If you already have an account, sign in. An admin matches your email to a team, and then you can add players. Nobody is emailed.
+        Sign in with the email the county admin linked to your team. Add players to your squad, mark availability on
+        <a href={`${import.meta.env.BASE_URL}captains/matches/`}>Matches</a>, and set the playing order before each fixture.
+        New self-registration is paused (no confirmation emails are sent).
       </p>
       <p class="status" data-status role="status"></p>
 

@@ -7,7 +7,7 @@ export const SITE = {
   tagline: 'Squash & Squash 57 across Bedfordshire',
   description:
     'The official home of squash and Squash 57 (racketball) in Bedfordshire: clubs, leagues, tournaments, juniors, county teams, events and news from the Bedfordshire Squash & Racketball Association.',
-  email: 'bedssquash@gmail.com', // TODO: confirm the association's public email address
+  email: 'bedssquash@gmail.com',
   facebook: 'https://www.facebook.com/groups/532458603934848/',
   leagueMaster: 'https://bedfordshiresquash.leaguemaster.co.uk/',
   englandSquash: 'https://www.englandsquash.com/',
@@ -26,7 +26,7 @@ export const NAV = [
   { label: 'Documents', href: '/documents/' },
   { label: 'About', href: '/about/' },
   { label: 'Contact', href: '/contact/' },
-  { label: 'Admin', href: '/captains/admin/' },
+  { label: 'Club captains', href: '/captains/' },
 ];
 
 /** Prefix a root-relative path with the configured base (works for "/" and "/beds-squash"). */

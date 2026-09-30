@@ -15,7 +15,7 @@ The new home of squash and Squash 57 (racketball) in Bedfordshire, replacing the
 | News posts with categories, featured posts, RSS feed | `/news/`, `/rss.xml` |
 | Events calendar — county, club, Inter-County and **England Squash** dates, with an iCal feed to subscribe to | `/events/`, `/events.ics` |
 | Interactive **map of clubs & courts** (Leaflet + OpenStreetMap, no API key) with club pages | `/clubs/` |
-| Leagues page with League Master quick links and editable rules | `/leagues/` |
+| Leagues page, **online tables & fixtures**, SquashLevels levels | `/leagues/`, `/leagues/results/`, `/leagues/ratings/` |
 | Tournaments + **Honours board** (County Closed champions by year) | `/tournaments/` |
 | Juniors, County Teams and About pages (editable text) | `/juniors/`, `/county-teams/`, `/about/` |
 | **Photo galleries** with lightbox | `/gallery/` |
@@ -24,7 +24,7 @@ The new home of squash and Squash 57 (racketball) in Bedfordshire, replacing the
 | Browser-based CMS so committee members can edit without touching code | `/admin/` |
 
 Tech: [Astro 7](https://astro.build) static site · Markdown content collections · [Decap CMS](https://decapcms.org) · Leaflet ·
-GitHub Actions → GitHub Pages. No database, no server, no hosting bill.
+[Supabase](https://supabase.com) for league data, captain tools and SquashLevels sync · GitHub Actions → GitHub Pages.
 
 ---
 
@@ -46,8 +46,13 @@ GitHub Actions → GitHub Pages. No database, no server, no hosting bill.
 4. Register a domain (`bedfordshiresquash.co.uk`, `bedssquash.co.uk`, `bedssquash.org.uk` were all available on 26 Sep 2026) and point it at GitHub Pages.
 5. Ask the owner of beds-sra.co.uk to add a "we've moved" banner/link, update the England Squash county page and the Facebook group with the new address.
 
-**Section 2 — members (not started)**
-Player accounts, personal fixtures, availability and captain tools stay off this site until the public pages have been used and checked. Do not add logins, registration or a members area to the public site.
+**Section 2 — club captains (live, noindex)**
+- `/captains/` — squad list (sign-in; self-registration paused).
+- `/captains/matches/` — fixtures, availability and team order (League Master sync).
+- `/captains/admin/` — county admin: clubs, roles, traffic stats, match articles.
+- `/juniors/closed/entries/` — junior closed organiser list.
+
+Public pages also include read-only **league tables** (`/leagues/results/`) and **SquashLevels** (`/leagues/ratings/`).
 
 **Later, still public**
 - Pull England Squash news/events automatically (their site blocks scraping; would need an official feed or a manual monthly sweep).
@@ -135,6 +140,46 @@ The old site (last updated Sept 2023) had these sections; where they live now:
 | Web Site Links | Footer |
 
 Download the PDFs from the old Weebly site while it is still up and attach them through the CMS.
+
+---
+
+## Site operations (automation & QA)
+
+### GitHub Actions secrets (repository → Settings → Secrets and variables → Actions)
+
+| Secret | Used by |
+| --- | --- |
+| `SQUASHLEVELS_EMAIL` | Daily SquashLevels sync |
+| `SQUASHLEVELS_PASSWORD` | Daily SquashLevels sync |
+| `SUPABASE_URL` | League import & SquashLevels sync |
+| `SUPABASE_SERVICE_ROLE_KEY` | League import & SquashLevels sync |
+
+Workflows: **Deploy to GitHub Pages** (build + post-deploy smoke tests), **Site tests** (`npm run check` + Playwright), **SquashLevels daily**, **Sync League Master**.
+
+### Local commands
+
+```bash
+npm test              # Playwright against local preview
+npm run test:smoke    # PLAYWRIGHT_BASE_URL=https://philj50.github.io/beds-squash npm run test:smoke
+node scripts/squashlevels-daily.mjs --date 2026-08-11
+node scripts/backfill-squashlevels-articles.mjs --from 2026-08-01 --to 2026-08-31
+```
+
+Match articles are template-based (not AI). Toggle auto vs manual publish in **captains admin → Match articles**.
+
+### Theme
+
+Navy is the default. Charcoal: `PUBLIC_SITE_THEME=default npm run build`. Light: `PUBLIC_SITE_THEME=light`.
+
+### Custom domain
+
+Set Actions variables `SITE_URL` and `SITE_BASE=/` (see **Custom domain** above). Deploy already sets `PUBLIC_SITE_THEME=navy`.
+
+### Content still worth adding via CMS
+
+- PDFs on existing document entries (minutes, policies).
+- Photo galleries (albums under `/gallery/` — see `src/content/galleries/`).
+- Extra honours years on `/tournaments/` as results come in.
 
 ---
 

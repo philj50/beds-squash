@@ -16,6 +16,7 @@ const LM = SITE.leagueMaster.replace(/\/$/, '');
   <PageHero eyebrow="Team squash" title={page?.data.title ?? 'Leagues'} lede={page?.data.intro}>
     <div class="hero-actions">
       <a class="btn btn--primary" href={url('/leagues/results/')}>Tables &amp; fixtures</a>
+      <a class="btn btn--ghost" href={url('/leagues/ratings/')}>SquashLevels</a>
       {rules[0] && <a class="btn btn--ghost" href={url(`/documents/${rules[0].id}/`)}>League rules</a>}
       <a class="btn btn--ghost" href={SITE.leagueMaster} target="_blank" rel="noopener">League Master ↗</a>
     </div>

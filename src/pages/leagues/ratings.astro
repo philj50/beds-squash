@@ -1,0 +1,225 @@
+---
+import Base from '@/layouts/Base.astro';
+import PageHero from '@/components/PageHero.astro';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
+import { url } from '@/lib/site';
+
+const crumbs = [
+  { name: 'Leagues', path: '/leagues/' },
+  { name: 'SquashLevels', path: '/leagues/ratings/' },
+];
+---
+
+<Base
+  title="SquashLevels ratings"
+  description="SquashLevels levels for players in Bedfordshire league clubs — updated from match results."
+  crumbs={crumbs}
+>
+  <PageHero
+    eyebrow="Levels"
+    title="SquashLevels"
+    lede="Levels for league players we track on SquashLevels. Updated when league matches are played. Search by name to see a rating history."
+  >
+    <div class="hero-actions">
+      <a class="btn btn--ghost" href={url('/leagues/results/')}>Tables &amp; fixtures</a>
+      <a class="btn btn--ghost" href="https://squashlevels.com/" target="_blank" rel="noopener">SquashLevels ↗</a>
+    </div>
+  </PageHero>
+
+  <section class="section">
+    <div class="container ratings" id="ratings-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
+      <label class="search">
+        <span class="sr-only">Search players</span>
+        <input type="search" name="q" placeholder="Search by player name…" autocomplete="off" data-search />
+      </label>
+      <p class="status muted" data-status role="status">Loading…</p>
+      <div class="overview-box" data-list-wrap hidden>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Player</th>
+              <th>Level</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody data-players></tbody>
+        </table>
+      </div>
+      <article class="card player-detail" data-detail hidden>
+        <div class="card__body">
+          <h2 data-detail-name></h2>
+          <p class="muted" data-detail-level></p>
+          <h3 class="h-small">Rating history</h3>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr><th>Date</th><th>Level</th><th>Change</th></tr>
+              </thead>
+              <tbody data-history></tbody>
+            </table>
+          </div>
+          <button class="btn btn--ghost btn--sm" type="button" data-back>← Back to list</button>
+        </div>
+      </article>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+
+  type Player = { id: number; display_name: string; current_level: number | null; updated_at: string | null };
+  type Rating = { recorded_on: string; level: number; kind: string | null };
+
+  const root = document.getElementById('ratings-app');
+  if (!root) throw new Error('ratings app missing');
+  const supabase = createClient(root.dataset.url!, root.dataset.key!);
+  const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
+  const listWrap = root.querySelector<HTMLElement>('[data-list-wrap]')!;
+  const playersBody = root.querySelector<HTMLElement>('[data-players]')!;
+  const search = root.querySelector<HTMLInputElement>('[data-search]')!;
+  const detail = root.querySelector<HTMLElement>('[data-detail]')!;
+  const detailName = root.querySelector<HTMLElement>('[data-detail-name]')!;
+  const detailLevel = root.querySelector<HTMLElement>('[data-detail-level]')!;
+  const historyBody = root.querySelector<HTMLElement>('[data-history]')!;
+
+  let players: Player[] = [];
+  const dayFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+  const levelText = (n: number | null) => (n == null ? '—' : n.toLocaleString('en-GB'));
+
+  function renderList(filter = '') {
+    const q = filter.trim().toLowerCase();
+    const rows = players.filter((p) => !q || p.display_name.toLowerCase().includes(q));
+    playersBody.innerHTML =
+      rows.length === 0
+        ? '<tr><td colspan="3">No players match.</td></tr>'
+        : rows
+            .map(
+              (p) =>
+                `<tr><td><button type="button" class="link-button" data-pick="${p.id}">${escapeHtml(p.display_name)}</button></td><td>${levelText(p.current_level)}</td><td>${p.updated_at ? dayFmt.format(new Date(p.updated_at)) : '—'}</td></tr>`,
+            )
+            .join('');
+  }
+
+  async function showPlayer(id: number) {
+    const player = players.find((p) => p.id === id);
+    if (!player) return;
+    detailName.textContent = player.display_name;
+    detailLevel.textContent = `Current level: ${levelText(player.current_level)}`;
+    historyBody.innerHTML = '<tr><td colspan="3">Loading…</td></tr>';
+    listWrap.hidden = true;
+    search.hidden = true;
+    detail.hidden = false;
+    const { data, error } = await supabase
+      .from('squashlevels_ratings')
+      .select('recorded_on, level, kind')
+      .eq('player_id', id)
+      .order('recorded_on', { ascending: false })
+      .limit(120);
+    if (error) {
+      historyBody.innerHTML = `<tr><td colspan="3">${escapeHtml(error.message)}</td></tr>`;
+      return;
+    }
+    const ratings = (data ?? []) as Rating[];
+    historyBody.innerHTML =
+      ratings.length === 0
+        ? '<tr><td colspan="3">No history yet.</td></tr>'
+        : ratings
+            .map((row, index) => {
+              const prev = ratings[index + 1];
+              const delta = prev ? row.level - prev.level : null;
+              const change =
+                delta == null ? '—' : delta === 0 ? '—' : delta > 0 ? `+${delta}` : String(delta);
+              return `<tr><td>${dayFmt.format(new Date(`${row.recorded_on}T12:00:00`))}</td><td>${levelText(row.level)}</td><td>${change}</td></tr>`;
+            })
+            .join('');
+  }
+
+  function escapeHtml(value: string) {
+    return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
+  }
+
+  root.addEventListener('click', (event) => {
+    const pick = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-pick]');
+    if (pick) {
+      void showPlayer(Number(pick.dataset.pick));
+      return;
+    }
+    if ((event.target as HTMLElement).closest('[data-back]')) {
+      detail.hidden = true;
+      listWrap.hidden = false;
+      search.hidden = false;
+    }
+  });
+
+  search.addEventListener('input', () => renderList(search.value));
+
+  const { data, error } = await supabase
+    .from('squashlevels_players')
+    .select('id, display_name, current_level, updated_at')
+    .order('display_name', { ascending: true });
+  if (error) {
+    statusEl.textContent = error.message;
+  } else {
+    players = (data ?? []) as Player[];
+    statusEl.hidden = true;
+    listWrap.hidden = false;
+    renderList();
+  }
+</script>
+
+<style>
+  .ratings .search {
+    display: block;
+    margin-bottom: 1rem;
+  }
+  .ratings .search input {
+    width: 100%;
+    max-width: 28rem;
+    padding: 0.65rem 0.85rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    background: var(--bg-elev);
+    color: var(--text);
+    font: inherit;
+  }
+  .ratings .overview-box {
+    border: 2px solid var(--gold-500);
+    border-radius: var(--radius);
+    background: var(--bg-elev);
+    overflow-x: auto;
+  }
+  .ratings .table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+  }
+  .ratings .table th,
+  .ratings .table td {
+    text-align: left;
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .ratings .table th {
+    color: var(--gold-400);
+  }
+  .ratings .link-button {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--link);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .ratings .player-detail {
+    margin-top: 1rem;
+  }
+  .ratings .h-small {
+    margin: 1.25rem 0 0.5rem;
+    font-size: 1rem;
+  }
+</style>

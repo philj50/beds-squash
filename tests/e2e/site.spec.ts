@@ -37,6 +37,12 @@ test.describe('Public site', () => {
     );
   });
 
+  test('SquashLevels ratings shell loads', async ({ page }) => {
+    await open(page, 'leagues/ratings/');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(/SquashLevels/i);
+    await expect(page.locator('#ratings-app')).toBeVisible();
+  });
+
   test('league results shell loads', async ({ page }) => {
     await open(page, 'leagues/results/');
     await expect(page.getByRole('heading', { level: 1 })).toContainText(/Tables and fixtures/i);

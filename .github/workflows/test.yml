@@ -25,6 +25,9 @@ jobs:
       - name: Install Playwright browser
         run: npx playwright install chromium --with-deps
 
+      - name: Astro check
+        run: npm run check
+
       - name: Run Playwright tests
         run: npm test
         env:
