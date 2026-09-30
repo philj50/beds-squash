@@ -28,7 +28,7 @@ export async function nvidiaArticle(facts, template) {
 
   const system = `You write short news posts for the Bedfordshire Squash & Racketball Association website.
 Use ONLY the facts provided. Do not invent players, scores, dates, teams, or ratings.
-British English. No hype or exclamation marks. Two to four short paragraphs plus an optional single-sentence upset note.
+British English. No hype or exclamation marks. Do not call the match a final unless the facts say so. Two to four short paragraphs plus an optional single-sentence upset note.
 Return JSON only: {"title":"...","summary":"...","body":"..."}
 Summary max 280 characters. Body is Markdown (paragraphs separated by blank lines). Keep any markdown link exactly as given in facts.`;
 

@@ -349,6 +349,7 @@ function chooseRubber(rubbers, names, matches) {
     if (homeBefore === null || awayBefore === null) continue;
     const winnerBefore = rubber.winner === 'home' ? homeBefore : awayBefore;
     const loserBefore = rubber.winner === 'home' ? awayBefore : homeBefore;
+    const levelGap = loserBefore - winnerBefore;
     ranked.push({
       rubber,
       homeBefore,
@@ -356,8 +357,14 @@ function chooseRubber(rubbers, names, matches) {
       homeAfter,
       awayAfter,
       gap: Math.abs(homeBefore - awayBefore) / Math.max(homeBefore, awayBefore, 1),
+      levelGap,
       upset: winnerBefore < loserBefore,
     });
+  }
+  const significantUpsets = ranked.filter((row) => row.upset && (row.levelGap >= 200 || row.gap >= 0.12));
+  if (significantUpsets.length) {
+    significantUpsets.sort((left, right) => right.levelGap - left.levelGap || right.gap - left.gap);
+    return significantUpsets[0];
   }
   ranked.sort((left, right) => left.gap - right.gap || Number(right.upset) - Number(left.upset));
   return ranked[0] ?? null;
