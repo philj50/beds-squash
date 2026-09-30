@@ -195,7 +195,7 @@ const payload = clubs.map((c) => ({ ...c, href: url(`/clubs/${c.id}/`) }));
     z-index: 500;
     display: flex;
     gap: 1rem;
-    background: rgba(15, 17, 21, 0.85);
+    background: color-mix(in srgb, var(--ink-900) 88%, transparent);
     border: 1px solid var(--border-strong);
     border-radius: 999px;
     padding: 0.4rem 0.9rem;
@@ -267,7 +267,7 @@ const payload = clubs.map((c) => ({ ...c, href: url(`/clubs/${c.id}/`) }));
     background: var(--ink-700);
   }
   .leaflet-control-attribution {
-    background: rgba(15, 17, 21, 0.75) !important;
+    background: color-mix(in srgb, var(--ink-900) 75%, transparent) !important;
     color: var(--ink-300) !important;
     font-size: 10px;
   }

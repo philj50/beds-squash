@@ -9,11 +9,7 @@ const isActive = (href: string) => (href === '/' ? current === '/' : current.sta
 <header class="site-header">
   <div class="container bar">
     <a class="brand" href={url('/')} aria-label={`${SITE.name} home`}>
-      <img src={url('/brand/logo-192.png')} alt="" width="48" height="48" />
-      <span class="brand__text">
-        <span class="brand__name">Beds Squash</span>
-        <span class="brand__sub">Bedfordshire Squash &amp; Racketball Association</span>
-      </span>
+      <img src={url('/brand/logo-navy.png')} alt="" width="154" height="91" />
     </a>
 
     <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav" data-menu-toggle>
@@ -58,7 +54,7 @@ const isActive = (href: string) => (href === '/' ? current === '/' : current.sta
     position: sticky;
     top: 0;
     z-index: 100;
-    background: rgba(15, 17, 21, 0.85);
+    background: color-mix(in srgb, var(--ink-950) 82%, transparent);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border);
@@ -78,27 +74,11 @@ const isActive = (href: string) => (href === '/' ? current === '/' : current.sta
     color: var(--text);
   }
   .brand img {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
+    width: auto;
+    height: 52px;
+    border-radius: 6px;
     flex-shrink: 0;
-  }
-  .brand__text {
-    display: flex;
-    flex-direction: column;
-    line-height: 1.05;
-  }
-  .brand__name {
-    font-family: var(--font-display);
-    font-weight: 800;
-    font-size: 1.5rem;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-  }
-  .brand__sub {
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    letter-spacing: 0.02em;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
   }
 
   .nav ul {
@@ -189,11 +169,6 @@ const isActive = (href: string) => (href === '/' ? current === '/' : current.sta
     transform: translateY(-7px) rotate(-45deg);
   }
 
-  @media (max-width: 1540px) {
-    .brand__sub {
-      display: none;
-    }
-  }
   @media (max-width: 1240px) {
     .menu-btn {
       display: inline-flex;

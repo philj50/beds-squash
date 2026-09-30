@@ -183,7 +183,7 @@ Optional repo **Variable** `NVIDIA_MODEL` (default `openai/gpt-oss-20b`). Older 
 
 ### Theme
 
-Navy is the default. Charcoal: `PUBLIC_SITE_THEME=default npm run build`. Light: `PUBLIC_SITE_THEME=light`.
+Navy (`#003568`, BSR lockup) is the default. Charcoal: `PUBLIC_SITE_THEME=default npm run build`. Light: `PUBLIC_SITE_THEME=light`.
 
 ### Custom domain
 

@@ -18,7 +18,7 @@ const href = url(`/news/${post.id}/`);
         <img class="card__img" src={url(image)} alt={imageAlt ?? ''} loading="lazy" decoding="async" />
       ) : (
         <div class="card__img placeholder">
-          <img src={url('/brand/logo-192.png')} alt="" width="96" height="96" />
+          <img src={url('/brand/logo-navy.png')} alt="" width="160" height="94" />
         </div>
       )
     }
@@ -41,13 +41,14 @@ const href = url(`/news/${post.id}/`);
     display: grid;
     place-items: center;
     background:
-      radial-gradient(circle at 30% 30%, rgba(242, 183, 5, 0.12), transparent 50%),
+      radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 50%),
       var(--ink-700);
   }
   .placeholder img {
-    opacity: 0.5;
-    width: 96px;
-    height: 96px;
+    opacity: 0.85;
+    width: min(70%, 160px);
+    height: auto;
+    border-radius: 6px;
   }
   .summary {
     color: var(--ink-200);

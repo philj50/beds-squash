@@ -12,5 +12,5 @@ export function siteTheme(): SiteTheme {
 export const THEME_COLOR: Record<SiteTheme, string> = {
   default: '#0f1115',
   light: '#f5f5f0',
-  navy: '#0a1628',
+  navy: '#003568',
 };
