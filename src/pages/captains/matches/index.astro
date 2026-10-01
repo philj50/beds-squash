@@ -19,7 +19,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       <form class="card" method="post" data-form="sign-in">
         <div class="card__body stack">
           <h2>Sign in</h2>
-          <label>Email <input name="email" type="email" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" /></label>
+          <label>Email <input name="username" type="email" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" /></label>
           <label>Password <input name="password" type="password" required autocomplete="current-password" /></label>
           <button class="btn btn--primary" type="submit">Sign in</button>
         </div>
@@ -122,11 +122,12 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     const data = new FormData(signInForm);
     setStatus('Signing in…');
     const { error } = await supabase.auth.signInWithPassword({
-      email: String(data.get('email')),
+      email: String(data.get('username')),
       password: String(data.get('password')),
     });
     setStatus(error ? error.message : '');
     if (!error) {
+      signInForm.remove();
       await save;
       await showSession();
     }

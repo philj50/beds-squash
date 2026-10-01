@@ -14,7 +14,7 @@ import { url } from '@/lib/site';
       <div data-panel="signed-out">
         <form class="card" method="post" data-form="sign-in">
           <div class="card__body stack">
-            <label>Email <input name="email" type="email" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" /></label>
+            <label>Email <input name="username" type="email" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" /></label>
             <label>Password <input name="password" type="password" required autocomplete="current-password" /></label>
             <button class="btn btn--primary" type="submit">Sign in</button>
           </div>
@@ -80,11 +80,12 @@ import { url } from '@/lib/site';
     const data = new FormData(form);
     statusEl.textContent = 'Signing in…';
     const { error } = await supabase.auth.signInWithPassword({
-      email: String(data.get('email')),
+      email: String(data.get('username')),
       password: String(data.get('password')),
     });
     statusEl.textContent = error ? error.message : '';
     if (!error) {
+      form.remove();
       await save;
       await showSession();
     }

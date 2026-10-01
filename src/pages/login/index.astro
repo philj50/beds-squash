@@ -18,15 +18,15 @@ const profileHref = url('/captains/profile/');
       <h1>Log in</h1>
       <p class="lede">Use the email and password for your Bedfordshire Squash account. A club captain sets that account up.</p>
       <p class="status" data-status role="status"></p>
-      <form class="card" method="post" data-form="sign-in">
+      <form class="card" method="post" action={url('/captains/profile/')} autocomplete="on" data-form="sign-in">
         <div class="card__body stack">
           <label>
             Email
-            <input name="email" type="email" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" placeholder="Email" />
+            <input name="username" id="username" type="email" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" placeholder="Email" />
           </label>
           <label>
             Password
-            <input name="password" type="password" required autocomplete="current-password" placeholder="Password" />
+            <input name="password" id="password" type="password" required autocomplete="current-password" placeholder="Password" />
           </label>
           <button class="btn btn--primary" type="submit">Log in</button>
         </div>
@@ -62,13 +62,14 @@ const profileHref = url('/captains/profile/');
     const data = new FormData(form);
     statusEl.textContent = 'Signing in…';
     const { error } = await supabase.auth.signInWithPassword({
-      email: String(data.get('email')),
+      email: String(data.get('username')),
       password: String(data.get('password')),
     });
     if (error) {
       statusEl.textContent = error.message;
       return;
     }
+    form.remove();
     await save;
     location.assign(nextHref);
   });
