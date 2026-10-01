@@ -18,15 +18,15 @@ const profileHref = url('/captains/profile/');
       <h1>Log in</h1>
       <p class="lede">Use the email and password for your Bedfordshire Squash account. A club captain sets that account up.</p>
       <p class="status" data-status role="status"></p>
-      <form class="card" method="post" action={url('/login/')} data-form="sign-in">
+      <form id="login" class="card" method="post" action={url('/login/')} data-form="sign-in">
         <div class="card__body stack">
           <div class="field">
-            <label for="email">Email</label>
-            <input id="email" name="email" type="text" inputmode="email" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Email" />
+            <label for="username">Email</label>
+            <input id="username" name="username" type="email" autocomplete="username" required autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Email" />
           </div>
           <div class="field">
-            <label for="current-password">Password</label>
-            <input id="current-password" name="password" type="password" required autocomplete="current-password" placeholder="Password" />
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required placeholder="Password" />
           </div>
           <button class="btn btn--primary" type="submit">Log in</button>
         </div>
@@ -37,7 +37,7 @@ const profileHref = url('/captains/profile/');
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { rememberPassword } from '@/lib/passwords';
+  import { storeFormPassword } from '@/lib/passwords';
 
   const root = document.getElementById('login-app');
   if (!root) throw new Error('login app missing');
@@ -64,22 +64,29 @@ const profileHref = url('/captains/profile/');
     });
   }
 
-  form.addEventListener('submit', (event) => {
+  form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const data = new FormData(form);
-    const email = String(data.get('email') ?? '').trim();
+    const email = String(data.get('username') ?? '').trim();
     const password = String(data.get('password') ?? '');
-    const remember = rememberPassword(email, password);
     statusEl.textContent = 'Signing in…';
-    supabase.auth.signInWithPassword({ email, password }).then(async ({ error }) => {
-      if (error) {
-        statusEl.textContent = error.message;
-        return;
-      }
-      statusEl.textContent = 'Signed in. If the browser asks to save the password, choose Save.';
-      await remember;
-      location.assign(nextHref);
-    });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      statusEl.textContent = error.message;
+      return;
+    }
+
+    // Chrome and Edge: save from the form after the password is accepted.
+    // https://developer.chrome.com/blog/credential-management-api
+    await storeFormPassword(form);
+
+    // Every browser: a scripted sign-in counts only when the address changes
+    // and the password form is gone.
+    // https://www.chromium.org/developers/design-documents/create-amazing-password-forms/
+    history.pushState({}, '', nextHref);
+    form.remove();
+    statusEl.textContent = 'Signed in. If the browser asks to save the password, choose Save.';
+    window.setTimeout(() => location.assign(nextHref), 1500);
   });
 
   const { data } = await supabase.auth.getSession();

@@ -115,15 +115,18 @@ export function fillSuggestedPassword(form: HTMLFormElement) {
   first?.select();
 }
 
-type PasswordCredentialCtor = new (data: { id: string; password: string; name?: string } | HTMLFormElement) => Credential;
-
-/** Ask Chrome or Edge to keep this email and password together. Call it from the sign-in click, before any await. */
-export function rememberPassword(email: string, password: string): Promise<void> {
+/**
+ * Ask Chrome or Edge to save this form.
+ * Chromium reads autocomplete="username" and autocomplete="current-password"
+ * (or "new-password") off the form itself.
+ * https://developer.chrome.com/blog/credential-management-api
+ */
+export function storeFormPassword(form: HTMLFormElement): Promise<void> {
   const credentials = navigator.credentials;
-  const Ctor = (window as Window & { PasswordCredential?: PasswordCredentialCtor }).PasswordCredential;
-  if (!credentials?.store || !Ctor || !email || !password) return Promise.resolve();
+  const Ctor = (window as Window & { PasswordCredential?: new (source: HTMLFormElement) => Credential }).PasswordCredential;
+  if (!credentials?.store || !Ctor) return Promise.resolve();
   try {
-    return credentials.store(new Ctor({ id: email, password, name: email })).then(
+    return credentials.store(new Ctor(form)).then(
       () => undefined,
       () => undefined,
     );
@@ -132,17 +135,8 @@ export function rememberPassword(email: string, password: string): Promise<void>
   }
 }
 
-/**
- * Ask Chrome or Edge to save this password. Call this in the submit handler
- * before any await, so the browser still counts it as the click.
- */
 export function startPasswordSave(form: HTMLFormElement): Promise<void> {
-  form.querySelectorAll<HTMLInputElement>('input[name="password"], input[name="current_password"], input[name="confirm_password"]').forEach((input) => {
-    if (input.type !== 'password') input.type = 'password';
-  });
-  const email = form.querySelector<HTMLInputElement>('input[name="email"], input[name="username"]')?.value.trim() ?? '';
-  const password = form.querySelector<HTMLInputElement>('input[name="password"]')?.value ?? '';
-  return rememberPassword(email, password);
+  return storeFormPassword(form);
 }
 
 /** Signed-in user replaces their own password. Returns an error message, or null. */
