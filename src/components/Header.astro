@@ -1,44 +1,51 @@
 ---
 import { NAV, SITE, url } from '@/lib/site';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 const base = import.meta.env.BASE_URL.replace(/\/+$/, '');
 const current = Astro.url.pathname.replace(base, '') || '/';
 const isActive = (href: string) => (href === '/' ? current === '/' : current.startsWith(href));
+const loginHref = url('/login/');
+const profileHref = url('/captains/profile/');
 ---
 
-<header class="site-header">
+<header class="site-header" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} data-login={loginHref} data-profile={profileHref}>
   <div class="container bar">
     <a class="brand" href={url('/')} aria-label={`${SITE.name} home`}>
       <img src={url('/brand/logo-navy.png')} alt="" width="154" height="91" />
     </a>
 
-    <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav" data-menu-toggle>
-      <span class="menu-btn__bars" aria-hidden="true"></span>
-      <span class="sr-only">Menu</span>
-    </button>
-
-    <nav id="site-nav" class="nav" aria-label="Primary">
-      <ul>
-        {
-          NAV.map((item) => (
-            <li>
-              <a href={url(item.href)} aria-current={isActive(item.href) ? 'page' : undefined}>
-                {item.label}
-              </a>
-            </li>
-          ))
-        }
-        <li class="nav__cta">
-          <a class="btn btn--primary btn--sm" href={url('/leagues/results/')} aria-current={current.startsWith('/leagues/results') ? 'page' : undefined} title="League tables and fixtures">
-            Tables
-          </a>
-        </li>
-      </ul>
-    </nav>
+    <div class="bar-end">
+      <nav id="site-nav" class="nav" aria-label="Primary">
+        <ul>
+          {
+            NAV.map((item) => (
+              <li>
+                <a href={url(item.href)} aria-current={isActive(item.href) ? 'page' : undefined}>
+                  {item.label}
+                </a>
+              </li>
+            ))
+          }
+          <li class="nav__cta">
+            <a class="btn btn--primary btn--sm" href={url('/leagues/results/')} aria-current={current.startsWith('/leagues/results') ? 'page' : undefined} title="League tables and fixtures">
+              Tables
+            </a>
+          </li>
+        </ul>
+      </nav>
+      <a class="btn btn--ghost btn--sm account-link" data-account href={loginHref}>Log in</a>
+      <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav" data-menu-toggle>
+        <span class="menu-btn__bars" aria-hidden="true"></span>
+        <span class="sr-only">Menu</span>
+      </button>
+    </div>
   </div>
 </header>
 
 <script>
+  import { createClient } from '@supabase/supabase-js';
+
   const btn = document.querySelector<HTMLButtonElement>('[data-menu-toggle]');
   const nav = document.getElementById('site-nav');
   btn?.addEventListener('click', () => {
@@ -47,6 +54,42 @@ const isActive = (href: string) => (href === '/' ? current === '/' : current.sta
     nav?.classList.toggle('is-open', !open);
     document.body.classList.toggle('nav-open', !open);
   });
+
+  const header = document.querySelector<HTMLElement>('.site-header');
+  const account = header?.querySelector<HTMLAnchorElement>('[data-account]');
+  if (header && account && header.dataset.url && header.dataset.key) {
+    const supabase = createClient(header.dataset.url, header.dataset.key);
+    const loginHref = header.dataset.login!;
+    const profileHref = header.dataset.profile!;
+
+    let paintId = 0;
+    async function paintAccount() {
+      const id = ++paintId;
+      const { data } = await supabase.auth.getSession();
+      if (id !== paintId) return;
+      const session = data.session;
+      if (!session) {
+        account!.textContent = 'Log in';
+        account!.href = loginHref;
+        account!.title = 'Log in';
+        delete account!.dataset.signedIn;
+        return;
+      }
+      let name = session.user.user_metadata?.display_name || session.user.email?.split('@')[0] || 'Profile';
+      account!.textContent = name;
+      account!.href = profileHref;
+      account!.title = 'Your profile';
+      account!.dataset.signedIn = 'true';
+      const { data: me } = await supabase.from('profiles').select('display_name').eq('id', session.user.id).maybeSingle();
+      if (id !== paintId || !me?.display_name) return;
+      account!.textContent = me.display_name;
+    }
+
+    supabase.auth.onAuthStateChange(() => {
+      void paintAccount();
+    });
+    void paintAccount();
+  }
 </script>
 
 <style>
@@ -65,6 +108,24 @@ const isActive = (href: string) => (href === '/' ? current === '/' : current.sta
     justify-content: space-between;
     gap: 1rem;
     min-height: 72px;
+  }
+  .bar-end {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+    min-width: 0;
+  }
+  .account-link {
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: 12rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .account-link[data-signed-in] {
+    text-transform: none;
+    letter-spacing: 0;
   }
   .brand {
     display: flex;

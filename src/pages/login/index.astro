@@ -1,0 +1,108 @@
+---
+import Base from '@/layouts/Base.astro';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
+import { url } from '@/lib/site';
+
+const profileHref = url('/captains/profile/');
+---
+
+<Base title="Log in" description="Sign in to your Bedfordshire Squash account." noindex>
+  <section class="section">
+    <div
+      class="container login"
+      id="login-app"
+      data-url={SUPABASE_URL}
+      data-key={SUPABASE_PUBLISHABLE_KEY}
+      data-profile={profileHref}
+    >
+      <h1>Log in</h1>
+      <p class="lede">Use the email and password for your Bedfordshire Squash account. A club captain sets that account up.</p>
+      <p class="status" data-status role="status"></p>
+      <form class="card" data-form="sign-in">
+        <div class="card__body stack">
+          <label>
+            Email
+            <input name="email" type="email" required autocomplete="username" placeholder="Email" />
+          </label>
+          <label>
+            Password
+            <input name="password" type="password" required autocomplete="current-password" placeholder="Password" />
+          </label>
+          <button class="btn btn--primary" type="submit">Log in</button>
+        </div>
+      </form>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+
+  const root = document.getElementById('login-app');
+  if (!root) throw new Error('login app missing');
+  const supabase = createClient(root.dataset.url!, root.dataset.key!);
+  const profileHref = root.dataset.profile!;
+  const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
+  const base = import.meta.env.BASE_URL.replace(/\/+$/, '');
+
+  function safeNext(raw: string | null) {
+    if (!raw || raw.includes('://') || raw.includes('\\') || raw.startsWith('//') || raw.includes('/login')) return profileHref;
+    if (base && !raw.startsWith(`${base}/`)) return profileHref;
+    if (!base && !raw.startsWith('/')) return profileHref;
+    return raw;
+  }
+
+  const nextHref = safeNext(new URLSearchParams(location.search).get('next'));
+
+  root.querySelector<HTMLFormElement>('[data-form="sign-in"]')!.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget as HTMLFormElement);
+    statusEl.textContent = 'Signing in…';
+    const { error } = await supabase.auth.signInWithPassword({
+      email: String(data.get('email')),
+      password: String(data.get('password')),
+    });
+    if (error) {
+      statusEl.textContent = error.message;
+      return;
+    }
+    location.assign(nextHref);
+  });
+
+  const { data } = await supabase.auth.getSession();
+  if (data.session) location.replace(nextHref);
+</script>
+
+<style>
+  .login {
+    max-width: 28rem;
+  }
+  .lede {
+    color: var(--ink-200);
+  }
+  .status:empty {
+    display: none;
+  }
+  .status {
+    margin: 1rem 0;
+    color: var(--gold-400);
+  }
+  .stack {
+    display: grid;
+    gap: 0.75rem;
+  }
+  label {
+    display: grid;
+    gap: 0.3rem;
+    font-size: 0.9rem;
+  }
+  input {
+    width: 100%;
+    background: var(--ink-900);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 0.65rem 0.75rem;
+    font: inherit;
+  }
+</style>
