@@ -37,7 +37,6 @@ const profileHref = url('/captains/profile/');
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { storeFormPassword } from '@/lib/passwords';
 
   const root = document.getElementById('login-app');
   if (!root) throw new Error('login app missing');
@@ -75,18 +74,7 @@ const profileHref = url('/captains/profile/');
       statusEl.textContent = error.message;
       return;
     }
-
-    // Chrome and Edge: save from the form after the password is accepted.
-    // https://developer.chrome.com/blog/credential-management-api
-    await storeFormPassword(form);
-
-    // Every browser: a scripted sign-in counts only when the address changes
-    // and the password form is gone.
-    // https://www.chromium.org/developers/design-documents/create-amazing-password-forms/
-    history.pushState({}, '', nextHref);
-    form.remove();
-    statusEl.textContent = 'Signed in. If the browser asks to save the password, choose Save.';
-    window.setTimeout(() => location.assign(nextHref), 1500);
+    location.assign(nextHref);
   });
 
   const { data } = await supabase.auth.getSession();
