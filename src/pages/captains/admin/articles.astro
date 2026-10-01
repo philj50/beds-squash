@@ -67,7 +67,7 @@ import { url } from '@/lib/site';
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { offerToSavePassword } from '@/lib/passwords';
+  import { startPasswordSave } from '@/lib/passwords';
 
   type Article = {
     id: number;
@@ -94,9 +94,9 @@ import { url } from '@/lib/site';
 
   root.querySelector<HTMLFormElement>('[data-form="sign-in"]')!.addEventListener('submit', async (event) => {
     const form = event.currentTarget as HTMLFormElement;
-    if (form.dataset.passwordSave === '1') return;
     event.preventDefault();
-    const data = new FormData(event.currentTarget as HTMLFormElement);
+    const save = startPasswordSave(form);
+    const data = new FormData(form);
     statusEl.textContent = 'Signing in…';
     const { error } = await supabase.auth.signInWithPassword({
       email: String(data.get('email')),
@@ -104,7 +104,7 @@ import { url } from '@/lib/site';
     });
     statusEl.textContent = error ? error.message : '';
     if (!error) {
-      await offerToSavePassword(form);
+      await save;
       await showSession();
     }
   });

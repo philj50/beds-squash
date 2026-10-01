@@ -116,44 +116,24 @@ export function fillSuggestedPassword(form: HTMLFormElement) {
 }
 
 /**
- * Ask the browser to save or update this password, then give it a moment to show the prompt.
- * Callers must ignore the follow-up submit marked with data-password-save.
+ * Ask Chrome or Edge to save this password. Call this in the submit handler
+ * before any await, so the browser still counts it as the click.
  */
-export async function offerToSavePassword(form: HTMLFormElement): Promise<void> {
+export function startPasswordSave(form: HTMLFormElement): Promise<void> {
   form.querySelectorAll<HTMLInputElement>('input[name="password"], input[name="current_password"], input[name="confirm_password"]').forEach((input) => {
     if (input.type !== 'password') input.type = 'password';
   });
-  const email =
-    form.querySelector<HTMLInputElement>('[name="email"]')?.value ||
-    form.querySelector<HTMLInputElement>('[name="username"]')?.value ||
-    '';
-  const password = form.querySelector<HTMLInputElement>('[name="password"]')?.value ?? '';
-  const Ctor = (window as Window & { PasswordCredential?: new (data: { id: string; password: string; name?: string }) => Credential }).PasswordCredential;
-  if (email && password && Ctor && navigator.credentials?.store) {
-    try {
-      await navigator.credentials.store(new Ctor({ id: email, password, name: email }));
-      return;
-    } catch {
-      /* This browser wants a real form post instead. */
-    }
+  const credentials = navigator.credentials;
+  const Ctor = (window as Window & { PasswordCredential?: new (form: HTMLFormElement) => Credential }).PasswordCredential;
+  if (!credentials?.store || !Ctor) return Promise.resolve();
+  try {
+    return credentials.store(new Ctor(form)).then(
+      () => undefined,
+      () => undefined,
+    );
+  } catch {
+    return Promise.resolve();
   }
-  const frame = document.createElement('iframe');
-  frame.name = 'password-save';
-  frame.setAttribute('aria-hidden', 'true');
-  frame.tabIndex = -1;
-  frame.style.cssText = 'position:absolute;width:0;height:0;border:0;opacity:0';
-  document.body.append(frame);
-  const previousTarget = form.target;
-  const previousAction = form.action;
-  form.dataset.passwordSave = '1';
-  form.target = frame.name;
-  form.method = 'post';
-  form.action = `${location.origin}${location.pathname}`;
-  form.requestSubmit();
-  await new Promise((resolve) => window.setTimeout(resolve, 1200));
-  form.target = previousTarget;
-  form.action = previousAction;
-  delete form.dataset.passwordSave;
 }
 
 /** Signed-in user replaces their own password. Returns an error message, or null. */

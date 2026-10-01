@@ -58,7 +58,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { offerToSavePassword } from '@/lib/passwords';
+  import { startPasswordSave } from '@/lib/passwords';
 
   type Season = { id: number; name: string; starts_on: string | null };
   type Squad = { id: number; name: string; team_id: number | null };
@@ -117,8 +117,8 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   const ours = (fixture: Fixture) => (fixture.home.team_id === currentSquad?.team_id ? 'home' : 'away');
 
   signInForm.addEventListener('submit', async (event) => {
-    if (signInForm.dataset.passwordSave === '1') return;
     event.preventDefault();
+    const save = startPasswordSave(signInForm);
     const data = new FormData(signInForm);
     setStatus('Signing in…');
     const { error } = await supabase.auth.signInWithPassword({
@@ -127,7 +127,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     });
     setStatus(error ? error.message : '');
     if (!error) {
-      await offerToSavePassword(signInForm);
+      await save;
       await showSession();
     }
   });

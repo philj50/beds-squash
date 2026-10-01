@@ -303,7 +303,7 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { bindPasswordRules, bindPasswordToggles, callManageAccounts, fetchProtectedAdmin, fillSuggestedPassword, offerToSavePassword, passwordIssue } from '@/lib/passwords';
+  import { bindPasswordRules, bindPasswordToggles, callManageAccounts, fetchProtectedAdmin, fillSuggestedPassword, passwordIssue, startPasswordSave } from '@/lib/passwords';
 
   type Person = { id: string; display_name: string; email: string | null; is_admin: boolean };
   type Club = { slug: string; name: string; contact_name: string | null; contact_email: string | null };
@@ -575,9 +575,9 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
 
   root.querySelector<HTMLFormElement>('[data-form="sign-in"]')!.addEventListener('submit', async (event) => {
     const form = event.currentTarget as HTMLFormElement;
-    if (form.dataset.passwordSave === '1') return;
     event.preventDefault();
-    const data = new FormData(event.currentTarget as HTMLFormElement);
+    const save = startPasswordSave(form);
+    const data = new FormData(form);
     setStatus('Signing in…');
     const { error } = await supabase.auth.signInWithPassword({
       email: String(data.get('email')),
@@ -585,7 +585,7 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
     });
     setStatus(error ? error.message : '');
     if (!error) {
-      await offerToSavePassword(form);
+      await save;
       await showSession();
     }
   });

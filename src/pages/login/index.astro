@@ -37,7 +37,7 @@ const profileHref = url('/captains/profile/');
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { offerToSavePassword } from '@/lib/passwords';
+  import { startPasswordSave } from '@/lib/passwords';
 
   const root = document.getElementById('login-app');
   if (!root) throw new Error('login app missing');
@@ -57,8 +57,8 @@ const profileHref = url('/captains/profile/');
   const form = root.querySelector<HTMLFormElement>('[data-form="sign-in"]')!;
 
   form.addEventListener('submit', async (event) => {
-    if (form.dataset.passwordSave === '1') return;
     event.preventDefault();
+    const save = startPasswordSave(form);
     const data = new FormData(form);
     statusEl.textContent = 'Signing in…';
     const { error } = await supabase.auth.signInWithPassword({
@@ -69,7 +69,7 @@ const profileHref = url('/captains/profile/');
       statusEl.textContent = error.message;
       return;
     }
-    await offerToSavePassword(form);
+    await save;
     location.assign(nextHref);
   });
 
