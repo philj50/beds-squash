@@ -12,9 +12,9 @@ import { url } from '@/lib/site';
       <p class="status" data-status role="status"></p>
 
       <div data-panel="signed-out">
-        <form class="card" data-form="sign-in">
+        <form class="card" method="post" data-form="sign-in">
           <div class="card__body stack">
-            <label>Email <input name="email" type="email" required autocomplete="email" /></label>
+            <label>Email <input name="email" type="email" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" /></label>
             <label>Password <input name="password" type="password" required autocomplete="current-password" /></label>
             <button class="btn btn--primary" type="submit">Sign in</button>
           </div>
@@ -38,6 +38,7 @@ import { url } from '@/lib/site';
 
 <script>
   import { createClient } from '@supabase/supabase-js';
+  import { offerToSavePassword } from '@/lib/passwords';
   import { AGE_CATEGORIES } from '@/lib/junior-age';
 
   type Entry = {
@@ -81,7 +82,10 @@ import { url } from '@/lib/site';
       password: String(data.get('password')),
     });
     statusEl.textContent = error ? error.message : '';
-    if (!error) await showSession();
+    if (!error) {
+      await offerToSavePassword(event.currentTarget as HTMLFormElement);
+      await showSession();
+    }
   });
 
   root.querySelector('[data-sign-out]')!.addEventListener('click', async () => {

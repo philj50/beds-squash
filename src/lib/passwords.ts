@@ -115,6 +115,39 @@ export function fillSuggestedPassword(form: HTMLFormElement) {
   first?.select();
 }
 
+/** Ask the browser to remember this login. Chrome and Edge show the save prompt. */
+export async function offerToSavePassword(form: HTMLFormElement) {
+  const credentials = navigator.credentials;
+  const Ctor = (window as Window & { PasswordCredential?: new (form: HTMLFormElement) => Credential }).PasswordCredential;
+  if (!credentials?.store || !Ctor) return;
+  form.querySelectorAll<HTMLInputElement>('input[name="password"], input[name="current_password"], input[name="confirm_password"]').forEach((input) => {
+    if (input.type !== 'password') input.type = 'password';
+  });
+  try {
+    await credentials.store(new Ctor(form));
+  } catch {
+    /* The browser hid the prompt, or the user dismissed it. */
+  }
+}
+
+/** Fill a login form from the browser's saved passwords, when it offers one. */
+export async function fillSavedPassword(form: HTMLFormElement) {
+  const credentials = navigator.credentials;
+  if (!credentials?.get) return;
+  try {
+    const cred = await credentials.get({ password: true, mediation: 'optional' } as CredentialRequestOptions);
+    if (!cred || cred.type !== 'password' || !cred.id) return;
+    const password = 'password' in cred && typeof cred.password === 'string' ? cred.password : '';
+    if (!password) return;
+    const email = form.querySelector<HTMLInputElement>('[name="email"]');
+    const field = form.querySelector<HTMLInputElement>('[name="password"]');
+    if (email && !email.value) email.value = cred.id;
+    if (field && !field.value) field.value = password;
+  } catch {
+    /* No saved password, or the user dismissed the prompt. */
+  }
+}
+
 /** Signed-in user replaces their own password. Returns an error message, or null. */
 export async function changeOwnPassword(
   supabase: SupabaseClient,

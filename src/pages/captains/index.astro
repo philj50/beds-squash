@@ -31,9 +31,9 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
           </div>
         </div>
 
-        <form class="card" data-form="sign-in" hidden>
+        <form class="card" method="post" data-form="sign-in" hidden>
           <div class="card__body stack">
-            <label>Email <input name="email" type="email" required autocomplete="email" /></label>
+            <label>Email <input name="email" type="email" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" /></label>
             <label>Password <input name="password" type="password" required autocomplete="current-password" /></label>
             <button class="btn btn--primary" type="submit">Sign in</button>
           </div>
@@ -64,6 +64,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 <script>
   import { createClient } from '@supabase/supabase-js';
+  import { offerToSavePassword } from '@/lib/passwords';
 
   const root = document.getElementById('captain-app');
   if (!root) throw new Error('captain app missing');
@@ -97,7 +98,10 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       password: String(data.get('password')),
     });
     setStatus(error ? error.message : '');
-    if (!error) await showSession();
+    if (!error) {
+      await offerToSavePassword(event.currentTarget as HTMLFormElement);
+      await showSession();
+    }
   });
 
   root.querySelector('[data-sign-out]')!.addEventListener('click', async () => {

@@ -16,10 +16,10 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       </p>
       <p class="status" data-status role="status"></p>
 
-      <form class="card" data-form="sign-in">
+      <form class="card" method="post" data-form="sign-in">
         <div class="card__body stack">
           <h2>Sign in</h2>
-          <label>Email <input name="email" type="email" required autocomplete="email" /></label>
+          <label>Email <input name="email" type="email" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" /></label>
           <label>Password <input name="password" type="password" required autocomplete="current-password" /></label>
           <button class="btn btn--primary" type="submit">Sign in</button>
         </div>
@@ -58,6 +58,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 <script>
   import { createClient } from '@supabase/supabase-js';
+  import { offerToSavePassword } from '@/lib/passwords';
 
   type Season = { id: number; name: string; starts_on: string | null };
   type Squad = { id: number; name: string; team_id: number | null };
@@ -124,7 +125,10 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       password: String(data.get('password')),
     });
     setStatus(error ? error.message : '');
-    if (!error) await showSession();
+    if (!error) {
+      await offerToSavePassword(signInForm);
+      await showSession();
+    }
   });
 
   root.querySelector('[data-sign-out]')!.addEventListener('click', async () => {

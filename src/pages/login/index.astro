@@ -18,11 +18,11 @@ const profileHref = url('/captains/profile/');
       <h1>Log in</h1>
       <p class="lede">Use the email and password for your Bedfordshire Squash account. A club captain sets that account up.</p>
       <p class="status" data-status role="status"></p>
-      <form class="card" data-form="sign-in">
+      <form class="card" method="post" data-form="sign-in">
         <div class="card__body stack">
           <label>
             Email
-            <input name="email" type="email" required autocomplete="username" placeholder="Email" />
+            <input name="email" type="email" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" placeholder="Email" />
           </label>
           <label>
             Password
@@ -37,6 +37,7 @@ const profileHref = url('/captains/profile/');
 
 <script>
   import { createClient } from '@supabase/supabase-js';
+  import { fillSavedPassword, offerToSavePassword } from '@/lib/passwords';
 
   const root = document.getElementById('login-app');
   if (!root) throw new Error('login app missing');
@@ -53,10 +54,11 @@ const profileHref = url('/captains/profile/');
   }
 
   const nextHref = safeNext(new URLSearchParams(location.search).get('next'));
+  const form = root.querySelector<HTMLFormElement>('[data-form="sign-in"]')!;
 
-  root.querySelector<HTMLFormElement>('[data-form="sign-in"]')!.addEventListener('submit', async (event) => {
+  form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const data = new FormData(event.currentTarget as HTMLFormElement);
+    const data = new FormData(form);
     statusEl.textContent = 'Signing in…';
     const { error } = await supabase.auth.signInWithPassword({
       email: String(data.get('email')),
@@ -66,11 +68,13 @@ const profileHref = url('/captains/profile/');
       statusEl.textContent = error.message;
       return;
     }
+    await offerToSavePassword(form);
     location.assign(nextHref);
   });
 
   const { data } = await supabase.auth.getSession();
   if (data.session) location.replace(nextHref);
+  else await fillSavedPassword(form);
 </script>
 
 <style>
