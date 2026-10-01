@@ -27,14 +27,11 @@ const profileHref = url('/captains/profile/');
               </li>
             ))
           }
-          <li class="nav__cta">
-            <a class="btn btn--primary btn--sm" href={url('/leagues/results/')} aria-current={current.startsWith('/leagues/results') ? 'page' : undefined} title="League tables and fixtures">
-              Tables
-            </a>
+          <li>
+            <a data-account href={loginHref}>Log in</a>
           </li>
         </ul>
       </nav>
-      <a class="btn btn--ghost btn--sm account-link" data-account href={loginHref}>Log in</a>
       <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav" data-menu-toggle>
         <span class="menu-btn__bars" aria-hidden="true"></span>
         <span class="sr-only">Menu</span>
@@ -116,17 +113,6 @@ const profileHref = url('/captains/profile/');
     margin-left: auto;
     min-width: 0;
   }
-  .account-link {
-    flex-shrink: 1;
-    min-width: 0;
-    max-width: 12rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .account-link[data-signed-in] {
-    text-transform: none;
-    letter-spacing: 0;
-  }
   .brand {
     display: flex;
     align-items: center;
@@ -180,13 +166,6 @@ const profileHref = url('/captains/profile/');
     background: var(--accent);
     border-radius: 1px;
   }
-  .nav__cta {
-    margin-left: 0.5rem;
-  }
-  .nav .btn {
-    white-space: nowrap;
-  }
-
   .menu-btn {
     display: none;
     background: transparent;
@@ -263,9 +242,6 @@ const profileHref = url('/captains/profile/');
     }
     .nav a[aria-current='page']::after {
       display: none;
-    }
-    .nav__cta {
-      margin: 1rem 0 0;
     }
   }
 </style>
