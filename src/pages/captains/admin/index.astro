@@ -574,6 +574,8 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
   });
 
   root.querySelector<HTMLFormElement>('[data-form="sign-in"]')!.addEventListener('submit', async (event) => {
+    const form = event.currentTarget as HTMLFormElement;
+    if (form.dataset.passwordSave === '1') return;
     event.preventDefault();
     const data = new FormData(event.currentTarget as HTMLFormElement);
     setStatus('Signing in…');
@@ -583,7 +585,7 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
     });
     setStatus(error ? error.message : '');
     if (!error) {
-      await offerToSavePassword(event.currentTarget as HTMLFormElement);
+      await offerToSavePassword(form);
       await showSession();
     }
   });

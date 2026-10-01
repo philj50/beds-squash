@@ -74,6 +74,8 @@ import { url } from '@/lib/site';
   const when = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
   root.querySelector<HTMLFormElement>('[data-form="sign-in"]')!.addEventListener('submit', async (event) => {
+    const form = event.currentTarget as HTMLFormElement;
+    if (form.dataset.passwordSave === '1') return;
     event.preventDefault();
     const data = new FormData(event.currentTarget as HTMLFormElement);
     statusEl.textContent = 'Signing in…';
@@ -83,7 +85,7 @@ import { url } from '@/lib/site';
     });
     statusEl.textContent = error ? error.message : '';
     if (!error) {
-      await offerToSavePassword(event.currentTarget as HTMLFormElement);
+      await offerToSavePassword(form);
       await showSession();
     }
   });

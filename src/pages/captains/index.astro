@@ -90,6 +90,8 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   });
 
   root.querySelector<HTMLFormElement>('[data-form="sign-in"]')!.addEventListener('submit', async (event) => {
+    const form = event.currentTarget as HTMLFormElement;
+    if (form.dataset.passwordSave === '1') return;
     event.preventDefault();
     const data = new FormData(event.currentTarget as HTMLFormElement);
     setStatus('Signing in…');
@@ -99,7 +101,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     });
     setStatus(error ? error.message : '');
     if (!error) {
-      await offerToSavePassword(event.currentTarget as HTMLFormElement);
+      await offerToSavePassword(form);
       await showSession();
     }
   });

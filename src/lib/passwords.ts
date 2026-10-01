@@ -115,37 +115,45 @@ export function fillSuggestedPassword(form: HTMLFormElement) {
   first?.select();
 }
 
-/** Ask the browser to remember this login. Chrome and Edge show the save prompt. */
-export async function offerToSavePassword(form: HTMLFormElement) {
-  const credentials = navigator.credentials;
-  const Ctor = (window as Window & { PasswordCredential?: new (form: HTMLFormElement) => Credential }).PasswordCredential;
-  if (!credentials?.store || !Ctor) return;
+/**
+ * Ask the browser to save or update this password, then give it a moment to show the prompt.
+ * Callers must ignore the follow-up submit marked with data-password-save.
+ */
+export async function offerToSavePassword(form: HTMLFormElement): Promise<void> {
   form.querySelectorAll<HTMLInputElement>('input[name="password"], input[name="current_password"], input[name="confirm_password"]').forEach((input) => {
     if (input.type !== 'password') input.type = 'password';
   });
-  try {
-    await credentials.store(new Ctor(form));
-  } catch {
-    /* The browser hid the prompt, or the user dismissed it. */
+  const email =
+    form.querySelector<HTMLInputElement>('[name="email"]')?.value ||
+    form.querySelector<HTMLInputElement>('[name="username"]')?.value ||
+    '';
+  const password = form.querySelector<HTMLInputElement>('[name="password"]')?.value ?? '';
+  const Ctor = (window as Window & { PasswordCredential?: new (data: { id: string; password: string; name?: string }) => Credential }).PasswordCredential;
+  if (email && password && Ctor && navigator.credentials?.store) {
+    try {
+      await navigator.credentials.store(new Ctor({ id: email, password, name: email }));
+      return;
+    } catch {
+      /* This browser wants a real form post instead. */
+    }
   }
-}
-
-/** Fill a login form from the browser's saved passwords, when it offers one. */
-export async function fillSavedPassword(form: HTMLFormElement) {
-  const credentials = navigator.credentials;
-  if (!credentials?.get) return;
-  try {
-    const cred = await credentials.get({ password: true, mediation: 'optional' } as CredentialRequestOptions);
-    if (!cred || cred.type !== 'password' || !cred.id) return;
-    const password = 'password' in cred && typeof cred.password === 'string' ? cred.password : '';
-    if (!password) return;
-    const email = form.querySelector<HTMLInputElement>('[name="email"]');
-    const field = form.querySelector<HTMLInputElement>('[name="password"]');
-    if (email && !email.value) email.value = cred.id;
-    if (field && !field.value) field.value = password;
-  } catch {
-    /* No saved password, or the user dismissed the prompt. */
-  }
+  const frame = document.createElement('iframe');
+  frame.name = 'password-save';
+  frame.setAttribute('aria-hidden', 'true');
+  frame.tabIndex = -1;
+  frame.style.cssText = 'position:absolute;width:0;height:0;border:0;opacity:0';
+  document.body.append(frame);
+  const previousTarget = form.target;
+  const previousAction = form.action;
+  form.dataset.passwordSave = '1';
+  form.target = frame.name;
+  form.method = 'post';
+  form.action = `${location.origin}${location.pathname}`;
+  form.requestSubmit();
+  await new Promise((resolve) => window.setTimeout(resolve, 1200));
+  form.target = previousTarget;
+  form.action = previousAction;
+  delete form.dataset.passwordSave;
 }
 
 /** Signed-in user replaces their own password. Returns an error message, or null. */

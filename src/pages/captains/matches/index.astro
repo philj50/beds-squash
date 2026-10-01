@@ -117,6 +117,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   const ours = (fixture: Fixture) => (fixture.home.team_id === currentSquad?.team_id ? 'home' : 'away');
 
   signInForm.addEventListener('submit', async (event) => {
+    if (signInForm.dataset.passwordSave === '1') return;
     event.preventDefault();
     const data = new FormData(signInForm);
     setStatus('Signing in…');
