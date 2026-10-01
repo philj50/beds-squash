@@ -115,6 +115,47 @@ export function fillSuggestedPassword(form: HTMLFormElement) {
   first?.select();
 }
 
+let browserSaveReady: Promise<boolean> | null = null;
+
+/** Get the tiny helper ready so a real login post can stay on this site. */
+export function prepareBrowserSave(): Promise<boolean> {
+  if (!browserSaveReady) {
+    browserSaveReady = (async () => {
+      if (!('serviceWorker' in navigator)) return false;
+      try {
+        await navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`);
+        if (navigator.serviceWorker.controller) return true;
+        await new Promise<void>((resolve) => {
+          const done = () => resolve();
+          navigator.serviceWorker.addEventListener('controllerchange', done, { once: true });
+          window.setTimeout(done, 2500);
+        });
+        return Boolean(navigator.serviceWorker.controller);
+      } catch {
+        return false;
+      }
+    })();
+  }
+  return browserSaveReady;
+}
+
+/**
+ * After a successful sign-in, post the form for real so the browser can offer to save it.
+ * Returns false when that hand-off is not available.
+ */
+export async function submitLoginForBrowser(form: HTMLFormElement, nextHref: string): Promise<boolean> {
+  const ready = await prepareBrowserSave();
+  if (!ready) return false;
+  form.querySelectorAll<HTMLInputElement>('input[name="password"]').forEach((input) => {
+    if (input.type !== 'password') input.type = 'password';
+  });
+  form.dataset.browserSave = '1';
+  form.method = 'post';
+  form.action = `${import.meta.env.BASE_URL}login/?next=${encodeURIComponent(nextHref)}`;
+  form.requestSubmit();
+  return true;
+}
+
 /**
  * Ask Chrome or Edge to save this password. Call this in the submit handler
  * before any await, so the browser still counts it as the click.

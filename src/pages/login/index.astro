@@ -18,7 +18,7 @@ const profileHref = url('/captains/profile/');
       <h1>Log in</h1>
       <p class="lede">Use the email and password for your Bedfordshire Squash account. A club captain sets that account up.</p>
       <p class="status" data-status role="status"></p>
-      <form class="card" method="post" action={url('/captains/profile/')} autocomplete="on" data-form="sign-in">
+      <form class="card" method="post" action={url('/login/')} autocomplete="on" data-form="sign-in">
         <div class="card__body stack">
           <label>
             Email
@@ -37,7 +37,7 @@ const profileHref = url('/captains/profile/');
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { startPasswordSave } from '@/lib/passwords';
+  import { prepareBrowserSave, submitLoginForBrowser } from '@/lib/passwords';
 
   const root = document.getElementById('login-app');
   if (!root) throw new Error('login app missing');
@@ -56,9 +56,11 @@ const profileHref = url('/captains/profile/');
   const nextHref = safeNext(new URLSearchParams(location.search).get('next'));
   const form = root.querySelector<HTMLFormElement>('[data-form="sign-in"]')!;
 
+  void prepareBrowserSave();
+
   form.addEventListener('submit', async (event) => {
+    if (form.dataset.browserSave === '1') return;
     event.preventDefault();
-    const save = startPasswordSave(form);
     const data = new FormData(form);
     statusEl.textContent = 'Signing in…';
     const { error } = await supabase.auth.signInWithPassword({
@@ -69,9 +71,8 @@ const profileHref = url('/captains/profile/');
       statusEl.textContent = error.message;
       return;
     }
-    form.remove();
-    await save;
-    location.assign(nextHref);
+    const handedOff = await submitLoginForBrowser(form, nextHref);
+    if (!handedOff) location.assign(nextHref);
   });
 
   const { data } = await supabase.auth.getSession();
