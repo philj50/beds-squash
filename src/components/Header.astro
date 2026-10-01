@@ -27,8 +27,17 @@ const profileHref = url('/captains/profile/');
               </li>
             ))
           }
-          <li>
-            <a data-account href={loginHref}>Log in</a>
+          <li class="account" data-account-item>
+            <a data-account-login href={loginHref}>Log in</a>
+            <div data-account-signed hidden>
+              <button class="account-toggle" type="button" data-account-toggle aria-expanded="false" aria-controls="account-menu" aria-haspopup="menu">
+                <span data-account-name>Profile</span>
+              </button>
+              <div id="account-menu" class="account-menu" data-account-menu hidden role="menu">
+                <a role="menuitem" href={profileHref}>Profile</a>
+                <button role="menuitem" type="button" data-log-out>Log out</button>
+              </div>
+            </div>
           </li>
         </ul>
       </nav>
@@ -53,11 +62,37 @@ const profileHref = url('/captains/profile/');
   });
 
   const header = document.querySelector<HTMLElement>('.site-header');
-  const account = header?.querySelector<HTMLAnchorElement>('[data-account]');
-  if (header && account && header.dataset.url && header.dataset.key) {
+  const accountItem = header?.querySelector<HTMLElement>('[data-account-item]');
+  const loginLink = header?.querySelector<HTMLAnchorElement>('[data-account-login]');
+  const signedIn = header?.querySelector<HTMLElement>('[data-account-signed]');
+  const nameEl = header?.querySelector<HTMLElement>('[data-account-name]');
+  const toggle = header?.querySelector<HTMLButtonElement>('[data-account-toggle]');
+  const menu = header?.querySelector<HTMLElement>('[data-account-menu]');
+  const logOut = header?.querySelector<HTMLButtonElement>('[data-log-out]');
+  if (header && accountItem && loginLink && signedIn && nameEl && toggle && menu && logOut && header.dataset.url && header.dataset.key) {
     const supabase = createClient(header.dataset.url, header.dataset.key);
-    const loginHref = header.dataset.login!;
-    const profileHref = header.dataset.profile!;
+
+    function setMenuOpen(open: boolean) {
+      toggle!.setAttribute('aria-expanded', String(open));
+      menu!.hidden = !open;
+    }
+
+    toggle.addEventListener('click', (event) => {
+      event.stopPropagation();
+      setMenuOpen(toggle.getAttribute('aria-expanded') !== 'true');
+    });
+    document.addEventListener('click', (event) => {
+      if (!accountItem.contains(event.target as Node)) setMenuOpen(false);
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    });
+    logOut.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      setMenuOpen(false);
+      await supabase.auth.signOut();
+      location.reload();
+    });
 
     let paintId = 0;
     async function paintAccount() {
@@ -66,20 +101,17 @@ const profileHref = url('/captains/profile/');
       if (id !== paintId) return;
       const session = data.session;
       if (!session) {
-        account!.textContent = 'Log in';
-        account!.href = loginHref;
-        account!.title = 'Log in';
-        delete account!.dataset.signedIn;
+        setMenuOpen(false);
+        loginLink!.hidden = false;
+        signedIn!.hidden = true;
         return;
       }
-      let name = session.user.user_metadata?.display_name || session.user.email?.split('@')[0] || 'Profile';
-      account!.textContent = name;
-      account!.href = profileHref;
-      account!.title = 'Your profile';
-      account!.dataset.signedIn = 'true';
+      loginLink!.hidden = true;
+      signedIn!.hidden = false;
+      nameEl!.textContent = session.user.user_metadata?.display_name || session.user.email?.split('@')[0] || 'Profile';
       const { data: me } = await supabase.from('profiles').select('display_name').eq('id', session.user.id).maybeSingle();
       if (id !== paintId || !me?.display_name) return;
-      account!.textContent = me.display_name;
+      nameEl!.textContent = me.display_name;
     }
 
     supabase.auth.onAuthStateChange(() => {
@@ -138,7 +170,11 @@ const profileHref = url('/captains/profile/');
     flex-wrap: nowrap;
     justify-content: flex-end;
   }
-  .nav a:not(.btn) {
+  .nav > ul > li > a[hidden] {
+    display: none;
+  }
+  .nav > ul > li > a,
+  .account-toggle {
     display: block;
     padding: 0.5rem 0.55rem;
     color: var(--ink-200);
@@ -149,14 +185,30 @@ const profileHref = url('/captains/profile/');
     position: relative;
     white-space: nowrap;
   }
-  .nav a:not(.btn):hover {
+  .account-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .account-toggle::after {
+    content: '';
+    display: inline-block;
+    margin-left: 0.35rem;
+    border: 4px solid transparent;
+    border-top-color: currentColor;
+    vertical-align: middle;
+  }
+  .nav > ul > li > a:hover,
+  .account-toggle:hover,
+  .account-toggle[aria-expanded='true'] {
     color: #fff;
     background: rgba(255, 255, 255, 0.05);
   }
-  .nav a[aria-current='page'] {
+  .nav > ul > li > a[aria-current='page'] {
     color: var(--accent);
   }
-  .nav a[aria-current='page']::after {
+  .nav > ul > li > a[aria-current='page']::after {
     content: '';
     position: absolute;
     left: 0.65rem;
@@ -165,6 +217,43 @@ const profileHref = url('/captains/profile/');
     height: 2px;
     background: var(--accent);
     border-radius: 1px;
+  }
+  .account {
+    position: relative;
+  }
+  .account-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.35rem);
+    min-width: 10.5rem;
+    background: var(--ink-900);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 0.35rem;
+    box-shadow: var(--shadow);
+    z-index: 30;
+  }
+  .account-menu a,
+  .account-menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    color: var(--ink-200);
+    font: inherit;
+    font-weight: 600;
+    font-size: 0.9rem;
+    padding: 0.55rem 0.7rem;
+    border-radius: 6px;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .account-menu a:hover,
+  .account-menu button:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.06);
   }
   .menu-btn {
     display: none;
@@ -234,14 +323,25 @@ const profileHref = url('/captains/profile/');
       align-items: stretch;
       gap: 0;
     }
-    .nav a:not(.btn) {
+    .nav > ul > li > a,
+    .account-toggle {
       padding: 0.8rem 0.5rem;
       font-size: 1.1rem;
       border-bottom: 1px solid var(--border);
       border-radius: 0;
     }
-    .nav a[aria-current='page']::after {
+    .nav > ul > li > a[aria-current='page']::after {
       display: none;
+    }
+    .account-menu {
+      position: static;
+      min-width: 0;
+      margin: 0;
+      padding: 0 0 0 0.75rem;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+      background: transparent;
     }
   }
 </style>
