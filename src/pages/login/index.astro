@@ -54,16 +54,51 @@ const profileHref = url('/captains/profile/');
 
   const nextHref = safeNext(new URLSearchParams(location.search).get('next'));
   const form = root.querySelector<HTMLFormElement>('[data-form="sign-in"]')!;
+  let postingForBrowser = false;
 
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then((regs) => {
-      regs.forEach((reg) => {
-        reg.unregister();
-      });
+  function pingLoginHelper(): Promise<boolean> {
+    const controller = navigator.serviceWorker?.controller;
+    if (!controller) return Promise.resolve(false);
+    return new Promise((resolve) => {
+      const timer = window.setTimeout(() => {
+        navigator.serviceWorker.removeEventListener('message', onMessage);
+        resolve(false);
+      }, 400);
+      const onMessage = (event: MessageEvent) => {
+        if (event.data !== 'beds-login') return;
+        window.clearTimeout(timer);
+        navigator.serviceWorker.removeEventListener('message', onMessage);
+        resolve(true);
+      };
+      navigator.serviceWorker.addEventListener('message', onMessage);
+      controller.postMessage('beds-login');
     });
   }
 
+  const loginHelperReady = (async () => {
+    if (!('serviceWorker' in navigator)) return false;
+    try {
+      await navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`);
+      if (await pingLoginHelper()) return true;
+      await new Promise<void>((resolve) => {
+        const timer = window.setTimeout(resolve, 4000);
+        navigator.serviceWorker.addEventListener(
+          'controllerchange',
+          () => {
+            window.clearTimeout(timer);
+            resolve();
+          },
+          { once: true },
+        );
+      });
+      return pingLoginHelper();
+    } catch {
+      return false;
+    }
+  })();
+
   form.addEventListener('submit', async (event) => {
+    if (postingForBrowser) return;
     event.preventDefault();
     const data = new FormData(form);
     const email = String(data.get('username') ?? '').trim();
@@ -74,7 +109,19 @@ const profileHref = url('/captains/profile/');
       statusEl.textContent = error.message;
       return;
     }
-    location.assign(nextHref);
+    const ready = await loginHelperReady;
+    if (!ready) {
+      location.assign(nextHref);
+      return;
+    }
+    postingForBrowser = true;
+    form.method = 'post';
+    form.action = `${import.meta.env.BASE_URL}login/?next=${encodeURIComponent(nextHref)}`;
+    try {
+      form.requestSubmit();
+    } catch {
+      location.assign(nextHref);
+    }
   });
 
   const { data } = await supabase.auth.getSession();
