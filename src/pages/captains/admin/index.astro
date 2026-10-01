@@ -585,8 +585,8 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
     });
     setStatus(error ? error.message : '');
     if (!error) {
-      form.remove();
       await save;
+      form.remove();
       await showSession();
     }
   });

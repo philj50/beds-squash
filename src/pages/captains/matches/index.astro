@@ -127,8 +127,8 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     });
     setStatus(error ? error.message : '');
     if (!error) {
-      signInForm.remove();
       await save;
+      signInForm.remove();
       await showSession();
     }
   });
