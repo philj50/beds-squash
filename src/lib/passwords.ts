@@ -2,14 +2,38 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 export const PASSWORD_MIN = 12;
 export const PASSWORD_MAX = 72;
+/** Tells Safari and other browsers how strong a suggested password must be. */
+export const PASSWORD_RULES = 'minlength: 12; required: lower; required: upper; required: digit; required: special;';
 
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+const symbols = '!@#$%&*?';
+
+export type PasswordCheck = { id: string; label: string; met: boolean };
+
+/** The checklist shown beside a new password, the same kind of prompt other sites use. */
+export function passwordChecks(password: string): PasswordCheck[] {
+  return [
+    { id: 'length', label: 'At least 12 characters', met: password.length >= PASSWORD_MIN && password.length <= PASSWORD_MAX },
+    { id: 'lower', label: 'A lowercase letter', met: /[a-z]/.test(password) },
+    { id: 'upper', label: 'An uppercase letter', met: /[A-Z]/.test(password) },
+    { id: 'number', label: 'A number', met: /[0-9]/.test(password) },
+    { id: 'symbol', label: 'A symbol', met: /[^A-Za-z0-9]/.test(password) },
+  ];
+}
+
+export function passwordStrength(password: string): 'empty' | 'weak' | 'fair' | 'strong' {
+  if (!password) return 'empty';
+  const met = passwordChecks(password).filter((check) => check.met).length;
+  if (met <= 2) return 'weak';
+  if (met < passwordChecks(password).length) return 'fair';
+  return 'strong';
+}
 
 /** Why a password is too weak, or null when it is acceptable. */
 export function passwordIssue(password: string, email = ''): string | null {
-  if (password.length < PASSWORD_MIN) return `Use at least ${PASSWORD_MIN} characters.`;
   if (password.length > PASSWORD_MAX) return `Use at most ${PASSWORD_MAX} characters.`;
-  if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) return 'Include a letter and a number.';
+  const missing = passwordChecks(password).find((check) => !check.met);
+  if (missing) return `Password needs: ${missing.label.charAt(0).toLowerCase()}${missing.label.slice(1)}.`;
   if (email && password.toLowerCase() === email.toLowerCase()) return 'Do not use the email address as the password.';
   return null;
 }
@@ -19,8 +43,42 @@ export function suggestPassword(length = 16): string {
   crypto.getRandomValues(bytes);
   let value = Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join('');
   if (!/[0-9]/.test(value)) value = `${value.slice(0, -1)}7`;
-  if (!/[A-Za-z]/.test(value)) value = `A${value.slice(1)}`;
+  if (!/[a-z]/.test(value)) value = `a${value.slice(1)}`;
+  if (!/[A-Z]/.test(value)) value = `A${value.slice(1)}`;
+  if (!/[^A-Za-z0-9]/.test(value)) value = `${value.slice(0, -1)}${symbols[bytes[0] % symbols.length]}`;
   return value;
+}
+
+/** Live strength checklist for each new-password field in a form. */
+export function bindPasswordRules(root: ParentNode) {
+  root.querySelectorAll<HTMLElement>('[data-password-rules]').forEach((list) => {
+    if (list.dataset.bound === 'true') return;
+    list.dataset.bound = 'true';
+    const form = list.closest('form');
+    const input = form?.querySelector<HTMLInputElement>('[name="password"]');
+    const meter = form?.querySelector<HTMLElement>('[data-password-strength]');
+    if (!input) return;
+    input.setAttribute('passwordrules', PASSWORD_RULES);
+    const paint = () => {
+      const password = input.value;
+      const checks = passwordChecks(password);
+      list.hidden = password.length === 0;
+      if (meter) meter.hidden = password.length === 0;
+      list.querySelectorAll<HTMLElement>('[data-rule]').forEach((item) => {
+        const check = checks.find((entry) => entry.id === item.dataset.rule);
+        item.classList.toggle('met', Boolean(check?.met));
+      });
+      const level = passwordStrength(password);
+      if (!meter) return;
+      meter.dataset.level = level;
+      meter.textContent = level === 'weak' ? 'Weak' : level === 'fair' ? 'Fair' : level === 'strong' ? 'Strong' : '';
+    };
+    input.addEventListener('input', paint);
+    form?.addEventListener('reset', () => {
+      window.setTimeout(paint, 0);
+    });
+    paint();
+  });
 }
 
 export function bindPasswordToggles(root: ParentNode) {
@@ -52,6 +110,7 @@ export function fillSuggestedPassword(form: HTMLFormElement) {
   form.querySelectorAll<HTMLButtonElement>('[data-toggle-password]').forEach((button) => {
     button.textContent = 'Hide';
   });
+  first?.dispatchEvent(new Event('input', { bubbles: true }));
   first?.focus();
   first?.select();
 }

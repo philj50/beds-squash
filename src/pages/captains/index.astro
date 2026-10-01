@@ -1,6 +1,5 @@
 ---
 import Base from '@/layouts/Base.astro';
-import ChangePassword from '@/components/ChangePassword.astro';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 ---
 
@@ -15,7 +14,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       <p class="lede">
         Sign in with the email and password a county admin gave you. Add players to your squad, mark availability on
         <a href={`${import.meta.env.BASE_URL}captains/matches/`}>Matches</a>, and set the playing order before each fixture.
-        You can change your own password after you sign in. New self-registration stays paused.
+        Change your password on your <a href={`${import.meta.env.BASE_URL}captains/profile/`}>profile</a>. New self-registration stays paused.
       </p>
       <p class="status" data-status role="status"></p>
 
@@ -46,6 +45,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
         <p class="actions">
           <a class="btn btn--primary btn--sm" href={`${import.meta.env.BASE_URL}captains/matches/`}>Matches</a>
           <a class="btn btn--ghost btn--sm" data-admin-link hidden href={`${import.meta.env.BASE_URL}captains/admin/`}>Clubs and captains</a>
+          <a class="btn btn--ghost btn--sm" href={`${import.meta.env.BASE_URL}captains/profile/`}>Profile</a>
           <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
         </p>
 
@@ -57,7 +57,6 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
         </div>
 
         <div data-squads></div>
-        <ChangePassword />
       </div>
     </div>
   </section>

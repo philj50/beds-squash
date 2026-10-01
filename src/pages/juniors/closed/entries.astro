@@ -1,6 +1,5 @@
 ---
 import Base from '@/layouts/Base.astro';
-import ChangePassword from '@/components/ChangePassword.astro';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 import { url } from '@/lib/site';
 ---
@@ -27,9 +26,9 @@ import { url } from '@/lib/site';
         <p class="actions">
           <a class="btn btn--ghost btn--sm" href={url('/juniors/closed/')}>Entry page</a>
           <a class="btn btn--ghost btn--sm" href={url('/captains/admin/')}>Admin</a>
+          <a class="btn btn--ghost btn--sm" href={url('/captains/profile/')}>Profile</a>
           <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
         </p>
-        <ChangePassword />
         <p data-denied hidden>This account cannot see entries.</p>
         <div data-list hidden></div>
       </div>

@@ -1,0 +1,157 @@
+---
+import Base from '@/layouts/Base.astro';
+import ChangePassword from '@/components/ChangePassword.astro';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
+import { url } from '@/lib/site';
+---
+
+<Base title="Your profile" description="Your Bedfordshire Squash account and password." noindex>
+  <section class="section">
+    <div class="container profile" id="profile-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
+      <h1>Your profile</h1>
+      <p class="lede">This is your account. Change your password here. Nothing is emailed.</p>
+      <p class="status" data-status role="status"></p>
+
+      <div data-panel="signed-out">
+        <form class="card" data-form="sign-in">
+          <div class="card__body stack">
+            <h2>Sign in</h2>
+            <label>Email <input name="email" type="email" required autocomplete="email" /></label>
+            <label>Password <input name="password" type="password" required autocomplete="current-password" /></label>
+            <button class="btn btn--primary" type="submit">Sign in</button>
+          </div>
+        </form>
+      </div>
+
+      <div data-panel="signed-in" hidden>
+        <p class="who" data-who></p>
+        <dl class="account">
+          <div>
+            <dt>Name</dt>
+            <dd data-name></dd>
+          </div>
+          <div>
+            <dt>Email</dt>
+            <dd data-email></dd>
+          </div>
+        </dl>
+        <p class="actions">
+          <a class="btn btn--ghost btn--sm" href={url('/captains/')}>Squad</a>
+          <a class="btn btn--ghost btn--sm" href={url('/captains/matches/')}>Matches</a>
+          <a class="btn btn--ghost btn--sm" data-admin-link hidden href={url('/captains/admin/')}>Clubs and captains</a>
+          <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
+        </p>
+        <ChangePassword />
+      </div>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+
+  const root = document.getElementById('profile-app');
+  if (!root) throw new Error('profile app missing');
+  const supabase = createClient(root.dataset.url!, root.dataset.key!);
+  const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
+  const signedOut = root.querySelector<HTMLElement>('[data-panel="signed-out"]')!;
+  const signedIn = root.querySelector<HTMLElement>('[data-panel="signed-in"]')!;
+  const adminLink = root.querySelector<HTMLElement>('[data-admin-link]')!;
+
+  root.querySelector<HTMLFormElement>('[data-form="sign-in"]')!.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget as HTMLFormElement);
+    statusEl.textContent = 'Signing in…';
+    const { error } = await supabase.auth.signInWithPassword({
+      email: String(data.get('email')),
+      password: String(data.get('password')),
+    });
+    statusEl.textContent = error ? error.message : '';
+    if (!error) await showSession();
+  });
+
+  root.querySelector('[data-sign-out]')!.addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    await showSession();
+  });
+
+  async function showSession() {
+    const { data } = await supabase.auth.getSession();
+    const session = data.session;
+    signedOut.hidden = Boolean(session);
+    signedIn.hidden = !session;
+    if (!session) {
+      adminLink.hidden = true;
+      return;
+    }
+    const name = session.user.user_metadata?.display_name || 'Not set';
+    root.querySelector('[data-who]')!.textContent = `Signed in as ${session.user.user_metadata?.display_name || session.user.email}`;
+    root.querySelector('[data-name]')!.textContent = name;
+    root.querySelector('[data-email]')!.textContent = session.user.email ?? '—';
+    const { data: me } = await supabase.from('profiles').select('display_name, is_admin').eq('id', session.user.id).maybeSingle();
+    if (me?.display_name) root.querySelector('[data-name]')!.textContent = me.display_name;
+    adminLink.hidden = !me?.is_admin;
+  }
+
+  showSession();
+</script>
+
+<style>
+  .profile {
+    max-width: 640px;
+  }
+  .lede {
+    color: var(--ink-200);
+  }
+  .status:empty {
+    display: none;
+  }
+  .status {
+    margin: 1rem 0;
+    color: var(--gold-400);
+  }
+  .stack {
+    display: grid;
+    gap: 0.75rem;
+  }
+  label {
+    display: grid;
+    gap: 0.3rem;
+    font-size: 0.9rem;
+  }
+  input {
+    width: 100%;
+    background: var(--ink-900);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 0.65rem 0.75rem;
+    font: inherit;
+  }
+  .who {
+    margin-bottom: 0.75rem;
+  }
+  .account {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0 0 1rem;
+  }
+  .account div {
+    display: grid;
+    gap: 0.15rem;
+  }
+  .account dt {
+    font-size: 0.8rem;
+    color: var(--ink-300);
+  }
+  .account dd {
+    margin: 0;
+    font-weight: 600;
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0 0 1rem;
+  }
+</style>

@@ -17,9 +17,12 @@ function json(body: unknown, status = 200) {
 }
 
 function passwordIssue(password: string, email = '') {
-  if (password.length < PASSWORD_MIN) return `Use at least ${PASSWORD_MIN} characters.`;
   if (password.length > PASSWORD_MAX) return `Use at most ${PASSWORD_MAX} characters.`;
-  if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) return 'Include a letter and a number.';
+  if (password.length < PASSWORD_MIN) return 'Password needs: at least 12 characters.';
+  if (!/[a-z]/.test(password)) return 'Password needs: a lowercase letter.';
+  if (!/[A-Z]/.test(password)) return 'Password needs: an uppercase letter.';
+  if (!/[0-9]/.test(password)) return 'Password needs: a number.';
+  if (!/[^A-Za-z0-9]/.test(password)) return 'Password needs: a symbol.';
   if (email && password.toLowerCase() === email.toLowerCase()) return 'Do not use the email address as the password.';
   return null;
 }

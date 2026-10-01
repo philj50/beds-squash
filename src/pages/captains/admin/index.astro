@@ -1,6 +1,6 @@
 ---
 import Base from '@/layouts/Base.astro';
-import ChangePassword from '@/components/ChangePassword.astro';
+import PasswordRules from '@/components/PasswordRules.astro';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 const captainsHref = `${import.meta.env.BASE_URL}captains/`;
@@ -40,10 +40,10 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
           <a class="btn btn--ghost btn--sm" href={`${captainsHref}matches/`}>Matches</a>
           <a class="btn btn--ghost btn--sm" href={juniorEntriesHref}>Junior entries</a>
           <a class="btn btn--ghost btn--sm" href={articlesHref}>Match articles</a>
+          <a class="btn btn--ghost btn--sm" href={`${captainsHref}profile/`}>Profile</a>
           <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
         </p>
         <p data-denied hidden>This account cannot set up teams.</p>
-        <ChangePassword />
 
         <div data-admin hidden>
           <nav class="admin-tabs" aria-label="Admin sections">
@@ -125,9 +125,10 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
                 <label>
                   First password
                   <span class="pw-field">
-                    <input name="password" type="password" required minlength="12" maxlength="72" autocomplete="new-password" />
+                    <input name="password" type="password" required minlength="12" maxlength="72" autocomplete="new-password" passwordrules="minlength: 12; required: lower; required: upper; required: digit; required: special;" />
                     <button class="btn btn--ghost btn--sm" type="button" data-toggle-password>Show</button>
                   </span>
+                  <PasswordRules />
                 </label>
                 <label>
                   Confirm password
@@ -136,7 +137,7 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
                     <button class="btn btn--ghost btn--sm" type="button" data-toggle-password>Show</button>
                   </span>
                 </label>
-                <p class="muted small">At least 12 characters, with a letter and a number.</p>
+                <p class="muted small">The password has to meet every line above. They change it later on their profile.</p>
                 <div class="actions">
                   <button class="btn btn--ghost btn--sm" type="button" data-suggest-password>Suggest a password</button>
                   <button class="btn btn--primary" type="submit">Create account</button>
@@ -162,15 +163,16 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
             <form class="card" data-form="set-password" hidden>
               <div class="card__body stack">
                 <h3>Set a new password for <span data-password-who></span></h3>
-                <p class="muted small">They can change this after they sign in. Nothing is emailed.</p>
+                <p class="muted small">They can change this later on their profile. Nothing is emailed.</p>
                 <input type="hidden" name="user_id" data-password-user />
                 <input type="hidden" name="email" data-password-email />
                 <label>
                   New password
                   <span class="pw-field">
-                    <input name="password" type="password" required minlength="12" maxlength="72" autocomplete="new-password" />
+                    <input name="password" type="password" required minlength="12" maxlength="72" autocomplete="new-password" passwordrules="minlength: 12; required: lower; required: upper; required: digit; required: special;" />
                     <button class="btn btn--ghost btn--sm" type="button" data-toggle-password>Show</button>
                   </span>
+                  <PasswordRules />
                 </label>
                 <label>
                   Confirm password
@@ -301,7 +303,7 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { bindPasswordToggles, callManageAccounts, fetchProtectedAdmin, fillSuggestedPassword, passwordIssue } from '@/lib/passwords';
+  import { bindPasswordRules, bindPasswordToggles, callManageAccounts, fetchProtectedAdmin, fillSuggestedPassword, passwordIssue } from '@/lib/passwords';
 
   type Person = { id: string; display_name: string; email: string | null; is_admin: boolean };
   type Club = { slug: string; name: string; contact_name: string | null; contact_email: string | null };
@@ -489,6 +491,7 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
   const passwordUser = root.querySelector<HTMLInputElement>('[data-password-user]')!;
   const passwordEmail = root.querySelector<HTMLInputElement>('[data-password-email]')!;
   bindPasswordToggles(root);
+  bindPasswordRules(root);
   root.querySelectorAll<HTMLButtonElement>('[data-suggest-password]').forEach((button) => {
     button.addEventListener('click', () => {
       const form = button.closest('form');
