@@ -19,7 +19,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       <div data-panel="signed-in" hidden>
         <p class="who" data-who></p>
         <p class="actions">
-          <a class="btn btn--ghost btn--sm" href={`${import.meta.env.BASE_URL}captains/`}>Squad</a>
+          <a class="btn btn--ghost btn--sm" data-squad-link href={`${import.meta.env.BASE_URL}captains/`}>Squad</a>
           <a class="btn btn--ghost btn--sm" data-admin-link hidden href={`${import.meta.env.BASE_URL}captains/admin/`}>Clubs and captains</a>
           <a class="btn btn--ghost btn--sm" href={`${import.meta.env.BASE_URL}captains/profile/`}>Profile</a>
           <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
@@ -247,6 +247,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     playerOnly = account.playerOnly;
     accountEmail = account.email.toLowerCase();
     root!.querySelector('[data-who]')!.textContent = `Signed in as ${account.displayName || account.email}`;
+    root!.querySelector('[data-squad-link]')!.textContent = account.playerOnly ? 'Your team' : 'Squad';
     adminLink.hidden = !account.isAdmin;
 
     const [squadResult, { data: clubRows }, { data: seasonRows }] = await Promise.all([
