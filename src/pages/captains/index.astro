@@ -12,33 +12,12 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     <div class="container captain" id="captain-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
       <h1>Club captains</h1>
       <p class="lede">
-        Sign in with the email and password a county admin gave you. Add players to your squad, mark availability on
-        <a href={`${import.meta.env.BASE_URL}captains/matches/`}>Matches</a>, and set the playing order before each fixture.
-        Change your password on your <a href={`${import.meta.env.BASE_URL}captains/profile/`}>profile</a>. New self-registration stays paused.
+        Captains add players to the squad and set the playing order. Players mark whether they can play on
+        <a href={`${import.meta.env.BASE_URL}captains/matches/`}>Matches</a>.
+        Your name, team and password are on your <a href={`${import.meta.env.BASE_URL}captains/profile/`}>profile</a>.
+        A county admin creates each account.
       </p>
       <p class="status" data-status role="status"></p>
-
-      <div data-panel="signed-out">
-        <div class="tabs" role="tablist">
-          <button class="btn btn--primary btn--sm" type="button" data-tab="register">Register</button>
-          <button class="btn btn--ghost btn--sm" type="button" data-tab="sign-in">Sign in</button>
-        </div>
-
-        <div class="card" data-form="register">
-          <div class="card__body stack">
-            <h2>Registration is paused</h2>
-            <p class="muted">A county admin creates your account and gives you a password. Sign in with that, then change the password yourself. No confirmation email is sent.</p>
-          </div>
-        </div>
-
-        <form class="card" method="post" data-form="sign-in" hidden>
-          <div class="card__body stack">
-            <label>Email <input name="username" type="email" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" /></label>
-            <label>Password <input name="password" type="password" required autocomplete="current-password" /></label>
-            <button class="btn btn--primary" type="submit">Sign in</button>
-          </div>
-        </form>
-      </div>
 
       <div data-panel="signed-in" hidden>
         <p class="who" data-who></p>
@@ -56,6 +35,14 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
           </div>
         </div>
 
+        <div class="card" data-player-only hidden>
+          <div class="card__body">
+            <h2>Your team</h2>
+            <p data-player-places></p>
+            <p class="muted">Mark whether you can play on <a href={`${import.meta.env.BASE_URL}captains/matches/`}>Matches</a>. Your captain looks after the squad list and the playing order.</p>
+          </div>
+        </div>
+
         <div data-squads></div>
       </div>
     </div>
@@ -64,48 +51,23 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { startPasswordSave } from '@/lib/passwords';
+  import { loadAccount, sendToLogin } from '@/lib/account';
 
   const root = document.getElementById('captain-app');
   if (!root) throw new Error('captain app missing');
   const supabase = createClient(root.dataset.url!, root.dataset.key!);
   const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
-  const signedOut = root.querySelector<HTMLElement>('[data-panel="signed-out"]')!;
   const signedIn = root.querySelector<HTMLElement>('[data-panel="signed-in"]')!;
   const squadHost = root.querySelector<HTMLElement>('[data-squads]')!;
   const unassigned = root.querySelector<HTMLElement>('[data-unassigned]')!;
+  const playerOnlyPanel = root.querySelector<HTMLElement>('[data-player-only]')!;
+  const playerPlaces = root.querySelector<HTMLElement>('[data-player-places]')!;
   const adminLink = root.querySelector<HTMLElement>('[data-admin-link]')!;
   const whoEl = root.querySelector<HTMLElement>('[data-who]')!;
 
   const setStatus = (message: string) => {
     statusEl.textContent = message;
   };
-
-  root.querySelectorAll<HTMLButtonElement>('[data-tab]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const tab = button.dataset.tab;
-      root.querySelector<HTMLElement>('[data-form="register"]')!.hidden = tab !== 'register';
-      root.querySelector<HTMLElement>('[data-form="sign-in"]')!.hidden = tab !== 'sign-in';
-    });
-  });
-
-  root.querySelector<HTMLFormElement>('[data-form="sign-in"]')!.addEventListener('submit', async (event) => {
-    const form = event.currentTarget as HTMLFormElement;
-    event.preventDefault();
-    const save = startPasswordSave(form);
-    const data = new FormData(form);
-    setStatus('Signing in…');
-    const { error } = await supabase.auth.signInWithPassword({
-      email: String(data.get('username')),
-      password: String(data.get('password')),
-    });
-    setStatus(error ? error.message : '');
-    if (!error) {
-      await save;
-      form.remove();
-      await showSession();
-    }
-  });
 
   root.querySelector('[data-sign-out]')!.addEventListener('click', async () => {
     await supabase.auth.signOut();
@@ -143,20 +105,26 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   });
 
   async function showSession() {
-    const { data } = await supabase.auth.getSession();
-    const session = data.session;
-    signedOut.hidden = Boolean(session);
-    signedIn.hidden = !session;
-    if (!session) {
+    const account = await loadAccount(supabase);
+    signedIn.hidden = !account;
+    if (!account) {
       squadHost.replaceChildren();
       unassigned.hidden = true;
+      playerOnlyPanel.hidden = true;
       adminLink.hidden = true;
+      sendToLogin();
       return;
     }
-    const name = session.user.user_metadata?.display_name || session.user.email;
-    whoEl.textContent = `Signed in as ${name}`;
-    const { data: me } = await supabase.from('profiles').select('is_admin').eq('id', session.user.id).maybeSingle();
-    adminLink.hidden = !me?.is_admin;
+    whoEl.textContent = `Signed in as ${account.displayName || account.email}`;
+    adminLink.hidden = !account.isAdmin;
+    if (account.playerOnly) {
+      squadHost.replaceChildren();
+      unassigned.hidden = true;
+      playerOnlyPanel.hidden = false;
+      playerPlaces.textContent = account.places.map((place) => place.label).join('. ') || 'Your team is not set yet.';
+      return;
+    }
+    playerOnlyPanel.hidden = true;
 
     const { data: squads, error } = await supabase
       .from('captain_squads')

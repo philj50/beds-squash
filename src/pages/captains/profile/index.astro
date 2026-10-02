@@ -9,27 +9,37 @@ import { url } from '@/lib/site';
   <section class="section">
     <div class="container profile" id="profile-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} data-login={url('/login/')}>
       <h1>Your profile</h1>
-      <p class="lede">This is your account. Change your password here. Nothing is emailed.</p>
+      <p class="lede">This is your account. Your name, email, club and team are here, and you can change your password. Nothing is emailed.</p>
 
       <div data-panel="signed-out">
-        <p>Sign in to see your account.</p>
-        <p><a class="btn btn--primary" href={`${url('/login/')}?next=${encodeURIComponent(url('/captains/profile/'))}`}>Log in</a></p>
+        <p>Taking you to log in…</p>
       </div>
 
       <div data-panel="signed-in" hidden>
         <p class="who" data-who></p>
-        <dl class="account">
-          <div>
-            <dt>Name</dt>
-            <dd data-name></dd>
+        <p class="status" data-status role="status"></p>
+        <form class="card" data-form="name">
+          <div class="card__body stack">
+            <label>
+              Name
+              <input name="display_name" data-name-input required minlength="2" maxlength="80" autocomplete="name" />
+            </label>
+            <p class="muted small">This is the name in the menu and on your account.</p>
+            <button class="btn btn--primary btn--sm" type="submit">Save name</button>
           </div>
+        </form>
+        <dl class="account">
           <div>
             <dt>Email</dt>
             <dd data-email></dd>
           </div>
+          <div>
+            <dt>Club and team</dt>
+            <dd data-places>Loading…</dd>
+          </div>
         </dl>
         <p class="actions">
-          <a class="btn btn--ghost btn--sm" href={url('/captains/')}>Squad</a>
+          <a class="btn btn--ghost btn--sm" data-squad-link href={url('/captains/')}>Squad</a>
           <a class="btn btn--ghost btn--sm" href={url('/captains/matches/')}>Matches</a>
           <a class="btn btn--ghost btn--sm" data-admin-link hidden href={url('/captains/admin/')}>Clubs and captains</a>
           <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
@@ -42,6 +52,7 @@ import { url } from '@/lib/site';
 
 <script>
   import { createClient } from '@supabase/supabase-js';
+  import { loadAccount, saveDisplayName, sendToLogin } from '@/lib/account';
 
   const root = document.getElementById('profile-app');
   if (!root) throw new Error('profile app missing');
@@ -49,30 +60,42 @@ import { url } from '@/lib/site';
   const signedOut = root.querySelector<HTMLElement>('[data-panel="signed-out"]')!;
   const signedIn = root.querySelector<HTMLElement>('[data-panel="signed-in"]')!;
   const adminLink = root.querySelector<HTMLElement>('[data-admin-link]')!;
+  const squadLink = root.querySelector<HTMLAnchorElement>('[data-squad-link]')!;
+  const nameInput = root.querySelector<HTMLInputElement>('[data-name-input]')!;
+  const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
+  const whoEl = root.querySelector<HTMLElement>('[data-who]')!;
+  const emailEl = root.querySelector<HTMLElement>('[data-email]')!;
+  const placesEl = root.querySelector<HTMLElement>('[data-places]')!;
 
   root.querySelector('[data-sign-out]')!.addEventListener('click', async () => {
     await supabase.auth.signOut();
-    await showSession();
+    sendToLogin();
+  });
+
+  root.querySelector<HTMLFormElement>('[data-form="name"]')!.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    statusEl.textContent = 'Saving name…';
+    const message = await saveDisplayName(supabase, nameInput.value);
+    statusEl.textContent = message ?? 'Name saved.';
+    if (!message) await showSession();
   });
 
   async function showSession() {
-    const { data } = await supabase.auth.getSession();
-    const session = data.session;
-    signedOut.hidden = Boolean(session);
-    signedIn.hidden = !session;
-    if (!session) {
-      adminLink.hidden = true;
-      const next = encodeURIComponent(location.pathname + location.search);
-      location.replace(`${root.dataset.login}?next=${next}`);
+    const account = await loadAccount(supabase);
+    signedOut.hidden = Boolean(account);
+    signedIn.hidden = !account;
+    if (!account) {
+      sendToLogin();
       return;
     }
-    const name = session.user.user_metadata?.display_name || 'Not set';
-    root.querySelector('[data-who]')!.textContent = `Signed in as ${session.user.user_metadata?.display_name || session.user.email}`;
-    root.querySelector('[data-name]')!.textContent = name;
-    root.querySelector('[data-email]')!.textContent = session.user.email ?? '—';
-    const { data: me } = await supabase.from('profiles').select('display_name, is_admin').eq('id', session.user.id).maybeSingle();
-    if (me?.display_name) root.querySelector('[data-name]')!.textContent = me.display_name;
-    adminLink.hidden = !me?.is_admin;
+    whoEl.textContent = `Signed in as ${account.displayName || account.email}`;
+    nameInput.value = account.displayName;
+    emailEl.textContent = account.email || '—';
+    placesEl.textContent = account.places.length
+      ? account.places.map((place) => place.label).join('. ')
+      : 'No club or team yet. An admin sets that on the People tab.';
+    adminLink.hidden = !account.isAdmin;
+    squadLink.textContent = account.playerOnly ? 'Your team' : 'Squad';
   }
 
   showSession();
@@ -113,6 +136,9 @@ import { url } from '@/lib/site';
   .who {
     margin-bottom: 0.75rem;
   }
+  form.card {
+    margin: 0 0 1rem;
+  }
   .account {
     display: grid;
     gap: 0.75rem;
@@ -129,6 +155,13 @@ import { url } from '@/lib/site';
   .account dd {
     margin: 0;
     font-weight: 600;
+  }
+  .muted {
+    color: var(--ink-200);
+  }
+  .small {
+    font-size: 0.85rem;
+    margin: 0.35rem 0 0;
   }
   .actions {
     display: flex;

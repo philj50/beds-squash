@@ -16,15 +16,6 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       </p>
       <p class="status" data-status role="status"></p>
 
-      <form class="card" method="post" data-form="sign-in">
-        <div class="card__body stack">
-          <h2>Sign in</h2>
-          <label>Email <input name="username" type="email" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" /></label>
-          <label>Password <input name="password" type="password" required autocomplete="current-password" /></label>
-          <button class="btn btn--primary" type="submit">Sign in</button>
-        </div>
-      </form>
-
       <div data-panel="signed-in" hidden>
         <p class="who" data-who></p>
         <p class="actions">
@@ -58,7 +49,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { startPasswordSave } from '@/lib/passwords';
+  import { loadAccount, sendToLogin } from '@/lib/account';
 
   type Season = { id: number; name: string; starts_on: string | null };
   type Squad = { id: number; name: string; team_id: number | null };
@@ -85,7 +76,6 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   if (!root) throw new Error('match app missing');
   const supabase = createClient(root.dataset.url!, root.dataset.key!);
   const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
-  const signInForm = root.querySelector<HTMLFormElement>('[data-form="sign-in"]')!;
   const signedIn = root.querySelector<HTMLElement>('[data-panel="signed-in"]')!;
   const unassigned = root.querySelector<HTMLElement>('[data-unassigned]')!;
   const adminLink = root.querySelector<HTMLElement>('[data-admin-link]')!;
@@ -105,6 +95,8 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   let fixtures: Fixture[] = [];
   let currentFixture: Fixture | null = null;
   let players: Player[] = [];
+  let playerOnly = false;
+  let accountEmail = '';
 
   const setStatus = (message: string) => {
     statusEl.textContent = message;
@@ -115,23 +107,6 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     new Date(iso).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   const isPast = (fixture: Fixture) => new Date(fixture.starts_at).getTime() < Date.now() - 6 * 3600_000;
   const ours = (fixture: Fixture) => (fixture.home.team_id === currentSquad?.team_id ? 'home' : 'away');
-
-  signInForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const save = startPasswordSave(signInForm);
-    const data = new FormData(signInForm);
-    setStatus('Signing in…');
-    const { error } = await supabase.auth.signInWithPassword({
-      email: String(data.get('username')),
-      password: String(data.get('password')),
-    });
-    setStatus(error ? error.message : '');
-    if (!error) {
-      await save;
-      signInForm.remove();
-      await showSession();
-    }
-  });
 
   root.querySelector('[data-sign-out]')!.addEventListener('click', async () => {
     await supabase.auth.signOut();
@@ -167,7 +142,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       return;
     }
     const nomButton = target.closest<HTMLButtonElement>('[data-add-nomination]');
-    if (nomButton && currentSquad) {
+    if (nomButton && currentSquad && !playerOnly) {
       const { error } = await supabase
         .from('squad_players')
         .insert({ squad_id: currentSquad.id, display_name: nomButton.dataset.addNomination });
@@ -176,7 +151,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       return;
     }
     const clearButton = target.closest<HTMLButtonElement>('[data-clear-selection]');
-    if (clearButton && currentFixture && currentSquad) {
+    if (clearButton && currentFixture && currentSquad && !playerOnly) {
       const { error } = await supabase
         .from('selections')
         .delete()
@@ -189,13 +164,13 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
   matchHost.addEventListener('change', async (event) => {
     const select = (event.target as HTMLElement).closest<HTMLSelectElement>('[data-position]');
-    if (!select || !currentFixture || !currentSquad) return;
+    if (!select || !currentFixture || !currentSquad || playerOnly) return;
     await setPosition(Number(select.dataset.position), select.value ? Number(select.value) : null);
   });
 
   matchHost.addEventListener('submit', async (event) => {
     const form = event.target as HTMLFormElement;
-    if (!form.matches('[data-form="player"]') || !currentSquad) return;
+    if (!form.matches('[data-form="player"]') || !currentSquad || playerOnly) return;
     event.preventDefault();
     const data = new FormData(form);
     const { error } = await supabase.from('squad_players').insert({
@@ -212,6 +187,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
   async function setAvailability(playerId: number, status: Availability['status'] | 'clear') {
     if (!currentFixture) return;
+    if (playerOnly && !players.some((player) => player.id === playerId)) return;
     setStatus('Saving…');
     const { data: existing } = await supabase
       .from('availability')
@@ -234,7 +210,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   }
 
   async function setPosition(playerId: number, position: number | null) {
-    if (!currentFixture || !currentSquad) return;
+    if (!currentFixture || !currentSquad || playerOnly) return;
     setStatus('Saving…');
     // Remove this player's existing slot and anyone already in the target slot.
     let query = supabase
@@ -257,31 +233,49 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   }
 
   async function showSession() {
-    const { data } = await supabase.auth.getSession();
-    const session = data.session;
-    signInForm.hidden = Boolean(session);
-    signedIn.hidden = !session;
-    if (!session) {
+    const account = await loadAccount(supabase);
+    signedIn.hidden = !account;
+    if (!account) {
       teamMenu.replaceChildren();
       layout.hidden = true;
       unassigned.hidden = true;
+      playerOnly = false;
+      sendToLogin();
       return;
     }
-    userId = session.user.id;
-    root!.querySelector('[data-who]')!.textContent = `Signed in as ${session.user.user_metadata?.display_name || session.user.email}`;
-    const { data: me } = await supabase.from('profiles').select('is_admin').eq('id', session.user.id).maybeSingle();
-    adminLink.hidden = !me?.is_admin;
+    userId = account.userId;
+    playerOnly = account.playerOnly;
+    accountEmail = account.email.toLowerCase();
+    root!.querySelector('[data-who]')!.textContent = `Signed in as ${account.displayName || account.email}`;
+    adminLink.hidden = !account.isAdmin;
 
-    const [{ data: squadRows, error }, { data: clubRows }, { data: seasonRows }] = await Promise.all([
+    const [squadResult, { data: clubRows }, { data: seasonRows }] = await Promise.all([
       supabase.from('captain_squads').select('id, name, team_id').not('team_id', 'is', null).order('name'),
       supabase.from('clubs').select('slug, name'),
       supabase.from('league_seasons').select('id, name, starts_on').order('starts_on', { ascending: false }),
     ]);
-    if (error) {
-      setStatus(error.message);
+    let squadRows = squadResult.data;
+    let squadError = squadResult.error;
+    if (playerOnly && accountEmail && (squadError || !(squadRows ?? []).length)) {
+      const { data: ownPlayers } = await supabase.from('squad_players').select('squad_id').ilike('email', accountEmail);
+      const ids = [...new Set((ownPlayers ?? []).map((row: { squad_id: number }) => row.squad_id))];
+      if (ids.length) {
+        const { data: ownSquads, error: ownError } = await supabase
+          .from('captain_squads')
+          .select('id, name, team_id')
+          .in('id', ids)
+          .not('team_id', 'is', null);
+        if (!ownError && ownSquads?.length) {
+          squadRows = ownSquads;
+          squadError = null;
+        }
+      }
+    }
+    if (squadError && !playerOnly) {
+      setStatus(squadError.message);
       return;
     }
-    squads = (squadRows ?? []) as Squad[];
+    squads = squadError ? [] : ((squadRows ?? []) as Squad[]);
     // The two latest seasons: this winter, then last winter as the worked example.
     seasons = ((seasonRows ?? []) as Season[]).slice(0, 2);
     clubNames = new Map((clubRows ?? []).map((c: { slug: string; name: string }) => [c.slug, c.name]));
@@ -424,6 +418,9 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
         .order('position'),
     ]);
     players = (playersRes.data ?? []) as Player[];
+    if (playerOnly) {
+      players = players.filter((player) => (player.email ?? '').toLowerCase() === accountEmail);
+    }
     const avail = new Map(((availRes.data ?? []) as Availability[]).map((a) => [a.squad_player_id, a.status]));
     const selected = new Map(((selRes.data ?? []) as Selection[]).map((s) => [s.squad_player_id, s.position]));
     const rubbers = (rubberRes.data ?? []) as Rubber[];
@@ -433,7 +430,11 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     const opponent = side === 'home' ? fixture.away : fixture.home;
     const venue = clubNames.get(fixture.home.club_slug ?? '') ?? fixture.home.name;
     const counts = { in: 0, out: 0, maybe: 0 };
-    for (const status of avail.values()) counts[status] += 1;
+    const mine = new Set(players.map((player) => player.id));
+    for (const [id, status] of avail) {
+      if (playerOnly && !mine.has(id)) continue;
+      counts[status] += 1;
+    }
     const order = [...selected.entries()].sort((a, b) => a[1] - b[1]);
     const nameOf = (id: number) => players.find((p) => p.id === id)?.display_name ?? '?';
     const known = new Set(players.map((p) => p.display_name.toLowerCase()));
@@ -453,7 +454,9 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
           `<td class="name">${esc(p.display_name)}</td>` +
           `<td class="avail-cell">${btn('in', 'In')}${btn('maybe', 'Maybe')}${btn('out', 'Out')}` +
           `${status ? `<button type="button" class="avail avail--clear" data-avail="clear" data-player="${p.id}" title="Clear">×</button>` : ''}</td>` +
-          `<td><select class="pos" data-position="${p.id}" aria-label="Position for ${esc(p.display_name)}">${options}</select></td>` +
+          (playerOnly
+            ? ''
+            : `<td><select class="pos" data-position="${p.id}" aria-label="Position for ${esc(p.display_name)}">${options}</select></td>`) +
           `</tr>`
         );
       })
@@ -491,10 +494,18 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
         <span class="chip">${players.length - counts.in - counts.out - counts.maybe} no reply</span>
       </div>
       <table class="squad">
-        <thead><tr><th>Player</th><th>Availability</th><th>Order</th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="3" class="muted">No players in this squad yet. Add them below.</td></tr>'}</tbody>
+        <thead><tr><th>Player</th><th>Availability</th>${playerOnly ? '' : '<th>Order</th>'}</tr></thead>
+        <tbody>${
+          rows ||
+          (playerOnly
+            ? '<tr><td colspan="2" class="muted">Your captain has not added your email to this squad yet, so you cannot mark availability.</td></tr>'
+            : '<tr><td colspan="3" class="muted">No players in this squad yet. Add them below.</td></tr>')
+        }</tbody>
       </table>
-      <div class="selection">
+      ${
+        playerOnly
+          ? ''
+          : `<div class="selection">
         <h3>Team for this match</h3>
         ${
           order.length
@@ -522,7 +533,8 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
               ? '<p class="muted">Everyone on the League Master nomination list is already in this squad.</p>'
               : '<p class="muted">League Master has not published a nomination list for this team yet. Names are pulled in automatically when it does.</p>'
         }
-      </details>`;
+      </details>`
+      }`;
   }
 
   showSession();

@@ -11,16 +11,6 @@ import { url } from '@/lib/site';
       <p class="lede">Player details stay on this page. They are not published, and saving or removing an entry does not send an email.</p>
       <p class="status" data-status role="status"></p>
 
-      <div data-panel="signed-out">
-        <form class="card" method="post" data-form="sign-in">
-          <div class="card__body stack">
-            <label>Email <input name="username" type="email" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" /></label>
-            <label>Password <input name="password" type="password" required autocomplete="current-password" /></label>
-            <button class="btn btn--primary" type="submit">Sign in</button>
-          </div>
-        </form>
-      </div>
-
       <div data-panel="signed-in" hidden>
         <p class="who" data-who></p>
         <p class="actions">
@@ -38,7 +28,7 @@ import { url } from '@/lib/site';
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { startPasswordSave } from '@/lib/passwords';
+  import { sendToLogin } from '@/lib/account';
   import { AGE_CATEGORIES } from '@/lib/junior-age';
 
   type Entry = {
@@ -62,7 +52,6 @@ import { url } from '@/lib/site';
   if (!root) throw new Error('entries app missing');
   const supabase = createClient(root.dataset.url!, root.dataset.key!);
   const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
-  const signedOut = root.querySelector<HTMLElement>('[data-panel="signed-out"]')!;
   const signedIn = root.querySelector<HTMLElement>('[data-panel="signed-in"]')!;
   const list = root.querySelector<HTMLElement>('[data-list]')!;
   const denied = root.querySelector<HTMLElement>('[data-denied]')!;
@@ -72,24 +61,6 @@ import { url } from '@/lib/site';
     value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
 
   const when = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-
-  root.querySelector<HTMLFormElement>('[data-form="sign-in"]')!.addEventListener('submit', async (event) => {
-    const form = event.currentTarget as HTMLFormElement;
-    event.preventDefault();
-    const save = startPasswordSave(form);
-    const data = new FormData(form);
-    statusEl.textContent = 'Signing in…';
-    const { error } = await supabase.auth.signInWithPassword({
-      email: String(data.get('username')),
-      password: String(data.get('password')),
-    });
-    statusEl.textContent = error ? error.message : '';
-    if (!error) {
-      await save;
-      form.remove();
-      await showSession();
-    }
-  });
 
   root.querySelector('[data-sign-out]')!.addEventListener('click', async () => {
     await supabase.auth.signOut();
@@ -109,11 +80,11 @@ import { url } from '@/lib/site';
   async function showSession() {
     const { data } = await supabase.auth.getSession();
     const session = data.session;
-    signedOut.hidden = Boolean(session);
     signedIn.hidden = !session;
     if (!session) {
       list.hidden = true;
       denied.hidden = true;
+      sendToLogin();
       return;
     }
     whoEl.textContent = `Signed in as ${session.user.email ?? 'organiser'}`;
