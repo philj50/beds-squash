@@ -1,0 +1,97 @@
+---
+import QRCode from 'qrcode';
+import { url } from '@/lib/site';
+
+interface Props {
+  showEnter?: boolean;
+}
+const { showEnter = true } = Astro.props;
+
+const signupUrl = new URL(url('/juniors/closed/'), Astro.site).href;
+const qrSvg = await QRCode.toString(signupUrl, {
+  type: 'svg',
+  margin: 1,
+  errorCorrectionLevel: 'M',
+  color: { dark: '#111111', light: '#ffffff' },
+});
+---
+
+<aside class="entry-qr" id="poster">
+  <p class="entry-qr__label">Scan to enter the Junior County Closed</p>
+  <div class="entry-qr__code" set:html={qrSvg} />
+  <p class="entry-qr__url">{signupUrl}</p>
+  <p class="entry-qr__actions no-print">
+    {showEnter && <a class="btn btn--primary btn--sm" href={url('/juniors/closed/')}>Enter online</a>}
+    <button class="btn btn--ghost btn--sm" type="button" data-print-qr>Print this code</button>
+  </p>
+</aside>
+
+<script>
+  document.querySelectorAll('[data-print-qr]').forEach((button) => {
+    button.addEventListener('click', () => window.print());
+  });
+</script>
+
+<style>
+  .entry-qr {
+    display: grid;
+    justify-items: center;
+    gap: 0.2rem;
+    width: fit-content;
+    max-width: 100%;
+    margin: 0.4rem 0 0.6rem;
+    padding: 0.55rem 0.7rem 0.65rem;
+    background: #fff;
+    color: #111;
+    border-radius: var(--radius);
+    text-align: center;
+  }
+  .entry-qr__label,
+  .entry-qr__url {
+    margin: 0;
+    color: #111;
+    line-height: 1.3;
+  }
+  .entry-qr__label {
+    font-weight: 700;
+    font-size: 0.9rem;
+  }
+  .entry-qr__code :global(svg) {
+    display: block;
+    width: 9.5rem;
+    height: auto;
+  }
+  .entry-qr__url {
+    font-size: 0.72rem;
+    word-break: break-all;
+  }
+  .entry-qr__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.4rem;
+    margin: 0.25rem 0 0;
+  }
+  .entry-qr .btn--ghost {
+    color: #111;
+    border-color: #222;
+  }
+  @media print {
+    :global(body *) {
+      visibility: hidden;
+    }
+    .entry-qr,
+    .entry-qr * {
+      visibility: visible;
+    }
+    .entry-qr {
+      position: absolute;
+      left: 0;
+      top: 0;
+      margin: 0;
+    }
+    .no-print {
+      display: none !important;
+    }
+  }
+</style>

@@ -14,7 +14,7 @@ The aim is a junior county team, with A and B sides as the squad grows.
 
 ## Coming up
 
-- **Junior County Closed** — November. [Enter a player](/juniors/closed/), or print the QR code on that page for the club noticeboard. The exact date will be added here once it is fixed.
+- **Junior County Closed** — November. Scan the code at the top of this page, or [enter a player](/juniors/closed/). The exact date will be added here once it is fixed.
 - **Northants Grand Prix** — February
 - **Beds schools** — March / April
 

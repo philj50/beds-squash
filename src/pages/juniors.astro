@@ -2,6 +2,7 @@
 import Base from '@/layouts/Base.astro';
 import ContentPage from '@/components/ContentPage.astro';
 import EventCard from '@/components/EventCard.astro';
+import JuniorClosedQr from '@/components/JuniorClosedQr.astro';
 import { getClubs, getDocuments, getUpcomingEvents } from '@/lib/content';
 import { url } from '@/lib/site';
 
@@ -12,10 +13,11 @@ const safeguarding = (await getDocuments()).filter((d) => d.data.category === 's
 
 <Base title="Junior squash in Bedfordshire" description="Junior squash in Bedfordshire: county squads, age groups, the Junior County Closed, coaching venues and safeguarding." crumbs={[{ name: 'Juniors', path: '/juniors/' }]}>
   <ContentPage id="juniors" eyebrow="Under 19s" fallbackTitle="Juniors">
+    <JuniorClosedQr slot="hero" />
     <div slot="aside" class="stack">
       <div class="card"><div class="card__body">
         <h3>Junior County Closed</h3>
-        <p>November. Parents enter a player online. The page includes a QR code to print.</p>
+        <p>November. A parent or guardian enters the player.</p>
         <a class="btn btn--primary btn--sm" href={url('/juniors/closed/')}>Enter</a>
       </div></div>
       <div class="card"><div class="card__body">

@@ -1,19 +1,12 @@
 ---
-import QRCode from 'qrcode';
 import Base from '@/layouts/Base.astro';
+import JuniorClosedQr from '@/components/JuniorClosedQr.astro';
 import { getClubs } from '@/lib/content';
 import { AGE_REFERENCE } from '@/lib/junior-age';
 import { url } from '@/lib/site';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 const clubs = (await getClubs()).map((club) => club.data.name);
-const signupUrl = new URL(url('/juniors/closed/'), Astro.site).href;
-const qrSvg = await QRCode.toString(signupUrl, {
-  type: 'svg',
-  margin: 1,
-  errorCorrectionLevel: 'M',
-  color: { dark: '#111111', light: '#ffffff' },
-});
 const organiserHref = url('/juniors/closed/entries/');
 ---
 
@@ -31,6 +24,7 @@ const organiserHref = url('/juniors/closed/entries/');
         <div>
           <p class="eyebrow">Juniors</p>
           <h1>Junior County Closed</h1>
+          <JuniorClosedQr showEnter={false} />
           <p class="lede">
             November. The playing date is still to be fixed. A parent or guardian enters the player here. The age group is worked out from the date of birth, using age on {AGE_REFERENCE}: Under 11, Under 13, Under 15, Under 17 and Under 19.
           </p>
@@ -84,15 +78,6 @@ const organiserHref = url('/juniors/closed/entries/');
             </div>
           </form>
         </div>
-
-        <aside class="poster" id="poster">
-          <p class="poster__eyebrow">Bedfordshire Squash</p>
-          <h2>Junior County Closed</h2>
-          <p>Scan to enter</p>
-          <div class="poster__qr" set:html={qrSvg} />
-          <p class="poster__url">{signupUrl}</p>
-          <button class="btn btn--ghost btn--sm no-print" type="button" data-print>Print this code</button>
-        </aside>
       </div>
       <p class="organiser no-print"><a href={organiserHref}>Organisers</a></p>
     </div>
@@ -123,8 +108,6 @@ const organiserHref = url('/juniors/closed/entries/');
       : 'That date of birth is outside the junior age groups, so this player cannot be entered.';
   };
   dob.addEventListener('change', showCategory);
-
-  root.querySelector('[data-print]')!.addEventListener('click', () => window.print());
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -171,14 +154,7 @@ const organiserHref = url('/juniors/closed/entries/');
     max-width: 64rem;
   }
   .closed__layout {
-    display: grid;
-    gap: 1.5rem;
-  }
-  @media (min-width: 860px) {
-    .closed__layout {
-      grid-template-columns: minmax(0, 1fr) 18rem;
-      align-items: start;
-    }
+    display: block;
   }
   .lede {
     color: var(--ink-200);
@@ -239,32 +215,6 @@ const organiserHref = url('/juniors/closed/entries/');
     height: 0;
     overflow: hidden;
   }
-  .poster {
-    background: #fff;
-    color: #111;
-    border-radius: var(--radius);
-    padding: 1.25rem;
-    text-align: center;
-  }
-  .poster h2,
-  .poster p {
-    color: #111;
-    margin: 0.25rem 0;
-  }
-  .poster__eyebrow {
-    font-family: var(--font-display);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    font-size: 0.8rem;
-  }
-  .poster__qr :global(svg) {
-    width: min(100%, 14rem);
-    height: auto;
-  }
-  .poster__url {
-    font-size: 0.75rem;
-    word-break: break-all;
-  }
   .organiser {
     margin-top: 1.5rem;
     font-size: 0.85rem;
@@ -282,9 +232,6 @@ const organiserHref = url('/juniors/closed/entries/');
     }
     .closed__layout {
       display: block;
-    }
-    .poster {
-      box-shadow: none;
     }
   }
 </style>
