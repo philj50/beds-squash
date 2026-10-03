@@ -43,6 +43,28 @@ test.describe('Public site', () => {
     await expect(page.locator('#ratings-app')).toBeVisible();
   });
 
+  test('SquashLevels search narrows the player list', async ({ page }) => {
+    await page.route('**/rest/v1/squashlevels_players*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: { 'content-range': '0-1/2' },
+        body: JSON.stringify([
+          { id: 1, display_name: 'Pat Player', current_level: 4321, updated_at: '2026-09-01T00:00:00Z' },
+          { id: 2, display_name: 'Zoe Player', current_level: 2100, updated_at: '2026-09-02T00:00:00Z' },
+        ]),
+      });
+    });
+    await open(page, 'leagues/ratings/');
+    const search = page.getByRole('searchbox', { name: 'Search players' });
+    await expect(page.getByRole('button', { name: 'Pat Player' })).toBeVisible();
+    await expect(page.getByRole('status')).toContainText('2 players');
+    await search.fill('zoe');
+    await expect(page.getByRole('button', { name: 'Zoe Player' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Pat Player' })).toHaveCount(0);
+    await expect(page.getByRole('status')).toContainText('1 of 2 players');
+  });
+
   test('league results shell loads', async ({ page }) => {
     await open(page, 'leagues/results/');
     await expect(page.getByRole('heading', { level: 1 })).toContainText(/Tables and fixtures/i);

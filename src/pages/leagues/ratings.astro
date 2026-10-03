@@ -91,6 +91,10 @@ const crumbs = [
   function renderList(filter = '') {
     const q = filter.trim().toLowerCase();
     const rows = players.filter((p) => !q || p.display_name.toLowerCase().includes(q));
+    statusEl.hidden = false;
+    statusEl.textContent = q
+      ? `${rows.length} of ${players.length} players`
+      : `${players.length} players. Type a name to narrow the list.`;
     playersBody.innerHTML =
       rows.length === 0
         ? '<tr><td colspan="3">No players match.</td></tr>'
@@ -155,15 +159,25 @@ const crumbs = [
 
   search.addEventListener('input', () => renderList(search.value));
 
-  const { data, error } = await supabase
-    .from('squashlevels_players')
-    .select('id, display_name, current_level, updated_at')
-    .order('display_name', { ascending: true });
-  if (error) {
-    statusEl.textContent = error.message;
+  const loaded: Player[] = [];
+  let loadError: { message: string } | null = null;
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase
+      .from('squashlevels_players')
+      .select('id, display_name, current_level, updated_at')
+      .order('display_name', { ascending: true })
+      .range(from, from + 999);
+    if (error) {
+      loadError = error;
+      break;
+    }
+    loaded.push(...((data ?? []) as Player[]));
+    if (!data || data.length < 1000) break;
+  }
+  if (loadError && loaded.length === 0) {
+    statusEl.textContent = loadError.message;
   } else {
-    players = (data ?? []) as Player[];
-    statusEl.hidden = true;
+    players = loaded;
     listWrap.hidden = false;
     renderList();
   }

@@ -208,6 +208,9 @@ test.describe('Club captain, team captain, and player', () => {
           },
         ]);
       }
+      if (path.endsWith('/squashlevels_players')) {
+        return send([{ display_name: 'Pat Player', current_level: 4321 }]);
+      }
       if (path.endsWith('/captain_squads')) {
         return send([
           {
@@ -260,11 +263,14 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(row).toContainText('123456');
     await expect(row).toContainText('pat.player@example.test');
     await expect(row).toContainText('07000000000');
+    await expect(row).toContainText('4,321');
+    await expect(page.locator('[data-directory] tr', { hasText: 'Zoe Player' })).not.toContainText('4,321');
     await expect(page.locator('[data-directory] tr', { hasText: 'Zoe Player' })).not.toContainText('Test Club');
     await expect(page.locator('[data-directory] tr.team-start', { hasText: 'Sam Squad' })).toContainText('Test Team 2');
     await expect(page.locator('[data-directory] tr.club-start', { hasText: 'Alex Away' })).toContainText('Other Club');
     await expect(page.locator('[data-directory-count]')).toContainText('2 with an ES number');
     await expect(page.locator('[data-directory-count]')).toContainText('1 with a mobile');
+    await expect(page.locator('[data-directory-count]')).toContainText('1 with a SquashLevels level');
 
     await page.getByRole('searchbox', { name: 'Search' }).fill('no-such-player');
     await expect(page.getByText('No players match that search.')).toBeVisible();
