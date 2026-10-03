@@ -38,6 +38,7 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
         <div data-admin hidden>
           <nav class="admin-tabs" aria-label="Admin sections">
             <button type="button" data-tab-button="overview">Overview</button>
+            <button type="button" data-tab-button="players">Players</button>
             <button type="button" data-tab-button="accounts">People</button>
             <button type="button" data-tab-button="clubs">Clubs</button>
             <button type="button" data-tab-button="roles">Roles</button>
@@ -59,6 +60,31 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
                   </tr>
                 </thead>
                 <tbody data-overview></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="admin-panel" data-tab="players" hidden>
+            <h2>Players</h2>
+            <p class="muted small">Every winter-league player, with the England Squash number, email and mobile held for them. A dash means that detail is not on file yet.</p>
+            <label class="directory-search">
+              Search
+              <input type="search" data-player-search placeholder="Club, team, player, email or ES number" autocomplete="off" />
+            </label>
+            <p class="muted small" data-directory-count></p>
+            <div class="overview-box">
+              <table class="overview">
+                <thead>
+                  <tr>
+                    <th>Club</th>
+                    <th class="col-team">Team</th>
+                    <th>Player</th>
+                    <th>ES number</th>
+                    <th>Email</th>
+                    <th>Mobile</th>
+                  </tr>
+                </thead>
+                <tbody data-directory></tbody>
               </table>
             </div>
           </section>
@@ -337,7 +363,11 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
     leaguemaster_team_id: string | null;
     team_id: number | null;
     profiles: { display_name: string } | { display_name: string }[] | null;
+    squad_players:
+      | { id: number; display_name: string; email: string | null; phone: string | null; england_squash_id: string | null }[]
+      | null;
   };
+  type DirectoryRow = { club: string; team: string; name: string; es: string; email: string; mobile: string };
 
   const root = document.getElementById('setup-app');
   if (!root) throw new Error('setup app missing');
@@ -349,6 +379,10 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
   const whoEl = root.querySelector<HTMLElement>('[data-who]')!;
   const teamsHost = root.querySelector<HTMLElement>('[data-teams]')!;
   const overviewHost = root.querySelector<HTMLElement>('[data-overview]')!;
+  const directoryHost = root.querySelector<HTMLElement>('[data-directory]')!;
+  const directoryCount = root.querySelector<HTMLElement>('[data-directory-count]')!;
+  const playerSearch = root.querySelector<HTMLInputElement>('[data-player-search]')!;
+  let directoryRows: DirectoryRow[] = [];
   const clubMenu = root.querySelector<HTMLElement>('[data-club-menu]')!;
   const peopleHost = root.querySelector<HTMLElement>('[data-people]')!;
   const rolesHost = root.querySelector<HTMLElement>('[data-roles]')!;
@@ -365,7 +399,7 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
   const accountTeam = root.querySelector<HTMLSelectElement>('[data-account-team]')!;
   let protectedAdminId = '';
   const newClubForm = root.querySelector<HTMLFormElement>('[data-form="new-club"]')!;
-  const tabs = ['overview', 'clubs', 'accounts', 'roles', 'traffic'] as const;
+  const tabs = ['overview', 'players', 'clubs', 'accounts', 'roles', 'traffic'] as const;
   type Tab = (typeof tabs)[number];
   let currentClub = '';
   let trafficLoaded = false;
@@ -934,7 +968,7 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
     ] = await Promise.all([
       supabase
         .from('captain_squads')
-        .select('id, name, captain_email, captain_id, leaguemaster_team_id, team_id, profiles(display_name)')
+        .select('id, name, captain_email, captain_id, leaguemaster_team_id, team_id, profiles(display_name), squad_players(id, display_name, email, phone, england_squash_id)')
         .order('name', { ascending: true }),
       supabase.from('profiles').select('id, display_name, email, is_admin').order('display_name', { ascending: true }),
       supabase.from('clubs').select('slug, name, contact_name, contact_email').order('name', { ascending: true }),
@@ -953,6 +987,22 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
     const accounts = (people ?? []) as Person[];
     const memberships = (roleRows ?? []) as Membership[];
     const winterTeams = orgTeams.filter((team) => team.last_season === SEASON);
+    const clubNames = new Map(clubs.map((club) => [club.slug, club.name]));
+    directoryRows = winterTeams
+      .flatMap((team) => {
+        const squad = squads.find((item) => item.team_id === team.id);
+        const players = (squad?.squad_players ?? []).slice().sort((a, b) => a.display_name.localeCompare(b.display_name, 'en'));
+        return players.map((player) => ({
+          club: clubNames.get(team.club_slug) || team.club_slug,
+          team: team.division ? `${team.name} · ${team.division}` : team.name,
+          name: player.display_name,
+          es: player.england_squash_id || '',
+          email: player.email || '',
+          mobile: player.phone || '',
+        }));
+      })
+      .sort((a, b) => a.club.localeCompare(b.club, 'en') || a.team.localeCompare(b.team, 'en') || a.name.localeCompare(b.name, 'en'));
+    paintDirectory();
 
     const accountName = (email: string | null) => {
       if (!email) return '';
@@ -1198,9 +1248,31 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
     );
   }
 
+  function paintDirectory() {
+    const query = playerSearch.value.trim().toLowerCase();
+    const shown = directoryRows.filter((row) =>
+      !query || [row.club, row.team, row.name, row.es, row.email, row.mobile].some((value) => value.toLowerCase().includes(query)),
+    );
+    const filled = (rows: DirectoryRow[], field: 'es' | 'email' | 'mobile') => rows.filter((row) => row[field]).length;
+    directoryCount.textContent = query
+      ? `${shown.length} of ${directoryRows.length} players`
+      : `${directoryRows.length} players · ${filled(directoryRows, 'es')} with an ES number · ${filled(directoryRows, 'email')} with an email · ${filled(directoryRows, 'mobile')} with a mobile`;
+    const cell = (value: string) => (value ? escapeHtml(value) : '<span class="muted">—</span>');
+    directoryHost.innerHTML = shown.length
+      ? shown
+          .map(
+            (row) =>
+              `<tr><td>${escapeHtml(row.club)}</td><td class="col-team">${escapeHtml(row.team)}</td><td>${escapeHtml(row.name)}</td><td>${cell(row.es)}</td><td>${cell(row.email)}</td><td>${cell(row.mobile)}</td></tr>`,
+          )
+          .join('')
+      : `<tr><td colspan="6">${directoryRows.length ? 'No players match that search.' : 'No players yet.'}</td></tr>`;
+  }
+
   function escapeHtml(value: string) {
     return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
   }
+
+  playerSearch.addEventListener('input', () => paintDirectory());
 
   const startTab = location.hash.slice(1) as Tab;
   showTab(tabs.includes(startTab) ? startTab : 'overview');
@@ -1262,6 +1334,18 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
   }
   #setup-app .admin-panel > h2 {
     margin-top: 0;
+  }
+  #setup-app .directory-search {
+    display: grid;
+    gap: 0.35rem;
+    max-width: 28rem;
+    margin: 0 0 0.75rem;
+    font-weight: 600;
+  }
+  #setup-app .directory-search input {
+    font: inherit;
+    font-weight: 400;
+    padding: 0.55rem 0.7rem;
   }
 
   #setup-app .traffic-kpis {

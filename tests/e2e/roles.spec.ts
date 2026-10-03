@@ -131,6 +131,93 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.locator('[data-places]')).toHaveText(PEOPLE.team_player.place);
     await expect(page.locator('[data-squad-link]')).toHaveText('Your team');
   });
+
+  test('admin can look up a player by club, team, ES number, email and mobile', async ({ page }) => {
+    const adminId = '44444444-4444-4444-8444-444444444444';
+    const expiresAt = Math.floor(Date.now() / 1000) + 60 * 60;
+    const session = {
+      access_token: jwt({ sub: adminId, email: 'admin@example.test', role: 'authenticated', exp: expiresAt }),
+      refresh_token: 'simulated-refresh',
+      token_type: 'bearer',
+      expires_in: 3600,
+      expires_at: expiresAt,
+      user: {
+        id: adminId,
+        aud: 'authenticated',
+        role: 'authenticated',
+        email: 'admin@example.test',
+        app_metadata: { provider: 'email', providers: ['email'] },
+        user_metadata: { display_name: 'County Admin' },
+        identities: [],
+        created_at: '2026-10-02T00:00:00Z',
+        updated_at: '2026-10-02T00:00:00Z',
+      },
+    };
+    await page.addInitScript((stored) => {
+      localStorage.setItem('sb-klxyjmwiaivvqjbhxzak-auth-token', JSON.stringify(stored));
+    }, session);
+
+    await page.route(`${SUPABASE}/**`, async (route) => {
+      const url = new URL(route.request().url());
+      const path = url.pathname;
+      const send = (payload: unknown) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload) });
+      if (path.startsWith('/auth/v1/')) return send(path.endsWith('/user') ? session.user : session);
+      if (path.endsWith('/functions/v1/manage-accounts')) return send({ user_id: adminId });
+      if (path.endsWith('/profiles')) {
+        const row = { id: adminId, display_name: 'County Admin', email: 'admin@example.test', is_admin: true };
+        return send((route.request().headers().accept ?? '').includes('application/vnd.pgrst.object+json') ? row : [row]);
+      }
+      if (path.endsWith('/clubs')) return send([{ slug: 'test-club', name: 'Test Club', contact_name: 'Chris Club', contact_email: 'club@example.test' }]);
+      if (path.endsWith('/teams')) {
+        return send([{
+          id: 5,
+          club_slug: 'test-club',
+          name: 'Test Team 1',
+          division: 'Division 1',
+          leaguemaster_team_id: '1',
+          captain_name: 'Taylor Team',
+          captain_email: 'taylor@example.test',
+          last_season: 'Winter 2026/27',
+        }]);
+      }
+      if (path.endsWith('/captain_squads')) {
+        return send([{
+          id: 10,
+          name: 'Test Team 1',
+          captain_email: 'taylor@example.test',
+          captain_id: null,
+          leaguemaster_team_id: '1',
+          team_id: 5,
+          profiles: null,
+          squad_players: [{
+            id: 1,
+            display_name: 'Pat Player',
+            email: 'pat.player@example.test',
+            phone: '07000000000',
+            england_squash_id: '123456',
+          }],
+        }]);
+      }
+      return send([]);
+    });
+
+    await page.goto('captains/admin/#players', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: 'Players' })).toBeVisible();
+    const row = page.locator('[data-directory] tr', { hasText: 'Pat Player' });
+    await expect(row).toContainText('Test Club');
+    await expect(row).toContainText('Test Team 1');
+    await expect(row).toContainText('123456');
+    await expect(row).toContainText('pat.player@example.test');
+    await expect(row).toContainText('07000000000');
+    await expect(page.locator('[data-directory-count]')).toContainText('1 with an ES number');
+    await expect(page.locator('[data-directory-count]')).toContainText('1 with a mobile');
+
+    await page.getByRole('searchbox', { name: 'Search' }).fill('no-such-player');
+    await expect(page.getByText('No players match that search.')).toBeVisible();
+    await page.getByRole('searchbox', { name: 'Search' }).fill('123456');
+    await expect(row).toBeVisible();
+  });
 });
 
 async function signIn(page: Page, role: RoleName) {
