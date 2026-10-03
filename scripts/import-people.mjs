@@ -264,6 +264,7 @@ for (const id of clubIds) {
 const lmTeams = [...(await request('/cgi-county/icounty.exe/showteamlist')).matchAll(/showteam\?teamid=(\d+)/gi)].map((m) => m[1]);
 const teamIds = [...new Set(lmTeams)];
 const teamUpdates = [];
+const contactByTeamId = new Map();
 for (const id of teamIds) {
   const html = await request(`/cgi-county/icounty.exe/showteam?teamid=${id}`);
   const fields = fieldsUntil(labelled(html), 'Team Contact', /reserve|club details|fixture|nomination/i);
@@ -271,6 +272,7 @@ for (const id of teamIds) {
   if (!local) continue;
   const captainName = fields['team contact'] || null;
   const captainEmail = (fields.email || '').includes('@') ? fields.email.toLowerCase() : null;
+  if (captainName && captainEmail) contactByTeamId.set(local.id, { name: captainName, email: captainEmail });
   if ((captainName && captainName !== local.captain_name) || (captainEmail && captainEmail !== (local.captain_email || '').toLowerCase())) {
     teamUpdates.push({ id: local.id, captain_name: captainName || local.captain_name, captain_email: captainEmail || local.captain_email });
   }
@@ -279,6 +281,7 @@ for (const id of teamIds) {
 
 let matched = 0;
 let withNumber = 0;
+let captainEmailsCopied = 0;
 const playerUpdates = [];
 for (const player of players) {
   const person = matchPerson(player.display_name);
@@ -292,10 +295,23 @@ for (const player of players) {
   }
 }
 
+for (const player of players) {
+  if (player.email) continue;
+  const squad = squads.find((row) => row.id === player.squad_id);
+  const contact = squad && contactByTeamId.get(squad.team_id);
+  if (!contact || norm(player.display_name) !== norm(contact.name)) continue;
+  const existing = playerUpdates.find((row) => row.id === player.id);
+  if (existing?.email) continue;
+  if (existing) existing.email = contact.email;
+  else playerUpdates.push({ id: player.id, email: contact.email, england_squash_id: null });
+  captainEmailsCopied += 1;
+}
+
 console.log(`Spreadsheet: ${registry.length} people, ${registry.filter((p) => p.englandSquashId).length} with an England Squash number.`);
 console.log(`League Master clubs to update: ${clubUpdates.length} of ${clubs.length}.`);
 console.log(`League Master captains to update: ${teamUpdates.length} of ${teams.length}.`);
 console.log(`Squad players matched to the spreadsheet: ${matched} of ${players.length} (${withNumber} with a number).`);
+console.log(`Team-contact emails copied onto a matching player who had none: ${captainEmailsCopied}.`);
 console.log(dryRun ? 'Dry run only.' : 'Writing.');
 
 if (dryRun) process.exit(0);

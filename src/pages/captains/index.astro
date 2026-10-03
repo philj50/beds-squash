@@ -8,7 +8,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   description="Sign in to manage your squad, fixtures, availability and team selection for Bedfordshire squash leagues."
   noindex
 >
-  <section class="section">
+  <section class="section section--tight">
     <div class="container captain" id="captain-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
       <h1>Club captains</h1>
       <p class="lede">
@@ -208,6 +208,10 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   .captain {
     max-width: 960px;
   }
+  .captain h1 {
+    font-size: clamp(1.7rem, 3vw, 2.2rem);
+    margin-bottom: 0.35rem;
+  }
   .test-flag {
     border: 1px solid var(--gold-500);
     color: var(--gold-400);
@@ -294,7 +298,8 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     min-width: 48rem;
     border-collapse: collapse;
     table-layout: fixed;
-    font-size: 0.95rem;
+    font-size: 0.84rem;
+    line-height: 1.25;
   }
   #captain-app .squad-table .col-name {
     width: 22%;
@@ -315,7 +320,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   #captain-app .squad-table td {
     text-align: left;
     vertical-align: middle;
-    padding: 0.6rem 0.75rem;
+    padding: 0.2rem 0.4rem;
     border: 1px solid rgba(255, 255, 255, 0.2);
     overflow-wrap: anywhere;
   }
@@ -346,7 +351,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     color: var(--text);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
-    padding: 0.5rem 0.6rem;
+    padding: 0.28rem 0.4rem;
     font: inherit;
   }
   #captain-app .squad-table .empty td {

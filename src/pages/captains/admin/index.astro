@@ -13,7 +13,7 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
   description="Edit club contacts and team captain emails."
   noindex
 >
-  <section class="section">
+  <section class="section section--tight">
     <div class="container setup" id="setup-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
       <h1>Clubs and captains</h1>
       <p class="lede">
@@ -66,14 +66,14 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
 
           <section class="admin-panel" data-tab="players" hidden>
             <h2>Players</h2>
-            <p class="muted small">Every winter-league player, with the England Squash number, email and mobile held for them. A dash means that detail is not on file yet.</p>
+            <p class="muted small">Winter-league players, grouped by club and then team, with the England Squash number, email and mobile held for them. A dash means that detail is not on file yet.</p>
             <label class="directory-search">
               Search
               <input type="search" data-player-search placeholder="Club, team, player, email or ES number" autocomplete="off" />
             </label>
             <p class="muted small" data-directory-count></p>
             <div class="overview-box">
-              <table class="overview">
+              <table class="overview directory">
                 <thead>
                   <tr>
                     <th>Club</th>
@@ -1258,13 +1258,31 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
       ? `${shown.length} of ${directoryRows.length} players`
       : `${directoryRows.length} players · ${filled(directoryRows, 'es')} with an ES number · ${filled(directoryRows, 'email')} with an email · ${filled(directoryRows, 'mobile')} with a mobile`;
     const cell = (value: string) => (value ? escapeHtml(value) : '<span class="muted">—</span>');
-    directoryHost.innerHTML = shown.length
-      ? shown
-          .map(
-            (row) =>
-              `<tr><td>${escapeHtml(row.club)}</td><td class="col-team">${escapeHtml(row.team)}</td><td>${escapeHtml(row.name)}</td><td>${cell(row.es)}</td><td>${cell(row.email)}</td><td>${cell(row.mobile)}</td></tr>`,
-          )
-          .join('')
+    const html: string[] = [];
+    let index = 0;
+    while (index < shown.length) {
+      const club = shown[index].club;
+      let clubCount = 1;
+      while (index + clubCount < shown.length && shown[index + clubCount].club === club) clubCount += 1;
+      for (let teamIndex = 0; teamIndex < clubCount; ) {
+        const team = shown[index + teamIndex].team;
+        let teamCount = 1;
+        while (teamIndex + teamCount < clubCount && shown[index + teamIndex + teamCount].team === team) teamCount += 1;
+        for (let playerIndex = 0; playerIndex < teamCount; playerIndex += 1) {
+          const row = shown[index + teamIndex + playerIndex];
+          const clubCell = teamIndex === 0 && playerIndex === 0 ? `<td class="col-club" rowspan="${clubCount}">${escapeHtml(club)}</td>` : '';
+          const teamCell = playerIndex === 0 ? `<td class="col-team" rowspan="${teamCount}">${escapeHtml(team)}</td>` : '';
+          const marker = teamIndex === 0 && playerIndex === 0 ? ' class="club-start"' : playerIndex === 0 ? ' class="team-start"' : '';
+          html.push(
+            `<tr${marker}>${clubCell}${teamCell}<td>${escapeHtml(row.name)}</td><td>${cell(row.es)}</td><td>${cell(row.email)}</td><td>${cell(row.mobile)}</td></tr>`,
+          );
+        }
+        teamIndex += teamCount;
+      }
+      index += clubCount;
+    }
+    directoryHost.innerHTML = html.length
+      ? html.join('')
       : `<tr><td colspan="6">${directoryRows.length ? 'No players match that search.' : 'No players yet.'}</td></tr>`;
   }
 
@@ -1282,6 +1300,14 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
 <style is:global>
   #setup-app {
     max-width: none;
+  }
+  #setup-app h1 {
+    font-size: clamp(1.7rem, 3vw, 2.2rem);
+    margin-bottom: 0.35rem;
+  }
+  #setup-app h2 {
+    font-size: 1.25rem;
+    margin-bottom: 0.35rem;
   }
   #setup-app .test-flag {
     border: 1px solid var(--gold-500);
@@ -1308,7 +1334,7 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
     display: flex;
     flex-wrap: wrap;
     gap: 0;
-    margin: 0 0 1.5rem;
+    margin: 0 0 0.75rem;
     border-bottom: 2px solid var(--gold-500);
   }
   #setup-app .admin-tabs button {
@@ -1317,9 +1343,10 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
     border: 1px solid transparent;
     border-bottom: none;
     border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-    padding: 0.7rem 1.25rem;
+    padding: 0.35rem 0.75rem;
     margin-bottom: -2px;
     font: inherit;
+    font-size: 0.92rem;
     font-weight: 600;
     cursor: pointer;
   }
@@ -1405,19 +1432,20 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
     border-radius: var(--radius);
     background: var(--ink-800);
     overflow-x: auto;
-    margin: 0 0 1.75rem;
+    margin: 0 0 1rem;
   }
   #setup-app .overview {
     width: 100%;
     border-collapse: collapse;
     border-style: hidden;
-    font-size: 0.92rem;
+    font-size: 0.82rem;
+    line-height: 1.25;
   }
   #setup-app .overview th,
   #setup-app .overview td {
     text-align: left;
-    vertical-align: top;
-    padding: 0.5rem 0.65rem;
+    vertical-align: middle;
+    padding: 0.18rem 0.4rem;
     border: 1px solid rgba(255, 255, 255, 0.2);
   }
   #setup-app .overview .col-team,
@@ -1437,7 +1465,21 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
   #setup-app .overview tr.club-start td {
     border-top: 2px solid var(--gold-600);
   }
+  #setup-app .overview tr.team-start td {
+    border-top: 2px solid rgba(255, 255, 255, 0.35);
+  }
   #setup-app .overview td[rowspan] {
+    background: var(--ink-800);
+    vertical-align: top;
+    font-weight: 700;
+  }
+  #setup-app .directory td.col-club {
+    color: var(--gold-400);
+  }
+  #setup-app .directory tbody tr:nth-child(odd) td {
+    background: transparent;
+  }
+  #setup-app .directory td[rowspan] {
     background: var(--ink-800);
   }
   #setup-app .link-button {
@@ -1474,8 +1516,9 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
     font: inherit;
   }
   #setup-app .small {
-    font-size: 0.85rem;
-    margin: 0 0 1rem;
+    font-size: 0.82rem;
+    margin: 0 0 0.5rem;
+    line-height: 1.35;
   }
   #setup-app .actions {
     display: flex;
@@ -1525,8 +1568,9 @@ const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
     padding: 0;
   }
   #setup-app .people li {
-    padding: 0.55rem 0;
+    padding: 0.22rem 0;
     border-bottom: 1px solid var(--border);
+    line-height: 1.3;
   }
   #setup-app .check {
     display: flex;

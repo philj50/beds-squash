@@ -168,36 +168,86 @@ test.describe('Club captain, team captain, and player', () => {
         const row = { id: adminId, display_name: 'County Admin', email: 'admin@example.test', is_admin: true };
         return send((route.request().headers().accept ?? '').includes('application/vnd.pgrst.object+json') ? row : [row]);
       }
-      if (path.endsWith('/clubs')) return send([{ slug: 'test-club', name: 'Test Club', contact_name: 'Chris Club', contact_email: 'club@example.test' }]);
+      if (path.endsWith('/clubs')) {
+        return send([
+          { slug: 'test-club', name: 'Test Club', contact_name: 'Chris Club', contact_email: 'club@example.test' },
+          { slug: 'other-club', name: 'Other Club', contact_name: 'Olivia Other', contact_email: 'other@example.test' },
+        ]);
+      }
       if (path.endsWith('/teams')) {
-        return send([{
-          id: 5,
-          club_slug: 'test-club',
-          name: 'Test Team 1',
-          division: 'Division 1',
-          leaguemaster_team_id: '1',
-          captain_name: 'Taylor Team',
-          captain_email: 'taylor@example.test',
-          last_season: 'Winter 2026/27',
-        }]);
+        return send([
+          {
+            id: 5,
+            club_slug: 'test-club',
+            name: 'Test Team 1',
+            division: 'Division 1',
+            leaguemaster_team_id: '1',
+            captain_name: 'Taylor Team',
+            captain_email: 'taylor@example.test',
+            last_season: 'Winter 2026/27',
+          },
+          {
+            id: 6,
+            club_slug: 'test-club',
+            name: 'Test Team 2',
+            division: 'Division 2',
+            leaguemaster_team_id: '2',
+            captain_name: 'Sam Captain',
+            captain_email: 'sam@example.test',
+            last_season: 'Winter 2026/27',
+          },
+          {
+            id: 7,
+            club_slug: 'other-club',
+            name: 'Other Team',
+            division: 'Division 1',
+            leaguemaster_team_id: '3',
+            captain_name: 'Alex Captain',
+            captain_email: 'alex@example.test',
+            last_season: 'Winter 2026/27',
+          },
+        ]);
       }
       if (path.endsWith('/captain_squads')) {
-        return send([{
-          id: 10,
-          name: 'Test Team 1',
-          captain_email: 'taylor@example.test',
-          captain_id: null,
-          leaguemaster_team_id: '1',
-          team_id: 5,
-          profiles: null,
-          squad_players: [{
-            id: 1,
-            display_name: 'Pat Player',
-            email: 'pat.player@example.test',
-            phone: '07000000000',
-            england_squash_id: '123456',
-          }],
-        }]);
+        return send([
+          {
+            id: 10,
+            name: 'Test Team 1',
+            captain_email: 'taylor@example.test',
+            captain_id: null,
+            leaguemaster_team_id: '1',
+            team_id: 5,
+            profiles: null,
+            squad_players: [
+              { id: 1, display_name: 'Pat Player', email: 'pat.player@example.test', phone: '07000000000', england_squash_id: '123456' },
+              { id: 2, display_name: 'Zoe Player', email: 'zoe.player@example.test', phone: null, england_squash_id: null },
+            ],
+          },
+          {
+            id: 11,
+            name: 'Test Team 2',
+            captain_email: 'sam@example.test',
+            captain_id: null,
+            leaguemaster_team_id: '2',
+            team_id: 6,
+            profiles: null,
+            squad_players: [
+              { id: 3, display_name: 'Sam Squad', email: 'sam.squad@example.test', phone: null, england_squash_id: '654321' },
+            ],
+          },
+          {
+            id: 12,
+            name: 'Other Team',
+            captain_email: 'alex@example.test',
+            captain_id: null,
+            leaguemaster_team_id: '3',
+            team_id: 7,
+            profiles: null,
+            squad_players: [
+              { id: 4, display_name: 'Alex Away', email: null, phone: null, england_squash_id: null },
+            ],
+          },
+        ]);
       }
       return send([]);
     });
@@ -210,7 +260,10 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(row).toContainText('123456');
     await expect(row).toContainText('pat.player@example.test');
     await expect(row).toContainText('07000000000');
-    await expect(page.locator('[data-directory-count]')).toContainText('1 with an ES number');
+    await expect(page.locator('[data-directory] tr', { hasText: 'Zoe Player' })).not.toContainText('Test Club');
+    await expect(page.locator('[data-directory] tr.team-start', { hasText: 'Sam Squad' })).toContainText('Test Team 2');
+    await expect(page.locator('[data-directory] tr.club-start', { hasText: 'Alex Away' })).toContainText('Other Club');
+    await expect(page.locator('[data-directory-count]')).toContainText('2 with an ES number');
     await expect(page.locator('[data-directory-count]')).toContainText('1 with a mobile');
 
     await page.getByRole('searchbox', { name: 'Search' }).fill('no-such-player');
