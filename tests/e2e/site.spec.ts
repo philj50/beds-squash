@@ -65,6 +65,39 @@ test.describe('Public site', () => {
     await expect(page.getByRole('status')).toContainText('1 player');
   });
 
+  test('SquashLevels player opens as a timeline', async ({ page }) => {
+    await page.route('**/rest/v1/squashlevels_players*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          { id: 1, display_name: 'Pat Player', current_level: 1800, updated_at: '2026-09-01T00:00:00Z' },
+        ]),
+      });
+    });
+    await page.route('**/rest/v1/squashlevels_ratings*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          { recorded_on: '2026-01-01', level: 1500, kind: 'before' },
+          { recorded_on: '2026-01-01', level: 1520, kind: 'after' },
+          { recorded_on: '2026-06-01', level: 1700, kind: 'before' },
+          { recorded_on: '2026-06-01', level: 1680, kind: 'after' },
+          { recorded_on: '2026-09-01', level: 1750, kind: 'before' },
+          { recorded_on: '2026-09-01', level: 1800, kind: 'after' },
+        ]),
+      });
+    });
+    await open(page, 'leagues/ratings/');
+    await page.getByRole('searchbox', { name: 'Search players' }).fill('pat');
+    await page.getByRole('button', { name: 'Pat Player' }).click();
+    await expect(page.getByRole('img', { name: 'Level after each match' })).toBeVisible();
+    await expect(page.locator('[data-history] tr')).toHaveCount(3);
+    await expect(page.locator('[data-history]')).toContainText('1,800');
+    await expect(page.locator('[data-history]')).not.toContainText('1,500');
+  });
+
   test('league results shell loads', async ({ page }) => {
     await open(page, 'leagues/results/');
     await expect(page.getByRole('heading', { level: 1 })).toContainText(/Tables and fixtures/i);

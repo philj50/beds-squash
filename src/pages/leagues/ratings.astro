@@ -49,7 +49,8 @@ const crumbs = [
         <div class="card__body">
           <h2 data-detail-name></h2>
           <p class="muted" data-detail-level></p>
-          <h3 class="h-small">Rating history</h3>
+          <div class="chart" data-chart hidden></div>
+          <h3 class="h-small">Recent results</h3>
           <div class="table-wrap">
             <table class="table">
               <thead>
@@ -69,7 +70,7 @@ const crumbs = [
   import { createClient } from '@supabase/supabase-js';
 
   type Player = { id: number; display_name: string; current_level: number | null; updated_at: string | null };
-  type Rating = { recorded_on: string; level: number; kind: string | null };
+  type Rating = { recorded_on: string; level: number; kind: string | null; squashlevels_match_id?: string | null };
 
   const root = document.getElementById('ratings-app');
   if (!root) throw new Error('ratings app missing');
@@ -81,6 +82,7 @@ const crumbs = [
   const detail = root.querySelector<HTMLElement>('[data-detail]')!;
   const detailName = root.querySelector<HTMLElement>('[data-detail-name]')!;
   const detailLevel = root.querySelector<HTMLElement>('[data-detail-level]')!;
+  const chartEl = root.querySelector<HTMLElement>('[data-chart]')!;
   const historyBody = root.querySelector<HTMLElement>('[data-history]')!;
 
   let players: Player[] = [];
@@ -111,32 +113,85 @@ const crumbs = [
             .join('');
   }
 
+  function timeline(ratings: Rating[]) {
+    const after = ratings.filter((row) => row.kind === 'after');
+    const source = after.length ? after : ratings;
+    return source.slice().sort((a, b) => a.recorded_on.localeCompare(b.recorded_on) || String(a.squashlevels_match_id ?? '').localeCompare(String(b.squashlevels_match_id ?? '')));
+  }
+
+  function drawChart(points: Rating[]) {
+    if (points.length < 2) {
+      chartEl.hidden = true;
+      chartEl.innerHTML = '';
+      return;
+    }
+    const width = 640;
+    const height = 220;
+    const pad = { l: 56, r: 16, t: 16, b: 36 };
+    const levels = points.map((point) => point.level);
+    let min = Math.min(...levels);
+    let max = Math.max(...levels);
+    if (min === max) {
+      min -= 50;
+      max += 50;
+    }
+    const padY = (max - min) * 0.08;
+    min -= padY;
+    max += padY;
+    const innerW = width - pad.l - pad.r;
+    const innerH = height - pad.t - pad.b;
+    const xAt = (index: number) => pad.l + (index / (points.length - 1)) * innerW;
+    const yAt = (level: number) => pad.t + ((max - level) / (max - min)) * innerH;
+    const line = points.map((point, index) => `${index === 0 ? 'M' : 'L'}${xAt(index).toFixed(1)},${yAt(point.level).toFixed(1)}`).join(' ');
+    const yTicks = [max, (max + min) / 2, min];
+    const xTicks = [0, Math.floor((points.length - 1) / 2), points.length - 1];
+    const dateLabel = (iso: string) => dayFmt.format(new Date(`${iso}T12:00:00`));
+    const anchor = (index: number) => (index === 0 ? 'start' : index === points.length - 1 ? 'end' : 'middle');
+    chartEl.hidden = false;
+    chartEl.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Level after each match">
+      ${yTicks
+        .map((tick) => {
+          const y = yAt(tick);
+          return `<line x1="${pad.l}" y1="${y.toFixed(1)}" x2="${width - pad.r}" y2="${y.toFixed(1)}" stroke="#c5d6e8" stroke-opacity="0.25" /><text x="${pad.l - 8}" y="${(y + 4).toFixed(1)}" text-anchor="end" fill="#c5d6e8" font-size="12">${levelText(Math.round(tick))}</text>`;
+        })
+        .join('')}
+      <path d="${line}" fill="none" stroke="#f2b705" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
+      ${xTicks.map((index) => `<text x="${xAt(index).toFixed(1)}" y="${height - 10}" text-anchor="${anchor(index)}" fill="#c5d6e8" font-size="12">${dateLabel(points[index].recorded_on)}</text>`).join('')}
+    </svg>
+    <p class="muted small">Level after each match.</p>`;
+  }
+
   async function showPlayer(id: number) {
     const player = players.find((p) => p.id === id);
     if (!player) return;
     detailName.textContent = player.display_name;
     detailLevel.textContent = `Current level: ${levelText(player.current_level)}`;
+    chartEl.hidden = true;
+    chartEl.innerHTML = '';
     historyBody.innerHTML = '<tr><td colspan="3">Loading…</td></tr>';
     listWrap.hidden = true;
     search.hidden = true;
     detail.hidden = false;
     const { data, error } = await supabase
       .from('squashlevels_ratings')
-      .select('recorded_on, level, kind')
+      .select('recorded_on, level, kind, squashlevels_match_id')
       .eq('player_id', id)
-      .order('recorded_on', { ascending: false })
-      .limit(120);
+      .order('recorded_on', { ascending: true })
+      .order('squashlevels_match_id', { ascending: true })
+      .limit(1000);
     if (error) {
       historyBody.innerHTML = `<tr><td colspan="3">${escapeHtml(error.message)}</td></tr>`;
       return;
     }
-    const ratings = (data ?? []) as Rating[];
+    const points = timeline((data ?? []) as Rating[]);
+    drawChart(points);
+    const recent = points.slice(-12).reverse();
     historyBody.innerHTML =
-      ratings.length === 0
+      recent.length === 0
         ? '<tr><td colspan="3">No history yet.</td></tr>'
-        : ratings
+        : recent
             .map((row, index) => {
-              const prev = ratings[index + 1];
+              const prev = recent[index + 1];
               const delta = prev ? row.level - prev.level : null;
               const change =
                 delta == null ? '—' : delta === 0 ? '—' : delta > 0 ? `+${delta}` : String(delta);
@@ -241,5 +296,30 @@ const crumbs = [
   .ratings .h-small {
     margin: 1.25rem 0 0.5rem;
     font-size: 1rem;
+  }
+  .ratings .chart svg {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  .ratings .chart .grid {
+    stroke: var(--border);
+    stroke-width: 1;
+  }
+  .ratings .chart .line {
+    fill: none;
+    stroke: var(--gold-500);
+    stroke-width: 2.5;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+  .ratings .chart text {
+    fill: var(--text-muted);
+    font-size: 12px;
+    font-family: inherit;
+  }
+  .ratings .chart .small {
+    margin: 0.35rem 0 0;
+    font-size: 0.8rem;
   }
 </style>
