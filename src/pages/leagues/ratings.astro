@@ -32,7 +32,7 @@ const crumbs = [
         <span class="sr-only">Search players</span>
         <input type="search" name="q" placeholder="Search by player name…" autocomplete="off" data-search />
       </label>
-      <p class="status muted" data-status role="status">Loading…</p>
+      <p class="status muted" data-status role="status">Type a name to find a player.</p>
       <div class="overview-box" data-list-wrap hidden>
         <table class="table">
           <thead>
@@ -90,11 +90,16 @@ const crumbs = [
 
   function renderList(filter = '') {
     const q = filter.trim().toLowerCase();
-    const rows = players.filter((p) => !q || p.display_name.toLowerCase().includes(q));
     statusEl.hidden = false;
-    statusEl.textContent = q
-      ? `${rows.length} of ${players.length} players`
-      : `${players.length} players. Type a name to narrow the list.`;
+    if (q.length < 2) {
+      listWrap.hidden = true;
+      playersBody.innerHTML = '';
+      statusEl.textContent = 'Type a name to find a player.';
+      return;
+    }
+    const rows = players.filter((p) => p.display_name.toLowerCase().includes(q));
+    statusEl.textContent = rows.length === 1 ? '1 player' : `${rows.length} players`;
+    listWrap.hidden = false;
     playersBody.innerHTML =
       rows.length === 0
         ? '<tr><td colspan="3">No players match.</td></tr>'
@@ -152,8 +157,8 @@ const crumbs = [
     }
     if ((event.target as HTMLElement).closest('[data-back]')) {
       detail.hidden = true;
-      listWrap.hidden = false;
       search.hidden = false;
+      renderList(search.value);
     }
   });
 
@@ -178,8 +183,7 @@ const crumbs = [
     statusEl.textContent = loadError.message;
   } else {
     players = loaded;
-    listWrap.hidden = false;
-    renderList();
+    renderList(search.value);
   }
 </script>
 

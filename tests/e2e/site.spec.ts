@@ -57,12 +57,12 @@ test.describe('Public site', () => {
     });
     await open(page, 'leagues/ratings/');
     const search = page.getByRole('searchbox', { name: 'Search players' });
-    await expect(page.getByRole('button', { name: 'Pat Player' })).toBeVisible();
-    await expect(page.getByRole('status')).toContainText('2 players');
+    await expect(page.getByRole('status')).toContainText('Type a name to find a player.');
+    await expect(page.getByRole('button', { name: 'Pat Player' })).toHaveCount(0);
     await search.fill('zoe');
     await expect(page.getByRole('button', { name: 'Zoe Player' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Pat Player' })).toHaveCount(0);
-    await expect(page.getByRole('status')).toContainText('1 of 2 players');
+    await expect(page.getByRole('status')).toContainText('1 player');
   });
 
   test('league results shell loads', async ({ page }) => {

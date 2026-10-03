@@ -37,6 +37,36 @@ const safeguarding = (await getDocuments()).filter((d) => d.data.category === 's
 </Base>
 
 <style>
+  :global(.page-hero .container) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 1.25rem;
+    align-items: center;
+  }
+  :global(.page-hero .eyebrow),
+  :global(.page-hero h1),
+  :global(.page-hero .lede) {
+    grid-column: 1;
+  }
+  :global(.page-hero .entry-qr) {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    align-self: center;
+    margin: 0;
+  }
+  :global(.page-hero .entry-qr__code svg) {
+    width: 7.5rem;
+  }
+  @media (max-width: 700px) {
+    :global(.page-hero .container) {
+      grid-template-columns: 1fr;
+    }
+    :global(.page-hero .entry-qr) {
+      grid-column: 1;
+      grid-row: auto;
+      justify-self: end;
+    }
+  }
   .links {
     list-style: none;
     padding: 0;
