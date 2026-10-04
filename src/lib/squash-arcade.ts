@@ -18,6 +18,7 @@ const BALL = 6;
 const LIVES = 3;
 const BONUS_POINTS = 5;
 const BONUS_R = 15;
+const BONUS_MAX = 5;
 
 export const PLAY = { left: LEFT, right: RIGHT, front: FRONT, back: BACK };
 
@@ -72,7 +73,7 @@ export function createArcade(): Arcade {
     wait: 0,
     age: 0,
     bonusesSpawned: 0,
-    nextBonus: 7 + Math.random() * 8,
+    nextBonus: 5 + Math.random() * 6,
     bonus: null,
   };
 }
@@ -136,7 +137,7 @@ export function tick(game: Arcade, dt: number): TickEvent[] {
         const collected = collectBonus(game, ball, events);
         if (!collected && game.bonus && game.age >= game.bonus.until) {
           game.bonus = null;
-          game.nextBonus = game.age + 9 + Math.random() * 12;
+          game.nextBonus = game.age + bonusGap();
         }
       }
 
@@ -216,8 +217,12 @@ function releaseWaiting(game: Arcade) {
   waiting.vx = (Math.random() - 0.5) * Math.min(160, 50 + game.age * 4);
 }
 
+function bonusGap() {
+  return 6 + Math.random() * 8;
+}
+
 function maybeSpawn(game: Arcade) {
-  if (game.bonus || game.bonusesSpawned >= 2 || game.age < game.nextBonus) return;
+  if (game.bonus || game.bonusesSpawned >= BONUS_MAX || game.age < game.nextBonus) return;
   const midX = (LEFT + RIGHT) / 2;
   const midY = (FRONT + BACK) / 2;
   game.bonus = {
@@ -236,7 +241,7 @@ function collectBonus(game: Arcade, ball: Ball, events: TickEvent[]) {
   if (dx * dx + dy * dy > (BONUS_R + BALL) * (BONUS_R + BALL)) return false;
   game.score += BONUS_POINTS;
   game.bonus = null;
-  game.nextBonus = game.age + 9 + Math.random() * 12;
+  game.nextBonus = game.age + bonusGap();
   events.push('bonus');
   return true;
 }

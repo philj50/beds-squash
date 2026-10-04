@@ -4,13 +4,13 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 ---
 
 <Base
-  title="Club captains"
+  title="Administration"
   description="Sign in to manage your squad, fixtures, availability and team selection for Bedfordshire squash leagues."
   noindex
 >
   <section class="section section--tight">
     <div class="container captain" id="captain-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
-      <h1>Club captains</h1>
+      <h1>Administration</h1>
       <p class="lede">
         Captains add players to the squad and set the playing order. Players mark whether they can play on
         <a href={`${import.meta.env.BASE_URL}captains/matches/`}>Matches</a>.

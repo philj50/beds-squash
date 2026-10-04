@@ -28,7 +28,7 @@ export const NAV = [
   { label: 'About', href: '/about/' },
   { label: 'Contact', href: '/contact/' },
   { label: 'Minigame', href: '/minigame/' },
-  { label: 'Club captains', href: '/captains/' },
+  { label: 'Administration', href: '/captains/' },
 ];
 
 /** Prefix a root-relative path with the configured base (works for "/" and "/beds-squash"). */
