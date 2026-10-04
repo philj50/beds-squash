@@ -297,6 +297,98 @@ async function main() {
     return;
   }
   console.log(await importPayload(payload));
+  await refreshContacts();
+}
+
+function labelled(html) {
+  const pairs = [];
+  for (const match of html.matchAll(/<th[^>]*>([\s\S]*?)<\/th>\s*<td[^>]*>([\s\S]*?)<\/td>/gi)) {
+    pairs.push([decode(match[1]).replace(/:$/, ''), decode(match[2])]);
+  }
+  return pairs;
+}
+
+function fieldsUntil(pairs, start, stop) {
+  const from = pairs.findIndex(([label]) => label.toLowerCase() === start.toLowerCase());
+  if (from < 0) return {};
+  const slice = [];
+  for (const pair of pairs.slice(from)) {
+    if (slice.length && stop.test(pair[0])) break;
+    slice.push(pair);
+  }
+  const out = {};
+  for (const [label, value] of slice) {
+    if (value && value !== '-') out[label.toLowerCase()] = value;
+  }
+  return out;
+}
+
+async function rest(path, options = {}) {
+  const url = process.env.SUPABASE_URL.replace(/\/$/, '');
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const res = await fetch(`${url}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      apikey: key,
+      authorization: `Bearer ${key}`,
+      'content-type': 'application/json',
+      prefer: 'return=minimal',
+      ...(options.headers ?? {}),
+    },
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`${options.method || 'GET'} ${path} -> ${res.status} ${text.slice(0, 200)}`);
+  return text ? JSON.parse(text) : null;
+}
+
+/** Copy club manager and team contact emails from the public League Master pages. */
+async function refreshContacts() {
+  const clubs = await rest('clubs?select=slug,leaguemaster_club_id,contact_name,contact_email');
+  const teams = await rest('teams?select=id,leaguemaster_team_id,captain_name,captain_email');
+  let clubCount = 0;
+  let captainCount = 0;
+  for (const club of clubs ?? []) {
+    if (!club.leaguemaster_club_id) continue;
+    const html = await request(`/cgi-county/icounty.exe/showclub?clubid=${club.leaguemaster_club_id}`);
+    const fields = fieldsUntil(labelled(html), 'Manager', /fixture|nomination/i);
+    const contactName = fields.manager || null;
+    const contactEmail = (fields.email || '').includes('@') ? fields.email.toLowerCase() : null;
+    const nextName = contactName || club.contact_name;
+    const nextEmail = contactEmail || club.contact_email;
+    if (nextName !== club.contact_name || nextEmail !== club.contact_email) {
+      await rest(`clubs?slug=eq.${encodeURIComponent(club.slug)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ contact_name: nextName, contact_email: nextEmail }),
+      });
+      clubCount += 1;
+    }
+    await pause(40);
+  }
+  for (const team of teams ?? []) {
+    if (!team.leaguemaster_team_id) continue;
+    const html = await request(`/cgi-county/icounty.exe/showteam?teamid=${team.leaguemaster_team_id}`);
+    const fields = fieldsUntil(labelled(html), 'Team Contact', /reserve|club details|fixture|nomination/i);
+    const captainName = fields['team contact'] || null;
+    const captainEmail = (fields.email || '').includes('@') ? fields.email.toLowerCase() : null;
+    const nextName = captainName || team.captain_name;
+    const nextEmail = captainEmail || team.captain_email;
+    if (nextName !== team.captain_name || nextEmail !== team.captain_email) {
+      await rest(`teams?id=eq.${team.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ captain_name: nextName, captain_email: nextEmail }),
+      });
+      const squads = await rest(`captain_squads?team_id=eq.${team.id}&select=id`);
+      if (squads?.[0] && nextEmail) {
+        await rest(`captain_squads?id=eq.${squads[0].id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ captain_email: nextEmail }),
+        });
+      }
+      captainCount += 1;
+    }
+    await pause(40);
+  }
+  console.error(`League Master contacts: ${clubCount} clubs, ${captainCount} captains updated`);
 }
 
 main().catch((err) => {

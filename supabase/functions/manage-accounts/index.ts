@@ -110,9 +110,9 @@ Deno.serve(async (req) => {
     const email = String(body.email ?? '').trim().toLowerCase();
     const password = String(body.password ?? '');
     const displayName = String(body.display_name ?? '').trim();
-    const role = String(body.role ?? (body.is_admin ? 'admin' : 'club_captain'));
+    const role = String(body.role ?? '').trim();
     const roles = ['admin', 'club_captain', 'team_captain', 'team_player'];
-    if (!roles.includes(role)) return json({ error: 'Choose a role.' }, 400);
+    if (role && !roles.includes(role)) return json({ error: 'Choose a role.' }, 400);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'Enter a valid email.' }, 400);
     if (displayName.length < 2 || displayName.length > 80) return json({ error: 'Enter a name.' }, 400);
     const issue = passwordIssue(password, email);
@@ -146,14 +146,16 @@ Deno.serve(async (req) => {
       if (insertError) return json({ error: insertError.message }, 400);
     }
 
-    const membership: { profile_id: string; role: string; club_slug?: string; team_id?: number } = {
-      profile_id: created.user.id,
-      role,
-    };
-    if (role === 'club_captain') membership.club_slug = clubSlug;
-    if (role === 'team_captain' || role === 'team_player') membership.team_id = teamId;
-    const { error: roleError } = await admin.from('memberships').insert(membership);
-    if (roleError && roleError.code !== '23505') return json({ error: roleError.message }, 400);
+    if (role) {
+      const membership: { profile_id: string; role: string; club_slug?: string; team_id?: number } = {
+        profile_id: created.user.id,
+        role,
+      };
+      if (role === 'club_captain') membership.club_slug = clubSlug;
+      if (role === 'team_captain' || role === 'team_player') membership.team_id = teamId;
+      const { error: roleError } = await admin.from('memberships').insert(membership);
+      if (roleError && roleError.code !== '23505') return json({ error: roleError.message }, 400);
+    }
     return json({ ok: true });
   }
 
