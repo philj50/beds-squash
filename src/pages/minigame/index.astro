@@ -1,0 +1,325 @@
+---
+import Base from '@/layouts/Base.astro';
+import PageHero from '@/components/PageHero.astro';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
+
+---
+
+<Base
+  title="Minigame"
+  description="A one-player retro squash game. Enter your name, return the ball above the tin, and take a place on the high scores."
+  crumbs={[{ name: 'Minigame', path: '/minigame/' }]}
+>
+  <PageHero
+    eyebrow="Arcade"
+    title="Minigame"
+    lede="One player. Line-art squash. Type your name, then keep the rally alive above the tin."
+  />
+  <section class="section">
+    <div class="container arcade" id="minigame" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
+      <div class="play">
+        <form class="card name-card" data-start>
+          <div class="card__body stack">
+            <label>
+              Your name
+              <input name="player" required minlength="2" maxlength="16" autocomplete="nickname" />
+            </label>
+            <button class="btn btn--primary" type="submit">Play</button>
+          </div>
+        </form>
+        <p class="hud" data-hud hidden>
+          <span data-score>0000</span>
+          <span data-lives></span>
+        </p>
+        <canvas width="640" height="360" data-court tabindex="0" aria-label="Squash court"></canvas>
+        <p class="hint">Move with the mouse, a finger, or the arrow keys. Return the ball above the red tin.</p>
+        <p class="result" data-result hidden></p>
+        <p class="again" data-again hidden>
+          <button class="btn btn--primary btn--sm" type="button" data-replay>Play again</button>
+          <button class="btn btn--ghost btn--sm" type="button" data-rename>Change name</button>
+        </p>
+      </div>
+      <aside class="board-card">
+        <h2>High scores</h2>
+        <ol data-board></ol>
+      </aside>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+  import { COURT, createArcade, drawCourt, setRacket, tick, type Arcade } from '@/lib/squash-arcade';
+
+  type Row = { name: string; score: number };
+
+  const root = document.getElementById('minigame');
+  if (!root) throw new Error('minigame missing');
+  const supabase = createClient(root.dataset.url!, root.dataset.key!);
+  const form = root.querySelector<HTMLFormElement>('[data-start]')!;
+  const nameInput = form.querySelector<HTMLInputElement>('[name="player"]')!;
+  const hud = root.querySelector<HTMLElement>('[data-hud]')!;
+  const scoreEl = root.querySelector<HTMLElement>('[data-score]')!;
+  const livesEl = root.querySelector<HTMLElement>('[data-lives]')!;
+  const canvas = root.querySelector<HTMLCanvasElement>('[data-court]')!;
+  const resultEl = root.querySelector<HTMLElement>('[data-result]')!;
+  const again = root.querySelector<HTMLElement>('[data-again]')!;
+  const boardEl = root.querySelector<HTMLElement>('[data-board]')!;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('court missing');
+
+  let game: Arcade | null = null;
+  let playId = 0;
+  let last = 0;
+  let pointerY = COURT.height / 2;
+  let saved = false;
+  let audioCtx: AudioContext | null = null;
+
+  const escapeHtml = (value: string) =>
+    value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
+
+  function blip(freq: number) {
+    try {
+      audioCtx ??= new AudioContext();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = freq;
+      gain.gain.value = 0.03;
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.05);
+    } catch {
+      /* the game still plays if sound is blocked */
+    }
+  }
+
+  function paint() {
+    if (!game) {
+      drawCourt(ctx!, createArcade());
+      return;
+    }
+    drawCourt(ctx!, game);
+    scoreEl.textContent = String(game.score).padStart(4, '0');
+    livesEl.textContent = game.lives > 0 ? `${game.lives} ${game.lives === 1 ? 'life' : 'lives'}` : '';
+  }
+
+  async function loadBoard() {
+    const { data, error } = await supabase.rpc('minigame_leaderboard');
+    if (error) {
+      boardEl.innerHTML = '<li class="empty">The board is not available yet.</li>';
+      return;
+    }
+    const rows = (data ?? []) as Row[];
+    boardEl.innerHTML = rows.length
+      ? rows
+          .map(
+            (row, index) =>
+              `<li><span class="rank">${index + 1}</span><span class="who">${escapeHtml(row.name)}</span><span class="tally">${row.score}</span></li>`,
+          )
+          .join('')
+      : '<li class="empty">No scores yet.</li>';
+  }
+
+  async function saveScore(name: string, score: number) {
+    if (saved || score < 1) return;
+    saved = true;
+    const { data, error } = await supabase.rpc('submit_minigame_score', { p_name: name, p_score: score });
+    if (error) {
+      resultEl.textContent = `${name}, you scored ${score}. The board did not save it.`;
+      return;
+    }
+    const rank = Number(data);
+    resultEl.textContent = rank <= 10 ? `${name} scored ${score} and is number ${rank}.` : `${name} scored ${score}.`;
+    await loadBoard();
+  }
+
+  function finish(name: string) {
+    if (!game) return;
+    resultEl.hidden = false;
+    again.hidden = false;
+    hud.hidden = true;
+    resultEl.textContent = game.score > 0 ? `${name} scored ${game.score}.` : 'Game over.';
+    void saveScore(name, game.score);
+  }
+
+  function frame(now: number, id: number) {
+    if (id !== playId || !game || game.phase === 'over') return;
+    const dt = last ? (now - last) / 1000 : 0;
+    last = now;
+    setRacket(game, pointerY);
+    const event = tick(game, dt);
+    if (event === 'hit') blip(520);
+    if (event === 'score') blip(740);
+    if (event === 'miss' || event === 'over') blip(120);
+    paint();
+    if (event === 'over') {
+      finish(nameInput.value.trim());
+      return;
+    }
+    requestAnimationFrame((time) => frame(time, id));
+  }
+
+  function start() {
+    const id = ++playId;
+    game = createArcade();
+    saved = false;
+    last = 0;
+    form.hidden = true;
+    resultEl.hidden = true;
+    again.hidden = true;
+    hud.hidden = false;
+    paint();
+    requestAnimationFrame((time) => frame(time, id));
+  }
+
+  function aim(clientY: number) {
+    const rect = canvas.getBoundingClientRect();
+    pointerY = ((clientY - rect.top) / rect.height) * COURT.height;
+  }
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const name = nameInput.value.trim();
+    if (name.length < 2) return;
+    start();
+  });
+
+  root.querySelector('[data-replay]')!.addEventListener('click', () => start());
+  root.querySelector('[data-rename]')!.addEventListener('click', () => {
+    game = null;
+    form.hidden = false;
+    again.hidden = true;
+    resultEl.hidden = true;
+    hud.hidden = true;
+    paint();
+    nameInput.focus();
+  });
+
+  canvas.addEventListener('pointermove', (event) => aim(event.clientY));
+  canvas.addEventListener('pointerdown', (event) => {
+    canvas.setPointerCapture(event.pointerId);
+    aim(event.clientY);
+  });
+  window.addEventListener('keydown', (event) => {
+    if (!game || game.phase === 'over') return;
+    if (event.key === 'ArrowUp' || event.key === 'w' || event.key === 'W') {
+      pointerY -= 28;
+      event.preventDefault();
+    }
+    if (event.key === 'ArrowDown' || event.key === 's' || event.key === 'S') {
+      pointerY += 28;
+      event.preventDefault();
+    }
+  });
+
+  paint();
+  void loadBoard();
+</script>
+
+<style>
+  .arcade {
+    display: grid;
+    gap: 1.25rem;
+    align-items: start;
+  }
+  @media (min-width: 900px) {
+    .arcade {
+      grid-template-columns: minmax(0, 1.6fr) 16rem;
+    }
+  }
+  .stack {
+    display: grid;
+    gap: 0.75rem;
+  }
+  label {
+    display: grid;
+    gap: 0.3rem;
+    font-size: 0.9rem;
+  }
+  input {
+    width: 100%;
+    background: var(--ink-900);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 0.65rem 0.75rem;
+    font: inherit;
+  }
+  .name-card {
+    margin-bottom: 0.8rem;
+  }
+  canvas {
+    width: 100%;
+    height: auto;
+    display: block;
+    background: #041426;
+    border: 1px solid var(--gold-500);
+    border-radius: var(--radius-sm);
+    touch-action: none;
+  }
+  .hud {
+    display: flex;
+    justify-content: space-between;
+    margin: 0 0 0.4rem;
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .hint,
+  .result {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin: 0.55rem 0 0;
+  }
+  .again {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.7rem;
+  }
+  .board-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.8rem 0.9rem;
+  }
+  .board-card h2 {
+    margin: 0 0 0.6rem;
+  }
+  [data-board] {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  [data-board] :global(li) {
+    display: grid;
+    grid-template-columns: 1.4rem minmax(0, 1fr) auto;
+    column-gap: 0.55rem;
+    align-items: baseline;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  [data-board] :global(li:last-child) {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+  [data-board] :global(.rank) {
+    color: var(--gold-400);
+    font-weight: 700;
+  }
+  [data-board] :global(.who) {
+    overflow-wrap: anywhere;
+  }
+  [data-board] :global(.tally) {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+  }
+  [data-board] :global(li.empty) {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+  [hidden] {
+    display: none !important;
+  }
+</style>

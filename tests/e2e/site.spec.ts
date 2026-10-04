@@ -23,6 +23,8 @@ test.describe('Public site', () => {
     await expect(nav.getByRole('link', { name: 'News', exact: true })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Leagues', exact: true })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Juniors', exact: true })).toBeVisible();
+    const labels = await nav.getByRole('link').allTextContents();
+    expect(labels.indexOf('Minigame')).toBe(labels.indexOf('Contact') + 1);
   });
 
   test('news index and a league match article', async ({ page }) => {
@@ -315,6 +317,15 @@ test.describe('Public site', () => {
     await open(page, 'share/');
     await expect(page.getByText('This account cannot send content.')).toBeVisible();
     await expect(page.locator('[data-form]')).toBeHidden();
+  });
+
+  test('minigame asks for a name before play', async ({ page }) => {
+    await open(page, 'minigame/');
+    await expect(page.getByRole('heading', { level: 1, name: 'Minigame' })).toBeVisible();
+    await expect(page.getByLabel('Your name')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'High scores' })).toBeVisible();
+    await expect(page.locator('canvas')).toBeVisible();
   });
 
   test('junior closed signup form', async ({ page }) => {
