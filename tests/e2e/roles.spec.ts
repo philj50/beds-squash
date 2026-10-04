@@ -303,7 +303,7 @@ test.describe('Club captain, team captain, and player', () => {
 
     await page.goto('captains/admin/minigame/', { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { level: 1, name: 'Minigame scores' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Allowed names' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Disallowed initials' })).toBeVisible();
     await expect(page.getByRole('cell', { name: 'Philip Jenkins' })).toBeVisible();
     await page.getByRole('button', { name: 'Remove' }).click();
     await expect(page.getByRole('dialog')).toContainText('Philip Jenkins');

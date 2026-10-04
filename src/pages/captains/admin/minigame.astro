@@ -35,18 +35,19 @@ import { url } from '@/lib/site';
               <tbody data-rows></tbody>
             </table>
           </div>
-          <h2>Allowed names</h2>
+          <h2>Disallowed initials</h2>
           <p class="hint">
-            Scores on the board are two or three letters.
+            ASS, ARS, CUL, CUM, CUN, DIK, FAG, FAP, FUC, FUK, JAP, KKK, NIG, SEX, TIT and XXX are already stopped.
+            Add any other initials that should stay off the board.
           </p>
-          <form class="allow" data-allow>
+          <form class="allow" data-block>
             <label>
               Initials
-              <input name="allow" required minlength="2" maxlength="3" autocomplete="off" />
+              <input name="block" required minlength="2" maxlength="3" autocomplete="off" />
             </label>
-            <button class="btn btn--primary btn--sm" type="submit">Allow this name</button>
+            <button class="btn btn--primary btn--sm" type="submit">Stop these initials</button>
           </form>
-          <ul data-allowed></ul>
+          <ul data-blocked></ul>
         </div>
       </div>
       <dialog data-confirm>
@@ -75,8 +76,8 @@ import { url } from '@/lib/site';
   const admin = root.querySelector<HTMLElement>('[data-admin]')!;
   const whoEl = root.querySelector<HTMLElement>('[data-who]')!;
   const rowsEl = root.querySelector<HTMLElement>('[data-rows]')!;
-  const allowedEl = root.querySelector<HTMLElement>('[data-allowed]')!;
-  const allowForm = root.querySelector<HTMLFormElement>('[data-allow]')!;
+  const blockedEl = root.querySelector<HTMLElement>('[data-blocked]')!;
+  const blockForm = root.querySelector<HTMLFormElement>('[data-block]')!;
   const confirmDialog = root.querySelector<HTMLDialogElement>('[data-confirm]')!;
   const confirmLine = root.querySelector<HTMLElement>('[data-confirm-line]')!;
   let pendingId: number | null = null;
@@ -111,31 +112,31 @@ import { url } from '@/lib/site';
       .join('');
   }
 
-  type Allowed = { id: number; player_name: string };
+  type Blocked = { id: number; initials: string };
 
-  function drawAllowed(names: Allowed[]) {
+  function drawBlocked(names: Blocked[]) {
     if (!names.length) {
-      allowedEl.innerHTML = '<li class="empty">No names are allowed past the checker.</li>';
+      blockedEl.innerHTML = '<li class="empty">No extra initials are stopped.</li>';
       return;
     }
-    allowedEl.innerHTML = names
+    blockedEl.innerHTML = names
       .map(
         (row) =>
-          `<li><span>${escapeHtml(row.player_name)}</span><button class="btn btn--ghost btn--sm" type="button" data-unallow="${row.id}">Remove</button></li>`,
+          `<li><span>${escapeHtml(row.initials)}</span><button class="btn btn--ghost btn--sm" type="button" data-unblock="${row.id}">Allow</button></li>`,
       )
       .join('');
   }
 
-  async function loadAllowed() {
+  async function loadBlocked() {
     const { data, error } = await supabase
-      .from('minigame_allowed_names')
-      .select('id, player_name')
-      .order('player_name', { ascending: true });
+      .from('minigame_blocked_initials')
+      .select('id, initials')
+      .order('initials', { ascending: true });
     if (error) {
       statusEl.textContent = error.message;
       return;
     }
-    drawAllowed((data ?? []) as Allowed[]);
+    drawBlocked((data ?? []) as Blocked[]);
   }
 
   async function loadScores() {
@@ -176,29 +177,29 @@ import { url } from '@/lib/site';
     if (!error) await loadScores();
   });
 
-  allowForm.addEventListener('submit', async (event) => {
+  blockForm.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const name = String(new FormData(allowForm).get('allow') ?? '').trim().toUpperCase();
-    if (!/^[A-Z]{2,3}$/.test(name)) {
+    const initials = String(new FormData(blockForm).get('block') ?? '').trim().toUpperCase();
+    if (!/^[A-Z]{2,3}$/.test(initials)) {
       statusEl.textContent = 'Use two or three letters.';
       return;
     }
-    statusEl.textContent = 'Allowing…';
-    const { error } = await supabase.rpc('allow_minigame_name', { p_name: name });
-    statusEl.textContent = error ? error.message : `${name} can be used.`;
+    statusEl.textContent = 'Stopping…';
+    const { error } = await supabase.rpc('block_minigame_initials', { p_initials: initials });
+    statusEl.textContent = error ? error.message : `${initials} is stopped.`;
     if (!error) {
-      allowForm.reset();
-      await loadAllowed();
+      blockForm.reset();
+      await loadBlocked();
     }
   });
 
-  allowedEl.addEventListener('click', async (event) => {
-    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-unallow]');
-    if (!button?.dataset.unallow) return;
-    statusEl.textContent = 'Removing…';
-    const { error } = await supabase.rpc('unallow_minigame_name', { p_id: Number(button.dataset.unallow) });
-    statusEl.textContent = error ? error.message : 'That name is checked again.';
-    if (!error) await loadAllowed();
+  blockedEl.addEventListener('click', async (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-unblock]');
+    if (!button?.dataset.unblock) return;
+    statusEl.textContent = 'Allowing…';
+    const { error } = await supabase.rpc('unblock_minigame_initials', { p_id: Number(button.dataset.unblock) });
+    statusEl.textContent = error ? error.message : 'Those initials can be used.';
+    if (!error) await loadBlocked();
   });
 
   root.querySelector('[data-sign-out]')!.addEventListener('click', async () => {
@@ -223,7 +224,7 @@ import { url } from '@/lib/site';
       return;
     }
     admin.hidden = false;
-    await Promise.all([loadScores(), loadAllowed()]);
+    await Promise.all([loadScores(), loadBlocked()]);
   }
 
   void showSession();
@@ -324,12 +325,12 @@ import { url } from '@/lib/site';
     padding: 0.55rem 0.7rem;
     font: inherit;
   }
-  [data-allowed] {
+  [data-blocked] {
     list-style: none;
     margin: 0;
     padding: 0;
   }
-  [data-allowed] :global(li) {
+  [data-blocked] :global(li) {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -337,7 +338,7 @@ import { url } from '@/lib/site';
     padding: 0.4rem 0;
     border-bottom: 1px solid var(--border);
   }
-  [data-allowed] :global(li.empty) {
+  [data-blocked] :global(li.empty) {
     color: var(--text-muted);
     font-size: 0.85rem;
     border-bottom: 0;

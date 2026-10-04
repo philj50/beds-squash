@@ -100,7 +100,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   let last = 0;
   let pointer = 0.5;
   let saved = false;
-  let allowedNames: string[] = [];
+  let blockedInitials: string[] = [];
   let audioCtx: AudioContext | null = null;
 
   const escapeHtml = (value: string) =>
@@ -194,10 +194,10 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     knob.style.left = `${pointer * 100}%`;
   }
 
-  async function loadAllowed() {
-    const { data, error } = await supabase.from('minigame_allowed_names').select('player_name');
+  async function loadBlocked() {
+    const { data, error } = await supabase.from('minigame_blocked_initials').select('initials');
     if (error || !data) return;
-    allowedNames = data.map((row) => row.player_name);
+    blockedInitials = data.map((row) => row.initials);
   }
 
   async function loadBoard() {
@@ -353,8 +353,8 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       return;
     }
     nameInput.value = initials;
-    await loadAllowed();
-    if (rudeName(initials, allowedNames)) {
+    await loadBlocked();
+    if (rudeName(initials, blockedInitials)) {
       rejectName();
       return;
     }
@@ -407,7 +407,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   });
 
   paint();
-  void loadAllowed();
+  void loadBlocked();
   void loadBoard();
 </script>
 

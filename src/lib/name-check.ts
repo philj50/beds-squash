@@ -1,4 +1,27 @@
-/** True when a minigame name is not fit for the public board. */
+/** True when a minigame name is not fit for the public board.
+ *
+ * Three-letter stops are words that are rude on their own.
+ * A prefix such as DIC or FAN is left out, because those are also ordinary initials.
+ */
+
+const BLOCKED_INITIALS = [
+  'ars',
+  'ass',
+  'cul',
+  'cum',
+  'cun',
+  'dik',
+  'fag',
+  'fap',
+  'fuc',
+  'fuk',
+  'jap',
+  'kkk',
+  'nig',
+  'sex',
+  'tit',
+  'xxx',
+];
 
 const WORDS = [
   'fuck',
@@ -101,10 +124,11 @@ function hits(collapsed: string, word: string) {
   return word.length >= 5 && collapsed.includes(word);
 }
 
-export function rudeName(name: string, allowed: Iterable<string> = []) {
+export function rudeName(name: string, blocked: Iterable<string> = []) {
   const key = nameKey(name);
-  for (const item of allowed) {
-    if (nameKey(item) === key) return false;
+  if (BLOCKED_INITIALS.includes(key)) return true;
+  for (const item of blocked) {
+    if (nameKey(item) === key) return true;
   }
   const folded = fold(name);
   const spaced = folded.replace(/[^a-z]+/g, ' ').trim();

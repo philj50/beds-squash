@@ -332,6 +332,11 @@ test.describe('Public site', () => {
     await page.getByRole('button', { name: 'Play' }).click();
     await expect(page.getByRole('button', { name: 'Serve' })).toBeHidden();
     await expect(page.getByLabel('Your initials')).toHaveValue('');
+    await page.getByLabel('Your initials').fill('ASS');
+    await page.getByRole('button', { name: 'Play' }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByLabel('Your initials')).toHaveValue('');
+    await page.getByRole('button', { name: 'Try again' }).click();
     await page.getByLabel('Your initials').fill('pj');
     await page.getByRole('button', { name: 'Play' }).click();
     const serve = page.getByRole('button', { name: 'Serve' });
