@@ -38,6 +38,10 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
           <button class="btn btn--primary btn--sm" type="button" data-replay>Play again</button>
           <button class="btn btn--ghost btn--sm" type="button" data-rename>Change name</button>
         </p>
+        <dialog data-naughty>
+          <p data-naughty-line></p>
+          <button class="btn btn--primary btn--sm" type="button" data-naughty-ok>Try again</button>
+        </dialog>
       </div>
       <aside class="board-card">
         <h2>High scores</h2>
@@ -49,6 +53,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 <script>
   import { createClient } from '@supabase/supabase-js';
+  import { rudeName } from '@/lib/name-check';
   import { COURT, createArcade, drawCourt, setRacket, tick, type Arcade } from '@/lib/squash-arcade';
 
   type Row = { name: string; score: number };
@@ -65,6 +70,13 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   const resultEl = root.querySelector<HTMLElement>('[data-result]')!;
   const again = root.querySelector<HTMLElement>('[data-again]')!;
   const boardEl = root.querySelector<HTMLElement>('[data-board]')!;
+  const naughty = root.querySelector<HTMLDialogElement>('[data-naughty]')!;
+  const naughtyLine = root.querySelector<HTMLElement>('[data-naughty-line]')!;
+  const RUDE_LINES = [
+    'Let. That name hit the tin, so the box is clear. Try one you would put on a trophy.',
+    'Conduct stroke. That name is off court. The line has been wiped.',
+    'No let. The referee will not read that one out. Have another go.',
+  ];
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('court missing');
 
@@ -179,10 +191,26 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     pointerY = ((clientY - rect.top) / rect.height) * COURT.height;
   }
 
+  function rejectName() {
+    nameInput.value = '';
+    naughtyLine.textContent = RUDE_LINES[Math.floor(Math.random() * RUDE_LINES.length)]!;
+    if (!naughty.open) naughty.showModal();
+    nameInput.focus();
+  }
+
+  naughty.querySelector('[data-naughty-ok]')!.addEventListener('click', () => {
+    naughty.close();
+    nameInput.focus();
+  });
+
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     const name = nameInput.value.trim();
     if (name.length < 2) return;
+    if (rudeName(name)) {
+      rejectName();
+      return;
+    }
     start();
   });
 
@@ -321,5 +349,19 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   }
   [hidden] {
     display: none !important;
+  }
+  dialog {
+    background: var(--ink-800);
+    color: var(--text);
+    border: 1px solid var(--gold-500);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.2rem;
+    max-width: 24rem;
+  }
+  dialog::backdrop {
+    background: rgba(0, 10, 24, 0.62);
+  }
+  dialog p {
+    margin: 0 0 0.9rem;
   }
 </style>

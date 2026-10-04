@@ -326,6 +326,12 @@ test.describe('Public site', () => {
     await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'High scores' })).toBeVisible();
     await expect(page.locator('canvas')).toBeVisible();
+    await page.getByLabel('Your name').fill('sh1t');
+    await page.getByRole('button', { name: 'Play' }).click();
+    await expect(page.getByRole('dialog')).toContainText('hit the tin');
+    await expect(page.getByLabel('Your name')).toHaveValue('');
+    await page.getByRole('button', { name: 'Try again' }).click();
+    await expect(page.getByRole('dialog')).toBeHidden();
   });
 
   test('junior closed signup form', async ({ page }) => {
