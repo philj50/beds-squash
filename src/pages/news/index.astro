@@ -3,7 +3,8 @@ import Base from '@/layouts/Base.astro';
 import PageHero from '@/components/PageHero.astro';
 import NewsCard from '@/components/NewsCard.astro';
 import { getNews } from '@/lib/content';
-import { CATEGORY_LABEL } from '@/lib/site';
+import { CATEGORY_LABEL, url } from '@/lib/site';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 const posts = await getNews();
 const categories = [...new Set(posts.map((p) => p.data.category))];
@@ -37,9 +38,47 @@ const categories = [...new Set(posts.map((p) => p.data.category))];
       {posts.length === 0 && <p class="notice">No news yet.</p>}
     </div>
   </section>
+  <section class="section" id="shared-news" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} hidden>
+    <div class="container">
+      <div class="section-head">
+        <h2>Sent in</h2>
+        <a href={url('/share/')}>Send an article →</a>
+      </div>
+      <div class="grid grid--3" data-shared-news></div>
+    </div>
+  </section>
 </Base>
 
 <script>
+  import { createClient } from '@supabase/supabase-js';
+
+  const shared = document.getElementById('shared-news');
+  if (shared) {
+    const supabase = createClient(shared.dataset.url!, shared.dataset.key!);
+    const host = shared.querySelector<HTMLElement>('[data-shared-news]')!;
+    const escapeHtml = (value: string) =>
+      value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
+    const { data } = await supabase
+      .from('contributions')
+      .select('id, title, published_at')
+      .eq('kind', 'article')
+      .eq('status', 'published')
+      .order('published_at', { ascending: false })
+      .limit(12);
+    if (data?.length) {
+      const base = import.meta.env.BASE_URL.replace(/\/+$/, '');
+      host.innerHTML = data
+        .map((row) => {
+          const when = row.published_at
+            ? new Date(row.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+            : '';
+          return `<article class="card"><div class="card__body"><div class="card__meta"><span class="pill">Sent in</span><time>${escapeHtml(when)}</time></div><h3 class="card__title"><a href="${base}/share/article/#${row.id}">${escapeHtml(row.title ?? 'Article')}</a></h3></div></article>`;
+        })
+        .join('');
+      shared.hidden = false;
+    }
+  }
+
   const buttons = document.querySelectorAll<HTMLButtonElement>('[data-filter]');
   const items = document.querySelectorAll<HTMLElement>('[data-news-grid] > [data-category]');
   buttons.forEach((b) =>
@@ -70,5 +109,12 @@ const categories = [...new Set(posts.map((p) => p.data.category))];
     background: var(--accent);
     color: var(--ink-950);
     border-color: var(--accent);
+  }
+  #shared-news[hidden] {
+    display: none;
+  }
+  #shared-news .card__title {
+    font-size: 1.28rem;
+    line-height: 1.25;
   }
 </style>

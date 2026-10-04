@@ -23,6 +23,7 @@ export const NAV = [
   { label: 'Juniors', href: '/juniors/' },
   { label: 'County Teams', href: '/county-teams/' },
   { label: 'Gallery', href: '/gallery/' },
+  { label: 'Share', href: '/share/' },
   { label: 'Documents', href: '/documents/' },
   { label: 'About', href: '/about/' },
   { label: 'Contact', href: '/contact/' },

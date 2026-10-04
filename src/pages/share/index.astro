@@ -1,0 +1,387 @@
+---
+import Base from '@/layouts/Base.astro';
+import PageHero from '@/components/PageHero.astro';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
+import { url } from '@/lib/site';
+---
+
+<Base
+  title="Share a photo, video, link or article"
+  description="Send Bedfordshire squash photos, short videos, links and articles. An admin publishes them before they appear on the site."
+  crumbs={[{ name: 'Share', path: '/share/' }]}
+>
+  <PageHero
+    eyebrow="From the courts"
+    title="Share"
+    lede="Send a photo, a short video, a link or an article. Nothing appears on the site until an admin publishes it."
+  />
+  <section class="section">
+    <div class="container share" id="share-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
+      <div class="share-layout">
+        <div>
+          <h2>Send something in</h2>
+          <p class="status" data-status role="status"></p>
+          <p class="thanks" data-thanks hidden>Thanks. An admin will look at it before it goes on the site.</p>
+          <form class="card" data-form>
+            <div class="card__body stack">
+              <label>Your name <input name="credit" required minlength="2" maxlength="80" autocomplete="name" /></label>
+              <fieldset>
+                <legend>What are you sending?</legend>
+                <div class="kinds">
+                  <label><input type="radio" name="kind" value="photo" checked /> Photo</label>
+                  <label><input type="radio" name="kind" value="video" /> Video</label>
+                  <label><input type="radio" name="kind" value="link" /> Link</label>
+                  <label><input type="radio" name="kind" value="article" /> Article</label>
+                </div>
+              </fieldset>
+              <label data-for="photo video">Caption <input name="caption" maxlength="200" /></label>
+              <div data-for="photo">
+                <label>Photo <input name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" /></label>
+                <p class="hint">JPG, PNG, WEBP or GIF, up to 8 MB.</p>
+              </div>
+              <div data-for="video" hidden>
+                <label>Video <input name="video" type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov" /></label>
+                <p class="hint">MP4, WEBM or MOV, up to 10 MB.</p>
+              </div>
+              <label data-for="link article" hidden>Title <input name="title" maxlength="140" /></label>
+              <div data-for="link" hidden>
+                <label>Link <input name="url" type="url" placeholder="https://" /></label>
+                <p class="hint">Any https link. YouTube, Vimeo and Facebook videos can be played on the page.</p>
+              </div>
+              <label data-for="link" hidden>Note, optional <input name="note" maxlength="200" /></label>
+              <label data-for="article" hidden>Summary, optional <input name="summary" maxlength="280" /></label>
+              <label data-for="article" hidden>Article <textarea name="body" maxlength="8000" rows="8"></textarea></label>
+              <label class="trap" aria-hidden="true">Website <input name="website" tabindex="-1" autocomplete="off" /></label>
+              <button class="btn btn--primary" type="submit">Send</button>
+            </div>
+          </form>
+          <div data-links-wrap hidden>
+            <h2>Shared links</h2>
+            <div class="link-list" data-links></div>
+          </div>
+        </div>
+        <aside class="board-card">
+          <h2>Contributors</h2>
+          <p class="hint">A name is counted when an admin publishes what they sent in.</p>
+          <ol data-board></ol>
+        </aside>
+      </div>
+      <p class="hint where">Published photos and videos go on the <a href={url('/gallery/')}>gallery</a>. Articles go on <a href={url('/news/')}>news</a>.</p>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+  import {
+    GALLERY_BODY_MAX,
+    GALLERY_BODY_MIN,
+    cleanLinkUrl,
+    contentTypeFor,
+    photoExtension,
+    photoProblem,
+    videoEmbedSrc,
+    videoExtension,
+    videoProblem,
+  } from '@/lib/gallery-media';
+
+  type Kind = 'photo' | 'video' | 'link' | 'article';
+  type BoardRow = { credit: string; photos: number; videos: number; links: number; articles: number; total: number };
+  type LinkRow = { id: string; title: string; caption: string | null; url: string; credit: string };
+
+  const root = document.getElementById('share-app');
+  if (!root) throw new Error('share form missing');
+  const supabase = createClient(root.dataset.url!, root.dataset.key!);
+  const form = root.querySelector<HTMLFormElement>('[data-form]')!;
+  const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
+  const thanks = root.querySelector<HTMLElement>('[data-thanks]')!;
+  const boardEl = root.querySelector<HTMLElement>('[data-board]')!;
+  const linksWrap = root.querySelector<HTMLElement>('[data-links-wrap]')!;
+  const linksEl = root.querySelector<HTMLElement>('[data-links]')!;
+
+  const escapeHtml = (value: string) =>
+    value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
+
+  const kindOf = () => (form.querySelector<HTMLInputElement>('input[name="kind"]:checked')?.value ?? 'photo') as Kind;
+
+  function showKind() {
+    const kind = kindOf();
+    root.querySelectorAll<HTMLElement>('[data-for]').forEach((el) => {
+      el.hidden = !el.dataset.for!.split(' ').includes(kind);
+    });
+  }
+
+  form.querySelectorAll('input[name="kind"]').forEach((input) => input.addEventListener('change', showKind));
+  showKind();
+
+  function boardLine(row: BoardRow) {
+    const parts = [
+      row.photos ? `${row.photos} photo${row.photos === 1 ? '' : 's'}` : '',
+      row.videos ? `${row.videos} video${row.videos === 1 ? '' : 's'}` : '',
+      row.links ? `${row.links} link${row.links === 1 ? '' : 's'}` : '',
+      row.articles ? `${row.articles} article${row.articles === 1 ? '' : 's'}` : '',
+    ].filter(Boolean);
+    return parts.join(' · ');
+  }
+
+  async function loadBoard() {
+    const { data, error } = await supabase.rpc('contribution_leaderboard');
+    if (error) {
+      boardEl.innerHTML = '<li class="muted">The board is not available yet.</li>';
+      return;
+    }
+    const rows = (data ?? []) as BoardRow[];
+    boardEl.innerHTML = rows.length
+      ? rows
+          .map(
+            (row, index) =>
+              `<li><span class="rank">${index + 1}</span><span>${escapeHtml(row.credit)}</span><span class="hint">${escapeHtml(boardLine(row))}</span></li>`,
+          )
+          .join('')
+      : '<li class="muted">No one is on the board yet.</li>';
+  }
+
+  async function loadLinks() {
+    const { data, error } = await supabase
+      .from('contributions')
+      .select('id, title, caption, url, credit')
+      .eq('kind', 'link')
+      .eq('status', 'published')
+      .order('published_at', { ascending: false })
+      .limit(30);
+    if (error || !data?.length) return;
+    linksWrap.hidden = false;
+    linksEl.innerHTML = (data as LinkRow[])
+      .map((row) => {
+        const embed = videoEmbedSrc(row.url);
+        const media = embed
+          ? `<iframe src="${escapeHtml(embed)}" title="${escapeHtml(row.title)}" loading="lazy" allow="fullscreen; picture-in-picture" allowfullscreen></iframe>`
+          : '';
+        return `<article class="card link-card"><div class="card__body"><h3 class="card__title"><a href="${escapeHtml(row.url)}" target="_blank" rel="noopener">${escapeHtml(row.title)}</a></h3><p class="hint">${escapeHtml(row.credit)}${row.caption ? ` · ${escapeHtml(row.caption)}` : ''}</p>${media}</div></article>`;
+      })
+      .join('');
+  }
+
+  async function upload(file: File, ext: string) {
+    const path = `incoming/${crypto.randomUUID()}.${ext}`;
+    const { error } = await supabase.storage.from('contributions').upload(path, file, {
+      contentType: contentTypeFor(ext),
+      upsert: false,
+    });
+    if (error) throw error;
+    return path;
+  }
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    if (String(data.get('website') ?? '').trim()) {
+      form.hidden = true;
+      thanks.hidden = false;
+      return;
+    }
+    const kind = kindOf();
+    const credit = String(data.get('credit') ?? '').trim();
+    let caption: string | null = null;
+    let title: string | null = null;
+    let body: string | null = null;
+    let storagePath: string | null = null;
+    let link: string | null = null;
+
+    if (kind === 'photo' || kind === 'video') {
+      caption = String(data.get('caption') ?? '').trim();
+      if (caption.length < 2) {
+        statusEl.textContent = 'Add a caption.';
+        return;
+      }
+      const file = data.get(kind) as File | null;
+      if (!file || file.size === 0) {
+        statusEl.textContent = kind === 'photo' ? 'Choose a photo.' : 'Choose a video.';
+        return;
+      }
+      const problem = kind === 'photo' ? photoProblem(file) : videoProblem(file);
+      if (problem) {
+        statusEl.textContent = problem;
+        return;
+      }
+      const ext = kind === 'photo' ? photoExtension(file) : videoExtension(file);
+      if (!ext) {
+        statusEl.textContent = kind === 'photo' ? 'Use a JPG, PNG, WEBP or GIF.' : 'Use an MP4, WEBM or MOV.';
+        return;
+      }
+      statusEl.textContent = 'Sending…';
+      try {
+        storagePath = await upload(file, ext);
+      } catch (error) {
+        statusEl.textContent = error instanceof Error ? error.message : 'The file did not upload.';
+        return;
+      }
+    } else if (kind === 'link') {
+      title = String(data.get('title') ?? '').trim();
+      caption = String(data.get('note') ?? '').trim() || null;
+      link = cleanLinkUrl(String(data.get('url') ?? ''));
+      if (title.length < 2) {
+        statusEl.textContent = 'Add a title.';
+        return;
+      }
+      if (!link) {
+        statusEl.textContent = 'Use an https link.';
+        return;
+      }
+    } else {
+      title = String(data.get('title') ?? '').trim();
+      caption = String(data.get('summary') ?? '').trim() || null;
+      body = String(data.get('body') ?? '').trim();
+      if (title.length < 4) {
+        statusEl.textContent = 'Add a title.';
+        return;
+      }
+      if (body.length < GALLERY_BODY_MIN || body.length > GALLERY_BODY_MAX) {
+        statusEl.textContent = 'Write the article, between 40 and 8000 characters.';
+        return;
+      }
+    }
+
+    statusEl.textContent = 'Sending…';
+    const { error } = await supabase.rpc('submit_contribution', {
+      p_kind: kind,
+      p_credit: credit,
+      p_caption: caption,
+      p_title: title,
+      p_body: body,
+      p_storage_path: storagePath,
+      p_url: link,
+    });
+    if (error) {
+      statusEl.textContent = error.message;
+      return;
+    }
+    statusEl.textContent = '';
+    form.hidden = true;
+    thanks.hidden = false;
+  });
+
+  void loadBoard();
+  void loadLinks();
+</script>
+
+<style>
+  .share {
+    max-width: 64rem;
+  }
+  .share-layout {
+    display: grid;
+    gap: 1.5rem;
+    align-items: start;
+  }
+  @media (min-width: 900px) {
+    .share-layout {
+      grid-template-columns: 1.4fr 0.8fr;
+    }
+  }
+  .stack {
+    display: grid;
+    gap: 0.75rem;
+  }
+  label,
+  fieldset {
+    display: grid;
+    gap: 0.3rem;
+    font-size: 0.9rem;
+  }
+  fieldset {
+    border: 0;
+    padding: 0;
+    margin: 0;
+  }
+  legend {
+    margin-bottom: 0.3rem;
+  }
+  .kinds {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+  }
+  .kinds label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .kinds input {
+    width: auto;
+  }
+  input,
+  textarea {
+    width: 100%;
+    background: var(--ink-900);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 0.65rem 0.75rem;
+    font: inherit;
+  }
+  .hint,
+  .where {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin: 0.2rem 0 0;
+  }
+  .where {
+    margin-top: 1.25rem;
+  }
+  .status:empty {
+    display: none;
+  }
+  .status,
+  .thanks {
+    margin: 0 0 0.8rem;
+  }
+  .trap {
+    position: absolute;
+    left: -10000px;
+    height: 0;
+    overflow: hidden;
+  }
+  .board-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.8rem 0.9rem;
+  }
+  .board-card h2,
+  .share h2 {
+    margin: 0 0 0.4rem;
+  }
+  [data-board] {
+    list-style: none;
+    margin: 0.6rem 0 0;
+    padding: 0;
+  }
+  [data-board] li {
+    display: grid;
+    grid-template-columns: 1.6rem 1fr;
+    gap: 0.15rem 0.5rem;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  [data-board] .hint {
+    grid-column: 2;
+  }
+  .rank {
+    color: var(--gold-400);
+    font-weight: 700;
+  }
+  .link-list {
+    display: grid;
+    gap: 0.8rem;
+  }
+  .link-card iframe {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border: 0;
+    border-radius: var(--radius-sm);
+    margin-top: 0.5rem;
+  }
+  [hidden] {
+    display: none !important;
+  }
+</style>

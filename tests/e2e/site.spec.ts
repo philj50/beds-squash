@@ -179,6 +179,61 @@ test.describe('Public site', () => {
     );
   });
 
+  test('share page holds a link for an admin and refuses a video over 10 MB', async ({ page }) => {
+    let submitted: Record<string, unknown> | null = null;
+    await page.route('**/rest/v1/**', async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      if (url.pathname.endsWith('/rpc/contribution_leaderboard')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([{ credit: 'Pat Player', photos: 2, videos: 1, links: 0, articles: 1, total: 4 }]),
+        });
+        return;
+      }
+      if (url.pathname.endsWith('/rpc/submit_contribution') && request.method() === 'POST') {
+        submitted = request.postDataJSON();
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify('11111111-1111-4111-8111-111111111111') });
+        return;
+      }
+      if (url.pathname.endsWith('/contributions')) {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+        return;
+      }
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+    });
+    await open(page, 'share/');
+    await expect(page.getByRole('heading', { level: 1, name: 'Share' })).toBeVisible();
+    await expect(page.getByText('Pat Player')).toBeVisible();
+    await expect(page.getByText('2 photos · 1 video · 1 article')).toBeVisible();
+    await page.getByRole('radio', { name: 'Video' }).check();
+    await expect(page.getByText('up to 10 MB')).toBeVisible();
+    await page.getByLabel('Your name').fill('Pat Player');
+    await page.getByLabel('Caption').fill('A short rally');
+    await page.locator('input[name="video"]').setInputFiles({
+      name: 'too-big.mp4',
+      mimeType: 'video/mp4',
+      buffer: Buffer.alloc(10 * 1024 * 1024 + 1),
+    });
+    await page.getByRole('button', { name: 'Send' }).click();
+    await expect(page.getByRole('status')).toHaveText('Videos can be up to 10 MB.');
+    expect(submitted).toBeNull();
+
+    await page.getByRole('radio', { name: 'Link' }).check();
+    await page.getByLabel('Title').fill('Club night');
+    await page.locator('input[name="url"]').fill('https://vimeo.com/1153984252/ad198677f7');
+    await page.getByRole('button', { name: 'Send' }).click();
+    await expect(page.getByText('An admin will look at it before it goes on the site.')).toBeVisible();
+    expect(submitted).toMatchObject({
+      p_kind: 'link',
+      p_credit: 'Pat Player',
+      p_title: 'Club night',
+      p_url: 'https://vimeo.com/1153984252/ad198677f7',
+    });
+    expect(submitted).not.toHaveProperty('status');
+  });
+
   test('junior closed signup form', async ({ page }) => {
     await open(page, 'juniors/closed/');
     await expect(page.getByRole('heading', { level: 1, name: 'Junior County Closed' })).toBeVisible();

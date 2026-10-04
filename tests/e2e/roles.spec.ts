@@ -46,6 +46,7 @@ test.describe('Signed out', () => {
     'captains/profile/',
     'captains/admin/',
     'captains/admin/articles/',
+    'captains/admin/share/',
     'juniors/closed/entries/',
   ]) {
     test(`${path} opens the login page`, async ({ page }) => {
@@ -85,8 +86,11 @@ test.describe('Club captain, team captain, and player', () => {
     await page.goto('captains/admin/', { waitUntil: 'domcontentloaded' });
     await expect(page.getByText('This account cannot set up teams.')).toBeVisible();
     await expect(page.locator('[data-junior-link]')).toBeHidden();
+    await expect(page.locator('[data-share-link]')).toBeHidden();
     await page.goto('captains/admin/articles/', { waitUntil: 'domcontentloaded' });
     await expect(page.getByText('This account cannot change articles.')).toBeVisible();
+    await page.goto('captains/admin/share/', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByText('This account cannot publish shared content.')).toBeVisible();
     await page.goto('juniors/closed/entries/', { waitUntil: 'domcontentloaded' });
     await expect(page.getByText('This account cannot see entries.')).toBeVisible();
   });
@@ -259,6 +263,7 @@ test.describe('Club captain, team captain, and player', () => {
     await page.goto('captains/admin/#players', { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: 'Players' })).toBeVisible();
     await expect(page.locator('[data-junior-link]')).toBeVisible();
+    await expect(page.locator('[data-share-link]')).toBeVisible();
     const row = page.locator('[data-directory] tr', { hasText: 'Pat Player' });
     await expect(row).toContainText('Test Club');
     await expect(row).toContainText('Test Team 1');

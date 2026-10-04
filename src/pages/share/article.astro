@@ -1,0 +1,107 @@
+---
+import Base from '@/layouts/Base.astro';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
+import { url } from '@/lib/site';
+---
+
+<Base
+  title="Shared article"
+  description="An article sent in to Bedfordshire Squash and published by an admin."
+  crumbs={[
+    { name: 'News', path: '/news/' },
+    { name: 'Shared article', path: '/share/article/' },
+  ]}
+>
+  <article class="section">
+    <div class="container narrow" id="article-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
+      <a class="back" href={url('/news/')}>← All news</a>
+      <p class="status" data-status role="status">Loading…</p>
+      <header data-head hidden>
+        <h1 data-title></h1>
+        <p class="lede" data-summary hidden></p>
+        <p class="meta" data-meta></p>
+      </header>
+      <div class="prose" data-body></div>
+    </div>
+  </article>
+</Base>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+
+  const root = document.getElementById('article-app');
+  if (!root) throw new Error('article missing');
+  const supabase = createClient(root.dataset.url!, root.dataset.key!);
+  const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
+  const head = root.querySelector<HTMLElement>('[data-head]')!;
+  const titleEl = root.querySelector<HTMLElement>('[data-title]')!;
+  const summaryEl = root.querySelector<HTMLElement>('[data-summary]')!;
+  const metaEl = root.querySelector<HTMLElement>('[data-meta]')!;
+  const bodyEl = root.querySelector<HTMLElement>('[data-body]')!;
+
+  const escapeHtml = (value: string) =>
+    value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
+
+  function paragraphs(body: string) {
+    return body
+      .split(/\n{2,}/)
+      .map((part) => `<p>${escapeHtml(part).replaceAll('\n', '<br>')}</p>`)
+      .join('');
+  }
+
+  async function show() {
+    const id = location.hash.replace(/^#/, '');
+    if (!/^[0-9a-f-]{36}$/i.test(id)) {
+      statusEl.textContent = 'Choose an article from the news page.';
+      return;
+    }
+    const { data, error } = await supabase
+      .from('contributions')
+      .select('title, caption, body, credit, published_at')
+      .eq('id', id)
+      .eq('kind', 'article')
+      .eq('status', 'published')
+      .maybeSingle();
+    if (error || !data?.body || !data.title) {
+      statusEl.textContent = 'That article is not published.';
+      return;
+    }
+    statusEl.hidden = true;
+    head.hidden = false;
+    titleEl.textContent = data.title;
+    document.title = `${data.title} · Bedfordshire Squash`;
+    if (data.caption) {
+      summaryEl.hidden = false;
+      summaryEl.textContent = data.caption;
+    }
+    const when = data.published_at ? new Date(data.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+    metaEl.textContent = [data.credit, when].filter(Boolean).join(' · ');
+    bodyEl.innerHTML = paragraphs(data.body);
+  }
+
+  window.addEventListener('hashchange', () => void show());
+  void show();
+</script>
+
+<style>
+  .back {
+    display: inline-block;
+    margin-bottom: 0.8rem;
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .back:hover {
+    color: var(--accent);
+  }
+  .lede {
+    color: var(--ink-200);
+  }
+  .meta {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+  .status:empty,
+  [hidden] {
+    display: none !important;
+  }
+</style>

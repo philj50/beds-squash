@@ -3,12 +3,15 @@ import Base from '@/layouts/Base.astro';
 import PageHero from '@/components/PageHero.astro';
 import { getGalleries } from '@/lib/content';
 import { formatDate, url } from '@/lib/site';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 const galleries = await getGalleries();
 ---
 
 <Base title="Bedfordshire squash photos" description="Photos from Bedfordshire squash events — County Closed finals, county weekends, junior events and more." crumbs={[{ name: 'Gallery', path: '/gallery/' }]}>
-  <PageHero eyebrow="Photos" title="Gallery" lede="Pictures from county tournaments, county weekends and junior events." />
+  <PageHero eyebrow="Photos" title="Gallery" lede="Pictures from county tournaments, county weekends and junior events.">
+    <p class="send-in"><a href={url('/share/')}>Send a photo or a short video</a></p>
+  </PageHero>
   <section class="section">
     <div class="container">
       {
@@ -46,4 +49,67 @@ const galleries = await getGalleries();
       }
     </div>
   </section>
+  <section class="section" id="gallery-shared" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} hidden>
+    <div class="container">
+      <div class="section-head">
+        <h2>Sent in</h2>
+        <a href={url('/share/')}>Send something in →</a>
+      </div>
+      <div class="grid grid--3" data-shared></div>
+    </div>
+  </section>
 </Base>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+
+  type Item = { id: string; kind: 'photo' | 'video'; caption: string | null; credit: string; storage_path: string };
+
+  const root = document.getElementById('gallery-shared');
+  if (root) {
+    const supabase = createClient(root.dataset.url!, root.dataset.key!);
+    const host = root.querySelector<HTMLElement>('[data-shared]')!;
+    const escapeHtml = (value: string) =>
+      value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
+
+    const { data } = await supabase
+      .from('contributions')
+      .select('id, kind, caption, credit, storage_path')
+      .in('kind', ['photo', 'video'])
+      .eq('status', 'published')
+      .order('published_at', { ascending: false })
+      .limit(24);
+    const items = ((data ?? []) as Item[]).filter((item) => item.storage_path);
+    if (items.length) {
+      const { data: signed } = await supabase.storage.from('contributions').createSignedUrls(
+        items.map((item) => item.storage_path),
+        3600,
+      );
+      const urls = new Map((signed ?? []).filter((row) => row.path && row.signedUrl).map((row) => [row.path!, row.signedUrl!]));
+      host.innerHTML = items
+        .map((item) => {
+          const src = urls.get(item.storage_path);
+          if (!src) return '';
+          const media =
+            item.kind === 'video'
+              ? `<video class="card__img" src="${escapeHtml(src)}" controls preload="metadata"></video>`
+              : `<img class="card__img" src="${escapeHtml(src)}" alt="${escapeHtml(item.caption ?? '')}" loading="lazy" />`;
+          return `<article class="card"><div>${media}</div><div class="card__body"><h3 class="card__title">${escapeHtml(item.caption ?? 'Photo')}</h3><p class="card__meta">${escapeHtml(item.credit)}</p></div></article>`;
+        })
+        .join('');
+      if (host.innerHTML.trim()) root.hidden = false;
+    }
+  }
+</script>
+
+<style>
+  .send-in {
+    margin: 0.4rem 0 0;
+  }
+  #gallery-shared[hidden] {
+    display: none;
+  }
+  #gallery-shared video.card__img {
+    background: var(--ink-950);
+  }
+</style>
