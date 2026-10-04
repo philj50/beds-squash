@@ -91,6 +91,7 @@ import { url } from '@/lib/site';
 
   const root = document.getElementById('share-app');
   if (!root) throw new Error('share form missing');
+  const app = root;
   const supabase = createClient(root.dataset.url!, root.dataset.key!);
   const form = root.querySelector<HTMLFormElement>('[data-form]')!;
   const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
@@ -106,7 +107,7 @@ import { url } from '@/lib/site';
 
   function showKind() {
     const kind = kindOf();
-    root.querySelectorAll<HTMLElement>('[data-for]').forEach((el) => {
+    app.querySelectorAll<HTMLElement>('[data-for]').forEach((el) => {
       el.hidden = !el.dataset.for!.split(' ').includes(kind);
     });
   }
