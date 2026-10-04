@@ -37,12 +37,12 @@ import { url } from '@/lib/site';
           </div>
           <h2>Allowed names</h2>
           <p class="hint">
-            Fanny is stopped, and so are rude words in other languages. Add a name here when it should be allowed on the board anyway.
+            Scores on the board are two or three letters.
           </p>
           <form class="allow" data-allow>
             <label>
-              Name
-              <input name="allow" required minlength="2" maxlength="16" autocomplete="off" />
+              Initials
+              <input name="allow" required minlength="2" maxlength="3" autocomplete="off" />
             </label>
             <button class="btn btn--primary btn--sm" type="submit">Allow this name</button>
           </form>
@@ -178,8 +178,11 @@ import { url } from '@/lib/site';
 
   allowForm.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const name = String(new FormData(allowForm).get('allow') ?? '').trim();
-    if (name.length < 2) return;
+    const name = String(new FormData(allowForm).get('allow') ?? '').trim().toUpperCase();
+    if (!/^[A-Z]{2,3}$/.test(name)) {
+      statusEl.textContent = 'Use two or three letters.';
+      return;
+    }
     statusEl.textContent = 'Allowing…';
     const { error } = await supabase.rpc('allow_minigame_name', { p_name: name });
     statusEl.textContent = error ? error.message : `${name} can be used.`;

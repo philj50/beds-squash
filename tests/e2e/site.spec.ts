@@ -319,23 +319,31 @@ test.describe('Public site', () => {
     await expect(page.locator('[data-form]')).toBeHidden();
   });
 
-  test('minigame asks for a name before play', async ({ page }) => {
+  test('minigame asks for initials and serves from the court', async ({ page }) => {
     await open(page, 'minigame/');
     await expect(page.getByRole('heading', { level: 1, name: 'Minigame' })).toBeVisible();
-    await expect(page.getByLabel('Your name')).toBeVisible();
+    await expect(page.getByLabel('Your initials')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'High scores' })).toBeVisible();
-    await expect(page.locator('canvas')).toBeVisible();
-    await page.getByLabel('Your name').fill('sh1t');
+    const court = page.locator('canvas');
+    await expect(court).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Serve' })).toBeHidden();
+    await page.getByLabel('Your initials').fill('1dick');
     await page.getByRole('button', { name: 'Play' }).click();
-    await expect(page.getByRole('dialog')).toContainText('hit the tin');
-    await expect(page.getByLabel('Your name')).toHaveValue('');
-    await page.getByRole('button', { name: 'Try again' }).click();
-    await expect(page.getByRole('dialog')).toBeHidden();
-    await page.getByLabel('Your name').fill('Fanny');
+    await expect(page.getByRole('button', { name: 'Serve' })).toBeHidden();
+    await expect(page.getByLabel('Your initials')).toHaveValue('');
+    await page.getByLabel('Your initials').fill('pj');
     await page.getByRole('button', { name: 'Play' }).click();
-    await expect(page.getByRole('dialog')).toContainText('hit the tin');
-    await expect(page.getByLabel('Your name')).toHaveValue('');
+    const serve = page.getByRole('button', { name: 'Serve' });
+    await expect(serve).toBeVisible();
+    const courtBox = await court.boundingBox();
+    const serveBox = await serve.boundingBox();
+    expect(courtBox).toBeTruthy();
+    expect(serveBox).toBeTruthy();
+    expect(serveBox!.x).toBeGreaterThan(courtBox!.x);
+    expect(serveBox!.y).toBeGreaterThan(courtBox!.y);
+    expect(serveBox!.x + serveBox!.width).toBeLessThan(courtBox!.x + courtBox!.width);
+    expect(serveBox!.y + serveBox!.height).toBeLessThan(courtBox!.y + courtBox!.height);
   });
 
   test('junior closed signup form', async ({ page }) => {

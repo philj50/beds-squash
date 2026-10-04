@@ -1,19 +1,20 @@
 ---
 import Base from '@/layouts/Base.astro';
 import PageHero from '@/components/PageHero.astro';
+import { COURT, SERVE_SPOT } from '@/lib/squash-arcade';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 ---
 
 <Base
   title="Minigame"
-  description="A one-player squash game on a court floor. Enter your name, serve, and send the ball back to the front wall."
+  description="A one-player squash game on a court floor. Enter your initials, serve, and send the ball back to the front wall."
   crumbs={[{ name: 'Minigame', path: '/minigame/' }]}
 >
   <PageHero
     eyebrow="Arcade"
     title="Minigame"
-    lede="One player, looking down the court. Type your name, press Serve, and send the ball back to the front wall."
+    lede="One player, looking down the court. Type your initials, press Serve, and send the ball back to the front wall."
   />
   <section class="section">
     <div class="container arcade" id="minigame" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
@@ -21,20 +22,20 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
         <form class="card name-card" data-start>
           <div class="card__body stack">
             <label>
-              Your name
-              <input name="player" required minlength="2" maxlength="16" autocomplete="nickname" />
+              Your initials
+              <input name="player" required minlength="2" maxlength="3" autocomplete="off" placeholder="PJ" />
             </label>
             <button class="btn btn--primary" type="submit">Play</button>
           </div>
         </form>
-        <p class="serve" data-serve hidden>
-          <button class="btn btn--primary" type="button" data-serve-btn>Serve</button>
-        </p>
         <p class="hud" data-hud hidden>
           <span data-score>0000</span>
           <span data-lives></span>
         </p>
-        <canvas width="440" height="680" data-court tabindex="0" aria-label="Squash court"></canvas>
+        <div class="court" style={`--serve-x: ${SERVE_SPOT.x}%; --serve-y: ${SERVE_SPOT.y}%;`}>
+          <canvas width={COURT.width} height={COURT.height} data-court tabindex="0" aria-label="Squash court"></canvas>
+          <button class="btn btn--primary serve-on-court" type="button" data-serve-btn hidden>Serve</button>
+        </div>
         <div class="bat-track" data-bat hidden>
           <span class="bat-knob" data-knob>
             <svg viewBox="0 0 40 56" aria-hidden="true">
@@ -47,7 +48,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
         <p class="result" data-result hidden></p>
         <p class="again" data-again hidden>
           <button class="btn btn--primary btn--sm" type="button" data-replay>Play again</button>
-          <button class="btn btn--ghost btn--sm" type="button" data-rename>Change name</button>
+          <button class="btn btn--ghost btn--sm" type="button" data-rename>Change initials</button>
         </p>
         <dialog data-naughty>
           <p data-naughty-line></p>
@@ -65,7 +66,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 <script>
   import { createClient } from '@supabase/supabase-js';
   import { rudeName } from '@/lib/name-check';
-  import { COURT, beginServe, createArcade, drawCourt, setRacket, tick, type Arcade } from '@/lib/squash-arcade';
+  import { PLAY, beginServe, createArcade, drawCourt, setRacket, tick, type Arcade } from '@/lib/squash-arcade';
 
   type Row = { name: string; score: number };
 
@@ -74,7 +75,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   const supabase = createClient(root.dataset.url!, root.dataset.key!);
   const form = root.querySelector<HTMLFormElement>('[data-start]')!;
   const nameInput = form.querySelector<HTMLInputElement>('[name="player"]')!;
-  const serveRow = root.querySelector<HTMLElement>('[data-serve]')!;
+  const serveBtn = root.querySelector<HTMLButtonElement>('[data-serve-btn]')!;
   const hud = root.querySelector<HTMLElement>('[data-hud]')!;
   const scoreEl = root.querySelector<HTMLElement>('[data-score]')!;
   const livesEl = root.querySelector<HTMLElement>('[data-lives]')!;
@@ -250,7 +251,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     resultEl.hidden = false;
     again.hidden = false;
     hud.hidden = true;
-    serveRow.hidden = true;
+    serveBtn.hidden = true;
     resultEl.textContent = 'Game over.';
     void saveScore(name, game.score);
   }
@@ -291,7 +292,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     resultEl.hidden = true;
     again.hidden = true;
     hud.hidden = true;
-    serveRow.hidden = false;
+    serveBtn.hidden = false;
     track.hidden = false;
     paint();
   }
@@ -302,7 +303,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     saved = false;
     last = 0;
     beginServe(game);
-    serveRow.hidden = true;
+    serveBtn.hidden = true;
     resultEl.hidden = true;
     again.hidden = true;
     hud.hidden = false;
@@ -320,9 +321,9 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
   function aimCourt(clientX: number) {
     const rect = canvas.getBoundingClientRect();
-    const x = ((clientX - rect.left) / rect.width) * COURT.width;
-    const left = 32;
-    const right = 408;
+    const x = ((clientX - rect.left) / rect.width) * canvas.width;
+    const left = PLAY.left;
+    const right = PLAY.right;
     pointer = Math.min(1, Math.max(0, (x - left) / (right - left)));
     if (game) setRacket(game, pointer);
     paint();
@@ -342,17 +343,25 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const name = nameInput.value.trim();
-    if (name.length < 2) return;
+    const initials = nameInput.value.trim().toUpperCase();
+    if (!/^[A-Z]{2,3}$/.test(initials)) {
+      nameInput.value = '';
+      nameInput.setCustomValidity('Use two or three letters.');
+      nameInput.reportValidity();
+      nameInput.setCustomValidity('');
+      nameInput.focus();
+      return;
+    }
+    nameInput.value = initials;
     await loadAllowed();
-    if (rudeName(name, allowedNames)) {
+    if (rudeName(initials, allowedNames)) {
       rejectName();
       return;
     }
     showServe();
   });
 
-  root.querySelector('[data-serve-btn]')!.addEventListener('click', () => serve());
+  serveBtn.addEventListener('click', () => serve());
   root.querySelector('[data-replay]')!.addEventListener('click', () => showServe());
   root.querySelector('[data-rename]')!.addEventListener('click', () => {
     playId += 1;
@@ -361,7 +370,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     again.hidden = true;
     resultEl.hidden = true;
     hud.hidden = true;
-    serveRow.hidden = true;
+    serveBtn.hidden = true;
     track.hidden = true;
     paint();
     nameInput.focus();
@@ -434,9 +443,18 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     padding: 0.65rem 0.75rem;
     font: inherit;
   }
-  .name-card,
-  .serve {
+  .name-card {
     margin-bottom: 0.8rem;
+  }
+  .court {
+    position: relative;
+  }
+  .serve-on-court {
+    position: absolute;
+    left: var(--serve-x);
+    top: var(--serve-y);
+    transform: translate(-50%, -50%);
+    z-index: 2;
   }
   canvas {
     width: 100%;

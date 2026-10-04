@@ -1,11 +1,17 @@
-/** Top-down squash. The ball travels from the front wall down to the bat. */
+/** Top-down squash. The ball travels from the front wall down to the bat.
+ *
+ * Singles court, World Squash: 9.75 m long and 6.40 m wide.
+ * The short line is 5.49 m from the front wall.
+ * Each service box is a 1.60 m square behind that line.
+ * Drawn at 60 px per metre, so the floor is 384 by 585.
+ */
 
-export const COURT = { width: 440, height: 680 };
+export const COURT = { width: 440, height: 660 };
 
-const LEFT = 32;
-const RIGHT = 408;
-const FRONT = 58;
-const BACK = 648;
+const LEFT = 28;
+const RIGHT = 412;
+const FRONT = 48;
+const BACK = 633;
 const RACKET_W = 74;
 const RACKET_Y = BACK - 16;
 const BALL = 6;
@@ -13,25 +19,47 @@ const LIVES = 3;
 const BONUS_POINTS = 5;
 const BONUS_R = 15;
 
+export const PLAY = { left: LEFT, right: RIGHT, front: FRONT, back: BACK };
+
+/** Where the Serve button sits, as a percentage of the canvas. */
+export const SERVE_SPOT = {
+  x: ((LEFT + RIGHT) / 2 / COURT.width) * 100,
+  y: ((FRONT + BACK) / 2 / COURT.height) * 100,
+};
+
 export type Phase = 'idle' | 'serve' | 'rally' | 'point' | 'over';
 export type TickEvent = 'hit' | 'score' | 'miss' | 'over' | 'bonus';
+
+type Ball = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  returned: boolean;
+};
 
 export type Arcade = {
   phase: Phase;
   score: number;
   lives: number;
   racketX: number;
-  ballX: number;
-  ballY: number;
-  vx: number;
-  vy: number;
+  balls: Ball[];
+  twin: boolean;
   wait: number;
-  returned: boolean;
   age: number;
   bonusesSpawned: number;
   nextBonus: number;
   bonus: { x: number; y: number; until: number } | null;
 };
+
+function parked(count: number): Ball[] {
+  const mid = (LEFT + RIGHT) / 2;
+  if (count < 2) return [{ x: mid, y: FRONT + 28, vx: 0, vy: 0, returned: false }];
+  return [
+    { x: mid - 28, y: FRONT + 28, vx: 0, vy: 0, returned: false },
+    { x: mid + 28, y: FRONT + 28, vx: 0, vy: 0, returned: false },
+  ];
+}
 
 export function createArcade(): Arcade {
   return {
@@ -39,12 +67,9 @@ export function createArcade(): Arcade {
     score: 0,
     lives: LIVES,
     racketX: (LEFT + RIGHT) / 2,
-    ballX: (LEFT + RIGHT) / 2,
-    ballY: FRONT + 28,
-    vx: 0,
-    vy: 0,
+    balls: parked(1),
+    twin: false,
     wait: 0,
-    returned: false,
     age: 0,
     bonusesSpawned: 0,
     nextBonus: 7 + Math.random() * 8,
@@ -55,11 +80,7 @@ export function createArcade(): Arcade {
 export function beginServe(game: Arcade) {
   game.phase = 'serve';
   game.wait = 0.55;
-  game.returned = false;
-  game.vx = 0;
-  game.vy = 0;
-  game.ballX = (LEFT + RIGHT) / 2;
-  game.ballY = FRONT + 28;
+  game.balls = parked(game.twin || game.age >= 60 ? 2 : 1);
 }
 
 /** fraction is 0 at the left sideline and 1 at the right. */
@@ -84,59 +105,64 @@ export function tick(game: Arcade, dt: number): TickEvent[] {
     return events;
   }
 
+  maybeTwin(game);
   maybeSpawn(game);
   const speed = pace(game);
   const slices = Math.max(5, Math.ceil((speed * step) / 10));
-  for (let i = 0; i < slices; i += 1) {
+  let missed = false;
+  for (let i = 0; i < slices && !missed; i += 1) {
     const piece = step / slices;
-    game.ballX += game.vx * piece;
-    game.ballY += game.vy * piece;
+    for (const ball of game.balls) {
+      ball.x += ball.vx * piece;
+      ball.y += ball.vy * piece;
 
-    if (game.ballX < LEFT + BALL) {
-      game.ballX = LEFT + BALL;
-      game.vx = Math.abs(game.vx);
-    }
-    if (game.ballX > RIGHT - BALL) {
-      game.ballX = RIGHT - BALL;
-      game.vx = -Math.abs(game.vx);
-    }
-
-    if (game.bonus) {
-      const collected = collectBonus(game, events);
-      if (!collected && game.bonus && game.age >= game.bonus.until) {
-        game.bonus = null;
-        game.nextBonus = game.age + 9 + Math.random() * 12;
+      if (ball.x < LEFT + BALL) {
+        ball.x = LEFT + BALL;
+        ball.vx = Math.abs(ball.vx);
       }
-    }
-
-    if (game.ballY < FRONT + BALL) {
-      game.ballY = FRONT + BALL;
-      game.vy = Math.abs(speed);
-      if (game.returned) {
-        game.score += 1;
-        game.returned = false;
-        events.push('score');
+      if (ball.x > RIGHT - BALL) {
+        ball.x = RIGHT - BALL;
+        ball.vx = -Math.abs(ball.vx);
       }
-      game.vx += wander(game, speed);
-      game.vx = clamp(game.vx, -speed * 0.8, speed * 0.8);
-    }
 
-    if (game.vy > 0 && game.ballY >= RACKET_Y - BALL && game.ballY <= RACKET_Y + 18) {
-      const half = RACKET_W / 2;
-      if (game.ballX >= game.racketX - half && game.ballX <= game.racketX + half) {
-        const along = (game.ballX - game.racketX) / half;
-        game.ballY = RACKET_Y - BALL;
-        game.vy = -speed;
-        game.vx = along * speed * 0.42 + wander(game, speed) * 0.35;
-        game.vx = clamp(game.vx, -speed * 0.85, speed * 0.85);
-        game.returned = true;
-        events.push('hit');
+      if (game.bonus) {
+        const collected = collectBonus(game, ball, events);
+        if (!collected && game.bonus && game.age >= game.bonus.until) {
+          game.bonus = null;
+          game.nextBonus = game.age + 9 + Math.random() * 12;
+        }
       }
-    }
 
-    if (game.ballY > RACKET_Y + 26) {
-      events.push(loseLife(game));
-      break;
+      if (ball.y < FRONT + BALL) {
+        ball.y = FRONT + BALL;
+        ball.vy = Math.abs(speed);
+        if (ball.returned) {
+          game.score += 1;
+          ball.returned = false;
+          events.push('score');
+        }
+        ball.vx += wander(game, speed);
+        ball.vx = clamp(ball.vx, -speed * 0.8, speed * 0.8);
+      }
+
+      if (ball.vy > 0 && ball.y >= RACKET_Y - BALL && ball.y <= RACKET_Y + 18) {
+        const half = RACKET_W / 2;
+        if (ball.x >= game.racketX - half && ball.x <= game.racketX + half) {
+          const along = (ball.x - game.racketX) / half;
+          ball.y = RACKET_Y - BALL;
+          ball.vy = -speed;
+          ball.vx = along * speed * 0.42 + wander(game, speed) * 0.35;
+          ball.vx = clamp(ball.vx, -speed * 0.85, speed * 0.85);
+          ball.returned = true;
+          events.push('hit');
+        }
+      }
+
+      if (ball.y > RACKET_Y + 26) {
+        events.push(loseLife(game));
+        missed = true;
+        break;
+      }
     }
   }
   return events;
@@ -146,6 +172,21 @@ function wander(game: Arcade, speed: number) {
   const heat = Math.max(0, game.age - 48);
   const spread = Math.min(speed * 0.62, 18 + game.age * 3.6 + heat * 6.5);
   return (Math.random() - 0.5) * spread;
+}
+
+function maybeTwin(game: Arcade) {
+  if (game.age < 60 || game.balls.length >= 2) return;
+  game.twin = true;
+  const speed = pace(game);
+  const other = game.balls[0];
+  const mid = (LEFT + RIGHT) / 2;
+  game.balls.push({
+    x: other && other.x >= mid ? LEFT + 70 : RIGHT - 70,
+    y: FRONT + 24,
+    vx: (Math.random() - 0.5) * 80,
+    vy: speed,
+    returned: false,
+  });
 }
 
 function maybeSpawn(game: Arcade) {
@@ -160,11 +201,11 @@ function maybeSpawn(game: Arcade) {
   game.bonusesSpawned += 1;
 }
 
-function collectBonus(game: Arcade, events: TickEvent[]) {
+function collectBonus(game: Arcade, ball: Ball, events: TickEvent[]) {
   const bonus = game.bonus;
   if (!bonus) return false;
-  const dx = game.ballX - bonus.x;
-  const dy = game.ballY - bonus.y;
+  const dx = ball.x - bonus.x;
+  const dy = ball.y - bonus.y;
   if (dx * dx + dy * dy > (BONUS_R + BALL) * (BONUS_R + BALL)) return false;
   game.score += BONUS_POINTS;
   game.bonus = null;
@@ -173,32 +214,40 @@ function collectBonus(game: Arcade, events: TickEvent[]) {
   return true;
 }
 
-function launch(game: Arcade) {
+function flying(game: Arcade, slot: number): Ball {
   const speed = pace(game);
+  const span = RIGHT - LEFT - 80;
+  const along = slot === 0 ? Math.random() : 0.62 + Math.random() * 0.2;
+  return {
+    x: LEFT + 40 + along * span,
+    y: FRONT + 24,
+    vx: (Math.random() - 0.5) * Math.min(160, 50 + game.age * 4),
+    vy: speed,
+    returned: false,
+  };
+}
+
+function launch(game: Arcade) {
+  if (game.age >= 60) game.twin = true;
+  const count = game.twin ? 2 : 1;
   game.phase = 'rally';
-  game.returned = false;
-  game.ballX = LEFT + 40 + Math.random() * (RIGHT - LEFT - 80);
-  game.ballY = FRONT + 24;
-  game.vy = speed;
-  game.vx = (Math.random() - 0.5) * Math.min(160, 50 + game.age * 4);
+  game.balls = Array.from({ length: count }, (_, index) => flying(game, index));
 }
 
 function loseLife(game: Arcade): 'miss' | 'over' {
   game.lives -= 1;
-  game.returned = false;
   game.bonus = null;
   if (game.lives <= 0) {
     game.phase = 'over';
-    game.vx = 0;
-    game.vy = 0;
+    for (const ball of game.balls) {
+      ball.vx = 0;
+      ball.vy = 0;
+    }
     return 'over';
   }
   game.phase = 'point';
   game.wait = 0.7;
-  game.vx = 0;
-  game.vy = 0;
-  game.ballX = (LEFT + RIGHT) / 2;
-  game.ballY = FRONT + 28;
+  game.balls = parked(game.twin ? 2 : 1);
   return 'miss';
 }
 
@@ -249,9 +298,11 @@ export function drawCourt(ctx: CanvasRenderingContext2D, game: Arcade) {
   if (showBall) {
     ctx.strokeStyle = '#ffc933';
     ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(game.ballX, game.ballY, BALL, 0, Math.PI * 2);
-    ctx.stroke();
+    for (const ball of game.balls) {
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, BALL, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
 
   ctx.strokeStyle = '#9fd0ff';
