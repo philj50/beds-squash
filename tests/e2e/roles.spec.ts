@@ -91,7 +91,18 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.getByText('Signed in as Chris C')).toBeVisible();
 
     await page.goto('captains/admin/', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByText('This account cannot set up teams.')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Administration' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Club', exact: true })).toBeVisible();
+    await expect(page.locator('[data-site-club]')).toContainText('Pat Player');
+    await expect(page.locator('[data-site-club]')).toContainText('Test Team 2');
+    await expect(page.locator('[data-site-club]')).not.toContainText('Away Player');
+    await expect(page.locator('[data-site-club]').getByRole('textbox', { name: 'Email for Pat Player' })).toBeVisible();
+    await page.getByRole('button', { name: 'SL', exact: true }).click();
+    await expect(page.locator('[data-site-sl]')).toContainText('Pat Player');
+    await expect(page.locator('[data-site-sl]')).toContainText('4,321');
+    await expect(page.locator('[data-site-sl]')).toContainText('Sam Squad');
+    await expect(page.locator('[data-site-sl]')).not.toContainText('Away Player');
+    await expect(page.getByRole('button', { name: 'People' })).toHaveCount(0);
     await expect(page.locator('[data-junior-link]')).toBeHidden();
     await expect(page.locator('[data-share-link]')).toBeHidden();
     await expect(page.locator('[data-scores-link]')).toBeHidden();
@@ -120,6 +131,20 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.locator('.chip--in')).toHaveText('1 in');
     await pat.locator('select.pos').selectOption('1');
     await expect(page.locator('.team')).toContainText('Pat Player');
+
+    await page.goto('captains/admin/', { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Team', exact: true }).click();
+    await expect(page.locator('[data-site-team]').getByRole('textbox', { name: 'Email for Pat Player' })).toBeVisible();
+    await expect(page.locator('[data-site-team]')).not.toContainText('Test Team 2');
+    await page.getByRole('button', { name: 'Club', exact: true }).click();
+    await expect(page.locator('[data-site-club]')).toContainText('Test Club');
+    await expect(page.locator('[data-site-club]')).toContainText('Pat Player');
+    await expect(page.locator('[data-site-club]')).not.toContainText('Test Team 2');
+    await expect(page.locator('[data-site-club] input')).toHaveCount(0);
+    await page.getByRole('button', { name: 'SL', exact: true }).click();
+    await expect(page.locator('[data-site-sl]')).toContainText('Pat Player');
+    await expect(page.locator('[data-site-sl]')).toContainText('4,321');
+    await expect(page.locator('[data-site-sl]')).not.toContainText('Sam Squad');
   });
 
   test('player only marks their own availability', async ({ page }) => {
@@ -145,6 +170,26 @@ test.describe('Club captain, team captain, and player', () => {
     await page.goto('captains/profile/', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('[data-places]')).toHaveText(PEOPLE.team_player.place);
     await expect(page.locator('[data-squad-link]')).toHaveText('Your team');
+
+    await page.goto('captains/admin/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-own-name]')).toHaveValue('Pat Player');
+    await expect(page.locator('[data-own-email]')).toHaveText('pat.player@example.test');
+    await expect(page.locator('[data-own-facts]')).toContainText('Test Club');
+    await expect(page.locator('[data-own-facts]')).toContainText('Test Team 1');
+    await expect(page.locator('[data-own-facts]')).toContainText('Pat Player');
+    await expect(page.locator('[data-tab="site-player"]')).not.toContainText('Sam Spare');
+    await page.getByRole('button', { name: 'Team', exact: true }).click();
+    await expect(page.locator('[data-site-team]')).toContainText('Pat Player');
+    await expect(page.locator('[data-site-team]')).not.toContainText('Sam Spare');
+    await expect(page.locator('[data-site-team] input')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Club', exact: true }).click();
+    await expect(page.locator('[data-site-club]')).toContainText('Test Club');
+    await expect(page.locator('[data-site-club]')).not.toContainText('Test Team 2');
+    await page.getByRole('button', { name: 'SL', exact: true }).click();
+    await expect(page.locator('[data-site-sl]')).toContainText('4,321');
+    await expect(page.locator('[data-site-sl]')).toContainText('10 Jan 2026');
+    await expect(page.locator('[data-site-sl]')).toContainText('Level after each match');
+    await expect(page.locator('[data-site-sl]')).not.toContainText('Sam Spare');
   });
 
   test('admin can look up a player by club, team, ES number, email and mobile', async ({ page }) => {
@@ -343,6 +388,13 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.getByRole('heading', { name: 'Admins' })).toBeVisible();
     await expect(page.locator('[data-admins]')).toContainText('County Admin');
 
+    await page.getByRole('button', { name: 'Activities' }).click();
+    await expect(page.getByRole('heading', { name: 'Player' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Team captain' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Club captain' })).toBeVisible();
+    await expect(page.locator('[data-tab="activities"]')).toContainText('mark whether they can play');
+    await expect(page.locator('[data-tab="activities"]')).toContainText('every team at their club');
+
     await page.getByRole('button', { name: 'People' }).click();
     await expect(page.getByRole('columnheader', { name: 'Last login' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Status' })).toBeVisible();
@@ -435,8 +487,8 @@ async function signIn(page: Page, role: RoleName) {
 
   const membership =
     role === 'club_captain'
-      ? [{ role, club_slug: 'test-club', teams: null }]
-      : [{ role, club_slug: null, teams: { name: 'Test Team 1' } }];
+      ? [{ role, club_slug: 'test-club', team_id: null, teams: null }]
+      : [{ role, club_slug: 'test-club', team_id: 5, teams: { name: 'Test Team 1' } }];
 
   const fixture = {
     id: 100,
@@ -499,9 +551,49 @@ async function signIn(page: Page, role: RoleName) {
       ]);
     }
     if (path.endsWith('/captain_squads')) {
-      const withPlayers = url.searchParams.get('select')?.includes('squad_players');
-      const squad = { id: 10, name: 'Test Team 1', team_id: 5, squad_players: players };
-      return send(withPlayers ? [squad] : [{ id: squad.id, name: squad.name, team_id: squad.team_id }]);
+      const select = url.searchParams.get('select') ?? '';
+      const withPlayers = select.includes('squad_players');
+      const squads = [
+        { id: 10, name: 'Test Team 1', team_id: 5, squad_players: players },
+        ...(select.includes('team_id') && withPlayers
+          ? [
+              {
+                id: 11,
+                name: 'Test Team 2',
+                team_id: 6,
+                squad_players: [{ id: 3, display_name: 'Sam Squad', email: 'sam.squad@example.test', phone: null, england_squash_id: null }],
+              },
+              {
+                id: 12,
+                name: 'Other Team',
+                team_id: 8,
+                squad_players: [{ id: 4, display_name: 'Away Player', email: null, phone: null, england_squash_id: null }],
+              },
+            ]
+          : []),
+      ];
+      return send(withPlayers ? squads : squads.map(({ id, name, team_id }) => ({ id, name, team_id })));
+    }
+    if (path.endsWith('/teams')) {
+      return send([
+        { id: 5, club_slug: 'test-club', name: 'Test Team 1', division: 'Division 1', captain_name: 'Taylor Team', captain_email: 'taylor@example.test' },
+        { id: 6, club_slug: 'test-club', name: 'Test Team 2', division: 'Division 2', captain_name: 'Sam Captain', captain_email: 'sam@example.test' },
+        { id: 8, club_slug: 'other-club', name: 'Other Team', division: 'Division 1', captain_name: 'Alex Captain', captain_email: 'alex@example.test' },
+      ]);
+    }
+    if (path.endsWith('/squashlevels_players')) {
+      return send([
+        { id: 90, display_name: 'Pat Player', current_level: 4321, updated_at: '2026-09-01' },
+        { id: 91, display_name: 'Sam Spare', current_level: 2100, updated_at: '2026-08-01' },
+        { id: 92, display_name: 'Sam Squad', current_level: 3000, updated_at: '2026-07-01' },
+        { id: 93, display_name: 'Away Player', current_level: 1500, updated_at: '2026-06-01' },
+      ]);
+    }
+    if (path.endsWith('/squashlevels_ratings')) {
+      return send([
+        { recorded_on: '2026-01-10', level: 4200, kind: 'after', squashlevels_match_id: 'a' },
+        { recorded_on: '2026-06-10', level: 4321, kind: 'after', squashlevels_match_id: 'b' },
+      ]);
     }
     if (path.endsWith('/squad_players')) return answerSquadPlayers(route, method, url, body, players, () => nextId++);
     if (path.endsWith('/availability')) return answerAvailability(route, method, url, body, availability, () => nextId++);
@@ -514,7 +606,14 @@ async function signIn(page: Page, role: RoleName) {
     }
     if (path.endsWith('/league_teams')) return send([{ id: 20 }]);
     if (path.endsWith('/fixtures')) return send([fixture]);
-    if (path.endsWith('/nominations') || path.endsWith('/rubbers')) return send([]);
+    if (path.endsWith('/nominations')) {
+      const season = url.searchParams.get('season') ?? '';
+      if (season.includes('Winter')) {
+        return send([{ team_id: 5, player_name: 'Pat Player', period: 1, position: 1, season: 'Winter 2026/27' }]);
+      }
+      return send([]);
+    }
+    if (path.endsWith('/rubbers')) return send([]);
     return send([]);
   });
 

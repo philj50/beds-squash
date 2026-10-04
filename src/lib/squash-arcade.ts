@@ -46,6 +46,8 @@ export type Arcade = {
   score: number;
   lives: number;
   racketX: number;
+  /** Court position of the racket. The back line is the default. */
+  racketY: number;
   balls: Ball[];
   twin: boolean;
   wait: number;
@@ -68,6 +70,7 @@ export function createArcade(): Arcade {
     score: 0,
     lives: LIVES,
     racketX: (LEFT + RIGHT) / 2,
+    racketY: RACKET_Y,
     balls: parked(1),
     twin: false,
     wait: 0,
@@ -84,10 +87,18 @@ export function beginServe(game: Arcade) {
   game.balls = parked(game.twin || game.age >= 60 ? 2 : 1);
 }
 
-/** fraction is 0 at the left sideline and 1 at the right. */
-export function setRacket(game: Arcade, fraction: number) {
-  const t = Math.min(1, Math.max(0, fraction));
+/** fractionX is 0 at the left sideline and 1 at the right.
+ * fractionY is 0 at the front wall and 1 at the back. Leave it out to keep the racket on the back line.
+ */
+export function setRacket(game: Arcade, fractionX: number, fractionY?: number) {
+  const t = Math.min(1, Math.max(0, fractionX));
   game.racketX = LEFT + t * (RIGHT - LEFT);
+  if (fractionY == null) {
+    game.racketY = RACKET_Y;
+    return;
+  }
+  const y = FRONT + Math.min(1, Math.max(0, fractionY)) * (BACK - FRONT);
+  game.racketY = Math.min(RACKET_Y, Math.max(FRONT + 36, y));
 }
 
 function pace(game: Arcade) {
@@ -121,6 +132,7 @@ export function tick(game: Arcade, dt: number): TickEvent[] {
         ball.vy = 0;
         continue;
       }
+      const prevY = ball.y;
       ball.x += ball.vx * piece;
       ball.y += ball.vy * piece;
 
@@ -160,11 +172,12 @@ export function tick(game: Arcade, dt: number): TickEvent[] {
         }
       }
 
-      if (ball.vy > 0 && ball.y >= RACKET_Y - BALL && ball.y <= RACKET_Y + 18) {
+      const racketY = game.racketY;
+      if (ball.vy > 0 && prevY <= racketY + 18 && ball.y >= racketY - BALL) {
         const half = RACKET_W / 2;
         if (ball.x >= game.racketX - half && ball.x <= game.racketX + half) {
           const along = (ball.x - game.racketX) / half;
-          ball.y = RACKET_Y - BALL;
+          ball.y = racketY - BALL;
           ball.vy = -speed;
           ball.vx = along * speed * 0.42 + wander(game, speed) * 0.35;
           ball.vx = clamp(ball.vx, -speed * 0.85, speed * 0.85);
@@ -173,7 +186,7 @@ export function tick(game: Arcade, dt: number): TickEvent[] {
         }
       }
 
-      if (ball.y > RACKET_Y + 26) {
+      if (ball.y > BACK + 10) {
         events.push(loseLife(game));
         missed = true;
         break;
@@ -341,13 +354,14 @@ export function drawCourt(ctx: CanvasRenderingContext2D, game: Arcade) {
 
   ctx.strokeStyle = '#9fd0ff';
   ctx.lineWidth = 3;
+  const racketY = game.racketY;
   ctx.beginPath();
-  ctx.moveTo(game.racketX - RACKET_W / 2, RACKET_Y);
-  ctx.lineTo(game.racketX + RACKET_W / 2, RACKET_Y);
+  ctx.moveTo(game.racketX - RACKET_W / 2, racketY);
+  ctx.lineTo(game.racketX + RACKET_W / 2, racketY);
   ctx.stroke();
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.ellipse(game.racketX, RACKET_Y - 10, 16, 12, 0, 0, Math.PI * 2);
+  ctx.ellipse(game.racketX, racketY - 10, 16, 12, 0, 0, Math.PI * 2);
   ctx.stroke();
 
   ctx.fillStyle = '#e7eaef';

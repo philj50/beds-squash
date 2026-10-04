@@ -44,7 +44,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
             </svg>
           </span>
         </div>
-        <p class="hint">Slide the bat under the court. A finger stays off the ball. Arrow keys work too.</p>
+        <p class="hint">Touch the court. The racket sits just in front of your finger, and it can meet the ball anywhere. The ball still comes back to the front wall. Arrow keys move along the back.</p>
         <p class="result" data-result hidden></p>
         <p class="again" data-again hidden>
           <button class="btn btn--primary btn--sm" type="button" data-replay>Play again</button>
@@ -99,6 +99,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   let playId = 0;
   let last = 0;
   let pointer = 0.5;
+  let pointerY: number | null = null;
   let saved = false;
   let blockedInitials: string[] = [];
   let audioCtx: AudioContext | null = null;
@@ -199,7 +200,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       drawCourt(ctx!, createArcade());
       return;
     }
-    setRacket(game, pointer);
+    setRacket(game, pointer, pointerY ?? undefined);
     drawCourt(ctx!, game);
     scoreEl.textContent = String(game.score).padStart(4, '0');
     livesEl.textContent = game.lives > 0 ? `${game.lives} ${game.lives === 1 ? 'life' : 'lives'}` : '';
@@ -272,7 +273,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     if (id !== playId || !game || game.phase === 'over' || game.phase === 'idle') return;
     const dt = last ? (now - last) / 1000 : 0;
     last = now;
-    setRacket(game, pointer);
+    setRacket(game, pointer, pointerY ?? undefined);
     const events = tick(game, dt);
     try {
       if (events.includes('hit')) batHit();
@@ -297,7 +298,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   function showServe() {
     playId += 1;
     game = createArcade();
-    setRacket(game, pointer);
+    setRacket(game, pointer, pointerY ?? undefined);
     saved = false;
     last = 0;
     form.hidden = true;
@@ -327,17 +328,21 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   function aimTrack(clientX: number) {
     const rect = track.getBoundingClientRect();
     pointer = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    pointerY = null;
     if (game) setRacket(game, pointer);
     paint();
   }
 
-  function aimCourt(clientX: number) {
+  function aimCourt(clientX: number, clientY: number) {
     const rect = canvas.getBoundingClientRect();
+    const scaleY = canvas.height / rect.height;
     const x = ((clientX - rect.left) / rect.width) * canvas.width;
-    const left = PLAY.left;
-    const right = PLAY.right;
-    pointer = Math.min(1, Math.max(0, (x - left) / (right - left)));
-    if (game) setRacket(game, pointer);
+    const y = ((clientY - rect.top) / rect.height) * canvas.height - 64 * scaleY;
+    const spanX = PLAY.right - PLAY.left;
+    const spanY = PLAY.back - PLAY.front;
+    pointer = Math.min(1, Math.max(0, (x - PLAY.left) / spanX));
+    pointerY = Math.min(1, Math.max(0, (y - PLAY.front) / spanY));
+    if (game) setRacket(game, pointer, pointerY);
     paint();
   }
 
@@ -396,13 +401,15 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     if (!track.hasPointerCapture(event.pointerId)) return;
     aimTrack(event.clientX);
   });
-  canvas.addEventListener('pointermove', (event) => {
-    if (event.pointerType === 'touch') return;
-    aimCourt(event.clientX);
-  });
   canvas.addEventListener('pointerdown', (event) => {
-    if (event.pointerType === 'touch') return;
-    aimCourt(event.clientX);
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    canvas.setPointerCapture(event.pointerId);
+    aimCourt(event.clientX, event.clientY);
+  });
+  canvas.addEventListener('pointermove', (event) => {
+    const dragging = canvas.hasPointerCapture(event.pointerId);
+    if (!dragging && event.pointerType !== 'mouse') return;
+    aimCourt(event.clientX, event.clientY);
   });
   window.addEventListener('keydown', (event) => {
     if (!game || game.phase === 'over') return;
@@ -475,7 +482,22 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     background: #07182c;
     border: 1px solid var(--gold-500);
     border-radius: var(--radius-sm);
-    touch-action: auto;
+    touch-action: none;
+  }
+  @media (max-width: 700px) {
+    .play {
+      max-width: none;
+    }
+    .court {
+      display: flex;
+      justify-content: center;
+    }
+    canvas {
+      width: min(100%, calc(72dvh * 440 / 660));
+    }
+    .bat-track {
+      display: none;
+    }
   }
   .bat-track {
     position: relative;

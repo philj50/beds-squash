@@ -43,11 +43,15 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
           <li><strong>2</strong><span>divisions</span></li>
         </ul>
       </div>
-      <div class="hero__art" aria-hidden="true">
-        <img src={url('/brand/logo-navy.png')} alt="" width="420" height="248" fetchpriority="high" />
-        <div class="hero__streak hero__streak--gold"></div>
-        <div class="hero__streak hero__streak--red"></div>
-      </div>
+      <figure class="hero__film">
+        <video
+          controls
+          playsinline
+          preload="metadata"
+          src={url('/video/beds-squash-launch-v3.mp4')}
+          aria-label="Bedfordshire Squash launch film"
+        ></video>
+      </figure>
     </div>
   </section>
 
@@ -220,49 +224,15 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
     text-transform: uppercase;
     letter-spacing: 0.08em;
   }
-  .hero__art {
-    position: relative;
-    display: grid;
-    place-items: center;
+  .hero__film {
+    margin: 0;
   }
-  .hero__art img {
-    width: min(100%, 420px);
+  .hero__film video {
+    width: 100%;
     height: auto;
-    filter: drop-shadow(0 30px 60px rgba(0, 0, 0, 0.6));
-    position: relative;
-    z-index: 1;
-    animation: float 8s ease-in-out infinite;
-  }
-  .hero__streak {
-    position: absolute;
-    height: 14px;
-    border-radius: 999px;
-    filter: blur(1px);
-    opacity: 0.9;
-  }
-  .hero__streak--gold {
-    width: 70%;
-    left: -20%;
-    top: 62%;
-    background: linear-gradient(90deg, transparent, var(--accent));
-    transform: rotate(-18deg);
-  }
-  .hero__streak--red {
-    width: 55%;
-    left: -15%;
-    top: 72%;
-    height: 10px;
-    background: linear-gradient(90deg, transparent, var(--accent-2));
-    transform: rotate(-18deg);
-  }
-  @keyframes float {
-    0%,
-    100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(-10px);
-    }
+    border-radius: var(--radius);
+    border: 1px solid var(--border-strong);
+    background: #000;
   }
 
   .quick {
@@ -374,11 +344,8 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
     .hero__inner {
       grid-template-columns: 1fr;
     }
-    .hero__art {
+    .hero__film {
       order: -1;
-    }
-    .hero__art img {
-      width: min(60%, 260px);
     }
     .cta {
       grid-template-columns: 1fr;

@@ -1,36 +1,38 @@
 ---
 import Base from '@/layouts/Base.astro';
+import ChangePassword from '@/components/ChangePassword.astro';
 import PasswordRules from '@/components/PasswordRules.astro';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
+import { url } from '@/lib/site';
 
-const captainsHref = `${import.meta.env.BASE_URL}captains/`;
-const juniorEntriesHref = `${import.meta.env.BASE_URL}juniors/closed/entries/`;
-const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
-const shareHref = `${import.meta.env.BASE_URL}captains/admin/share/`;
-const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
+const captainsHref = url('/captains/');
+const juniorEntriesHref = url('/juniors/closed/entries/');
+const articlesHref = url('/captains/admin/articles/');
+const shareHref = url('/captains/admin/share/');
+const scoresHref = url('/captains/admin/minigame/');
 ---
 
 <Base
-  title="League lists and accounts"
-  description="League Master clubs, captains and players, and the accounts that sign in."
+  title="Administration"
+  description="Club, team and player details for this website, and the League Master lists."
   noindex
 >
   <section class="section section--tight">
     <div class="container setup" id="setup-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
-      <h1>Clubs and captains</h1>
+      <h1>Administration</h1>
       <p class="lede">
-        Clubs, captains and player names come from League Master.
-        Add the email we use for a player on <strong>LM Player</strong>.
-        Club and captain emails are copied from League Master too.
-        <strong>People</strong> turns an account on and sets the password.
-        <strong>Admins</strong> is separate. Nothing is emailed.
+        <strong>Club</strong>, <strong>Team</strong> and <strong>Player</strong> are the details this website keeps.
+        A club captain sees their club. A team captain sees their team, and their club as read-only, not the other teams.
+        A player sees their profile, their League Master line, and the team and club they play for.
+        <strong>SL</strong> is SquashLevels: a club sees each player’s level and team, and a player sees their own level and the full history.
+        Nothing is emailed.
       </p>
       <p class="status" data-status role="status"></p>
 
       <div data-panel="signed-in" hidden>
         <p class="who" data-who></p>
         <p class="actions">
-          <a class="btn btn--ghost btn--sm" href={captainsHref}>Captain page</a>
+          <a class="btn btn--ghost btn--sm" href={captainsHref}>Squad</a>
           <a class="btn btn--ghost btn--sm" href={`${captainsHref}matches/`}>Matches</a>
           <a class="btn btn--ghost btn--sm" data-junior-link hidden href={juniorEntriesHref}>Junior entries</a>
           <a class="btn btn--ghost btn--sm" href={articlesHref}>Match articles</a>
@@ -39,19 +41,60 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
           <a class="btn btn--ghost btn--sm" href={`${captainsHref}profile/`}>Profile</a>
           <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
         </p>
-        <p data-denied hidden>This account cannot set up teams.</p>
-
-        <div data-admin hidden>
-          <nav class="admin-tabs" aria-label="Admin sections">
-            <button type="button" data-tab-button="lm-clubs">LM Club</button>
-            <button type="button" data-tab-button="lm-captains">LM Captain</button>
-            <button type="button" data-tab-button="lm-players">LM Player</button>
-            <button type="button" data-tab-button="accounts">People</button>
-            <button type="button" data-tab-button="admins">Admins</button>
-            <button type="button" data-tab-button="traffic">Traffic</button>
+        <div data-workspace hidden>
+          <nav class="admin-tabs" aria-label="Administration">
+            <span class="tab-label">This website</span>
+            <button type="button" data-tab-button="site-club">Club</button>
+            <button type="button" data-tab-button="site-team">Team</button>
+            <button type="button" data-tab-button="site-player">Player</button>
+            <button type="button" data-tab-button="site-sl">SL</button>
+            <span class="tab-label" data-lm-only>League Master</span>
+            <button type="button" data-lm-only data-tab-button="lm-clubs">LM Club</button>
+            <button type="button" data-lm-only data-tab-button="lm-captains">LM Captain</button>
+            <button type="button" data-lm-only data-tab-button="lm-players">LM Player</button>
+            <button type="button" data-lm-only data-tab-button="accounts">People</button>
+            <button type="button" data-lm-only data-tab-button="admins">Admins</button>
+            <button type="button" data-lm-only data-tab-button="activities">Activities</button>
+            <button type="button" data-lm-only data-tab-button="traffic">Traffic</button>
           </nav>
 
-          <section class="admin-panel" data-tab="lm-clubs">
+          <section class="admin-panel" data-tab="site-club">
+            <h2>Club</h2>
+            <p class="muted small" data-site-club-note></p>
+            <div data-site-club></div>
+          </section>
+
+          <section class="admin-panel" data-tab="site-team" hidden>
+            <h2>Team</h2>
+            <p class="muted small" data-site-team-note></p>
+            <div data-site-team></div>
+          </section>
+
+          <section class="admin-panel" data-tab="site-player" hidden>
+            <h2>Player</h2>
+            <p class="muted small" data-site-player-note></p>
+            <form class="card" data-form="own-name">
+              <div class="card__body stack">
+                <label>
+                  Name
+                  <input name="display_name" data-own-name required minlength="2" maxlength="80" autocomplete="name" />
+                </label>
+                <p class="muted small">This is the name on your account for this website.</p>
+                <p class="muted small">Email <strong data-own-email></strong></p>
+                <button class="btn btn--primary btn--sm" type="submit">Save name</button>
+              </div>
+            </form>
+            <ChangePassword />
+            <div class="site-facts" data-own-facts></div>
+          </section>
+
+          <section class="admin-panel" data-tab="site-sl" hidden>
+            <h2>SquashLevels</h2>
+            <p class="muted small" data-site-sl-note></p>
+            <div data-site-sl></div>
+          </section>
+
+          <section class="admin-panel" data-tab="lm-clubs" data-lm-only hidden>
             <h2>LM Club</h2>
             <p class="muted small">Each club and its contact email are copied from League Master. Change them there. A matching login is a club captain.</p>
             <div class="overview-box">
@@ -69,7 +112,7 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
             </div>
           </section>
 
-          <section class="admin-panel" data-tab="lm-captains" hidden>
+          <section class="admin-panel" data-tab="lm-captains" data-lm-only hidden>
             <h2>LM Captain</h2>
             <p class="muted small">Each team captain and their email are copied from League Master. Change them there. A matching login is a team captain.</p>
             <div class="overview-box">
@@ -88,7 +131,7 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
             </div>
           </section>
 
-          <section class="admin-panel" data-tab="lm-players" hidden>
+          <section class="admin-panel" data-tab="lm-players" data-lm-only hidden>
             <h2>LM Player</h2>
             <p class="muted small">Names come from the League Master nomination list. The email is the one we use here. Leave the box and it is saved. Nothing is sent to League Master. A matching login is a player.</p>
             <label class="directory-search">
@@ -112,7 +155,7 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
             </div>
           </section>
 
-          <section class="admin-panel" data-tab="accounts" hidden>
+          <section class="admin-panel" data-tab="accounts" data-lm-only hidden>
             <h2>People</h2>
             <p class="muted small">
               Create the login with the email already on LM Club, LM Captain or LM Player. The role is applied from that list.
@@ -200,7 +243,7 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
             </form>
           </section>
 
-          <section class="admin-panel" data-tab="admins" hidden>
+          <section class="admin-panel" data-tab="admins" data-lm-only hidden>
             <h2>Admins</h2>
             <p class="muted small">
               Admins cover every club and team. The default admin cannot be deleted or turned off.
@@ -258,7 +301,52 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
             </form>
           </section>
 
-          <section class="admin-panel" data-tab="traffic" hidden>
+          <section class="admin-panel" data-tab="activities" data-lm-only hidden>
+            <h2>Activities</h2>
+            <p class="muted small">Each role includes everything above it. A person with two roles can do both.</p>
+            <div class="activity-list">
+              <article class="card">
+                <div class="card__body">
+                  <h3>Player</h3>
+                  <ul>
+                    <li>See their profile, and change their name and password.</li>
+                    <li>See their own matches and mark whether they can play.</li>
+                    <li>Send a photo, video, link or article. An admin publishes it before it appears on the site.</li>
+                  </ul>
+                </div>
+              </article>
+              <article class="card">
+                <div class="card__body">
+                  <h3>Team captain</h3>
+                  <p class="muted small">Everything a player can do, for their own team, plus:</p>
+                  <ul>
+                    <li>See the players on their team and set each player's email.</li>
+                    <li>See who is in, maybe, or out.</li>
+                    <li>Set the playing order for a match.</li>
+                  </ul>
+                </div>
+              </article>
+              <article class="card">
+                <div class="card__body">
+                  <h3>Club captain</h3>
+                  <p class="muted small">Everything a team captain can do, for every team at their club.</p>
+                </div>
+              </article>
+              <article class="card">
+                <div class="card__body">
+                  <h3>Admin</h3>
+                  <p class="muted small">Everything a club captain can do, for every club, plus:</p>
+                  <ul>
+                    <li>The League Master lists, People accounts, and Admins.</li>
+                    <li>Site traffic and sign-ins.</li>
+                    <li>Publish shared photos and articles, match reports, minigame scores, and junior entries.</li>
+                  </ul>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section class="admin-panel" data-tab="traffic" data-lm-only hidden>
             <h2>Site traffic</h2>
             <p class="muted small">
               Page views are anonymous counts from public pages. Sign-ins record who logged in, and when. Admin and captain tools are not counted as page views.
@@ -340,7 +428,7 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
 <script>
   import { createClient } from '@supabase/supabase-js';
   import { bindPasswordRules, bindPasswordToggles, callManageAccounts, fetchAccountStates, fetchProtectedAdmin, fillSuggestedPassword, passwordIssue } from '@/lib/passwords';
-  import { randomLoginEmail, sendToLogin } from '@/lib/account';
+  import { loadAccount, randomLoginEmail, saveDisplayName, sendToLogin, type Account } from '@/lib/account';
 
   type Person = { id: string; display_name: string; email: string | null; is_admin: boolean };
   type Club = { slug: string; name: string; contact_name: string | null; contact_email: string | null; leaguemaster_club_id?: string | null };
@@ -382,8 +470,7 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
   const supabase = createClient(root.dataset.url!, root.dataset.key!);
   const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
   const signedIn = root.querySelector<HTMLElement>('[data-panel="signed-in"]')!;
-  const adminPanel = root.querySelector<HTMLElement>('[data-admin]')!;
-  const denied = root.querySelector<HTMLElement>('[data-denied]')!;
+  const workspace = root.querySelector<HTMLElement>('[data-workspace]')!;
   const juniorLink = root.querySelector<HTMLElement>('[data-junior-link]')!;
   const shareLink = root.querySelector<HTMLElement>('[data-share-link]')!;
   const scoresLink = root.querySelector<HTMLElement>('[data-scores-link]')!;
@@ -398,7 +485,8 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
   const adminsHost = root.querySelector<HTMLElement>('[data-admins]')!;
   const grantAdmin = root.querySelector<HTMLSelectElement>('[data-grant-admin]')!;
   let protectedAdminId = '';
-  const tabs = ['lm-clubs', 'lm-captains', 'lm-players', 'accounts', 'admins', 'traffic'] as const;
+  const siteTabs = ['site-club', 'site-team', 'site-player', 'site-sl'] as const;
+  const tabs = [...siteTabs, 'lm-clubs', 'lm-captains', 'lm-players', 'accounts', 'admins', 'activities', 'traffic'] as const;
   type Tab = (typeof tabs)[number];
   const tabAlias: Record<string, Tab> = {
     overview: 'lm-clubs',
@@ -490,20 +578,24 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
     trafficLoaded = true;
   };
 
+  let viewerIsAdmin = false;
+  const allowedTabs = () => (viewerIsAdmin ? tabs : siteTabs);
+
   const showTab = (tab: Tab) => {
-    for (const panel of root.querySelectorAll<HTMLElement>('[data-tab]')) panel.hidden = panel.dataset.tab !== tab;
+    const next = allowedTabs().includes(tab) ? tab : viewerIsAdmin ? 'lm-clubs' : 'site-club';
+    for (const panel of root.querySelectorAll<HTMLElement>('[data-tab]')) panel.hidden = panel.dataset.tab !== next;
     for (const button of root.querySelectorAll<HTMLButtonElement>('[data-tab-button]')) {
-      button.setAttribute('aria-current', button.dataset.tabButton === tab ? 'page' : 'false');
+      button.setAttribute('aria-current', button.dataset.tabButton === next ? 'page' : 'false');
     }
-    history.replaceState(null, '', `#${tab}`);
-    if (tab === 'traffic' && !trafficLoaded) void loadTraffic();
+    history.replaceState(null, '', `#${next}`);
+    if (next === 'traffic' && !trafficLoaded) void loadTraffic();
   };
 
   root.addEventListener('click', (event) => {
     const tabButton = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-tab-button]');
     if (!tabButton?.dataset.tabButton) return;
     const tab = tabAlias[tabButton.dataset.tabButton] ?? (tabButton.dataset.tabButton as Tab);
-    if (tabs.includes(tab)) showTab(tab);
+    if (tabs.includes(tab) && allowedTabs().includes(tab)) showTab(tab);
   });
 
   let clubs: Club[] = [];
@@ -763,13 +855,340 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
 
   const SEASON = 'Winter 2026/27';
 
+  type Mine = { role: string; club_slug: string | null; team_id: number | null };
+  type SitePlayer = {
+    id: number;
+    display_name: string;
+    email: string | null;
+    phone: string | null;
+    england_squash_id: string | null;
+  };
+  type SiteSquad = { id: number; name: string; team_id: number | null; squad_players: SitePlayer[] | null };
+  type SiteRow = {
+    playerId: number;
+    teamId: number | null;
+    clubSlug: string;
+    club: string;
+    team: string;
+    name: string;
+    email: string;
+    es: string;
+    phone: string;
+  };
+  const clubNote = root.querySelector<HTMLElement>('[data-site-club-note]')!;
+  const teamNote = root.querySelector<HTMLElement>('[data-site-team-note]')!;
+  const playerNote = root.querySelector<HTMLElement>('[data-site-player-note]')!;
+  const siteClubHost = root.querySelector<HTMLElement>('[data-site-club]')!;
+  const siteTeamHost = root.querySelector<HTMLElement>('[data-site-team]')!;
+  const ownName = root.querySelector<HTMLInputElement>('[data-own-name]')!;
+  const ownEmail = root.querySelector<HTMLElement>('[data-own-email]')!;
+  const ownFacts = root.querySelector<HTMLElement>('[data-own-facts]')!;
+  const slNote = root.querySelector<HTMLElement>('[data-site-sl-note]')!;
+  const slHost = root.querySelector<HTMLElement>('[data-site-sl]')!;
+  type SlPlayer = { id: number; display_name: string; current_level: number | null; updated_at: string | null };
+  type SlRating = { recorded_on: string; level: number; kind: string | null; squashlevels_match_id?: string | null };
+
+  const levelText = (n: number | null) => (n == null ? '—' : n.toLocaleString('en-GB'));
+  const nameKey = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
+
+  const slChart = (points: SlRating[]) => {
+    if (points.length < 2) return '';
+    const width = 640;
+    const height = 220;
+    const pad = { l: 56, r: 16, t: 16, b: 36 };
+    const levels = points.map((point) => point.level);
+    let min = Math.min(...levels);
+    let max = Math.max(...levels);
+    if (min === max) {
+      min -= 50;
+      max += 50;
+    }
+    const padY = (max - min) * 0.08;
+    min -= padY;
+    max += padY;
+    const innerW = width - pad.l - pad.r;
+    const innerH = height - pad.t - pad.b;
+    const xAt = (index: number) => pad.l + (index / (points.length - 1)) * innerW;
+    const yAt = (level: number) => pad.t + ((max - level) / (max - min)) * innerH;
+    const line = points.map((point, index) => `${index === 0 ? 'M' : 'L'}${xAt(index).toFixed(1)},${yAt(point.level).toFixed(1)}`).join(' ');
+    const yTicks = [max, (max + min) / 2, min];
+    const xTicks = [0, Math.floor((points.length - 1) / 2), points.length - 1];
+    const dateLabel = (iso: string) => formatDay(iso);
+    const anchor = (index: number) => (index === 0 ? 'start' : index === points.length - 1 ? 'end' : 'middle');
+    return `<div class="sl-chart"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Level after each match">
+      ${yTicks
+        .map((tick) => {
+          const y = yAt(tick);
+          return `<line x1="${pad.l}" y1="${y.toFixed(1)}" x2="${width - pad.r}" y2="${y.toFixed(1)}" stroke="#c5d6e8" stroke-opacity="0.25" /><text x="${pad.l - 8}" y="${(y + 4).toFixed(1)}" text-anchor="end" fill="#c5d6e8" font-size="12">${levelText(Math.round(tick))}</text>`;
+        })
+        .join('')}
+      <path d="${line}" fill="none" stroke="#f2b705" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
+      ${xTicks.map((index) => `<text x="${xAt(index).toFixed(1)}" y="${height - 10}" text-anchor="${anchor(index)}" fill="#c5d6e8" font-size="12">${dateLabel(points[index].recorded_on)}</text>`).join('')}
+    </svg><p class="muted small">Level after each match.</p></div>`;
+  };
+
+  const isSelf = (account: Account, name: string, email: string | null) => {
+    const mine = account.email.trim().toLowerCase();
+    const theirs = (email ?? '').trim().toLowerCase();
+    if (mine && theirs && mine === theirs) return true;
+    const left = account.displayName.trim().toLowerCase();
+    return Boolean(left) && left === name.trim().toLowerCase();
+  };
+
+  const siteTable = (rows: SiteRow[], editable: boolean, showTeam: boolean) => {
+    const body = rows
+      .map((row) => {
+        const emailCell = editable
+          ? `<input data-squad-email="${row.playerId}" data-player-name="${escapeHtml(row.name)}" data-saved="${escapeHtml(row.email)}" aria-label="Email for ${escapeHtml(row.name)}" type="email" value="${escapeHtml(row.email)}" autocomplete="off" />`
+          : escapeHtml(row.email || '—');
+        const teamCell = showTeam ? `<td>${escapeHtml(row.team)}</td>` : '';
+        return `<tr>${teamCell}<td>${escapeHtml(row.name)}</td><td>${emailCell}</td><td>${escapeHtml(row.es || '—')}</td><td>${escapeHtml(row.phone || '—')}</td></tr>`;
+      })
+      .join('');
+    const teamHead = showTeam ? '<th>Team</th>' : '';
+    return `<div class="overview-box"><table class="overview"><thead><tr>${teamHead}<th>Name</th><th>Email</th><th>ES number</th><th>Phone</th></tr></thead><tbody>${body}</tbody></table></div>`;
+  };
+
+  async function loadWebsite(account: Account) {
+    ownName.value = account.displayName;
+    ownEmail.textContent = account.email || '—';
+    const [{ data: mineRows }, { data: clubRows }, { data: teamRows }, { data: squadRows }, { data: nomRows }, { data: slRows }] = await Promise.all([
+      supabase.from('memberships').select('role, club_slug, team_id').eq('profile_id', account.userId),
+      supabase.from('clubs').select('slug, name, contact_name, contact_email').order('name', { ascending: true }),
+      supabase.from('teams').select('id, club_slug, name, division, captain_name, captain_email').order('name', { ascending: true }),
+      supabase.from('captain_squads').select('id, name, team_id, squad_players(id, display_name, email, england_squash_id, phone)'),
+      supabase.from('nominations').select('team_id, player_name, season').eq('season', SEASON),
+      supabase.from('squashlevels_players').select('id, display_name, current_level, updated_at').order('display_name', { ascending: true }),
+    ]);
+    const mine = (mineRows ?? []) as Mine[];
+    const clubList = (clubRows ?? []) as { slug: string; name: string; contact_name: string | null; contact_email: string | null }[];
+    const teamList = (teamRows ?? []) as {
+      id: number;
+      club_slug: string;
+      name: string;
+      division: string | null;
+      captain_name: string | null;
+      captain_email: string | null;
+    }[];
+    const squads = (squadRows ?? []) as SiteSquad[];
+    const nominations = (nomRows ?? []) as { team_id: number; player_name: string }[];
+    const slPlayers = (slRows ?? []) as SlPlayer[];
+    const clubBySlug = new Map(clubList.map((club) => [club.slug, club]));
+    const teamById = new Map(teamList.map((team) => [team.id, team]));
+    const clubSlugs = new Set(mine.filter((row) => row.role === 'club_captain' && row.club_slug).map((row) => row.club_slug as string));
+    const teamIds = new Set(mine.filter((row) => row.team_id != null).map((row) => row.team_id as number));
+    const homeClubSlugs = new Set<string>(clubSlugs);
+    for (const id of teamIds) {
+      const team = teamById.get(id);
+      if (team) homeClubSlugs.add(team.club_slug);
+    }
+    const hasClubRole = account.isAdmin || mine.some((row) => row.role === 'club_captain');
+    const hasTeamRole = mine.some((row) => row.role === 'team_captain');
+    const rows: SiteRow[] = [];
+    for (const squad of squads) {
+      const team = squad.team_id != null ? teamById.get(squad.team_id) : undefined;
+      const clubSlug = team?.club_slug ?? '';
+      const club = clubBySlug.get(clubSlug);
+      const teamLabel = team ? (team.division ? `${team.name} · ${team.division}` : team.name) : squad.name;
+      for (const player of squad.squad_players ?? []) {
+        rows.push({
+          playerId: player.id,
+          teamId: squad.team_id,
+          clubSlug,
+          club: club?.name ?? squad.name,
+          team: teamLabel,
+          name: player.display_name,
+          email: player.email ?? '',
+          es: player.england_squash_id ?? '',
+          phone: player.phone ?? '',
+        });
+      }
+    }
+    rows.sort((a, b) => a.club.localeCompare(b.club, 'en') || a.team.localeCompare(b.team, 'en') || a.name.localeCompare(b.name, 'en'));
+    const visible = (row: SiteRow) => {
+      if (account.isAdmin) return true;
+      const onTeam = row.teamId != null && teamIds.has(row.teamId);
+      const onClub = clubSlugs.has(row.clubSlug);
+      if (account.playerOnly) return isSelf(account, row.name, row.email) && (onTeam || homeClubSlugs.has(row.clubSlug));
+      return onClub || onTeam;
+    };
+    const clubRowsScoped = rows.filter((row) => visible(row));
+    const teamRowsScoped = clubRowsScoped.filter((row) => account.isAdmin || hasClubRole || (row.teamId != null && teamIds.has(row.teamId)));
+    const clubEditable = hasClubRole && !account.playerOnly;
+    const teamEditable = (hasClubRole || hasTeamRole) && !account.playerOnly;
+    clubNote.textContent = account.isAdmin
+      ? 'Every club on this website. Leave an email box and it is saved.'
+      : account.playerOnly
+        ? 'Your club on this website.'
+        : clubEditable
+          ? 'The players at your club. The email is the one this website uses. Leave the box and it is saved.'
+          : 'Your club is read-only. Other teams at the club are not listed.';
+    teamNote.textContent = account.isAdmin
+      ? 'Every team. Leave an email box and it is saved.'
+      : account.playerOnly
+        ? 'Your team on this website.'
+        : hasClubRole
+          ? 'Every team at your club. Leave an email box and it is saved.'
+          : 'Your team on this website. Leave an email box and it is saved.';
+    playerNote.textContent = 'Your profile for this website, your League Master line, and the team and club you play for.';
+
+    const clubsHere = clubList.filter((club) => (account.playerOnly ? homeClubSlugs.has(club.slug) : hasClubRole ? clubSlugs.has(club.slug) : homeClubSlugs.has(club.slug)));
+    const paintClub = (heading: string, group: SiteRow[]) => {
+      const club = clubsHere.find((item) => item.name === heading) ?? clubList.find((item) => item.name === heading);
+      const contact = [club?.contact_name, club?.contact_email].filter(Boolean).join(' · ');
+      return contact ? `<p class="muted small">${escapeHtml(contact)}</p>` : '';
+    };
+    const byClub: string[] = [];
+    for (const row of clubRowsScoped) if (!byClub.includes(row.club)) byClub.push(row.club);
+    siteClubHost.innerHTML = byClub.length
+      ? byClub
+          .map((club) => {
+            const group = clubRowsScoped.filter((row) => row.club === club);
+            return `<article class="site-card"><h3>${escapeHtml(club)}</h3>${paintClub(club, group)}${siteTable(group, clubEditable, true)}</article>`;
+          })
+          .join('')
+      : '<p class="muted small">No club players on this website yet.</p>';
+
+    const teamsHere = teamList.filter((team) => account.isAdmin || hasClubRole || teamIds.has(team.id));
+    const byTeam: string[] = [];
+    for (const row of teamRowsScoped) if (!byTeam.includes(row.team)) byTeam.push(row.team);
+    siteTeamHost.innerHTML = byTeam.length
+      ? byTeam
+          .map((label) => {
+            const group = teamRowsScoped.filter((row) => row.team === label);
+            const team = teamsHere.find((item) => (item.division ? `${item.name} · ${item.division}` : item.name) === label);
+            const captain = team?.captain_name ? `Captain ${team.captain_name}${team.captain_email ? ` · ${team.captain_email}` : ''}` : '';
+            return `<article class="site-card"><h3>${escapeHtml(label)}</h3>${captain ? `<p class="muted small">${escapeHtml(captain)}</p>` : ''}${siteTable(group, teamEditable, false)}</article>`;
+          })
+          .join('')
+      : '<p class="muted small">No team on this account yet.</p>';
+
+    const slByName = new Map<string, SlPlayer>();
+    for (const player of slPlayers) {
+      const key = nameKey(player.display_name);
+      if (!slByName.has(key)) slByName.set(key, player);
+    }
+    const slScope = account.playerOnly ? clubRowsScoped.filter((row) => isSelf(account, row.name, row.email)) : clubRowsScoped;
+    slNote.textContent = account.playerOnly
+      ? 'Your SquashLevels record, and the full history.'
+      : account.isAdmin
+        ? 'SquashLevels for every player on this website, with their team.'
+        : hasClubRole
+          ? 'SquashLevels for the players at your club, with their team.'
+          : 'SquashLevels for the players on your team.';
+    const selfSl = slByName.get(nameKey(account.displayName)) ?? (slScope[0] ? slByName.get(nameKey(slScope[0].name)) : undefined);
+    if (account.playerOnly) {
+      const place = slScope.map((row) => `${row.team} · ${row.club}`).join('. ') || 'Your team is not set yet.';
+      let historyHtml = '<p class="muted small">No SquashLevels history for this name yet.</p>';
+      if (selfSl?.id) {
+        const { data: ratingRows } = await supabase
+          .from('squashlevels_ratings')
+          .select('recorded_on, level, kind, squashlevels_match_id')
+          .eq('player_id', selfSl.id)
+          .order('recorded_on', { ascending: true })
+          .order('squashlevels_match_id', { ascending: true })
+          .limit(1000);
+        const ratings = (ratingRows ?? []) as SlRating[];
+        const after = ratings.filter((row) => row.kind === 'after');
+        const points = (after.length ? after : ratings)
+          .slice()
+          .sort((a, b) => a.recorded_on.localeCompare(b.recorded_on) || String(a.squashlevels_match_id ?? '').localeCompare(String(b.squashlevels_match_id ?? '')));
+        const newest = points.slice().reverse();
+        const rowsHtml = newest.length
+          ? newest
+              .map((row, index) => {
+                const older = newest[index + 1];
+                const delta = older ? row.level - older.level : null;
+                const change = delta == null || delta === 0 ? '—' : delta > 0 ? `+${delta}` : String(delta);
+                return `<tr><td>${escapeHtml(formatDay(row.recorded_on))}</td><td>${levelText(row.level)}</td><td>${change}</td></tr>`;
+              })
+              .join('')
+          : '<tr><td colspan="3">No history yet.</td></tr>';
+        historyHtml = `${slChart(points)}<h3>History</h3><div class="overview-box sl-history"><table class="overview"><thead><tr><th>Date</th><th>Level</th><th>Change</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`;
+      }
+      slHost.innerHTML = `<article class="site-card"><h3>${escapeHtml(account.displayName || 'You')}</h3><p>${escapeHtml(place)}</p><p>Current level ${levelText(selfSl?.current_level ?? null)}${selfSl?.updated_at ? ` · updated ${escapeHtml(formatDay(selfSl.updated_at.slice(0, 10)))}` : ''}</p>${historyHtml}</article>`;
+    } else {
+      const body = slScope.length
+        ? slScope
+            .map((row) => {
+              const level = slByName.get(nameKey(row.name));
+              const updated = level?.updated_at ? formatDay(level.updated_at.slice(0, 10)) : '—';
+              return `<tr><td>${escapeHtml(row.club)}</td><td>${escapeHtml(row.team)}</td><td>${escapeHtml(row.name)}</td><td>${levelText(level?.current_level ?? null)}</td><td>${escapeHtml(updated)}</td></tr>`;
+            })
+            .join('')
+        : '<tr><td colspan="5">No players on this list yet.</td></tr>';
+      slHost.innerHTML = `<div class="overview-box"><table class="overview"><thead><tr><th>Club</th><th>Team</th><th>Player</th><th>Level</th><th>Updated</th></tr></thead><tbody>${body}</tbody></table></div>`;
+    }
+
+    const myNominations = nominations.filter((row) => isSelf(account, row.player_name, null));
+    const lmHtml = myNominations.length
+      ? `<ul>${myNominations
+          .map((row) => {
+            const team = teamById.get(row.team_id);
+            const club = team ? clubBySlug.get(team.club_slug) : undefined;
+            return `<li>${escapeHtml(club?.name ?? 'Club')} · ${escapeHtml(team?.name ?? 'Team')} · ${escapeHtml(row.player_name)}</li>`;
+          })
+          .join('')}</ul>`
+      : '<p class="muted small">No League Master nomination matches your name.</p>';
+    const teamFacts = account.isAdmin
+      ? '<p class="muted small">Every team is on the Team tab.</p>'
+      : hasClubRole
+        ? '<p class="muted small">Every team at your club is on the Team tab.</p>'
+        : teamIds.size
+          ? teamList
+              .filter((team) => teamIds.has(team.id))
+              .map((team) => `<p>${escapeHtml(team.division ? `${team.name} · ${team.division}` : team.name)}${team.captain_name ? ` · Captain ${escapeHtml(team.captain_name)}` : ''}</p>`)
+              .join('')
+          : '<p class="muted small">No team on this account yet.</p>';
+    const clubFacts = account.isAdmin
+      ? '<p class="muted small">Every club is on the Club tab.</p>'
+      : (account.playerOnly ? clubList.filter((club) => homeClubSlugs.has(club.slug)) : hasClubRole ? clubList.filter((club) => clubSlugs.has(club.slug)) : clubList.filter((club) => homeClubSlugs.has(club.slug)))
+          .map((club) => `<p>${escapeHtml(club.name)}${club.contact_name ? ` · ${escapeHtml(club.contact_name)}` : ''}${club.contact_email ? ` · ${escapeHtml(club.contact_email)}` : ''}</p>`)
+          .join('') || '<p class="muted small">No club on this account yet.</p>';
+    ownFacts.innerHTML = `<h3>League Master</h3>${lmHtml}<h3>Team</h3>${teamFacts}<h3>Club</h3>${clubFacts}`;
+  }
+
+  root.querySelector<HTMLFormElement>('[data-form="own-name"]')!.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    setStatus('Saving name…');
+    const message = await saveDisplayName(supabase, ownName.value);
+    if (message) {
+      setStatus(message);
+      return;
+    }
+    setStatus('Name saved.');
+    await showSession();
+  });
+
+  const saveSquadEmail = async (input: HTMLInputElement) => {
+    const email = input.value.trim().toLowerCase();
+    if (email === (input.dataset.saved ?? '')) return;
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setStatus('Enter a valid email, or leave it blank.');
+      return;
+    }
+    const name = input.dataset.playerName || 'this player';
+    setStatus('Saving email…');
+    const { error } = await supabase.from('squad_players').update({ email: email || null }).eq('id', Number(input.dataset.squadEmail));
+    if (error) {
+      setStatus(error.message);
+      return;
+    }
+    input.dataset.saved = email;
+    setStatus(`Email saved for ${name}.`);
+  };
+  for (const host of [siteClubHost, siteTeamHost]) {
+    host.addEventListener('focusout', (event) => {
+      const input = (event.target as HTMLElement).closest<HTMLInputElement>('[data-squad-email]');
+      if (input) void saveSquadEmail(input);
+    });
+  }
+
   async function showSession() {
-    const { data } = await supabase.auth.getSession();
-    const session = data.session;
-    signedIn.hidden = !session;
-    if (!session) {
-      adminPanel.hidden = true;
-      denied.hidden = true;
+    const account = await loadAccount(supabase);
+    signedIn.hidden = !account;
+    if (!account) {
+      workspace.hidden = true;
       juniorLink.hidden = true;
       shareLink.hidden = true;
       scoresLink.hidden = true;
@@ -777,24 +1196,18 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
       return;
     }
 
-    const { data: me, error: meError } = await supabase
-      .from('profiles')
-      .select('display_name, is_admin')
-      .eq('id', session.user.id)
-      .maybeSingle();
-    if (meError) {
-      setStatus(meError.message);
-      return;
-    }
-    const label = me?.display_name || session.user.email;
-    whoEl.textContent = `Signed in as ${label}`;
-    const allowed = Boolean(me?.is_admin);
-    adminPanel.hidden = !allowed;
-    denied.hidden = allowed;
-    juniorLink.hidden = !allowed;
-    shareLink.hidden = !allowed;
-    scoresLink.hidden = !allowed;
-    if (!allowed) return;
+    whoEl.textContent = `Signed in as ${account.displayName || account.email}`;
+    viewerIsAdmin = account.isAdmin;
+    workspace.hidden = false;
+    for (const el of root.querySelectorAll<HTMLElement>('[data-lm-only]')) el.hidden = !account.isAdmin;
+    juniorLink.hidden = !account.isAdmin;
+    shareLink.hidden = !account.isAdmin;
+    scoresLink.hidden = !account.isAdmin;
+    const requested = tabAlias[location.hash.slice(1)] ?? (location.hash.slice(1) as Tab);
+    const fallback: Tab = account.playerOnly ? 'site-player' : 'site-club';
+    showTab((allowedTabs() as readonly string[]).includes(requested) ? requested : fallback);
+    await loadWebsite(account);
+    if (!account.isAdmin) return;
 
     if (location.hash.slice(1) === 'traffic' && !trafficLoaded) void loadTraffic();
 
@@ -880,7 +1293,7 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
     const fetchedAdmin = await fetchProtectedAdmin(supabase);
     const onlyAdmin = accounts.filter((person) => person.is_admin);
     protectedAdminId = fetchedAdmin || (onlyAdmin.length === 1 ? onlyAdmin[0].id : '');
-    const selfId = session.user.id;
+    const selfId = account.userId;
     const one = (value: { display_name?: string; email?: string | null; name?: string; division?: string | null } | { display_name?: string; email?: string | null; name?: string; division?: string | null }[] | null) =>
       Array.isArray(value) ? value[0] : value;
     const whereFor = (membership: Membership) => {
@@ -1048,9 +1461,6 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
     setStatus(`Email saved for ${name}. Their login role follows that address.`);
   });
 
-  const rawTab = location.hash.slice(1);
-  const startTab = tabAlias[rawTab] ?? (rawTab as Tab);
-  showTab(tabs.includes(startTab) ? startTab : 'lm-clubs');
   showSession();
 </script>
 
@@ -1090,9 +1500,53 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
   #setup-app .admin-tabs {
     display: flex;
     flex-wrap: wrap;
+    align-items: flex-end;
     gap: 0;
     margin: 0 0 0.75rem;
     border-bottom: 2px solid var(--gold-500);
+  }
+  #setup-app .admin-tabs .tab-label {
+    align-self: center;
+    margin: 0 0.4rem 0.15rem 0.85rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  #setup-app .admin-tabs .tab-label:first-child {
+    margin-left: 0;
+  }
+  #setup-app .site-card {
+    margin: 0 0 1rem;
+  }
+  #setup-app .site-card h3,
+  #setup-app .site-facts h3 {
+    margin: 0.8rem 0 0.3rem;
+    font-size: 1rem;
+  }
+  #setup-app .site-facts ul {
+    margin: 0.25rem 0 0;
+    padding-left: 1.2rem;
+  }
+  #setup-app .sl-chart svg {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  #setup-app .sl-history {
+    max-height: 24rem;
+    overflow: auto;
+  }
+  #setup-app .site-card input,
+  #setup-app [data-form='own-name'] input {
+    width: 100%;
+    background: var(--ink-950);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 0.35rem 0.45rem;
+    font: inherit;
   }
   #setup-app .admin-tabs button {
     background: transparent;
@@ -1118,6 +1572,21 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
   }
   #setup-app .admin-panel > h2 {
     margin-top: 0;
+  }
+  #setup-app .activity-list {
+    display: grid;
+    gap: 0.75rem;
+    max-width: 40rem;
+  }
+  #setup-app .activity-list h3 {
+    margin: 0 0 0.35rem;
+  }
+  #setup-app .activity-list ul {
+    margin: 0.35rem 0 0;
+    padding-left: 1.2rem;
+  }
+  #setup-app .activity-list li + li {
+    margin-top: 0.25rem;
   }
   #setup-app .directory-search {
     display: grid;

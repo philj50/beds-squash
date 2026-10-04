@@ -19,6 +19,12 @@ test.describe('Public site', () => {
   test('home page and main navigation', async ({ page }) => {
     await open(page);
     await expect(page).toHaveTitle(/Bedfordshire Squash/);
+    const film = page.getByLabel('Bedfordshire Squash launch film');
+    await expect(film).toBeVisible();
+    await expect(film).toHaveAttribute('src', /beds-squash-launch-v3\.mp4$/);
+    const filmSrc = await film.getAttribute('src');
+    expect(filmSrc).toBeTruthy();
+    expect((await page.request.get(filmSrc!)).ok()).toBeTruthy();
     const nav = page.getByRole('navigation', { name: 'Primary' });
     await expect(nav.getByRole('link', { name: 'News', exact: true })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Leagues', exact: true })).toBeVisible();
