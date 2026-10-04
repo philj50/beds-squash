@@ -7,13 +7,13 @@ import { url } from '@/lib/site';
 
 <Base
   title="Share a photo, video, link or article"
-  description="Send Bedfordshire squash photos, short videos, links and articles. An admin publishes them before they appear on the site."
+  description="Players, captains and admins can send Bedfordshire squash photos, short videos, links and articles. An admin publishes them before they appear on the site."
   crumbs={[{ name: 'Share', path: '/share/' }]}
 >
   <PageHero
     eyebrow="From the courts"
     title="Share"
-    lede="Send a photo, a short video, a link or an article. Nothing appears on the site until an admin publishes it."
+    lede="Players, team captains, club captains and admins can send a photo, a short video, a link or an article. Nothing appears on the site until an admin publishes it."
   />
   <section class="section">
     <div class="container share" id="share-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
@@ -21,8 +21,12 @@ import { url } from '@/lib/site';
         <div>
           <h2>Send something in</h2>
           <p class="status" data-status role="status"></p>
+          <p class="gate" data-gate>
+            Sign in as a player, team captain, club captain or admin to send something in.
+            <a href={url('/login/')} data-login>Log in</a>
+          </p>
           <p class="thanks" data-thanks hidden>Thanks. An admin will look at it before it goes on the site.</p>
-          <form class="card" data-form>
+          <form class="card" data-form hidden>
             <div class="card__body stack">
               <label>Your name <input name="credit" required minlength="2" maxlength="80" autocomplete="name" /></label>
               <fieldset>
@@ -73,6 +77,7 @@ import { url } from '@/lib/site';
 
 <script>
   import { createClient } from '@supabase/supabase-js';
+  import { loadAccount, sendToLogin, type Account } from '@/lib/account';
   import {
     GALLERY_BODY_MAX,
     GALLERY_BODY_MIN,
@@ -94,6 +99,7 @@ import { url } from '@/lib/site';
   const app = root;
   const supabase = createClient(root.dataset.url!, root.dataset.key!);
   const form = root.querySelector<HTMLFormElement>('[data-form]')!;
+  const gate = root.querySelector<HTMLElement>('[data-gate]')!;
   const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
   const thanks = root.querySelector<HTMLElement>('[data-thanks]')!;
   const boardEl = root.querySelector<HTMLElement>('[data-board]')!;
@@ -114,6 +120,28 @@ import { url } from '@/lib/site';
 
   form.querySelectorAll('input[name="kind"]').forEach((input) => input.addEventListener('change', showKind));
   showKind();
+
+  root.querySelector('[data-login]')!.addEventListener('click', (event) => {
+    event.preventDefault();
+    sendToLogin();
+  });
+
+  const maySend = (account: Account) =>
+    account.isAdmin ||
+    account.places.some((place) => place.role === 'club_captain' || place.role === 'team_captain' || place.role === 'team_player');
+
+  async function openForm() {
+    const account = await loadAccount(supabase);
+    if (!account) return;
+    if (!maySend(account)) {
+      gate.textContent = 'This account cannot send content. It needs to be a player, a team captain, a club captain or an admin.';
+      return;
+    }
+    gate.hidden = true;
+    form.hidden = false;
+    const credit = form.querySelector<HTMLInputElement>('[name="credit"]');
+    if (credit && !credit.value && account.displayName) credit.value = account.displayName;
+  }
 
   function boardLine(row: BoardRow) {
     const parts = [
@@ -264,6 +292,7 @@ import { url } from '@/lib/site';
 
   void loadBoard();
   void loadLinks();
+  void openForm();
 </script>
 
 <style>
@@ -334,8 +363,12 @@ import { url } from '@/lib/site';
     display: none;
   }
   .status,
-  .thanks {
+  .thanks,
+  .gate {
     margin: 0 0 0.8rem;
+  }
+  .gate a {
+    margin-left: 0.35rem;
   }
   .trap {
     position: absolute;

@@ -181,32 +181,69 @@ test.describe('Public site', () => {
 
   test('share page holds a link for an admin and refuses a video over 10 MB', async ({ page }) => {
     let submitted: Record<string, unknown> | null = null;
+    const playerId = '33333333-3333-4333-8333-333333333333';
+    const expiresAt = Math.floor(Date.now() / 1000) + 60 * 60;
+    const enc = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
+    const session = {
+      access_token: `${enc({ alg: 'HS256', typ: 'JWT' })}.${enc({ sub: playerId, email: 'pat.player@example.test', role: 'authenticated', exp: expiresAt })}.simulated`,
+      refresh_token: 'simulated-refresh',
+      token_type: 'bearer',
+      expires_in: 3600,
+      expires_at: expiresAt,
+      user: {
+        id: playerId,
+        aud: 'authenticated',
+        role: 'authenticated',
+        email: 'pat.player@example.test',
+        app_metadata: { provider: 'email', providers: ['email'] },
+        user_metadata: { display_name: 'Pat Player' },
+        identities: [],
+        created_at: '2026-10-02T00:00:00Z',
+        updated_at: '2026-10-02T00:00:00Z',
+      },
+    };
     await page.route('**/rest/v1/**', async (route) => {
       const request = route.request();
       const url = new URL(request.url());
+      const send = (payload: unknown, status = 200) =>
+        route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(payload) });
       if (url.pathname.endsWith('/rpc/contribution_leaderboard')) {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify([{ credit: 'Pat Player', photos: 2, videos: 1, links: 0, articles: 1, total: 4 }]),
-        });
+        await send([{ credit: 'Pat Player', photos: 2, videos: 1, links: 0, articles: 1, total: 4 }]);
         return;
       }
       if (url.pathname.endsWith('/rpc/submit_contribution') && request.method() === 'POST') {
         submitted = request.postDataJSON();
-        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify('11111111-1111-4111-8111-111111111111') });
+        await send('11111111-1111-4111-8111-111111111111');
         return;
       }
-      if (url.pathname.endsWith('/contributions')) {
-        await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+      if (url.pathname.endsWith('/profiles')) {
+        const row = { id: playerId, display_name: 'Pat Player', email: 'pat.player@example.test', is_admin: false };
+        const single = (request.headers().accept ?? '').includes('application/vnd.pgrst.object+json');
+        await send(single ? row : [row]);
         return;
       }
-      await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+      if (url.pathname.endsWith('/memberships')) {
+        await send([{ role: 'team_player', club_slug: null, teams: { name: 'Test Team 1' } }]);
+        return;
+      }
+      if (url.pathname.endsWith('/clubs')) {
+        await send([]);
+        return;
+      }
+      await send([]);
     });
     await open(page, 'share/');
     await expect(page.getByRole('heading', { level: 1, name: 'Share' })).toBeVisible();
     await expect(page.getByText('Pat Player')).toBeVisible();
     await expect(page.getByText('2 photos · 1 video · 1 article')).toBeVisible();
+    await expect(page.locator('[data-form]')).toBeHidden();
+    await expect(page.getByText('Sign in as a player, team captain, club captain or admin')).toBeVisible();
+
+    await page.evaluate((stored) => {
+      localStorage.setItem('sb-klxyjmwiaivvqjbhxzak-auth-token', JSON.stringify(stored));
+    }, session);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-form]')).toBeVisible();
     await page.getByRole('radio', { name: 'Video' }).check();
     await expect(page.getByText('up to 10 MB')).toBeVisible();
     await page.getByLabel('Your name').fill('Pat Player');
@@ -232,6 +269,52 @@ test.describe('Public site', () => {
       p_url: 'https://vimeo.com/1153984252/ad198677f7',
     });
     expect(submitted).not.toHaveProperty('status');
+  });
+
+  test('a signed-in account with no role cannot send content', async ({ page }) => {
+    const userId = '55555555-5555-4555-8555-555555555555';
+    const expiresAt = Math.floor(Date.now() / 1000) + 60 * 60;
+    const enc = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
+    const session = {
+      access_token: `${enc({ alg: 'HS256', typ: 'JWT' })}.${enc({ sub: userId, email: 'visitor@example.test', role: 'authenticated', exp: expiresAt })}.simulated`,
+      refresh_token: 'simulated-refresh',
+      token_type: 'bearer',
+      expires_in: 3600,
+      expires_at: expiresAt,
+      user: {
+        id: userId,
+        aud: 'authenticated',
+        role: 'authenticated',
+        email: 'visitor@example.test',
+        app_metadata: { provider: 'email', providers: ['email'] },
+        user_metadata: {},
+        identities: [],
+        created_at: '2026-10-02T00:00:00Z',
+        updated_at: '2026-10-02T00:00:00Z',
+      },
+    };
+    await page.addInitScript((stored) => {
+      localStorage.setItem('sb-klxyjmwiaivvqjbhxzak-auth-token', JSON.stringify(stored));
+    }, session);
+    await page.route('**/rest/v1/**', async (route) => {
+      const url = new URL(route.request().url());
+      const send = (payload: unknown) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload) });
+      if (url.pathname.endsWith('/profiles')) {
+        const row = { id: userId, display_name: 'Visitor', email: 'visitor@example.test', is_admin: false };
+        const single = (route.request().headers().accept ?? '').includes('application/vnd.pgrst.object+json');
+        await send(single ? row : [row]);
+        return;
+      }
+      if (url.pathname.endsWith('/rpc/contribution_leaderboard')) {
+        await send([]);
+        return;
+      }
+      await send([]);
+    });
+    await open(page, 'share/');
+    await expect(page.getByText('This account cannot send content.')).toBeVisible();
+    await expect(page.locator('[data-form]')).toBeHidden();
   });
 
   test('junior closed signup form', async ({ page }) => {
