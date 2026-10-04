@@ -47,19 +47,23 @@ const crumbs = [
       </div>
       <article class="card player-detail" data-detail hidden>
         <div class="card__body">
+          <button class="back-link" type="button" data-back>← Back to search</button>
           <h2 data-detail-name></h2>
-          <p class="muted" data-detail-level></p>
-          <div class="chart" data-chart hidden></div>
-          <h3 class="h-small">Recent results</h3>
-          <div class="table-wrap">
-            <table class="table">
-              <thead>
-                <tr><th>Date</th><th>Level</th><th>Change</th></tr>
-              </thead>
-              <tbody data-history></tbody>
-            </table>
+          <p class="level" data-detail-level></p>
+          <div class="detail-split">
+            <div class="chart" data-chart hidden></div>
+            <div>
+              <h3 class="h-small">Recent results</h3>
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr><th>Date</th><th>Level</th><th>Change</th></tr>
+                  </thead>
+                  <tbody data-history></tbody>
+                </table>
+              </div>
+            </div>
           </div>
-          <button class="btn btn--ghost btn--sm" type="button" data-back>← Back to list</button>
         </div>
       </article>
     </div>
@@ -171,6 +175,7 @@ const crumbs = [
     historyBody.innerHTML = '<tr><td colspan="3">Loading…</td></tr>';
     listWrap.hidden = true;
     search.hidden = true;
+    statusEl.hidden = true;
     detail.hidden = false;
     const { data, error } = await supabase
       .from('squashlevels_ratings')
@@ -213,6 +218,7 @@ const crumbs = [
     if ((event.target as HTMLElement).closest('[data-back]')) {
       detail.hidden = true;
       search.hidden = false;
+      statusEl.hidden = false;
       renderList(search.value);
     }
   });
@@ -279,28 +285,73 @@ const crumbs = [
   .ratings .table th {
     color: var(--gold-400);
   }
-  .ratings .link-button {
-    background: none;
+  .ratings :global(.link-button) {
+    appearance: none;
+    background: transparent;
     border: none;
     padding: 0;
-    color: var(--link);
+    color: var(--gold-400);
     font: inherit;
     font-weight: 600;
     cursor: pointer;
     text-decoration: underline;
     text-underline-offset: 3px;
   }
+  .ratings :global(.link-button):hover,
+  .ratings :global(.link-button):focus-visible {
+    color: #fff;
+    background: transparent;
+  }
   .ratings .player-detail {
-    margin-top: 1rem;
+    margin-top: 0.5rem;
+  }
+  .ratings .player-detail h2 {
+    margin: 0;
+  }
+  .ratings .level {
+    margin: 0.15rem 0 0;
+    color: var(--gold-400);
+    font-weight: 600;
+  }
+  .ratings .back-link {
+    appearance: none;
+    display: inline-block;
+    margin: 0 0 0.7rem;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--gold-400);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .ratings .back-link:hover,
+  .ratings .back-link:focus-visible {
+    color: #fff;
+    background: transparent;
+  }
+  .ratings .detail-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1rem 1.5rem;
+    align-items: start;
+    margin-top: 0.85rem;
   }
   .ratings .h-small {
-    margin: 1.25rem 0 0.5rem;
+    margin: 0 0 0.4rem;
     font-size: 1rem;
   }
   .ratings .chart svg {
     width: 100%;
     height: auto;
     display: block;
+  }
+  @media (max-width: 800px) {
+    .ratings .detail-split {
+      grid-template-columns: 1fr;
+    }
   }
   .ratings .chart .grid {
     stroke: var(--border);

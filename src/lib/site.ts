@@ -11,7 +11,7 @@ export const SITE = {
   facebook: 'https://www.facebook.com/groups/532458603934848/',
   leagueMaster: 'https://bedfordshiresquash.leaguemaster.co.uk/',
   englandSquash: 'https://www.englandsquash.com/',
-  englandSquashEvents: 'https://www.englandsquash.com/events',
+  englandSquashEvents: 'https://www.englandsquash.com/competitions/calendar',
 };
 
 export const NAV = [

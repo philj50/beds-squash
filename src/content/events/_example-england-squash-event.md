@@ -6,7 +6,7 @@ allDay: true
 venue: Manchester
 source: england-squash
 category: tournament
-link: https://www.englandsquash.com/events
+link: https://www.englandsquash.com/competitions/calendar
 draft: true
 ---
 

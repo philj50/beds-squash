@@ -7,7 +7,7 @@ interface Props {
   large?: boolean;
 }
 const { post, large = false } = Astro.props;
-const { title, date, summary, image, imageAlt, category } = post.data;
+const { title, date, image, imageAlt, category } = post.data;
 const href = url(`/news/${post.id}/`);
 ---
 
@@ -29,7 +29,6 @@ const href = url(`/news/${post.id}/`);
       <time datetime={date.toISOString()}>{formatDate(date)}</time>
     </div>
     <h3 class="card__title"><a href={href}>{title}</a></h3>
-    {summary && <p class="summary">{summary}</p>}
   </div>
 </article>
 
@@ -50,10 +49,9 @@ const href = url(`/news/${post.id}/`);
     height: auto;
     border-radius: 6px;
   }
-  .summary {
-    color: var(--ink-200);
-    margin: 0;
-    font-size: 0.95rem;
+  .card__title {
+    font-size: 1.28rem;
+    line-height: 1.25;
   }
   .news-card--large {
     display: grid;
@@ -69,7 +67,7 @@ const href = url(`/news/${post.id}/`);
     align-self: center;
   }
   .news-card--large .card__title {
-    font-size: 1.35rem;
+    font-size: 1.55rem;
   }
   @media (max-width: 720px) {
     .news-card--large {

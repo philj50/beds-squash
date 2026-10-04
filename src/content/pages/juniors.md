@@ -8,9 +8,7 @@ updated: 2026-09-23
 
 The junior programme has been rebuilt over the last 18 months. Sessions are organised through an app: about 36 players are on the squad, with around 10 at a typical session. Age groups are split into **under-13 and under-11**, and **under-15, under-17 and under-19**.
 
-**Gail Clark** is Junior Team Manager and **Sam Morris** is County Coach. **Dan Evans** is the second coach. The AGM agreed in principle to two hours a week for the top four players. New junior kit is subsidised, not fully funded.
-
-The aim is a junior county team, with A and B sides as the squad grows.
+**Gail Clark** is Junior Team Manager and **Sam Morris** is County Coach. **Dan Evans** is the second coach.
 
 ## Coming up
 
