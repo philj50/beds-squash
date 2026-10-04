@@ -75,6 +75,7 @@ Deno.serve(async (req) => {
     role?: string;
     club_slug?: string;
     team_id?: number;
+    active?: boolean;
   };
   try {
     body = await req.json();
@@ -153,6 +154,52 @@ Deno.serve(async (req) => {
     if (role === 'team_captain' || role === 'team_player') membership.team_id = teamId;
     const { error: roleError } = await admin.from('memberships').insert(membership);
     if (roleError && roleError.code !== '23505') return json({ error: roleError.message }, 400);
+    return json({ ok: true });
+  }
+
+  if (body.action === 'states') {
+    const accounts: { id: string; last_sign_in_at: string | null; active: boolean }[] = [];
+    for (let page = 1; page <= 20; page += 1) {
+      const { data, error: listError } = await admin.auth.admin.listUsers({ page, perPage: 200 });
+      if (listError) return json({ error: listError.message }, 500);
+      for (const user of data.users) {
+        const bannedUntil = user.banned_until ? new Date(user.banned_until).getTime() : 0;
+        accounts.push({
+          id: user.id,
+          last_sign_in_at: user.last_sign_in_at ?? null,
+          active: !bannedUntil || bannedUntil <= Date.now(),
+        });
+      }
+      if (data.users.length < 200) break;
+    }
+    return json({ accounts });
+  }
+
+  if (body.action === 'set-email') {
+    const userId = String(body.user_id ?? '');
+    const email = String(body.email ?? '').trim().toLowerCase();
+    if (!/^[0-9a-f-]{36}$/i.test(userId)) return json({ error: 'Choose an account.' }, 400);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'Enter a valid email.' }, 400);
+    const keeper = await protectedAdminId();
+    if (keeper.error) return json({ error: keeper.error }, 500);
+    if (userId === keeper.id) return json({ error: 'The default admin email stays as it is.' }, 400);
+    const { error } = await admin.auth.admin.updateUserById(userId, { email, email_confirm: true });
+    if (error) return json({ error: error.message }, 400);
+    const { error: profileError } = await admin.from('profiles').update({ email }).eq('id', userId);
+    if (profileError) return json({ error: profileError.message }, 400);
+    return json({ ok: true, email });
+  }
+
+  if (body.action === 'set-active') {
+    const userId = String(body.user_id ?? '');
+    const active = Boolean(body.active);
+    if (!/^[0-9a-f-]{36}$/i.test(userId)) return json({ error: 'Choose an account.' }, 400);
+    const keeper = await protectedAdminId();
+    if (keeper.error) return json({ error: keeper.error }, 500);
+    if (userId === keeper.id) return json({ error: 'The default admin stays active.' }, 400);
+    if (userId === userData.user.id) return json({ error: 'You cannot turn off your own account.' }, 400);
+    const { error } = await admin.auth.admin.updateUserById(userId, { ban_duration: active ? 'none' : '876600h' });
+    if (error) return json({ error: error.message }, 400);
     return json({ ok: true });
   }
 

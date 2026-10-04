@@ -173,9 +173,11 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     if (!form.matches('[data-form="player"]') || !currentSquad || playerOnly) return;
     event.preventDefault();
     const data = new FormData(form);
+    const email = String(data.get('email') ?? '').trim();
     const { error } = await supabase.from('squad_players').insert({
       squad_id: currentSquad.id,
       display_name: String(data.get('display_name')).trim(),
+      email: email || null,
     });
     if (error) {
       setStatus(error.message);
@@ -519,6 +521,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
         <summary>Add players</summary>
         <form class="player-form" data-form="player">
           <label>Name <input name="display_name" required minlength="2" maxlength="80" /></label>
+          <label>Email <input name="email" type="email" autocomplete="off" /></label>
           <button class="btn btn--primary btn--sm" type="submit">Add to squad</button>
         </form>
         ${

@@ -113,15 +113,21 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
           <section class="admin-panel" data-tab="accounts" hidden>
             <h2>People</h2>
             <p class="muted small">
-              Add each person here and choose what they are: admin, club captain, team captain, or player.
-              Give them a password. No email is sent. They sign in on the captain page and can change that password.
-              The default admin is the original admin account and cannot be deleted.
+              A club or team captain sets each player's email on the squad. Add the person here with that email, or a random login email if they have no address yet, and choose the first password.
+              Tell them the email and password yourself. Nothing is emailed. They sign in and change the password on their profile.
+              An inactive account cannot sign in. The default admin stays active and cannot be deleted.
             </p>
             <form class="card" data-form="create-account">
               <div class="card__body stack">
                 <h3>Add a person</h3>
                 <label>Name <input name="display_name" required minlength="2" maxlength="80" autocomplete="off" /></label>
-                <label>Email <input name="email" type="email" required autocomplete="off" /></label>
+                <label>
+                  Email
+                  <span class="pw-field">
+                    <input name="email" type="email" required autocomplete="off" />
+                    <button class="btn btn--ghost btn--sm" type="button" data-random-email>Random</button>
+                  </span>
+                </label>
                 <label>
                   Role
                   <select name="role" required data-account-role>
@@ -166,7 +172,7 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
               </div>
             </form>
             <h3>Everyone</h3>
-            <p class="muted small">Sorted by role, then by name. Admins first, then club captains, team captains, and players.</p>
+            <p class="muted small">Sorted by role, then by name. Last login is the last time they signed in with a password. A random email is only a login name.</p>
             <div class="overview-box">
               <table class="overview">
                 <thead>
@@ -175,6 +181,8 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
                     <th>Email</th>
                     <th>Role</th>
                     <th>Club / team</th>
+                    <th>Status</th>
+                    <th>Last login</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -267,7 +275,7 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
           <section class="admin-panel" data-tab="traffic" hidden>
             <h2>Site traffic</h2>
             <p class="muted small">
-              Anonymous counts from public pages (path and browser session only). Admin and captain tools are not tracked.
+              Page views are anonymous counts from public pages. Sign-ins record who logged in, and when. Admin and captain tools are not counted as page views.
             </p>
             <p class="muted small" data-traffic-status hidden role="status"></p>
             <div class="traffic-stats" data-traffic-stats hidden>
@@ -287,6 +295,14 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
                 <div>
                   <dt>Sessions (30 days)</dt>
                   <dd data-kpi="sessions-30">—</dd>
+                </div>
+                <div>
+                  <dt>Sign-ins (7 days)</dt>
+                  <dd data-kpi="signins-7">—</dd>
+                </div>
+                <div>
+                  <dt>Sign-ins (30 days)</dt>
+                  <dd data-kpi="signins-30">—</dd>
                 </div>
               </dl>
               <h3>Last 30 days</h3>
@@ -314,6 +330,19 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
                   <tbody data-traffic-top></tbody>
                 </table>
               </div>
+              <h3>Sign-ins (30 days)</h3>
+              <div class="overview-box">
+                <table class="overview traffic-table">
+                  <thead>
+                    <tr>
+                      <th>When</th>
+                      <th>Name</th>
+                      <th>Email</th>
+                    </tr>
+                  </thead>
+                  <tbody data-traffic-sign-ins></tbody>
+                </table>
+              </div>
             </div>
           </section>
         </div>
@@ -324,8 +353,8 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { bindPasswordRules, bindPasswordToggles, callManageAccounts, fetchProtectedAdmin, fillSuggestedPassword, passwordIssue } from '@/lib/passwords';
-  import { sendToLogin } from '@/lib/account';
+  import { bindPasswordRules, bindPasswordToggles, callManageAccounts, fetchAccountStates, fetchProtectedAdmin, fillSuggestedPassword, passwordIssue } from '@/lib/passwords';
+  import { randomLoginEmail, sendToLogin } from '@/lib/account';
 
   type Person = { id: string; display_name: string; email: string | null; is_admin: boolean };
   type Club = { slug: string; name: string; contact_name: string | null; contact_email: string | null };
@@ -415,10 +444,25 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
   const trafficStats = root.querySelector<HTMLElement>('[data-traffic-stats]')!;
   const trafficByDay = root.querySelector<HTMLElement>('[data-traffic-by-day]')!;
   const trafficTop = root.querySelector<HTMLElement>('[data-traffic-top]')!;
+  const trafficSignIns = root.querySelector<HTMLElement>('[data-traffic-sign-ins]')!;
 
   const formatDay = (iso: string) => {
     const d = new Date(`${iso}T12:00:00`);
     return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  const formatWhen = (iso: string | null) => {
+    if (!iso) return 'Not yet';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return 'Not yet';
+    return d.toLocaleString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Europe/London',
+    });
   };
 
   const loadTraffic = async () => {
@@ -435,13 +479,18 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
       total_30d: number;
       sessions_7d: number;
       sessions_30d: number;
+      sign_ins_7d?: number;
+      sign_ins_30d?: number;
       by_day: { day: string; page_views: number; sessions: number }[];
       top_pages: { path: string; page_views: number }[];
+      recent_sign_ins?: { signed_in_at: string; display_name: string; email: string }[];
     };
     root.querySelector('[data-kpi="views-7"]')!.textContent = String(stats.total_7d ?? 0);
     root.querySelector('[data-kpi="sessions-7"]')!.textContent = String(stats.sessions_7d ?? 0);
     root.querySelector('[data-kpi="views-30"]')!.textContent = String(stats.total_30d ?? 0);
     root.querySelector('[data-kpi="sessions-30"]')!.textContent = String(stats.sessions_30d ?? 0);
+    root.querySelector('[data-kpi="signins-7"]')!.textContent = String(stats.sign_ins_7d ?? 0);
+    root.querySelector('[data-kpi="signins-30"]')!.textContent = String(stats.sign_ins_30d ?? 0);
     const days = stats.by_day ?? [];
     trafficByDay.innerHTML =
       days.length === 0
@@ -458,6 +507,16 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
         ? '<tr><td colspan="2">No data yet.</td></tr>'
         : top
             .map((row) => `<tr><td><code>${escapeHtml(row.path)}</code></td><td>${row.page_views}</td></tr>`)
+            .join('');
+    const signIns = stats.recent_sign_ins ?? [];
+    trafficSignIns.innerHTML =
+      signIns.length === 0
+        ? '<tr><td colspan="3">No sign-ins yet. A row appears when someone logs in.</td></tr>'
+        : signIns
+            .map(
+              (row) =>
+                `<tr><td>${escapeHtml(formatWhen(row.signed_in_at))}</td><td>${escapeHtml(row.display_name)}</td><td>${escapeHtml(row.email || '—')}</td></tr>`,
+            )
             .join('');
     trafficStatus.hidden = true;
     trafficStats.hidden = false;
@@ -524,6 +583,13 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
   const passwordEmail = root.querySelector<HTMLInputElement>('[data-password-email]')!;
   bindPasswordToggles(root);
   bindPasswordRules(root);
+  createAccountForm.querySelector<HTMLButtonElement>('[data-random-email]')!.addEventListener('click', () => {
+    const input = createAccountForm.querySelector<HTMLInputElement>('[name="email"]');
+    if (!input) return;
+    input.value = randomLoginEmail();
+    input.focus();
+    input.select();
+  });
   root.querySelectorAll<HTMLButtonElement>('[data-suggest-password]').forEach((button) => {
     button.addEventListener('click', () => {
       const form = button.closest('form');
@@ -694,6 +760,44 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
         return;
       }
       setStatus(`${who} deleted.`);
+      await showSession();
+      return;
+    }
+    const randomEmail = target.closest<HTMLButtonElement>('[data-random-email-for]');
+    if (randomEmail) {
+      const who = randomEmail.dataset.personName || 'this person';
+      const email = randomLoginEmail();
+      if (!window.confirm(`Set a random login email for ${who}? They will sign in as ${email}. The address they use now will stop working. Nothing is emailed.`)) return;
+      setStatus('Saving email…');
+      const message = await callManageAccounts(supabase, {
+        action: 'set-email',
+        user_id: randomEmail.dataset.randomEmailFor,
+        email,
+      });
+      if (message) {
+        setStatus(message);
+        return;
+      }
+      setStatus(`Login email for ${who} is now ${email}. Tell them that address. Nothing was emailed.`);
+      await showSession();
+      return;
+    }
+    const setActive = target.closest<HTMLButtonElement>('[data-set-active]');
+    if (setActive) {
+      const who = setActive.dataset.personName || 'this person';
+      const active = setActive.dataset.activeNext === 'true';
+      if (!active && !window.confirm(`Make ${who} inactive? They cannot sign in until you turn the account back on.`)) return;
+      setStatus(active ? 'Turning the account on…' : 'Turning the account off…');
+      const message = await callManageAccounts(supabase, {
+        action: 'set-active',
+        user_id: setActive.dataset.setActive,
+        active,
+      });
+      if (message) {
+        setStatus(message);
+        return;
+      }
+      setStatus(active ? `${who} can sign in.` : `${who} is inactive.`);
       await showSession();
       return;
     }
@@ -1005,6 +1109,7 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
     const [
       { data: squadRows, error: squadError },
       { data: people, error: peopleError },
+      accountStates,
       { data: clubRows, error: clubError },
       { data: orgRows, error: orgError },
       { data: roleRows, error: roleError },
@@ -1014,6 +1119,7 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
         .select('id, name, captain_email, captain_id, leaguemaster_team_id, team_id, profiles(display_name), squad_players(id, display_name, email, phone, england_squash_id)')
         .order('name', { ascending: true }),
       supabase.from('profiles').select('id, display_name, email, is_admin').order('display_name', { ascending: true }),
+      fetchAccountStates(supabase),
       supabase.from('clubs').select('slug, name, contact_name, contact_email').order('name', { ascending: true }),
       supabase.from('teams').select('id, club_slug, name, division, leaguemaster_team_id, captain_name, captain_email, last_season').order('name', { ascending: true }),
       supabase.from('memberships').select('id, profile_id, role, club_slug, team_id, profiles(display_name, email), teams(name, division)').order('role', { ascending: true }),
@@ -1028,6 +1134,7 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
     squads = (squadRows ?? []) as Squad[];
     const teamRows = squads;
     const accounts = (people ?? []) as Person[];
+    const stateById = new Map((accountStates ?? []).map((state) => [state.id, state]));
     const memberships = (roleRows ?? []) as Membership[];
     const winterTeams = orgTeams.filter((team) => team.last_season === SEASON);
     const clubNames = new Map(clubs.map((club) => [club.slug, club.name]));
@@ -1226,6 +1333,8 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
             const placeText = person.is_admin || isDefault
               ? 'All clubs'
               : roles.map((membership) => whereFor(membership)).filter((place) => place !== '—').join('; ') || '—';
+            const state = stateById.get(person.id);
+            const active = state ? state.active : true;
             const adminButton = isDefault
               ? ''
               : person.is_admin
@@ -1234,19 +1343,32 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
             const deleteButton = protectedAdminId && !isDefault
               ? `<button class="btn btn--ghost btn--sm" type="button" data-delete-person="${person.id}" data-person-name="${escapeHtml(name)}">Delete</button>`
               : '';
+            const randomButton = isDefault
+              ? ''
+              : `<button class="btn btn--ghost btn--sm" type="button" data-random-email-for="${person.id}" data-person-name="${escapeHtml(name)}">Random email</button>`;
+            const activeButton = isDefault || person.id === selfId
+              ? ''
+              : `<button class="btn btn--ghost btn--sm" type="button" data-set-active="${person.id}" data-active-next="${active ? 'false' : 'true'}" data-person-name="${escapeHtml(name)}">${active ? 'Make inactive' : 'Make active'}</button>`;
+            const statusText = !state
+              ? '—'
+              : active
+                ? 'Active'
+                : '<span class="pill">Inactive</span>';
             row.innerHTML =
               `<td>${escapeHtml(name)}${person.id === selfId ? ' <span class="muted">(you)</span>' : ''}${isDefault ? ' <span class="pill">Default admin</span>' : ''}</td>` +
               `<td>${escapeHtml(person.email || '—')}</td>` +
               `<td>${escapeHtml(roleText.join(', ') || 'No role yet')}</td>` +
               `<td>${escapeHtml(placeText)}</td>` +
-              `<td class="col-action">` +
+              `<td>${statusText}</td>` +
+              `<td>${escapeHtml(state ? formatWhen(state.last_sign_in_at) : '—')}</td>` +
+              `<td class="col-action col-action--wrap">` +
               `<button class="btn btn--ghost btn--sm" type="button" data-open-password="${person.id}" data-password-name="${escapeHtml(name)}" data-password-email="${escapeHtml(person.email || '')}">Set password</button> ` +
-              adminButton +
+              `${randomButton} ${activeButton} ${adminButton}` +
               (deleteButton ? ` ${deleteButton}` : '') +
               `</td>`;
             return row;
           })
-        : [Object.assign(document.createElement('tr'), { innerHTML: '<td colspan="5">No accounts yet.</td>' })]),
+        : [Object.assign(document.createElement('tr'), { innerHTML: '<td colspan="7">No accounts yet.</td>' })]),
     );
 
     const chosenPerson = rolePerson.value;
@@ -1641,6 +1763,13 @@ const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
   }
   #setup-app .overview .col-action .btn + .btn {
     margin-left: 0.35rem;
+  }
+  #setup-app .overview .col-action--wrap {
+    white-space: normal;
+    min-width: 16rem;
+  }
+  #setup-app .overview .col-action--wrap .btn {
+    margin: 0.15rem 0 0.15rem 0.35rem;
   }
   #setup-app .pill {
     display: inline-block;

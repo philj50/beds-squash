@@ -186,6 +186,30 @@ export async function callManageAccounts(
   return null;
 }
 
+export type AccountState = {
+  id: string;
+  last_sign_in_at: string | null;
+  active: boolean;
+};
+
+/** Last sign-in and whether the account can sign in. Null if the account service is unavailable. */
+export async function fetchAccountStates(supabase: SupabaseClient): Promise<AccountState[] | null> {
+  const { data, error } = await supabase.functions.invoke('manage-accounts', { body: { action: 'states' } });
+  if (error || !data || typeof data !== 'object' || 'error' in data) return null;
+  const accounts = (data as { accounts?: unknown }).accounts;
+  if (!Array.isArray(accounts)) return null;
+  return accounts.flatMap((row) => {
+    if (!row || typeof row !== 'object') return [];
+    const item = row as { id?: unknown; last_sign_in_at?: unknown; active?: unknown };
+    if (typeof item.id !== 'string') return [];
+    return [{
+      id: item.id,
+      last_sign_in_at: typeof item.last_sign_in_at === 'string' ? item.last_sign_in_at : null,
+      active: item.active !== false,
+    }];
+  });
+}
+
 /** The original admin account, which cannot be deleted. Null if the function is unavailable. */
 export async function fetchProtectedAdmin(supabase: SupabaseClient): Promise<string | null> {
   const { data, error } = await supabase.functions.invoke('manage-accounts', { body: { action: 'protected' } });

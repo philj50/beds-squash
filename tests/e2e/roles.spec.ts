@@ -70,10 +70,16 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.locator('[data-admin-link]')).toBeHidden();
 
     await page.getByRole('textbox', { name: 'Name' }).fill('New Player');
-    await page.getByRole('textbox', { name: 'Email' }).fill('new.player@example.test');
+    await page.getByRole('textbox', { name: 'Email', exact: true }).fill('new.player@example.test');
     await page.getByRole('button', { name: 'Add' }).click();
     await expect(page.getByRole('cell', { name: 'New Player' })).toBeVisible();
     expect(world.players.some((player) => player.display_name === 'New Player')).toBeTruthy();
+
+    const patEmail = page.getByRole('textbox', { name: 'Email for Pat Player' });
+    await patEmail.fill('pat.new@example.test');
+    await patEmail.blur();
+    await expect(page.getByText('Email saved for Pat Player.')).toBeVisible();
+    expect(world.players.find((player) => player.display_name === 'Pat Player')?.email).toBe('pat.new@example.test');
 
     await page.goto('captains/profile/', { waitUntil: 'domcontentloaded' });
     await expect(page.getByLabel('Name')).toHaveValue('Chris Club');
@@ -173,7 +179,15 @@ test.describe('Club captain, team captain, and player', () => {
       const send = (payload: unknown) =>
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload) });
       if (path.startsWith('/auth/v1/')) return send(path.endsWith('/user') ? session.user : session);
-      if (path.endsWith('/functions/v1/manage-accounts')) return send({ user_id: adminId });
+      if (path.endsWith('/functions/v1/manage-accounts')) {
+        const payload = route.request().postDataJSON() as { action?: string } | null;
+        if (payload?.action === 'states') {
+          return send({
+            accounts: [{ id: adminId, last_sign_in_at: '2026-10-04T09:30:00.000Z', active: true }],
+          });
+        }
+        return send({ user_id: adminId });
+      }
       if (path.endsWith('/profiles')) {
         const row = { id: adminId, display_name: 'County Admin', email: 'admin@example.test', is_admin: true };
         return send((route.request().headers().accept ?? '').includes('application/vnd.pgrst.object+json') ? row : [row]);
@@ -263,6 +277,21 @@ test.describe('Club captain, team captain, and player', () => {
         ]);
       }
       if (path.endsWith('/minigame_scores')) return send(scores);
+      if (path.endsWith('/rpc/get_site_traffic_stats')) {
+        return send({
+          total_7d: 3,
+          total_30d: 10,
+          sessions_7d: 2,
+          sessions_30d: 4,
+          sign_ins_7d: 1,
+          sign_ins_30d: 1,
+          by_day: [],
+          top_pages: [],
+          recent_sign_ins: [
+            { signed_in_at: '2026-10-04T12:00:00.000Z', display_name: 'Pat Player', email: 'pat.player@example.test' },
+          ],
+        });
+      }
       if (path.endsWith('/rpc/delete_minigame_score')) {
         scores.length = 0;
         return send(null);
@@ -294,6 +323,19 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.getByText('No players match that search.')).toBeVisible();
     await page.getByRole('searchbox', { name: 'Search' }).fill('123456');
     await expect(row).toBeVisible();
+
+    await page.getByRole('button', { name: 'People' }).click();
+    await expect(page.getByRole('columnheader', { name: 'Last login' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Status' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Random' })).toBeVisible();
+    const adminRow = page.locator('[data-people] tr', { hasText: 'County Admin' });
+    await expect(adminRow).toContainText('Active');
+    await expect(adminRow).toContainText('4 Oct 2026');
+
+    await page.getByRole('button', { name: 'Traffic' }).click();
+    await expect(page.getByRole('heading', { name: 'Sign-ins (30 days)' })).toBeVisible();
+    await expect(page.locator('[data-traffic-sign-ins]')).toContainText('Pat Player');
+    await expect(page.locator('[data-kpi="signins-7"]')).toHaveText('1');
 
     await page.goto('juniors/', { waitUntil: 'domcontentloaded' });
     const adminMenu = page.locator('[data-junior-admin]');
@@ -442,7 +484,7 @@ async function signIn(page: Page, role: RoleName) {
       const squad = { id: 10, name: 'Test Team 1', team_id: 5, squad_players: players };
       return send(withPlayers ? [squad] : [{ id: squad.id, name: squad.name, team_id: squad.team_id }]);
     }
-    if (path.endsWith('/squad_players')) return answerSquadPlayers(route, method, body, players, () => nextId++);
+    if (path.endsWith('/squad_players')) return answerSquadPlayers(route, method, url, body, players, () => nextId++);
     if (path.endsWith('/availability')) return answerAvailability(route, method, url, body, availability, () => nextId++);
     if (path.endsWith('/selections')) return answerSelections(route, method, url, body, selections, () => nextId++);
     if (path.endsWith('/league_seasons')) {
@@ -460,7 +502,7 @@ async function signIn(page: Page, role: RoleName) {
   return { players };
 }
 
-function answerSquadPlayers(route: Route, method: string, body: Record<string, unknown> | null, players: Player[], id: () => number) {
+function answerSquadPlayers(route: Route, method: string, url: URL, body: Record<string, unknown> | null, players: Player[], id: () => number) {
   if (method === 'POST' && body) {
     const row: Player = {
       id: id(),
@@ -471,6 +513,12 @@ function answerSquadPlayers(route: Route, method: string, body: Record<string, u
     };
     players.push(row);
     return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(row) });
+  }
+  if (method === 'PATCH' && body) {
+    const target = url.searchParams.get('id') ?? '';
+    const row = players.find((item) => `eq.${item.id}` === target);
+    if (row && 'email' in body) row.email = body.email ? String(body.email) : null;
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(row ? [row] : []) });
   }
   return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(players) });
 }

@@ -12,6 +12,16 @@ export type AccountPlace = {
   label: string;
 };
 
+const loginAlphabet = 'abcdefghijkmnopqrstuvwxyz23456789';
+
+/** A sign-in address that cannot receive mail. The admin tells the player this by hand. */
+export function randomLoginEmail() {
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  const local = Array.from(bytes, (byte) => loginAlphabet[byte % loginAlphabet.length]).join('');
+  return `p-${local}@players.invalid`;
+}
+
 const ROLE_LABEL: Record<string, string> = {
   admin: 'Admin',
   club_captain: 'Club captain',
