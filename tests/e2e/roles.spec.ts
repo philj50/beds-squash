@@ -47,6 +47,7 @@ test.describe('Signed out', () => {
     'captains/admin/',
     'captains/admin/articles/',
     'captains/admin/share/',
+    'captains/admin/minigame/',
     'juniors/closed/entries/',
   ]) {
     test(`${path} opens the login page`, async ({ page }) => {
@@ -87,10 +88,13 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.getByText('This account cannot set up teams.')).toBeVisible();
     await expect(page.locator('[data-junior-link]')).toBeHidden();
     await expect(page.locator('[data-share-link]')).toBeHidden();
+    await expect(page.locator('[data-scores-link]')).toBeHidden();
     await page.goto('captains/admin/articles/', { waitUntil: 'domcontentloaded' });
     await expect(page.getByText('This account cannot change articles.')).toBeVisible();
     await page.goto('captains/admin/share/', { waitUntil: 'domcontentloaded' });
     await expect(page.getByText('This account cannot publish shared content.')).toBeVisible();
+    await page.goto('captains/admin/minigame/', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByText('This account cannot change the minigame board.')).toBeVisible();
     await page.goto('juniors/closed/entries/', { waitUntil: 'domcontentloaded' });
     await expect(page.getByText('This account cannot see entries.')).toBeVisible();
   });
@@ -162,6 +166,7 @@ test.describe('Club captain, team captain, and player', () => {
       localStorage.setItem('sb-klxyjmwiaivvqjbhxzak-auth-token', JSON.stringify(stored));
     }, session);
 
+    const scores = [{ id: 9, player_name: 'Philip Jenkins', score: 2, created_at: '2026-10-04T11:00:00.000Z' }];
     await page.route(`${SUPABASE}/**`, async (route) => {
       const url = new URL(route.request().url());
       const path = url.pathname;
@@ -257,6 +262,11 @@ test.describe('Club captain, team captain, and player', () => {
           },
         ]);
       }
+      if (path.endsWith('/minigame_scores')) return send(scores);
+      if (path.endsWith('/rpc/delete_minigame_score')) {
+        scores.length = 0;
+        return send(null);
+      }
       return send([]);
     });
 
@@ -264,6 +274,7 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.getByRole('heading', { name: 'Players' })).toBeVisible();
     await expect(page.locator('[data-junior-link]')).toBeVisible();
     await expect(page.locator('[data-share-link]')).toBeVisible();
+    await expect(page.locator('[data-scores-link]')).toBeVisible();
     const row = page.locator('[data-directory] tr', { hasText: 'Pat Player' });
     await expect(row).toContainText('Test Club');
     await expect(row).toContainText('Test Team 1');
@@ -289,6 +300,18 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(adminMenu).toBeVisible();
     await adminMenu.getByRole('button', { name: 'Junior admin' }).click();
     await expect(adminMenu.getByRole('menuitem', { name: 'County Closed entries' })).toBeVisible();
+
+    await page.goto('captains/admin/minigame/', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { level: 1, name: 'Minigame scores' })).toBeVisible();
+    await expect(page.getByRole('cell', { name: 'Philip Jenkins' })).toBeVisible();
+    await page.getByRole('button', { name: 'Remove' }).click();
+    await expect(page.getByRole('dialog')).toContainText('Philip Jenkins');
+    await page.getByRole('button', { name: 'Keep it' }).click();
+    await expect(page.getByRole('cell', { name: 'Philip Jenkins' })).toBeVisible();
+    await page.getByRole('button', { name: 'Remove' }).click();
+    await page.getByRole('button', { name: 'Remove it' }).click();
+    await expect(page.getByText('Removed from the board.')).toBeVisible();
+    await expect(page.getByText('No scores on the board.')).toBeVisible();
   });
 });
 

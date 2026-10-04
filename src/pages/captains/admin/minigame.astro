@@ -1,0 +1,236 @@
+---
+import Base from '@/layouts/Base.astro';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
+import { url } from '@/lib/site';
+---
+
+<Base title="Minigame scores" description="Remove a name from the minigame high-score board." noindex>
+  <section class="section">
+    <div class="container scores-admin" id="minigame-admin" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
+      <h1>Minigame scores</h1>
+      <p class="lede">
+        These names are on the <a href={url('/minigame/')}>minigame</a> high-score board.
+        Remove a row to take that name and score off the board.
+      </p>
+      <p class="status" data-status role="status"></p>
+      <div data-panel="signed-in" hidden>
+        <p class="who" data-who></p>
+        <p class="actions">
+          <a class="btn btn--ghost btn--sm" href={url('/captains/admin/')}>Admin</a>
+          <a class="btn btn--ghost btn--sm" href={url('/minigame/')}>Minigame</a>
+          <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
+        </p>
+        <p data-denied hidden>This account cannot change the minigame board.</p>
+        <div data-admin hidden>
+          <div class="overview-box">
+            <table class="overview">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Score</th>
+                  <th>When</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody data-rows></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <dialog data-confirm>
+        <p data-confirm-line></p>
+        <p class="actions">
+          <button class="btn btn--primary btn--sm" type="button" data-confirm-yes>Remove it</button>
+          <button class="btn btn--ghost btn--sm" type="button" data-confirm-no>Keep it</button>
+        </p>
+      </dialog>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+  import { sendToLogin } from '@/lib/account';
+
+  type Score = { id: number; player_name: string; score: number; created_at: string };
+
+  const root = document.getElementById('minigame-admin');
+  if (!root) throw new Error('minigame admin missing');
+  const supabase = createClient(root.dataset.url!, root.dataset.key!);
+  const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
+  const signedIn = root.querySelector<HTMLElement>('[data-panel="signed-in"]')!;
+  const denied = root.querySelector<HTMLElement>('[data-denied]')!;
+  const admin = root.querySelector<HTMLElement>('[data-admin]')!;
+  const whoEl = root.querySelector<HTMLElement>('[data-who]')!;
+  const rowsEl = root.querySelector<HTMLElement>('[data-rows]')!;
+  const confirmDialog = root.querySelector<HTMLDialogElement>('[data-confirm]')!;
+  const confirmLine = root.querySelector<HTMLElement>('[data-confirm-line]')!;
+  let pendingId: number | null = null;
+
+  const escapeHtml = (value: string) =>
+    value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
+
+  function when(value: string) {
+    return new Date(value).toLocaleString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  function draw(scores: Score[]) {
+    if (!scores.length) {
+      rowsEl.innerHTML = '<tr class="empty"><td colspan="4">No scores on the board.</td></tr>';
+      return;
+    }
+    rowsEl.innerHTML = scores
+      .map(
+        (row) => `<tr>
+          <td>${escapeHtml(row.player_name)}</td>
+          <td class="num">${row.score}</td>
+          <td>${escapeHtml(when(row.created_at))}</td>
+          <td><button class="btn btn--ghost btn--sm" type="button" data-remove="${row.id}" data-name="${escapeHtml(row.player_name)}" data-score="${row.score}">Remove</button></td>
+        </tr>`,
+      )
+      .join('');
+  }
+
+  async function loadScores() {
+    const { data, error } = await supabase
+      .from('minigame_scores')
+      .select('id, player_name, score, created_at')
+      .order('score', { ascending: false })
+      .order('created_at', { ascending: true })
+      .limit(100);
+    if (error) {
+      statusEl.textContent = error.message;
+      return;
+    }
+    draw((data ?? []) as Score[]);
+  }
+
+  rowsEl.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-remove]');
+    if (!button?.dataset.remove) return;
+    pendingId = Number(button.dataset.remove);
+    confirmLine.textContent = `Remove ${button.dataset.name} and the score of ${button.dataset.score} from the board?`;
+    if (!confirmDialog.open) confirmDialog.showModal();
+  });
+
+  confirmDialog.querySelector('[data-confirm-no]')!.addEventListener('click', () => {
+    pendingId = null;
+    confirmDialog.close();
+  });
+
+  confirmDialog.querySelector('[data-confirm-yes]')!.addEventListener('click', async () => {
+    const id = pendingId;
+    pendingId = null;
+    confirmDialog.close();
+    if (id == null) return;
+    statusEl.textContent = 'Removing…';
+    const { error } = await supabase.rpc('delete_minigame_score', { p_id: id });
+    statusEl.textContent = error ? error.message : 'Removed from the board.';
+    if (!error) await loadScores();
+  });
+
+  root.querySelector('[data-sign-out]')!.addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    await showSession();
+  });
+
+  async function showSession() {
+    const { data } = await supabase.auth.getSession();
+    const session = data.session;
+    signedIn.hidden = !session;
+    admin.hidden = true;
+    denied.hidden = true;
+    if (!session) {
+      sendToLogin();
+      return;
+    }
+    whoEl.textContent = session.user.email ?? 'Signed in';
+    const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', session.user.id).maybeSingle();
+    if (!profile?.is_admin) {
+      denied.hidden = false;
+      return;
+    }
+    admin.hidden = false;
+    await loadScores();
+  }
+
+  void showSession();
+</script>
+
+<style>
+  .scores-admin {
+    max-width: 46rem;
+  }
+  .lede,
+  .who {
+    color: var(--ink-200);
+  }
+  .status:empty {
+    display: none;
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .overview-box {
+    overflow-x: auto;
+    margin-top: 1rem;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92rem;
+  }
+  th,
+  td {
+    text-align: left;
+    padding: 0.45rem 0.55rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  th {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .num {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+  }
+  td:last-child,
+  th:last-child {
+    text-align: right;
+    width: 1%;
+    white-space: nowrap;
+  }
+  :global(tr.empty td) {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+  dialog {
+    background: var(--ink-800);
+    color: var(--text);
+    border: 1px solid var(--gold-500);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.2rem;
+    max-width: 24rem;
+  }
+  dialog::backdrop {
+    background: rgba(0, 10, 24, 0.62);
+  }
+  dialog p:first-child {
+    margin: 0 0 0.9rem;
+  }
+  [hidden] {
+    display: none !important;
+  }
+</style>

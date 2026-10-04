@@ -7,6 +7,7 @@ const captainsHref = `${import.meta.env.BASE_URL}captains/`;
 const juniorEntriesHref = `${import.meta.env.BASE_URL}juniors/closed/entries/`;
 const articlesHref = `${import.meta.env.BASE_URL}captains/admin/articles/`;
 const shareHref = `${import.meta.env.BASE_URL}captains/admin/share/`;
+const scoresHref = `${import.meta.env.BASE_URL}captains/admin/minigame/`;
 ---
 
 <Base
@@ -32,6 +33,7 @@ const shareHref = `${import.meta.env.BASE_URL}captains/admin/share/`;
           <a class="btn btn--ghost btn--sm" data-junior-link hidden href={juniorEntriesHref}>Junior entries</a>
           <a class="btn btn--ghost btn--sm" href={articlesHref}>Match articles</a>
           <a class="btn btn--ghost btn--sm" data-share-link hidden href={shareHref}>Shared content</a>
+          <a class="btn btn--ghost btn--sm" data-scores-link hidden href={scoresHref}>Minigame scores</a>
           <a class="btn btn--ghost btn--sm" href={`${captainsHref}profile/`}>Profile</a>
           <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
         </p>
@@ -381,6 +383,7 @@ const shareHref = `${import.meta.env.BASE_URL}captains/admin/share/`;
   const denied = root.querySelector<HTMLElement>('[data-denied]')!;
   const juniorLink = root.querySelector<HTMLElement>('[data-junior-link]')!;
   const shareLink = root.querySelector<HTMLElement>('[data-share-link]')!;
+  const scoresLink = root.querySelector<HTMLElement>('[data-scores-link]')!;
   const whoEl = root.querySelector<HTMLElement>('[data-who]')!;
   const teamsHost = root.querySelector<HTMLElement>('[data-teams]')!;
   const overviewHost = root.querySelector<HTMLElement>('[data-overview]')!;
@@ -973,6 +976,7 @@ const shareHref = `${import.meta.env.BASE_URL}captains/admin/share/`;
       denied.hidden = true;
       juniorLink.hidden = true;
       shareLink.hidden = true;
+      scoresLink.hidden = true;
       sendToLogin();
       return;
     }
@@ -993,6 +997,7 @@ const shareHref = `${import.meta.env.BASE_URL}captains/admin/share/`;
     denied.hidden = allowed;
     juniorLink.hidden = !allowed;
     shareLink.hidden = !allowed;
+    scoresLink.hidden = !allowed;
     if (!allowed) return;
 
     if (location.hash.slice(1) === 'traffic' && !trafficLoaded) void loadTraffic();
