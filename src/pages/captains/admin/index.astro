@@ -14,17 +14,18 @@ const scoresHref = url('/captains/admin/minigame/');
 
 <Base
   title="Administration"
-  description="Club, team and player details for this website, and the League Master lists."
+  description="League Master lists, SquashLevels, and the club, team and player details for this website."
   noindex
 >
   <section class="section section--tight">
     <div class="container setup" id="setup-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
       <h1>Administration</h1>
       <p class="lede">
-        <strong>Club</strong>, <strong>Team</strong> and <strong>Player</strong> are the details this website keeps.
+        <strong>League Master</strong> is the club, captain and player list copied from League Master.
+        <strong>SquashLevels</strong> shows levels for those players: a club sees each player’s level and team, and a player sees their own level and the full history.
+        <strong>This website</strong> is Club, Team and Player, plus People and Admins for an administrator.
         A club captain sees their club. A team captain sees their team, and their club as read-only, not the other teams.
         A player sees their profile, their League Master line, and the team and club they play for.
-        <strong>SL</strong> is SquashLevels: a club sees each player’s level and team, and a player sees their own level and the full history.
         Nothing is emailed.
       </p>
       <p class="status" data-status role="status"></p>
@@ -43,19 +44,28 @@ const scoresHref = url('/captains/admin/minigame/');
         </p>
         <div data-workspace hidden>
           <nav class="admin-tabs" aria-label="Administration">
-            <span class="tab-label">This website</span>
-            <button type="button" data-tab-button="site-club">Club</button>
-            <button type="button" data-tab-button="site-team">Team</button>
-            <button type="button" data-tab-button="site-player">Player</button>
-            <button type="button" data-tab-button="site-sl">SL</button>
-            <span class="tab-label" data-lm-only>League Master</span>
-            <button type="button" data-lm-only data-tab-button="lm-clubs">LM Club</button>
-            <button type="button" data-lm-only data-tab-button="lm-captains">LM Captain</button>
-            <button type="button" data-lm-only data-tab-button="lm-players">LM Player</button>
-            <button type="button" data-lm-only data-tab-button="accounts">People</button>
-            <button type="button" data-lm-only data-tab-button="admins">Admins</button>
-            <button type="button" data-lm-only data-tab-button="activities">Activities</button>
-            <button type="button" data-lm-only data-tab-button="traffic">Traffic</button>
+            <span class="tab-group" data-lm-only>
+              <span class="tab-label">League Master</span>
+              <button type="button" data-tab-button="lm-clubs">LM Club</button>
+              <button type="button" data-tab-button="lm-captains">LM Captain</button>
+              <button type="button" data-tab-button="lm-players">LM Player</button>
+            </span>
+            <span class="tab-group">
+              <span class="tab-label">SquashLevels</span>
+              <button type="button" data-tab-button="site-sl">SL</button>
+            </span>
+            <span class="tab-group">
+              <span class="tab-label">This website</span>
+              <button type="button" data-tab-button="site-club">Club</button>
+              <button type="button" data-tab-button="site-team">Team</button>
+              <button type="button" data-tab-button="site-player">Player</button>
+              <button type="button" data-lm-only data-tab-button="accounts">People</button>
+              <button type="button" data-lm-only data-tab-button="admins">Admins</button>
+            </span>
+          </nav>
+          <nav class="admin-tabs admin-tabs--aside" aria-label="Site" data-lm-only>
+            <button type="button" data-tab-button="activities">Activities</button>
+            <button type="button" data-tab-button="traffic">Traffic</button>
           </nav>
 
           <section class="admin-panel" data-tab="site-club">
@@ -349,7 +359,7 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="traffic" data-lm-only hidden>
             <h2>Site traffic</h2>
             <p class="muted small">
-              Page views are anonymous counts from public pages. Sign-ins record who logged in, and when. Admin and captain tools are not counted as page views.
+              Page views are anonymous counts from public pages, including the minigame. Sign-ins record who logged in, and when. Admin and captain tools, and switching these tabs, are not counted as page views.
             </p>
             <p class="muted small" data-traffic-status hidden role="status"></p>
             <div class="traffic-stats" data-traffic-stats hidden>
@@ -1501,21 +1511,32 @@ const scoresHref = url('/captains/admin/minigame/');
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;
-    gap: 0;
+    gap: 0.35rem 1rem;
     margin: 0 0 0.75rem;
     border-bottom: 2px solid var(--gold-500);
   }
+  #setup-app .admin-tabs--aside {
+    margin-top: -0.35rem;
+    border-bottom-color: var(--border-strong);
+  }
+  #setup-app .tab-group {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+  #setup-app .tab-group[hidden],
+  #setup-app .admin-tabs[hidden],
+  #setup-app .admin-tabs [hidden] {
+    display: none !important;
+  }
   #setup-app .admin-tabs .tab-label {
     align-self: center;
-    margin: 0 0.4rem 0.15rem 0.85rem;
+    margin: 0 0.45rem 0.15rem 0;
     font-size: 0.72rem;
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--text-muted);
-  }
-  #setup-app .admin-tabs .tab-label:first-child {
-    margin-left: 0;
   }
   #setup-app .site-card {
     margin: 0 0 1rem;

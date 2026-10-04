@@ -98,7 +98,7 @@ export function setRacket(game: Arcade, fractionX: number, fractionY?: number) {
     return;
   }
   const y = FRONT + Math.min(1, Math.max(0, fractionY)) * (BACK - FRONT);
-  game.racketY = Math.min(RACKET_Y, Math.max(FRONT + 36, y));
+  game.racketY = Math.min(RACKET_Y, Math.max(FRONT + 22, y));
 }
 
 function pace(game: Arcade) {

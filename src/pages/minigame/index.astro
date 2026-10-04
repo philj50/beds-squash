@@ -36,15 +36,6 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
           <canvas width={COURT.width} height={COURT.height} data-court tabindex="0" aria-label="Squash court"></canvas>
           <button class="btn btn--primary serve-on-court" type="button" data-serve-btn hidden>Serve</button>
         </div>
-        <div class="bat-track" data-bat hidden>
-          <span class="bat-knob" data-knob>
-            <svg viewBox="0 0 40 56" aria-hidden="true">
-              <ellipse cx="20" cy="16" rx="14" ry="16" fill="none" stroke="currentColor" stroke-width="2"></ellipse>
-              <line x1="20" y1="32" x2="20" y2="52" stroke="currentColor" stroke-width="2"></line>
-            </svg>
-          </span>
-        </div>
-        <p class="hint">Touch the court. The racket sits just in front of your finger, and it can meet the ball anywhere. The ball still comes back to the front wall. Arrow keys move along the back.</p>
         <p class="result" data-result hidden></p>
         <p class="again" data-again hidden>
           <button class="btn btn--primary btn--sm" type="button" data-replay>Play again</button>
@@ -80,8 +71,6 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   const scoreEl = root.querySelector<HTMLElement>('[data-score]')!;
   const livesEl = root.querySelector<HTMLElement>('[data-lives]')!;
   const canvas = root.querySelector<HTMLCanvasElement>('[data-court]')!;
-  const track = root.querySelector<HTMLElement>('[data-bat]')!;
-  const knob = root.querySelector<HTMLElement>('[data-knob]')!;
   const resultEl = root.querySelector<HTMLElement>('[data-result]')!;
   const again = root.querySelector<HTMLElement>('[data-again]')!;
   const boardEl = root.querySelector<HTMLElement>('[data-board]')!;
@@ -204,7 +193,6 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     drawCourt(ctx!, game);
     scoreEl.textContent = String(game.score).padStart(4, '0');
     livesEl.textContent = game.lives > 0 ? `${game.lives} ${game.lives === 1 ? 'life' : 'lives'}` : '';
-    knob.style.left = `${pointer * 100}%`;
   }
 
   async function loadBlocked() {
@@ -306,7 +294,6 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     again.hidden = true;
     hud.hidden = true;
     serveBtn.hidden = false;
-    track.hidden = false;
     paint();
   }
 
@@ -325,19 +312,13 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     requestAnimationFrame((time) => frame(time, id));
   }
 
-  function aimTrack(clientX: number) {
-    const rect = track.getBoundingClientRect();
-    pointer = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-    pointerY = null;
-    if (game) setRacket(game, pointer);
-    paint();
-  }
-
   function aimCourt(clientX: number, clientY: number) {
     const rect = canvas.getBoundingClientRect();
-    const scaleY = canvas.height / rect.height;
+    const scaleY = canvas.height / Math.max(rect.height, 1);
     const x = ((clientX - rect.left) / rect.width) * canvas.width;
-    const y = ((clientY - rect.top) / rect.height) * canvas.height - 64 * scaleY;
+    const fingerY = ((clientY - rect.top) / rect.height) * canvas.height;
+    const lead = Math.min(36 * scaleY, Math.max(0, fingerY - PLAY.front - 20));
+    const y = fingerY - lead;
     const spanX = PLAY.right - PLAY.left;
     const spanY = PLAY.back - PLAY.front;
     pointer = Math.min(1, Math.max(0, (x - PLAY.left) / spanX));
@@ -388,19 +369,10 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     resultEl.hidden = true;
     hud.hidden = true;
     serveBtn.hidden = true;
-    track.hidden = true;
     paint();
     nameInput.focus();
   });
 
-  track.addEventListener('pointerdown', (event) => {
-    track.setPointerCapture(event.pointerId);
-    aimTrack(event.clientX);
-  });
-  track.addEventListener('pointermove', (event) => {
-    if (!track.hasPointerCapture(event.pointerId)) return;
-    aimTrack(event.clientX);
-  });
   canvas.addEventListener('pointerdown', (event) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     canvas.setPointerCapture(event.pointerId);
@@ -493,35 +465,8 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       justify-content: center;
     }
     canvas {
-      width: min(100%, calc(72dvh * 440 / 660));
+      width: min(100%, calc(78dvh * 440 / 660));
     }
-    .bat-track {
-      display: none;
-    }
-  }
-  .bat-track {
-    position: relative;
-    height: 4.4rem;
-    margin-top: 0.45rem;
-    border: 1px solid var(--gold-500);
-    border-radius: var(--radius-sm);
-    background: #07182c;
-    touch-action: none;
-  }
-  .bat-knob {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 2.3rem;
-    height: 3.3rem;
-    color: #9fd0ff;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-  }
-  .bat-knob svg {
-    width: 100%;
-    height: 100%;
-    display: block;
   }
   .hud {
     display: flex;
@@ -531,7 +476,6 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     font-weight: 700;
     letter-spacing: 0.04em;
   }
-  .hint,
   .result {
     color: var(--text-muted);
     font-size: 0.85rem;

@@ -92,6 +92,7 @@ test.describe('Club captain, team captain, and player', () => {
 
     await page.goto('captains/admin/', { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { level: 1, name: 'Administration' })).toBeVisible();
+    await expect(page.locator('.admin-tabs .tab-label').filter({ visible: true })).toHaveText(['SquashLevels', 'This website']);
     await expect(page.getByRole('button', { name: 'Club', exact: true })).toBeVisible();
     await expect(page.locator('[data-site-club]')).toContainText('Pat Player');
     await expect(page.locator('[data-site-club]')).toContainText('Test Team 2');
@@ -103,6 +104,8 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.locator('[data-site-sl]')).toContainText('Sam Squad');
     await expect(page.locator('[data-site-sl]')).not.toContainText('Away Player');
     await expect(page.getByRole('button', { name: 'People' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Activities' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Traffic' })).toHaveCount(0);
     await expect(page.locator('[data-junior-link]')).toBeHidden();
     await expect(page.locator('[data-share-link]')).toBeHidden();
     await expect(page.locator('[data-scores-link]')).toBeHidden();
@@ -357,6 +360,7 @@ test.describe('Club captain, team captain, and player', () => {
 
     await page.goto('captains/admin/#lm-players', { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: 'LM Player' })).toBeVisible();
+    await expect(page.locator('.admin-tabs .tab-label')).toHaveText(['League Master', 'SquashLevels', 'This website']);
     await expect(page.locator('[data-junior-link]')).toBeVisible();
     await expect(page.locator('[data-share-link]')).toBeVisible();
     await expect(page.locator('[data-scores-link]')).toBeVisible();
