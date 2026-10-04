@@ -99,6 +99,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   let last = 0;
   let pointer = 0.5;
   let saved = false;
+  let allowedNames: string[] = [];
   let audioCtx: AudioContext | null = null;
 
   const escapeHtml = (value: string) =>
@@ -190,6 +191,12 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     scoreEl.textContent = String(game.score).padStart(4, '0');
     livesEl.textContent = game.lives > 0 ? `${game.lives} ${game.lives === 1 ? 'life' : 'lives'}` : '';
     knob.style.left = `${pointer * 100}%`;
+  }
+
+  async function loadAllowed() {
+    const { data, error } = await supabase.from('minigame_allowed_names').select('player_name');
+    if (error || !data) return;
+    allowedNames = data.map((row) => row.player_name);
   }
 
   async function loadBoard() {
@@ -333,11 +340,12 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     nameInput.focus();
   });
 
-  form.addEventListener('submit', (event) => {
+  form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const name = nameInput.value.trim();
     if (name.length < 2) return;
-    if (rudeName(name)) {
+    await loadAllowed();
+    if (rudeName(name, allowedNames)) {
       rejectName();
       return;
     }
@@ -390,6 +398,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   });
 
   paint();
+  void loadAllowed();
   void loadBoard();
 </script>
 

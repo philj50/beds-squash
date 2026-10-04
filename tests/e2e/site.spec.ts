@@ -332,6 +332,10 @@ test.describe('Public site', () => {
     await expect(page.getByLabel('Your name')).toHaveValue('');
     await page.getByRole('button', { name: 'Try again' }).click();
     await expect(page.getByRole('dialog')).toBeHidden();
+    await page.getByLabel('Your name').fill('Fanny');
+    await page.getByRole('button', { name: 'Play' }).click();
+    await expect(page.getByRole('dialog')).toContainText('hit the tin');
+    await expect(page.getByLabel('Your name')).toHaveValue('');
   });
 
   test('junior closed signup form', async ({ page }) => {

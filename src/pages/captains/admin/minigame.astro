@@ -35,6 +35,18 @@ import { url } from '@/lib/site';
               <tbody data-rows></tbody>
             </table>
           </div>
+          <h2>Allowed names</h2>
+          <p class="hint">
+            Fanny is stopped, and so are rude words in other languages. Add a name here when it should be allowed on the board anyway.
+          </p>
+          <form class="allow" data-allow>
+            <label>
+              Name
+              <input name="allow" required minlength="2" maxlength="16" autocomplete="off" />
+            </label>
+            <button class="btn btn--primary btn--sm" type="submit">Allow this name</button>
+          </form>
+          <ul data-allowed></ul>
         </div>
       </div>
       <dialog data-confirm>
@@ -63,6 +75,8 @@ import { url } from '@/lib/site';
   const admin = root.querySelector<HTMLElement>('[data-admin]')!;
   const whoEl = root.querySelector<HTMLElement>('[data-who]')!;
   const rowsEl = root.querySelector<HTMLElement>('[data-rows]')!;
+  const allowedEl = root.querySelector<HTMLElement>('[data-allowed]')!;
+  const allowForm = root.querySelector<HTMLFormElement>('[data-allow]')!;
   const confirmDialog = root.querySelector<HTMLDialogElement>('[data-confirm]')!;
   const confirmLine = root.querySelector<HTMLElement>('[data-confirm-line]')!;
   let pendingId: number | null = null;
@@ -95,6 +109,33 @@ import { url } from '@/lib/site';
         </tr>`,
       )
       .join('');
+  }
+
+  type Allowed = { id: number; player_name: string };
+
+  function drawAllowed(names: Allowed[]) {
+    if (!names.length) {
+      allowedEl.innerHTML = '<li class="empty">No names are allowed past the checker.</li>';
+      return;
+    }
+    allowedEl.innerHTML = names
+      .map(
+        (row) =>
+          `<li><span>${escapeHtml(row.player_name)}</span><button class="btn btn--ghost btn--sm" type="button" data-unallow="${row.id}">Remove</button></li>`,
+      )
+      .join('');
+  }
+
+  async function loadAllowed() {
+    const { data, error } = await supabase
+      .from('minigame_allowed_names')
+      .select('id, player_name')
+      .order('player_name', { ascending: true });
+    if (error) {
+      statusEl.textContent = error.message;
+      return;
+    }
+    drawAllowed((data ?? []) as Allowed[]);
   }
 
   async function loadScores() {
@@ -135,6 +176,28 @@ import { url } from '@/lib/site';
     if (!error) await loadScores();
   });
 
+  allowForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const name = String(new FormData(allowForm).get('allow') ?? '').trim();
+    if (name.length < 2) return;
+    statusEl.textContent = 'Allowing…';
+    const { error } = await supabase.rpc('allow_minigame_name', { p_name: name });
+    statusEl.textContent = error ? error.message : `${name} can be used.`;
+    if (!error) {
+      allowForm.reset();
+      await loadAllowed();
+    }
+  });
+
+  allowedEl.addEventListener('click', async (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-unallow]');
+    if (!button?.dataset.unallow) return;
+    statusEl.textContent = 'Removing…';
+    const { error } = await supabase.rpc('unallow_minigame_name', { p_id: Number(button.dataset.unallow) });
+    statusEl.textContent = error ? error.message : 'That name is checked again.';
+    if (!error) await loadAllowed();
+  });
+
   root.querySelector('[data-sign-out]')!.addEventListener('click', async () => {
     await supabase.auth.signOut();
     await showSession();
@@ -157,7 +220,7 @@ import { url } from '@/lib/site';
       return;
     }
     admin.hidden = false;
-    await loadScores();
+    await Promise.all([loadScores(), loadAllowed()]);
   }
 
   void showSession();
@@ -229,6 +292,52 @@ import { url } from '@/lib/site';
   }
   dialog p:first-child {
     margin: 0 0 0.9rem;
+  }
+  h2 {
+    margin: 1.6rem 0 0.4rem;
+  }
+  .hint {
+    color: var(--ink-200);
+    font-size: 0.9rem;
+    margin-top: 0;
+  }
+  .allow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: end;
+    margin: 0.8rem 0;
+  }
+  .allow label {
+    display: grid;
+    gap: 0.3rem;
+    font-size: 0.9rem;
+  }
+  .allow input {
+    background: var(--ink-900);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 0.55rem 0.7rem;
+    font: inherit;
+  }
+  [data-allowed] {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  [data-allowed] :global(li) {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  [data-allowed] :global(li.empty) {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    border-bottom: 0;
   }
   [hidden] {
     display: none !important;

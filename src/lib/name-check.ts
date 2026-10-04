@@ -22,6 +22,7 @@ const WORDS = [
   'dickhead',
   'prick',
   'knob',
+  'knobhead',
   'piss',
   'slut',
   'whore',
@@ -38,11 +39,55 @@ const WORDS = [
   'nigga',
   'retard',
   'spastic',
+  'fanny',
+  'bellend',
+  'minge',
+  'tosser',
+  'bugger',
+  'shag',
+  'slag',
+  'putain',
+  'merde',
+  'salope',
+  'connard',
+  'couille',
+  'enfoire',
+  'mierda',
+  'joder',
+  'cabron',
+  'maricon',
+  'gilipollas',
+  'puta',
+  'scheisse',
+  'fotze',
+  'arschloch',
+  'hurensohn',
+  'wichser',
+  'cazzo',
+  'stronzo',
+  'puttana',
+  'vaffanculo',
+  'merda',
+  'kurwa',
+  'pierdol',
+  'skurwysyn',
+  'klootzak',
+  'hoer',
+  'caralho',
+  'porra',
+  'foder',
 ];
+
+export function nameKey(name: string) {
+  return fold(name).replace(/[^a-z]+/g, '');
+}
 
 function fold(value: string) {
   return value
     .toLowerCase()
+    .replace(/ß/g, 'ss')
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
     .replace(/[@4]/g, 'a')
     .replace(/3/g, 'e')
     .replace(/[1!|]/g, 'i')
@@ -56,7 +101,11 @@ function hits(collapsed: string, word: string) {
   return word.length >= 5 && collapsed.includes(word);
 }
 
-export function rudeName(name: string) {
+export function rudeName(name: string, allowed: Iterable<string> = []) {
+  const key = nameKey(name);
+  for (const item of allowed) {
+    if (nameKey(item) === key) return false;
+  }
   const folded = fold(name);
   const spaced = folded.replace(/[^a-z]+/g, ' ').trim();
   const tokens = new Set(spaced.split(/\s+/).filter(Boolean));
