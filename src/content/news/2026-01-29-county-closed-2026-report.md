@@ -27,3 +27,5 @@ Two thrilling five-game semi-finals set up the final. **Rachael Hamp** edged Jol
 - **Plates:** Sam Gelder (A), Charlie Jessop (B), Ben Robinson (C)
 
 Full results are on the [Honours Board](/tournaments/#honours). Thanks to Club Towers for hosting and to everyone who entered, refereed and supported.
+
+Club Towers filmed the finals. Watch the [Open A Grade final](https://vimeo.com/1153984252/ad198677f7), the [Ladies A Grade final](https://vimeo.com/1153982230/8355f0edd8), the [B Grade plate final](https://vimeo.com/1153980921/f81f18bb1c) and the [Over 55s final](https://vimeo.com/1153983030/e4e56a15d7).

@@ -6,7 +6,7 @@ updated: 2026-09-23
 
 ## Winter League
 
-The main league runs through the winter with two divisions. The September 2026 AGM confirmed eight teams in each division again this season, on the same entry fees: **£80 and £50**.
+The main league runs through the winter with two divisions.
 
 | Division | Scoring | Order of play |
 | --- | --- | --- |

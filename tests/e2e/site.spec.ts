@@ -98,6 +98,77 @@ test.describe('Public site', () => {
     await expect(page.locator('[data-history]')).not.toContainText('1,500');
   });
 
+  test('a league player name opens all of their matches', async ({ page }) => {
+    await page.route('**/rest/v1/**', async (route) => {
+      const url = new URL(route.request().url());
+      const send = (body: unknown) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      if (url.pathname.endsWith('/league_seasons')) {
+        return send([{ id: 7, name: 'Winter 2025/26', starts_on: '2025-10-01', ends_on: '2026-03-31' }]);
+      }
+      if (url.pathname.endsWith('/divisions')) {
+        return send([{ id: 10, name: 'Division 1', scoring: 'PAR to 11' }]);
+      }
+      if (url.pathname.endsWith('/league_teams')) {
+        return send([
+          { id: 73, name: 'Club Towers 1', division_id: 10 },
+          { id: 74, name: 'Shenley Leisure 1', division_id: 10 },
+        ]);
+      }
+      if (url.pathname.endsWith('/fixtures')) {
+        return send([
+          {
+            id: 288,
+            division_id: 10,
+            home_team_id: 73,
+            away_team_id: 74,
+            starts_at: '2025-11-17T19:15:00+00:00',
+            status: 'played',
+            home_points: 4,
+            away_points: 17,
+            home_games: 4,
+            away_games: 15,
+            home: { name: 'Club Towers 1' },
+            away: { name: 'Shenley Leisure 1' },
+          },
+        ]);
+      }
+      if (url.pathname.endsWith('/rubbers')) {
+        if (url.searchParams.has('or')) {
+          return send([
+            {
+              home_player: 'Pat Player',
+              away_player: 'Zoe Player',
+              score: '11/5 11/7 11/9',
+              winner: 'home',
+              fixtures: {
+                starts_at: '2025-11-17T19:15:00+00:00',
+                home: { name: 'Club Towers 1' },
+                away: { name: 'Shenley Leisure 1' },
+                divisions: { name: 'Division 1', league_seasons: { name: 'Winter 2025/26' } },
+              },
+            },
+          ]);
+        }
+        return send([
+          { position: 1, home_player: 'Pat Player', away_player: 'Zoe Player', score: '11/5 11/7 11/9', winner: 'home' },
+        ]);
+      }
+      return send([]);
+    });
+
+    await open(page, 'leagues/results/');
+    await page.locator('[data-fixture-btn="288"]').click();
+    await page.getByRole('button', { name: 'Pat Player' }).click();
+    await expect(page.getByRole('heading', { name: 'Pat Player' })).toBeVisible();
+    await expect(page.locator('#player-matches')).toContainText('won 1, lost 0');
+    await expect(page.locator('#player-matches')).toContainText(/3\u20130/);
+    await expect(page.getByRole('button', { name: 'Zoe Player' })).toBeVisible();
+    await expect(page.locator('#player-matches')).toContainText('Club Towers 1');
+    await page.getByRole('button', { name: 'Back to tables' }).click();
+    await expect(page.getByRole('heading', { name: 'Division 1' })).toBeVisible();
+  });
+
   test('league results shell loads', async ({ page }) => {
     await open(page, 'leagues/results/');
     await expect(page.getByRole('heading', { level: 1 })).toContainText(/Tables and fixtures/i);

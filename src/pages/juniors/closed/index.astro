@@ -1,5 +1,6 @@
 ---
 import Base from '@/layouts/Base.astro';
+import JuniorAdminMenu from '@/components/JuniorAdminMenu.astro';
 import JuniorClosedQr from '@/components/JuniorClosedQr.astro';
 import { getClubs } from '@/lib/content';
 import { AGE_REFERENCE } from '@/lib/junior-age';
@@ -7,7 +8,6 @@ import { url } from '@/lib/site';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 const clubs = (await getClubs()).map((club) => club.data.name);
-const organiserHref = url('/juniors/closed/entries/');
 ---
 
 <Base
@@ -24,6 +24,7 @@ const organiserHref = url('/juniors/closed/entries/');
         <div>
           <p class="eyebrow">Juniors</p>
           <h1>Junior County Closed</h1>
+          <JuniorAdminMenu />
           <JuniorClosedQr showEnter={false} />
           <p class="lede">
             November. The playing date is still to be fixed. A parent or guardian enters the player here. The age group is worked out from the date of birth, using age on {AGE_REFERENCE}: Under 11, Under 13, Under 15, Under 17 and Under 19.
@@ -79,7 +80,6 @@ const organiserHref = url('/juniors/closed/entries/');
           </form>
         </div>
       </div>
-      <p class="organiser no-print"><a href={organiserHref}>Organisers</a></p>
     </div>
   </section>
 </Base>
@@ -215,9 +215,8 @@ const organiserHref = url('/juniors/closed/entries/');
     height: 0;
     overflow: hidden;
   }
-  .organiser {
-    margin-top: 1.5rem;
-    font-size: 0.85rem;
+  .junior-admin {
+    margin: 0.4rem 0 0.8rem;
   }
   @media print {
     :global(.site-header),

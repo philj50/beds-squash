@@ -18,7 +18,7 @@ const crumbs = [
   <PageHero
     eyebrow="Winter and summer"
     title="Tables and fixtures"
-    lede="Published results for previous seasons, and the fixtures for the season now in progress. Click a team for its matches, or a score for the match card. This page is for reading only — captains enter scores on League Master."
+    lede="Published results for previous seasons, and the fixtures for the season now in progress. Click a team for its matches, a score for the match card, or a player’s name for every match they have played. This page is for reading only — captains enter scores on League Master."
   >
     <div class="hero-actions">
       <a class="btn btn--ghost" href={url('/leagues/')}>League rules</a>
@@ -209,6 +209,94 @@ const crumbs = [
     return 'D';
   }
 
+  function linkablePlayer(name: string | null): string | null {
+    const label = name?.trim() ?? '';
+    if (label.length < 2 || /walkover/i.test(label)) return null;
+    return label;
+  }
+
+  function playerCell(name: string | null): string {
+    const label = linkablePlayer(name);
+    if (!label) return escapeHtml(name?.trim() || '\u2014');
+    return `<button type="button" class="player-link" data-player="${escapeHtml(label)}">${escapeHtml(label)}</button>`;
+  }
+
+  function rubberGames(score: string | null): { home: number; away: number } | null {
+    if (!score) return null;
+    let home = 0;
+    let away = 0;
+    for (const part of score.trim().split(/\s+/)) {
+      const [left, right] = part.split('/').map(Number);
+      if (!Number.isFinite(left) || !Number.isFinite(right) || left === right) continue;
+      if (left > right) home += 1;
+      else away += 1;
+    }
+    return home || away ? { home, away } : null;
+  }
+
+  type PlayerMatch = {
+    playedOn: string;
+    season: string;
+    division: string;
+    homeTeam: string;
+    awayTeam: string;
+    opponent: string;
+    side: 'home' | 'away';
+    won: boolean | null;
+    mine: number | null;
+    theirs: number | null;
+  };
+
+  function renderPlayer(name: string, matches: PlayerMatch[]): string {
+    const decided = matches.filter((match) => match.won != null);
+    const won = decided.filter((match) => match.won).length;
+    const lost = decided.length - won;
+    const recent = decided.slice(0, 16).reverse();
+    const form = recent
+      .map((match) => `<span class="form form--${match.won ? 'w' : 'l'}">${match.won ? 'W' : 'L'}</span>`)
+      .join('');
+    let lastGroup = '';
+    const rows = matches
+      .map((match) => {
+        const group = `${match.season}${match.division ? ` · ${match.division}` : ''}`;
+        const seasonRow = group !== lastGroup ? `<tr class="player-season"><td colspan="5">${escapeHtml(group)}</td></tr>` : '';
+        lastGroup = group;
+        const when = new Date(match.playedOn);
+        const games = match.mine != null && match.theirs != null ? `${match.mine}\u2013${match.theirs}` : '\u2014';
+        const mine = match.side === 'home' ? match.homeTeam : match.awayTeam;
+        const other = match.side === 'home' ? match.awayTeam : match.homeTeam;
+        const result =
+          match.won == null ? '' : `<span class="form form--${match.won ? 'w' : 'l'}">${match.won ? 'W' : 'L'}</span>`;
+        return `${seasonRow}<tr>
+          <td class="when"><time datetime="${match.playedOn}">${dateFmt.format(when)}</time></td>
+          <td class="player ${match.won ? 'is-win' : ''}">${playerCell(match.opponent)}</td>
+          <td class="score">${games}</td>
+          <td class="side"><strong>${escapeHtml(mine)}</strong> v ${escapeHtml(other)}</td>
+          <td class="outcome">${result}</td>
+        </tr>`;
+      })
+      .join('');
+    return `<article class="card player-card" id="player-matches">
+      <div class="card__body">
+        <div class="board-head board-head--focus">
+          <div>
+            <h2>${escapeHtml(name)}</h2>
+            <p>${matches.length} match${matches.length === 1 ? '' : 'es'} · won ${won}, lost ${lost} · every published league match under this name</p>
+            ${form ? `<div class="form-strip" aria-label="Recent results">${form}</div>` : ''}
+          </div>
+          <button type="button" class="btn btn--ghost btn--sm" data-player-back>Back to tables</button>
+        </div>
+        <div class="table-wrap">
+          <table class="fixtures">
+            <caption class="sr-only">Matches for ${escapeHtml(name)}</caption>
+            <thead><tr><th>Date</th><th>Opponent</th><th class="score">Games</th><th>Teams</th><th></th></tr></thead>
+            <tbody>${rows || '<tr><td colspan="5">No published matches for this name.</td></tr>'}</tbody>
+          </table>
+        </div>
+      </div>
+    </article>`;
+  }
+
   function renderRubbers(fixture: Fixture, rubbers: Rubber[] | null): string {
     if (rubbers === null) return '<p class="muted detail-note">Loading match card…</p>';
     if (!rubbers.length) {
@@ -221,9 +309,9 @@ const crumbs = [
         const walkover = /walkover/i.test(`${rubber.home_player ?? ''} ${rubber.away_player ?? ''}`) || rubber.score == null;
         return `<tr>
           <td class="num">${rubber.position}</td>
-          <td class="player ${homeWon ? 'is-win' : ''}">${escapeHtml(rubber.home_player ?? '\u2014')}</td>
+          <td class="player ${homeWon ? 'is-win' : ''}">${playerCell(rubber.home_player)}</td>
           <td class="score">${walkover && !rubber.score ? '<span class="muted">walkover</span>' : escapeHtml(rubber.score ?? '\u2014')}</td>
-          <td class="player away ${awayWon ? 'is-win' : ''}">${escapeHtml(rubber.away_player ?? '\u2014')}</td>
+          <td class="player away ${awayWon ? 'is-win' : ''}">${playerCell(rubber.away_player)}</td>
         </tr>`;
       })
       .join('');
@@ -290,7 +378,7 @@ const crumbs = [
         </tr>${detail}`;
       })
       .join('');
-    let fixtureHead = `<div class="board-head"><h2>Fixtures</h2><p>${fixtures.length} match${fixtures.length === 1 ? '' : 'es'} · home team first · click a score for the match card</p></div>`;
+    let fixtureHead = `<div class="board-head"><h2>Fixtures</h2><p>${fixtures.length} match${fixtures.length === 1 ? '' : 'es'} · home team first · click a score for the match card, then a name for that player’s matches</p></div>`;
     if (focus) {
       const record = shown.reduce(
         (acc, fixture) => {
@@ -374,7 +462,73 @@ const crumbs = [
     let fixtures: Fixture[] = [];
     let focusTeamId: number | null = null;
     let openFixtureId: number | null = null;
+    let playerName: string | null = null;
     const rubberCache = new Map<number, Rubber[]>();
+
+    function one<T>(value: T | T[] | null | undefined): T | null {
+      if (Array.isArray(value)) return value[0] ?? null;
+      return value ?? null;
+    }
+
+    async function loadPlayerMatches(name: string): Promise<PlayerMatch[]> {
+      const quoted = `"${name.replace(/["\\]/g, '')}"`;
+      const { data, error } = await supabase
+        .from('rubbers')
+        .select(
+          'home_player, away_player, score, winner, fixtures!inner(starts_at, home:league_teams!fixtures_home_team_id_fkey(name), away:league_teams!fixtures_away_team_id_fkey(name), divisions(name, league_seasons(name)))',
+        )
+        .or(`home_player.ilike.${quoted},away_player.ilike.${quoted}`)
+        .limit(500);
+      if (error) throw error;
+      const matches = ((data ?? []) as Array<Record<string, unknown>>).flatMap((row) => {
+        const fixture = one(row.fixtures as never);
+        if (!fixture) return [];
+        const division = one((fixture as { divisions?: unknown }).divisions as never) as {
+          name?: string;
+          league_seasons?: { name?: string } | { name?: string }[] | null;
+        } | null;
+        const season = one(division?.league_seasons ?? null);
+        const home = one((fixture as { home?: unknown }).home as never) as { name?: string } | null;
+        const away = one((fixture as { away?: unknown }).away as never) as { name?: string } | null;
+        const homePlayer = String(row.home_player ?? '');
+        const awayPlayer = String(row.away_player ?? '');
+        const side: 'home' | 'away' = homePlayer.toLowerCase() === name.toLowerCase() ? 'home' : 'away';
+        const games = rubberGames(row.score == null ? null : String(row.score));
+        const winner = row.winner == null ? null : String(row.winner);
+        const won = winner === 'home' || winner === 'away' ? winner === side : null;
+        return [
+          {
+            playedOn: String((fixture as { starts_at: string }).starts_at),
+            season: season?.name ?? 'League',
+            division: division?.name ?? '',
+            homeTeam: home?.name ?? 'Home',
+            awayTeam: away?.name ?? 'Away',
+            opponent: side === 'home' ? awayPlayer : homePlayer,
+            side,
+            won,
+            mine: games ? (side === 'home' ? games.home : games.away) : null,
+            theirs: games ? (side === 'home' ? games.away : games.home) : null,
+          } satisfies PlayerMatch,
+        ];
+      });
+      return matches.sort((a, b) => b.playedOn.localeCompare(a.playedOn));
+    }
+
+    async function showPlayer(name: string) {
+      playerName = name;
+      history.replaceState(null, '', `#player/${encodeURIComponent(name)}`);
+      board.innerHTML = `<article class="card player-card" id="player-matches"><div class="card__body"><p class="muted">Loading matches…</p></div></article>`;
+      document.getElementById('player-matches')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      try {
+        const matches = await loadPlayerMatches(name);
+        if (playerName !== name) return;
+        board.innerHTML = renderPlayer(name, matches);
+        setStatus('');
+      } catch (error) {
+        if (playerName !== name) return;
+        setStatus(error instanceof Error ? error.message : 'Those matches could not be loaded.');
+      }
+    }
 
     async function loadRubbers(fixtureId: number) {
       if (rubberCache.has(fixtureId)) return;
@@ -458,6 +612,7 @@ const crumbs = [
     }
 
     function paint() {
+      if (playerName) return;
       const season = seasons.find((item) => item.id === seasonId);
       const inKind = seasonsInKind(kind);
       showKind(kind);
@@ -507,6 +662,16 @@ const crumbs = [
 
     board.addEventListener('click', (event) => {
       const target = event.target as HTMLElement;
+      const playerButton = target.closest<HTMLButtonElement>('[data-player]');
+      if (playerButton?.dataset.player) {
+        void showPlayer(playerButton.dataset.player);
+        return;
+      }
+      if (target.closest('[data-player-back]')) {
+        playerName = null;
+        paint();
+        return;
+      }
       const teamButton = target.closest<HTMLButtonElement>('[data-team-btn]');
       if (teamButton) {
         const id = Number(teamButton.dataset.teamBtn);
@@ -536,6 +701,7 @@ const crumbs = [
       seasonId = season.id;
       focusTeamId = null;
       openFixtureId = null;
+      playerName = null;
       await loadSeason(season.id);
       divisionId = divisions[0]?.id ?? 0;
       paint();
@@ -565,6 +731,7 @@ const crumbs = [
       divisionId = Number(button.dataset.division);
       focusTeamId = null;
       openFixtureId = null;
+      playerName = null;
       paint();
     });
 
@@ -575,7 +742,15 @@ const crumbs = [
         .order('starts_on', { ascending: false });
       if (error) throw error;
       seasons = (data ?? []).filter((season) => kindOf(season.name));
-      const hashParts = location.hash.replace('#', '').split('/');
+      const rawHash = location.hash.replace('#', '');
+      let hash = rawHash;
+      try {
+        hash = decodeURIComponent(rawHash);
+      } catch {
+        hash = rawHash;
+      }
+      const hashParts = hash.split('/');
+      const hashPlayer = hashParts[0] === 'player' ? hashParts.slice(1).join('/') : '';
       const hashSeason = Number(hashParts[0]);
       const hashDivision = Number(hashParts[1]);
       const hashTeam = Number(hashParts.find((part) => /^t\d+$/.test(part))?.slice(1));
@@ -592,7 +767,10 @@ const crumbs = [
         await loadSeason(initial.id);
         divisionId = divisions.some((division) => division.id === hashDivision) ? hashDivision : (divisions[0]?.id ?? 0);
         focusTeamId = hashTeam || null;
-        if (hashMatch) await openFixture(hashMatch);
+        if (hashPlayer) {
+          paint();
+          await showPlayer(hashPlayer);
+        } else if (hashMatch) await openFixture(hashMatch);
         else paint();
       }
     } catch (error) {
@@ -877,9 +1055,39 @@ const crumbs = [
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
-  #results-app .rubbers .player.is-win {
+  #results-app .rubbers .player.is-win,
+  #results-app .player-card .player.is-win {
     color: var(--gold-400);
     font-weight: 600;
+  }
+  #results-app .player-link {
+    appearance: none;
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+    font-weight: inherit;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--gold-400) 55%, transparent);
+    text-underline-offset: 3px;
+  }
+  #results-app .player-link:hover,
+  #results-app .player-link:focus-visible {
+    color: var(--gold-400);
+  }
+  #results-app .player-season td {
+    padding-top: 0.85rem;
+    border-bottom: none;
+    color: var(--gold-400);
+    font-family: var(--font-display);
+    font-size: 1rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  #results-app .player-card .side strong {
+    font-weight: 700;
   }
   @media (max-width: 640px) {
     #results-app tr.fx-detail > td {

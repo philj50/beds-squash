@@ -84,6 +84,7 @@ test.describe('Club captain, team captain, and player', () => {
 
     await page.goto('captains/admin/', { waitUntil: 'domcontentloaded' });
     await expect(page.getByText('This account cannot set up teams.')).toBeVisible();
+    await expect(page.locator('[data-junior-link]')).toBeHidden();
     await page.goto('captains/admin/articles/', { waitUntil: 'domcontentloaded' });
     await expect(page.getByText('This account cannot change articles.')).toBeVisible();
     await page.goto('juniors/closed/entries/', { waitUntil: 'domcontentloaded' });
@@ -257,6 +258,7 @@ test.describe('Club captain, team captain, and player', () => {
 
     await page.goto('captains/admin/#players', { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: 'Players' })).toBeVisible();
+    await expect(page.locator('[data-junior-link]')).toBeVisible();
     const row = page.locator('[data-directory] tr', { hasText: 'Pat Player' });
     await expect(row).toContainText('Test Club');
     await expect(row).toContainText('Test Team 1');
@@ -276,7 +278,34 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.getByText('No players match that search.')).toBeVisible();
     await page.getByRole('searchbox', { name: 'Search' }).fill('123456');
     await expect(row).toBeVisible();
+
+    await page.goto('juniors/', { waitUntil: 'domcontentloaded' });
+    const adminMenu = page.locator('[data-junior-admin]');
+    await expect(adminMenu).toBeVisible();
+    await adminMenu.getByRole('button', { name: 'Junior admin' }).click();
+    await expect(adminMenu.getByRole('menuitem', { name: 'County Closed entries' })).toBeVisible();
   });
+});
+
+test.describe('Junior admin stays off the public juniors pages', () => {
+  for (const role of ['club_captain', 'team_captain', 'team_player'] as const) {
+    test(`${role.replaceAll('_', ' ')} does not see the junior admin menu`, async ({ page }) => {
+      await signIn(page, role);
+      const profiles = page.waitForResponse((res) => res.url().includes('/rest/v1/profiles'));
+      await page.goto('juniors/', { waitUntil: 'domcontentloaded' });
+      await profiles;
+      await page.waitForLoadState('networkidle');
+      await expect(page.locator('[data-junior-admin]')).toBeHidden();
+      await expect(page.getByRole('link', { name: 'County Closed entries' })).toHaveCount(0);
+
+      const profilesAgain = page.waitForResponse((res) => res.url().includes('/rest/v1/profiles'));
+      await page.goto('juniors/closed/', { waitUntil: 'domcontentloaded' });
+      await profilesAgain;
+      await page.waitForLoadState('networkidle');
+      await expect(page.getByRole('link', { name: 'Organisers' })).toHaveCount(0);
+      await expect(page.locator('[data-junior-admin]')).toBeHidden();
+    });
+  }
 });
 
 async function signIn(page: Page, role: RoleName) {

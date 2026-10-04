@@ -2,6 +2,7 @@
 import Base from '@/layouts/Base.astro';
 import ContentPage from '@/components/ContentPage.astro';
 import EventCard from '@/components/EventCard.astro';
+import JuniorAdminMenu from '@/components/JuniorAdminMenu.astro';
 import JuniorClosedQr from '@/components/JuniorClosedQr.astro';
 import { getClubs, getDocuments, getUpcomingEvents } from '@/lib/content';
 import { url } from '@/lib/site';
@@ -14,6 +15,7 @@ const safeguarding = (await getDocuments()).filter((d) => d.data.category === 's
 <Base title="Junior squash in Bedfordshire" description="Junior squash in Bedfordshire: county squads, age groups, the Junior County Closed, coaching venues and safeguarding." crumbs={[{ name: 'Juniors', path: '/juniors/' }]}>
   <ContentPage id="juniors" eyebrow="Under 19s" fallbackTitle="Juniors">
     <JuniorClosedQr slot="hero" />
+    <JuniorAdminMenu slot="hero" />
     <div slot="aside" class="stack">
       <div class="card"><div class="card__body">
         <h3>Junior County Closed</h3>
@@ -53,6 +55,11 @@ const safeguarding = (await getDocuments()).filter((d) => d.data.category === 's
     grid-row: 1 / span 3;
     align-self: center;
     margin: 0;
+  }
+  :global(.page-hero .junior-admin) {
+    grid-column: 1;
+    justify-self: start;
+    margin-top: 0.35rem;
   }
   :global(.page-hero .entry-qr__code svg) {
     width: 7.5rem;
