@@ -136,10 +136,10 @@ import { url } from '@/lib/site';
       ? rows
           .map(
             (row, index) =>
-              `<li><span class="rank">${index + 1}</span><span>${escapeHtml(row.credit)}</span><span class="hint">${escapeHtml(boardLine(row))}</span></li>`,
+              `<li><span class="rank">${index + 1}</span><span class="who">${escapeHtml(row.credit)}</span><span class="tally">${escapeHtml(boardLine(row))}</span></li>`,
           )
           .join('')
-      : '<li class="muted">No one is on the board yet.</li>';
+      : '<li class="empty">No one is on the board yet.</li>';
   }
 
   async function loadLinks() {
@@ -357,19 +357,35 @@ import { url } from '@/lib/site';
     margin: 0.6rem 0 0;
     padding: 0;
   }
-  [data-board] li {
+  [data-board] :global(li) {
     display: grid;
-    grid-template-columns: 1.6rem 1fr;
-    gap: 0.15rem 0.5rem;
-    padding: 0.4rem 0;
+    grid-template-columns: 1.4rem minmax(0, 1fr) auto;
+    align-items: baseline;
+    column-gap: 0.6rem;
+    padding: 0.45rem 0;
     border-bottom: 1px solid var(--border);
   }
-  [data-board] .hint {
-    grid-column: 2;
+  [data-board] :global(li:last-child) {
+    border-bottom: 0;
+    padding-bottom: 0;
   }
-  .rank {
+  [data-board] :global(.rank) {
     color: var(--gold-400);
     font-weight: 700;
+  }
+  [data-board] :global(.who) {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  [data-board] :global(.tally) {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    text-align: right;
+  }
+  [data-board] :global(li.empty) {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.85rem;
   }
   .link-list {
     display: grid;
