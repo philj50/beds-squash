@@ -36,6 +36,8 @@ type Ball = {
   vx: number;
   vy: number;
   returned: boolean;
+  /** Stays at the front until the other ball is on its way back. */
+  wait: boolean;
 };
 
 export type Arcade = {
@@ -54,11 +56,9 @@ export type Arcade = {
 
 function parked(count: number): Ball[] {
   const mid = (LEFT + RIGHT) / 2;
-  if (count < 2) return [{ x: mid, y: FRONT + 28, vx: 0, vy: 0, returned: false }];
-  return [
-    { x: mid - 28, y: FRONT + 28, vx: 0, vy: 0, returned: false },
-    { x: mid + 28, y: FRONT + 28, vx: 0, vy: 0, returned: false },
-  ];
+  const still = (x: number): Ball => ({ x, y: FRONT + 28, vx: 0, vy: 0, returned: false, wait: false });
+  if (count < 2) return [still(mid)];
+  return [still(mid - 28), still(mid + 28)];
 }
 
 export function createArcade(): Arcade {
@@ -106,6 +106,7 @@ export function tick(game: Arcade, dt: number): TickEvent[] {
   }
 
   maybeTwin(game);
+  releaseWaiting(game);
   maybeSpawn(game);
   const speed = pace(game);
   const slices = Math.max(5, Math.ceil((speed * step) / 10));
@@ -113,6 +114,12 @@ export function tick(game: Arcade, dt: number): TickEvent[] {
   for (let i = 0; i < slices && !missed; i += 1) {
     const piece = step / slices;
     for (const ball of game.balls) {
+      if (ball.wait) {
+        ball.y = FRONT + 28;
+        ball.vx = 0;
+        ball.vy = 0;
+        continue;
+      }
       ball.x += ball.vx * piece;
       ball.y += ball.vy * piece;
 
@@ -135,14 +142,21 @@ export function tick(game: Arcade, dt: number): TickEvent[] {
 
       if (ball.y < FRONT + BALL) {
         ball.y = FRONT + BALL;
-        ball.vy = Math.abs(speed);
         if (ball.returned) {
           game.score += 1;
           ball.returned = false;
           events.push('score');
         }
-        ball.vx += wander(game, speed);
-        ball.vx = clamp(ball.vx, -speed * 0.8, speed * 0.8);
+        const otherComing = game.balls.some((other) => other !== ball && !other.wait && other.vy > 0);
+        if (otherComing) {
+          ball.wait = true;
+          ball.vx = 0;
+          ball.vy = 0;
+        } else {
+          ball.vy = Math.abs(speed);
+          ball.vx += wander(game, speed);
+          ball.vx = clamp(ball.vx, -speed * 0.8, speed * 0.8);
+        }
       }
 
       if (ball.vy > 0 && ball.y >= RACKET_Y - BALL && ball.y <= RACKET_Y + 18) {
@@ -177,16 +191,29 @@ function wander(game: Arcade, speed: number) {
 function maybeTwin(game: Arcade) {
   if (game.age < 60 || game.balls.length >= 2) return;
   game.twin = true;
-  const speed = pace(game);
   const other = game.balls[0];
   const mid = (LEFT + RIGHT) / 2;
   game.balls.push({
     x: other && other.x >= mid ? LEFT + 70 : RIGHT - 70,
-    y: FRONT + 24,
-    vx: (Math.random() - 0.5) * 80,
-    vy: speed,
+    y: FRONT + 28,
+    vx: 0,
+    vy: 0,
     returned: false,
+    wait: true,
   });
+}
+
+/** One ball comes down. The other stays at the front until that one is hit back. */
+function releaseWaiting(game: Arcade) {
+  if (game.balls.some((ball) => !ball.wait && ball.vy > 0)) return;
+  const waiting = game.balls.find((ball) => ball.wait);
+  if (!waiting) return;
+  const speed = pace(game);
+  waiting.wait = false;
+  waiting.y = FRONT + 24;
+  waiting.returned = false;
+  waiting.vy = speed;
+  waiting.vx = (Math.random() - 0.5) * Math.min(160, 50 + game.age * 4);
 }
 
 function maybeSpawn(game: Arcade) {
@@ -218,12 +245,14 @@ function flying(game: Arcade, slot: number): Ball {
   const speed = pace(game);
   const span = RIGHT - LEFT - 80;
   const along = slot === 0 ? Math.random() : 0.62 + Math.random() * 0.2;
+  const lead = slot === 0;
   return {
     x: LEFT + 40 + along * span,
     y: FRONT + 24,
-    vx: (Math.random() - 0.5) * Math.min(160, 50 + game.age * 4),
-    vy: speed,
+    vx: lead ? (Math.random() - 0.5) * Math.min(160, 50 + game.age * 4) : 0,
+    vy: lead ? speed : 0,
     returned: false,
+    wait: !lead,
   };
 }
 

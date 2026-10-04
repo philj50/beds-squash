@@ -108,28 +108,38 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
   function audio() {
     audioCtx ??= new AudioContext();
-    if (audioCtx.state === 'suspended') void audioCtx.resume();
     return audioCtx;
   }
 
-  function beep(freq: number, at: number, dur: number, type: OscillatorType, volume: number) {
+  function whenReady(play: (ctxAudio: AudioContext) => void) {
     const ctxAudio = audio();
-    const osc = ctxAudio.createOscillator();
-    const gain = ctxAudio.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, at);
-    gain.gain.setValueAtTime(volume, at);
-    gain.gain.exponentialRampToValueAtTime(0.0001, at + dur);
-    osc.connect(gain);
-    gain.connect(ctxAudio.destination);
-    osc.start(at);
-    osc.stop(at + dur);
+    if (ctxAudio.state === 'suspended') {
+      void ctxAudio.resume().then(() => play(ctxAudio));
+      return;
+    }
+    play(ctxAudio);
+  }
+
+  function beep(freq: number, at: number, dur: number, type: OscillatorType, volume: number) {
+    whenReady((ctxAudio) => {
+      const start = Math.max(at, ctxAudio.currentTime);
+      const osc = ctxAudio.createOscillator();
+      const gain = ctxAudio.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(volume, start);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+      osc.connect(gain);
+      gain.connect(ctxAudio.destination);
+      osc.start(start);
+      osc.stop(start + dur);
+    });
   }
 
   function intro() {
     try {
       const now = audio().currentTime;
-      [330, 392, 494, 659].forEach((freq, index) => beep(freq, now + index * 0.11, 0.1, 'square', 0.035));
+      [330, 392, 494, 659].forEach((freq, index) => beep(freq, now + index * 0.11, 0.12, 'square', 0.07));
     } catch {
       /* the game still plays if sound is blocked */
     }
@@ -137,23 +147,24 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
   function batHit() {
     try {
-      const ctxAudio = audio();
-      const dur = 0.07;
-      const buffer = ctxAudio.createBuffer(1, Math.floor(ctxAudio.sampleRate * dur), ctxAudio.sampleRate);
-      const data = buffer.getChannelData(0);
-      for (let i = 0; i < data.length; i += 1) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
-      const src = ctxAudio.createBufferSource();
-      src.buffer = buffer;
-      const filter = ctxAudio.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.value = 720;
-      const gain = ctxAudio.createGain();
-      gain.gain.value = 0.09;
-      src.connect(filter);
-      filter.connect(gain);
-      gain.connect(ctxAudio.destination);
-      src.start();
-      beep(180, ctxAudio.currentTime, 0.05, 'square', 0.03);
+      whenReady((ctxAudio) => {
+        const dur = 0.07;
+        const buffer = ctxAudio.createBuffer(1, Math.floor(ctxAudio.sampleRate * dur), ctxAudio.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < data.length; i += 1) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+        const src = ctxAudio.createBufferSource();
+        src.buffer = buffer;
+        const filter = ctxAudio.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 720;
+        const gain = ctxAudio.createGain();
+        gain.gain.value = 0.16;
+        src.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctxAudio.destination);
+        src.start();
+        beep(180, ctxAudio.currentTime, 0.06, 'square', 0.06);
+      });
     } catch {
       /* the game still plays if sound is blocked */
     }
@@ -161,21 +172,22 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
   function wahwah() {
     try {
-      const now = audio().currentTime;
-      [392, 330, 262].forEach((freq, index) => {
-        const at = now + index * 0.24;
-        const ctxAudio = audio();
-        const osc = ctxAudio.createOscillator();
-        const gain = ctxAudio.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(freq * 1.5, at);
-        osc.frequency.exponentialRampToValueAtTime(freq * 0.7, at + 0.2);
-        gain.gain.setValueAtTime(0.045, at);
-        gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.22);
-        osc.connect(gain);
-        gain.connect(ctxAudio.destination);
-        osc.start(at);
-        osc.stop(at + 0.24);
+      whenReady((ctxAudio) => {
+        const now = ctxAudio.currentTime;
+        [392, 330, 262].forEach((freq, index) => {
+          const at = now + index * 0.24;
+          const osc = ctxAudio.createOscillator();
+          const gain = ctxAudio.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(freq * 1.5, at);
+          osc.frequency.exponentialRampToValueAtTime(freq * 0.7, at + 0.2);
+          gain.gain.setValueAtTime(0.08, at);
+          gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.22);
+          osc.connect(gain);
+          gain.connect(ctxAudio.destination);
+          osc.start(at);
+          osc.stop(at + 0.24);
+        });
       });
     } catch {
       /* the game still plays if sound is blocked */
@@ -235,7 +247,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       resultEl.textContent = `${name} scored ${score} and is number ${rank}.`;
       try {
         const now = audio().currentTime;
-        [523, 659, 784].forEach((freq, index) => beep(freq, now + index * 0.09, 0.12, 'square', 0.03));
+        [523, 659, 784].forEach((freq, index) => beep(freq, now + index * 0.09, 0.14, 'square', 0.07));
       } catch {
         /* still show the place */
       }
@@ -264,13 +276,13 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     const events = tick(game, dt);
     try {
       if (events.includes('hit')) batHit();
-      if (events.includes('score')) beep(740, audio().currentTime, 0.06, 'square', 0.03);
+      if (events.includes('score')) beep(740, audio().currentTime, 0.08, 'square', 0.06);
       if (events.includes('bonus')) {
         const nowTone = audio().currentTime;
-        beep(880, nowTone, 0.08, 'square', 0.035);
-        beep(1180, nowTone + 0.08, 0.1, 'square', 0.03);
+        beep(880, nowTone, 0.08, 'square', 0.07);
+        beep(1180, nowTone + 0.08, 0.1, 'square', 0.06);
       }
-      if (events.includes('miss') || events.includes('over')) beep(120, audio().currentTime, 0.08, 'square', 0.03);
+      if (events.includes('miss') || events.includes('over')) beep(120, audio().currentTime, 0.1, 'square', 0.07);
     } catch {
       /* the rally continues if sound is blocked */
     }
