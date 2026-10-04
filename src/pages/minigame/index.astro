@@ -7,13 +7,13 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 <Base
   title="Minigame"
-  description="A one-player retro squash game. Enter your name, return the ball above the tin, and take a place on the high scores."
+  description="A one-player squash game on a court floor. Enter your name, serve, and send the ball back to the front wall."
   crumbs={[{ name: 'Minigame', path: '/minigame/' }]}
 >
   <PageHero
     eyebrow="Arcade"
     title="Minigame"
-    lede="One player. Line-art squash. Type your name, then keep the rally alive above the tin."
+    lede="One player, looking down the court. Type your name, press Serve, and send the ball back to the front wall."
   />
   <section class="section">
     <div class="container arcade" id="minigame" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
@@ -27,12 +27,23 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
             <button class="btn btn--primary" type="submit">Play</button>
           </div>
         </form>
+        <p class="serve" data-serve hidden>
+          <button class="btn btn--primary" type="button" data-serve-btn>Serve</button>
+        </p>
         <p class="hud" data-hud hidden>
           <span data-score>0000</span>
           <span data-lives></span>
         </p>
-        <canvas width="640" height="360" data-court tabindex="0" aria-label="Squash court"></canvas>
-        <p class="hint">Move with the mouse, a finger, or the arrow keys. Return the ball above the red tin.</p>
+        <canvas width="440" height="680" data-court tabindex="0" aria-label="Squash court"></canvas>
+        <div class="bat-track" data-bat hidden>
+          <span class="bat-knob" data-knob>
+            <svg viewBox="0 0 40 56" aria-hidden="true">
+              <ellipse cx="20" cy="16" rx="14" ry="16" fill="none" stroke="currentColor" stroke-width="2"></ellipse>
+              <line x1="20" y1="32" x2="20" y2="52" stroke="currentColor" stroke-width="2"></line>
+            </svg>
+          </span>
+        </div>
+        <p class="hint">Slide the bat under the court. A finger stays off the ball. Arrow keys work too.</p>
         <p class="result" data-result hidden></p>
         <p class="again" data-again hidden>
           <button class="btn btn--primary btn--sm" type="button" data-replay>Play again</button>
@@ -54,7 +65,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 <script>
   import { createClient } from '@supabase/supabase-js';
   import { rudeName } from '@/lib/name-check';
-  import { COURT, createArcade, drawCourt, setRacket, tick, type Arcade } from '@/lib/squash-arcade';
+  import { COURT, beginServe, createArcade, drawCourt, setRacket, tick, type Arcade } from '@/lib/squash-arcade';
 
   type Row = { name: string; score: number };
 
@@ -63,10 +74,13 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   const supabase = createClient(root.dataset.url!, root.dataset.key!);
   const form = root.querySelector<HTMLFormElement>('[data-start]')!;
   const nameInput = form.querySelector<HTMLInputElement>('[name="player"]')!;
+  const serveRow = root.querySelector<HTMLElement>('[data-serve]')!;
   const hud = root.querySelector<HTMLElement>('[data-hud]')!;
   const scoreEl = root.querySelector<HTMLElement>('[data-score]')!;
   const livesEl = root.querySelector<HTMLElement>('[data-lives]')!;
   const canvas = root.querySelector<HTMLCanvasElement>('[data-court]')!;
+  const track = root.querySelector<HTMLElement>('[data-bat]')!;
+  const knob = root.querySelector<HTMLElement>('[data-knob]')!;
   const resultEl = root.querySelector<HTMLElement>('[data-result]')!;
   const again = root.querySelector<HTMLElement>('[data-again]')!;
   const boardEl = root.querySelector<HTMLElement>('[data-board]')!;
@@ -83,25 +97,84 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   let game: Arcade | null = null;
   let playId = 0;
   let last = 0;
-  let pointerY = COURT.height / 2;
+  let pointer = 0.5;
   let saved = false;
   let audioCtx: AudioContext | null = null;
 
   const escapeHtml = (value: string) =>
     value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
 
-  function blip(freq: number) {
+  function audio() {
+    audioCtx ??= new AudioContext();
+    if (audioCtx.state === 'suspended') void audioCtx.resume();
+    return audioCtx;
+  }
+
+  function beep(freq: number, at: number, dur: number, type: OscillatorType, volume: number) {
+    const ctxAudio = audio();
+    const osc = ctxAudio.createOscillator();
+    const gain = ctxAudio.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, at);
+    gain.gain.setValueAtTime(volume, at);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    osc.connect(gain);
+    gain.connect(ctxAudio.destination);
+    osc.start(at);
+    osc.stop(at + dur);
+  }
+
+  function intro() {
     try {
-      audioCtx ??= new AudioContext();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'square';
-      osc.frequency.value = freq;
-      gain.gain.value = 0.03;
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.05);
+      const now = audio().currentTime;
+      [330, 392, 494, 659].forEach((freq, index) => beep(freq, now + index * 0.11, 0.1, 'square', 0.035));
+    } catch {
+      /* the game still plays if sound is blocked */
+    }
+  }
+
+  function batHit() {
+    try {
+      const ctxAudio = audio();
+      const dur = 0.07;
+      const buffer = ctxAudio.createBuffer(1, Math.floor(ctxAudio.sampleRate * dur), ctxAudio.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < data.length; i += 1) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+      const src = ctxAudio.createBufferSource();
+      src.buffer = buffer;
+      const filter = ctxAudio.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 720;
+      const gain = ctxAudio.createGain();
+      gain.gain.value = 0.09;
+      src.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctxAudio.destination);
+      src.start();
+      beep(180, ctxAudio.currentTime, 0.05, 'square', 0.03);
+    } catch {
+      /* the game still plays if sound is blocked */
+    }
+  }
+
+  function wahwah() {
+    try {
+      const now = audio().currentTime;
+      [392, 330, 262].forEach((freq, index) => {
+        const at = now + index * 0.24;
+        const ctxAudio = audio();
+        const osc = ctxAudio.createOscillator();
+        const gain = ctxAudio.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq * 1.5, at);
+        osc.frequency.exponentialRampToValueAtTime(freq * 0.7, at + 0.2);
+        gain.gain.setValueAtTime(0.045, at);
+        gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.22);
+        osc.connect(gain);
+        gain.connect(ctxAudio.destination);
+        osc.start(at);
+        osc.stop(at + 0.24);
+      });
     } catch {
       /* the game still plays if sound is blocked */
     }
@@ -112,9 +185,11 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       drawCourt(ctx!, createArcade());
       return;
     }
+    setRacket(game, pointer);
     drawCourt(ctx!, game);
     scoreEl.textContent = String(game.score).padStart(4, '0');
     livesEl.textContent = game.lives > 0 ? `${game.lives} ${game.lives === 1 ? 'life' : 'lives'}` : '';
+    knob.style.left = `${pointer * 100}%`;
   }
 
   async function loadBoard() {
@@ -135,7 +210,12 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   }
 
   async function saveScore(name: string, score: number) {
-    if (saved || score < 1) return;
+    if (score < 1) {
+      resultEl.textContent = 'Better luck next time.';
+      wahwah();
+      return;
+    }
+    if (saved) return;
     saved = true;
     const { data, error } = await supabase.rpc('submit_minigame_score', { p_name: name, p_score: score });
     if (error) {
@@ -143,7 +223,18 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       return;
     }
     const rank = Number(data);
-    resultEl.textContent = rank <= 10 ? `${name} scored ${score} and is number ${rank}.` : `${name} scored ${score}.`;
+    if (rank <= 10) {
+      resultEl.textContent = `${name} scored ${score} and is number ${rank}.`;
+      try {
+        const now = audio().currentTime;
+        [523, 659, 784].forEach((freq, index) => beep(freq, now + index * 0.09, 0.12, 'square', 0.03));
+      } catch {
+        /* still show the place */
+      }
+    } else {
+      resultEl.textContent = `${name} scored ${score}. Better luck next time.`;
+      wahwah();
+    }
     await loadBoard();
   }
 
@@ -152,43 +243,82 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     resultEl.hidden = false;
     again.hidden = false;
     hud.hidden = true;
-    resultEl.textContent = game.score > 0 ? `${name} scored ${game.score}.` : 'Game over.';
+    serveRow.hidden = true;
+    resultEl.textContent = 'Game over.';
     void saveScore(name, game.score);
   }
 
   function frame(now: number, id: number) {
-    if (id !== playId || !game || game.phase === 'over') return;
+    if (id !== playId || !game || game.phase === 'over' || game.phase === 'idle') return;
     const dt = last ? (now - last) / 1000 : 0;
     last = now;
-    setRacket(game, pointerY);
-    const event = tick(game, dt);
-    if (event === 'hit') blip(520);
-    if (event === 'score') blip(740);
-    if (event === 'miss' || event === 'over') blip(120);
+    setRacket(game, pointer);
+    const events = tick(game, dt);
+    try {
+      if (events.includes('hit')) batHit();
+      if (events.includes('score')) beep(740, audio().currentTime, 0.06, 'square', 0.03);
+      if (events.includes('bonus')) {
+        const nowTone = audio().currentTime;
+        beep(880, nowTone, 0.08, 'square', 0.035);
+        beep(1180, nowTone + 0.08, 0.1, 'square', 0.03);
+      }
+      if (events.includes('miss') || events.includes('over')) beep(120, audio().currentTime, 0.08, 'square', 0.03);
+    } catch {
+      /* the rally continues if sound is blocked */
+    }
     paint();
-    if (event === 'over') {
+    if (events.includes('over')) {
       finish(nameInput.value.trim());
       return;
     }
     requestAnimationFrame((time) => frame(time, id));
   }
 
-  function start() {
-    const id = ++playId;
+  function showServe() {
+    playId += 1;
     game = createArcade();
+    setRacket(game, pointer);
     saved = false;
     last = 0;
     form.hidden = true;
     resultEl.hidden = true;
     again.hidden = true;
+    hud.hidden = true;
+    serveRow.hidden = false;
+    track.hidden = false;
+    paint();
+  }
+
+  function serve() {
+    if (!game) game = createArcade();
+    const id = ++playId;
+    saved = false;
+    last = 0;
+    beginServe(game);
+    serveRow.hidden = true;
+    resultEl.hidden = true;
+    again.hidden = true;
     hud.hidden = false;
+    intro();
     paint();
     requestAnimationFrame((time) => frame(time, id));
   }
 
-  function aim(clientY: number) {
+  function aimTrack(clientX: number) {
+    const rect = track.getBoundingClientRect();
+    pointer = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    if (game) setRacket(game, pointer);
+    paint();
+  }
+
+  function aimCourt(clientX: number) {
     const rect = canvas.getBoundingClientRect();
-    pointerY = ((clientY - rect.top) / rect.height) * COURT.height;
+    const x = ((clientX - rect.left) / rect.width) * COURT.width;
+    const left = 32;
+    const right = 408;
+    pointer = Math.min(1, Math.max(0, (x - left) / (right - left)));
+    if (game) setRacket(game, pointer);
+    paint();
   }
 
   function rejectName() {
@@ -211,34 +341,51 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       rejectName();
       return;
     }
-    start();
+    showServe();
   });
 
-  root.querySelector('[data-replay]')!.addEventListener('click', () => start());
+  root.querySelector('[data-serve-btn]')!.addEventListener('click', () => serve());
+  root.querySelector('[data-replay]')!.addEventListener('click', () => showServe());
   root.querySelector('[data-rename]')!.addEventListener('click', () => {
+    playId += 1;
     game = null;
     form.hidden = false;
     again.hidden = true;
     resultEl.hidden = true;
     hud.hidden = true;
+    serveRow.hidden = true;
+    track.hidden = true;
     paint();
     nameInput.focus();
   });
 
-  canvas.addEventListener('pointermove', (event) => aim(event.clientY));
+  track.addEventListener('pointerdown', (event) => {
+    track.setPointerCapture(event.pointerId);
+    aimTrack(event.clientX);
+  });
+  track.addEventListener('pointermove', (event) => {
+    if (!track.hasPointerCapture(event.pointerId)) return;
+    aimTrack(event.clientX);
+  });
+  canvas.addEventListener('pointermove', (event) => {
+    if (event.pointerType === 'touch') return;
+    aimCourt(event.clientX);
+  });
   canvas.addEventListener('pointerdown', (event) => {
-    canvas.setPointerCapture(event.pointerId);
-    aim(event.clientY);
+    if (event.pointerType === 'touch') return;
+    aimCourt(event.clientX);
   });
   window.addEventListener('keydown', (event) => {
     if (!game || game.phase === 'over') return;
-    if (event.key === 'ArrowUp' || event.key === 'w' || event.key === 'W') {
-      pointerY -= 28;
+    if (event.key === 'ArrowLeft' || event.key === 'a' || event.key === 'A') {
+      pointer = Math.max(0, pointer - 0.06);
       event.preventDefault();
+      paint();
     }
-    if (event.key === 'ArrowDown' || event.key === 's' || event.key === 'S') {
-      pointerY += 28;
+    if (event.key === 'ArrowRight' || event.key === 'd' || event.key === 'D') {
+      pointer = Math.min(1, pointer + 0.06);
       event.preventDefault();
+      paint();
     }
   });
 
@@ -254,8 +401,11 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   }
   @media (min-width: 900px) {
     .arcade {
-      grid-template-columns: minmax(0, 1.6fr) 16rem;
+      grid-template-columns: minmax(0, 22rem) 16rem;
     }
+  }
+  .play {
+    max-width: 28rem;
   }
   .stack {
     display: grid;
@@ -275,17 +425,42 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     padding: 0.65rem 0.75rem;
     font: inherit;
   }
-  .name-card {
+  .name-card,
+  .serve {
     margin-bottom: 0.8rem;
   }
   canvas {
     width: 100%;
     height: auto;
     display: block;
-    background: #041426;
+    background: #07182c;
     border: 1px solid var(--gold-500);
     border-radius: var(--radius-sm);
+    touch-action: auto;
+  }
+  .bat-track {
+    position: relative;
+    height: 4.4rem;
+    margin-top: 0.45rem;
+    border: 1px solid var(--gold-500);
+    border-radius: var(--radius-sm);
+    background: #07182c;
     touch-action: none;
+  }
+  .bat-knob {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 2.3rem;
+    height: 3.3rem;
+    color: #9fd0ff;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+  .bat-knob svg {
+    width: 100%;
+    height: 100%;
+    display: block;
   }
   .hud {
     display: flex;
