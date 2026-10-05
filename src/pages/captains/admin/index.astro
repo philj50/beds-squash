@@ -181,13 +181,7 @@ const scoresHref = url('/captains/admin/minigame/');
               <div class="card__body stack">
                 <h3>Add a person</h3>
                 <label>Name <input name="display_name" required minlength="2" maxlength="80" autocomplete="off" /></label>
-                <label>
-                  Email
-                  <span class="pw-field">
-                    <input name="email" type="email" required autocomplete="off" />
-                    <button class="btn btn--ghost btn--sm" type="button" data-random-email>Random</button>
-                  </span>
-                </label>
+                <label>Email <input name="email" type="email" required autocomplete="off" /></label>
                 <label>
                   First password
                   <span class="pw-field">
@@ -217,7 +211,7 @@ const scoresHref = url('/captains/admin/minigame/');
                 <div class="card__body">
                   <h3>Player</h3>
                   <ul>
-                    <li>See their profile, and change their name and password.</li>
+                    <li>See their profile, and change their own name, email, ES number, phone, and password.</li>
                     <li>See their own matches and mark whether they can play.</li>
                     <li>Send a photo, video, link or article. An admin publishes it before it appears on the site.</li>
                   </ul>
@@ -228,7 +222,7 @@ const scoresHref = url('/captains/admin/minigame/');
                   <h3>Team captain</h3>
                   <p class="muted small">Everything a player can do, for their own team, plus:</p>
                   <ul>
-                    <li>See the players on their team and set each player's email on the Player tab.</li>
+                    <li>See the players on their team and set each player's email, ES number, and phone.</li>
                     <li>See who is in, maybe, or out.</li>
                     <li>Set the playing order for a match.</li>
                   </ul>
@@ -254,7 +248,7 @@ const scoresHref = url('/captains/admin/minigame/');
             </div>
             </div>
             <h3>Everyone</h3>
-            <p class="muted small">Sorted by role, then by name. Last login is the last time they signed in with a password. A random email is only a login name.</p>
+            <p class="muted small">Sorted by role, then by name. Last login is the last time they signed in with a password.</p>
             <div class="overview-box">
               <table class="overview">
                 <thead>
@@ -441,7 +435,7 @@ const scoresHref = url('/captains/admin/minigame/');
 <script>
   import { createClient } from '@supabase/supabase-js';
   import { bindPasswordRules, bindPasswordToggles, callManageAccounts, fetchAccountStates, fetchProtectedAdmin, fillSuggestedPassword, passwordIssue } from '@/lib/passwords';
-  import { loadAccount, randomLoginEmail, saveDisplayName, sendToLogin, type Account } from '@/lib/account';
+  import { loadAccount, saveDisplayName, sendToLogin, type Account } from '@/lib/account';
 
   type Person = { id: string; display_name: string; email: string | null; is_admin: boolean };
   type Club = { slug: string; name: string; contact_name: string | null; contact_email: string | null; leaguemaster_club_id?: string | null };
@@ -627,13 +621,6 @@ const scoresHref = url('/captains/admin/minigame/');
   const passwordEmail = root.querySelector<HTMLInputElement>('[data-password-email]')!;
   bindPasswordToggles(root);
   bindPasswordRules(root);
-  createAccountForm.querySelector<HTMLButtonElement>('[data-random-email]')!.addEventListener('click', () => {
-    const input = createAccountForm.querySelector<HTMLInputElement>('[name="email"]');
-    if (!input) return;
-    input.value = randomLoginEmail();
-    input.focus();
-    input.select();
-  });
   root.querySelectorAll<HTMLButtonElement>('[data-suggest-password]').forEach((button) => {
     button.addEventListener('click', () => {
       const form = button.closest('form');
@@ -783,25 +770,6 @@ const scoresHref = url('/captains/admin/minigame/');
       await showSession();
       return;
     }
-    const randomEmail = target.closest<HTMLButtonElement>('[data-random-email-for]');
-    if (randomEmail) {
-      const who = randomEmail.dataset.personName || 'this person';
-      const email = randomLoginEmail();
-      if (!window.confirm(`Set a random login email for ${who}? They will sign in as ${email}. The address they use now will stop working. Nothing is emailed.`)) return;
-      setStatus('Saving email…');
-      const message = await callManageAccounts(supabase, {
-        action: 'set-email',
-        user_id: randomEmail.dataset.randomEmailFor,
-        email,
-      });
-      if (message) {
-        setStatus(message);
-        return;
-      }
-      setStatus(`Login email for ${who} is now ${email}. Tell them that address. Nothing was emailed.`);
-      await showSession();
-      return;
-    }
     const setActive = target.closest<HTMLButtonElement>('[data-set-active]');
     if (setActive) {
       const who = setActive.dataset.personName || 'this person';
@@ -889,6 +857,7 @@ const scoresHref = url('/captains/admin/minigame/');
     email: string;
     es: string;
     phone: string;
+    locked: boolean;
   };
   const clubNote = root.querySelector<HTMLElement>('[data-site-club-note]')!;
   const teamNote = root.querySelector<HTMLElement>('[data-site-team-note]')!;
@@ -953,14 +922,17 @@ const scoresHref = url('/captains/admin/minigame/');
     return Boolean(left) && left === name.trim().toLowerCase();
   };
 
-  const siteTable = (rows: SiteRow[], editable: boolean, showTeam: boolean) => {
+  const siteTable = (rows: SiteRow[], fields: 'all' | 'open' | 'none', showTeam: boolean) => {
+    const box = (row: SiteRow, field: 'email' | 'es' | 'phone', value: string, label: string, type: string) =>
+      `<input data-squad-field="${field}" data-squad-email="${row.playerId || ''}" data-team-id="${row.teamId ?? ''}" data-team-name="${escapeHtml(row.team)}" data-player-name="${escapeHtml(row.name)}" data-saved="${escapeHtml(value)}" aria-label="${label} for ${escapeHtml(row.name)}" type="${type}" value="${escapeHtml(value)}" autocomplete="off" />`;
     const body = rows
       .map((row) => {
-        const emailCell = editable
-          ? `<input data-squad-email="${row.playerId || ''}" data-team-id="${row.teamId ?? ''}" data-team-name="${escapeHtml(row.team)}" data-player-name="${escapeHtml(row.name)}" data-saved="${escapeHtml(row.email)}" aria-label="Email for ${escapeHtml(row.name)}" type="email" value="${escapeHtml(row.email)}" autocomplete="off" />`
-          : escapeHtml(row.email || '—');
+        const open = fields === 'all' || (fields === 'open' && !row.locked);
+        const emailCell = open ? box(row, 'email', row.email, 'Email', 'email') : escapeHtml(row.email || '—');
+        const esCell = open ? box(row, 'es', row.es, 'ES number', 'text') : escapeHtml(row.es || '—');
+        const phoneCell = open ? box(row, 'phone', row.phone, 'Phone', 'tel') : escapeHtml(row.phone || '—');
         const teamCell = showTeam ? `<td>${escapeHtml(row.team)}</td>` : '';
-        return `<tr>${teamCell}<td>${escapeHtml(row.name)}</td><td>${emailCell}</td><td>${escapeHtml(row.es || '—')}</td><td>${escapeHtml(row.phone || '—')}</td></tr>`;
+        return `<tr>${teamCell}<td>${escapeHtml(row.name)}</td><td>${emailCell}</td><td>${esCell}</td><td>${phoneCell}</td></tr>`;
       })
       .join('');
     const teamHead = showTeam ? '<th>Team</th>' : '';
@@ -994,6 +966,20 @@ const scoresHref = url('/captains/admin/minigame/');
     const slPlayers = (slRows ?? []) as SlPlayer[];
     const clubBySlug = new Map(clubList.map((club) => [club.slug, club]));
     const teamById = new Map(teamList.map((team) => [team.id, team]));
+    const sameText = (left: string, right: string | null) => {
+      const theirs = nameKey(right ?? '');
+      return Boolean(theirs) && nameKey(left) === theirs;
+    };
+    const lockedFromLm = (name: string, email: string, clubSlug: string, teamId: number | null) => {
+      const club = clubBySlug.get(clubSlug);
+      const team = teamId != null ? teamById.get(teamId) : undefined;
+      const address = email.trim().toLowerCase();
+      const clubEmail = (club?.contact_email ?? '').trim().toLowerCase();
+      const captainEmail = (team?.captain_email ?? '').trim().toLowerCase();
+      if (club && (sameText(name, club.contact_name) || (address && address === clubEmail))) return true;
+      if (team && (sameText(name, team.captain_name) || (address && address === captainEmail))) return true;
+      return false;
+    };
     const clubSlugs = new Set(mine.filter((row) => row.role === 'club_captain' && row.club_slug).map((row) => row.club_slug as string));
     const teamIds = new Set(mine.filter((row) => row.team_id != null).map((row) => row.team_id as number));
     const homeClubSlugs = new Set<string>(clubSlugs);
@@ -1028,6 +1014,7 @@ const scoresHref = url('/captains/admin/minigame/');
           email: player.email ?? '',
           es: player.england_squash_id ?? '',
           phone: player.phone ?? '',
+          locked: lockedFromLm(player.display_name, player.email ?? '', clubSlug, squad.team_id),
         });
       }
     }
@@ -1048,6 +1035,7 @@ const scoresHref = url('/captains/admin/minigame/');
         email: '',
         es: '',
         phone: '',
+        locked: lockedFromLm(nom.player_name, '', team?.club_slug ?? '', nom.team_id),
       });
     }
     rows.sort((a, b) => a.club.localeCompare(b.club, 'en') || a.team.localeCompare(b.team, 'en') || a.name.localeCompare(b.name, 'en'));
@@ -1063,22 +1051,20 @@ const scoresHref = url('/captains/admin/minigame/');
     const clubEditable = hasClubRole && !account.playerOnly;
     const teamEditable = (hasClubRole || hasTeamRole) && !account.playerOnly;
     clubNote.textContent = account.isAdmin
-      ? 'Every club on this website. Set each email on the Player tab.'
+      ? 'Every club. Email, ES number, and phone can be changed for players. Club captains and team captains stay as they are on League Master. Leave a box and it is saved.'
       : account.playerOnly
-        ? 'Your club on this website.'
-        : clubEditable
-          ? 'The players at your club. Set each email on the Player tab.'
+        ? 'Your club. You can change your own email, ES number, and phone. A club captain or team captain stays as they are on League Master.'
+        : clubEditable || hasTeamRole
+          ? 'The players you can see. Email, ES number, and phone can be changed. Club captains and team captains stay as they are on League Master. Leave a box and it is saved.'
           : 'Your club is read-only. Other teams at the club are not listed.';
     teamNote.textContent = account.isAdmin
-      ? 'Every team. Set each email on the Player tab.'
+      ? 'Every team. Email, ES number, and phone can be changed for players. Club captains and team captains stay as they are on League Master. Leave a box and it is saved.'
       : account.playerOnly
-        ? 'Your team on this website.'
-        : hasClubRole
-          ? 'Every team at your club. Set each email on the Player tab.'
-          : 'Your team on this website. Set each email on the Player tab.';
+        ? 'Your team. You can change your own email, ES number, and phone. A club captain or team captain stays as they are on League Master.'
+        : 'Your team. Email, ES number, and phone can be changed for players. Club captains and team captains stay as they are on League Master. Leave a box and it is saved.';
     playerNote.textContent = account.playerOnly
-      ? 'Your profile for this website, your League Master line, and the team and club you play for.'
-      : 'League Master names the players. The email saved here is shown on LM Player, and the player role follows it. If this record has an email, it takes the place of any older one. Leave the box and it is saved. Only an admin can add someone who is not on the League Master list.';
+      ? 'You can change your own email, ES number, and phone. Leave a box and it is saved. The email is shown on LM Player.'
+      : 'You can change the email, ES number, and phone for the players you look after. A player can change only their own row. Leave a box and it is saved. The email is shown on LM Player, and the player role follows it. Only an admin can add someone who is not on the League Master list.';
 
     const clubsHere = clubList.filter((club) => (account.playerOnly ? homeClubSlugs.has(club.slug) : hasClubRole ? clubSlugs.has(club.slug) : homeClubSlugs.has(club.slug)));
     const paintClub = (heading: string) => {
@@ -1092,7 +1078,7 @@ const scoresHref = url('/captains/admin/minigame/');
       ? byClub
           .map((club) => {
             const group = clubRowsScoped.filter((row) => row.club === club);
-            return `<article class="site-card"><h3>${escapeHtml(club)}</h3>${paintClub(club)}${siteTable(group, false, true)}</article>`;
+            return `<article class="site-card"><h3>${escapeHtml(club)}</h3>${paintClub(club)}${siteTable(group, 'open', true)}</article>`;
           })
           .join('')
       : '<p class="muted small">No club players on this website yet.</p>';
@@ -1106,12 +1092,13 @@ const scoresHref = url('/captains/admin/minigame/');
             const group = teamRowsScoped.filter((row) => row.team === label);
             const team = teamsHere.find((item) => (item.division ? `${item.name} · ${item.division}` : item.name) === label);
             const captain = team?.captain_name ? `Captain ${team.captain_name}${team.captain_email ? ` · ${team.captain_email}` : ''}` : '';
-            return `<article class="site-card"><h3>${escapeHtml(label)}</h3>${captain ? `<p class="muted small">${escapeHtml(captain)}</p>` : ''}${siteTable(group, false, false)}</article>`;
+            return `<article class="site-card"><h3>${escapeHtml(label)}</h3>${captain ? `<p class="muted small">${escapeHtml(captain)}</p>` : ''}${siteTable(group, 'open', false)}</article>`;
           })
           .join('')
       : '<p class="muted small">No team on this account yet.</p>';
 
-    const playerRows = account.playerOnly ? [] : account.isAdmin || clubEditable ? clubRowsScoped : teamRowsScoped;
+    const playerRows = account.playerOnly || account.isAdmin || clubEditable ? clubRowsScoped : teamRowsScoped;
+    const playerEditable = account.isAdmin || teamEditable || account.playerOnly;
     const teamChoices = teamList
       .filter((team) => account.isAdmin || clubSlugs.has(team.club_slug) || teamIds.has(team.id))
       .slice()
@@ -1125,9 +1112,7 @@ const scoresHref = url('/captains/admin/minigame/');
           })
           .join('')}</select></label><label>Player name <input name="display_name" required minlength="2" maxlength="80" autocomplete="off" /></label><label>Email <input name="email" type="email" autocomplete="off" /></label><button class="btn btn--primary btn--sm" type="submit">Add player</button></div></form>`
       : '';
-    playerListHost.innerHTML = account.playerOnly
-      ? ''
-      : `${playerRows.length ? siteTable(playerRows, account.isAdmin || teamEditable, true) : '<p class="muted small">No players on this list yet.</p>'}${addPlayer}`;
+    playerListHost.innerHTML = `${playerRows.length ? siteTable(playerRows, playerEditable ? 'all' : 'none', true) : '<p class="muted small">No players on this list yet.</p>'}${addPlayer}`;
 
     const slByName = new Map<string, SlPlayer>();
     for (const player of slPlayers) {
@@ -1248,19 +1233,33 @@ const scoresHref = url('/captains/admin/minigame/');
     return { id: created.id as number, error: '' };
   };
 
-  const saveWebsiteEmail = async (input: HTMLInputElement) => {
-    const email = input.value.trim().toLowerCase();
-    if (email === (input.dataset.saved ?? '')) return;
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  const savePlayerField = async (input: HTMLInputElement) => {
+    const field = input.dataset.squadField;
+    if (field !== 'email' && field !== 'es' && field !== 'phone') return;
+    const raw = input.value.trim();
+    const value = field === 'email' ? raw.toLowerCase() : raw;
+    if (value === (input.dataset.saved ?? '')) return;
+    if (field === 'email' && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
       setStatus('Enter a valid email, or leave it blank.');
+      return;
+    }
+    if (field === 'phone' && value && !/\d/.test(value)) {
+      setStatus('Enter a phone number, or leave it blank.');
+      return;
+    }
+    if (field === 'es' && value.length > 32) {
+      setStatus('ES number is too long.');
       return;
     }
     const name = input.dataset.playerName || 'this player';
     const teamId = Number(input.dataset.teamId || 0);
     let playerId = Number(input.dataset.squadEmail || 0);
-    setStatus('Saving email…');
+    const column = field === 'email' ? 'email' : field === 'es' ? 'england_squash_id' : 'phone';
+    const stored = value || null;
+    const label = field === 'email' ? 'Email' : field === 'es' ? 'ES number' : 'Phone';
+    setStatus(`Saving ${label.toLowerCase()}…`);
     if (playerId) {
-      const { error } = await supabase.from('squad_players').update({ email: email || null }).eq('id', playerId);
+      const { error } = await supabase.from('squad_players').update({ [column]: stored }).eq('id', playerId);
       if (error) {
         setStatus(error.message);
         return;
@@ -1273,29 +1272,36 @@ const scoresHref = url('/captains/admin/minigame/');
       }
       const { data: created, error } = await supabase
         .from('squad_players')
-        .insert({ squad_id: squad.id, display_name: name, email: email || null })
+        .insert({ squad_id: squad.id, display_name: name, [column]: stored })
         .select('id')
         .single();
       if (error || !created) {
-        setStatus(error?.message || 'Could not save the email.');
+        setStatus(error?.message || `Could not save the ${label.toLowerCase()}.`);
         return;
       }
       playerId = created.id as number;
-      input.dataset.squadEmail = String(playerId);
+      const row = input.closest('tr');
+      for (const box of row?.querySelectorAll<HTMLInputElement>('input') ?? []) box.dataset.squadEmail = String(playerId);
     }
-    input.dataset.saved = email;
-    rememberWebsiteEmail(teamId, name, email, playerId);
-    if (viewerIsAdmin) {
-      await supabase.rpc('sync_website_player_emails');
-      await supabase.rpc('apply_lm_roles');
+    input.dataset.saved = value;
+    if (field === 'email') {
+      rememberWebsiteEmail(teamId, name, value, playerId);
+      if (viewerIsAdmin) {
+        await supabase.rpc('sync_website_player_emails');
+        await supabase.rpc('apply_lm_roles');
+      }
+      setStatus(`Email saved for ${name}. LM Player shows this address, and the player role follows it.`);
+      return;
     }
-    setStatus(`Email saved for ${name}. LM Player shows this address, and the player role follows it.`);
+    setStatus(`${label} saved for ${name}.`);
   };
 
-  playerListHost.addEventListener('focusout', (event) => {
-    const input = (event.target as HTMLElement).closest<HTMLInputElement>('[data-squad-email]');
-    if (input) void saveWebsiteEmail(input);
-  });
+  for (const host of [siteClubHost, siteTeamHost, playerListHost]) {
+    host.addEventListener('focusout', (event) => {
+      const input = (event.target as HTMLElement).closest<HTMLInputElement>('[data-squad-field]');
+      if (input) void savePlayerField(input);
+    });
+  }
 
   playerListHost.addEventListener('submit', async (event) => {
     const form = (event.target as HTMLElement).closest<HTMLFormElement>('[data-form="add-player"]');
@@ -1490,9 +1496,6 @@ const scoresHref = url('/captains/admin/minigame/');
             const deleteButton = protectedAdminId && !isDefault
               ? `<button class="btn btn--ghost btn--sm" type="button" data-delete-person="${person.id}" data-person-name="${escapeHtml(name)}">Delete</button>`
               : '';
-            const randomButton = isDefault
-              ? ''
-              : `<button class="btn btn--ghost btn--sm" type="button" data-random-email-for="${person.id}" data-person-name="${escapeHtml(name)}">Random email</button>`;
             const activeButton = isDefault || person.id === selfId
               ? ''
               : `<button class="btn btn--ghost btn--sm" type="button" data-set-active="${person.id}" data-active-next="${active ? 'false' : 'true'}" data-person-name="${escapeHtml(name)}">${active ? 'Make inactive' : 'Make active'}</button>`;
@@ -1510,7 +1513,7 @@ const scoresHref = url('/captains/admin/minigame/');
               `<td>${escapeHtml(state ? formatWhen(state.last_sign_in_at) : '—')}</td>` +
               `<td class="col-action col-action--wrap">` +
               `<button class="btn btn--ghost btn--sm" type="button" data-open-password="${person.id}" data-password-name="${escapeHtml(name)}" data-password-email="${escapeHtml(person.email || '')}">Set password</button> ` +
-              `${randomButton} ${activeButton}` +
+              `${activeButton}` +
               (deleteButton ? ` ${deleteButton}` : '') +
               `</td>`;
             return row;
