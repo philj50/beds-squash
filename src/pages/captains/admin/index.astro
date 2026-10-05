@@ -927,10 +927,11 @@ const scoresHref = url('/captains/admin/minigame/');
       `<input data-squad-field="${field}" data-squad-email="${row.playerId || ''}" data-team-id="${row.teamId ?? ''}" data-team-name="${escapeHtml(row.team)}" data-player-name="${escapeHtml(row.name)}" data-saved="${escapeHtml(value)}" aria-label="${label} for ${escapeHtml(row.name)}" type="${type}" value="${escapeHtml(value)}" autocomplete="off" />`;
     const body = rows
       .map((row) => {
-        const open = fields === 'all' || (fields === 'open' && !row.locked);
-        const emailCell = open ? box(row, 'email', row.email, 'Email', 'email') : escapeHtml(row.email || '—');
-        const esCell = open ? box(row, 'es', row.es, 'ES number', 'text') : escapeHtml(row.es || '—');
-        const phoneCell = open ? box(row, 'phone', row.phone, 'Phone', 'tel') : escapeHtml(row.phone || '—');
+        const detailsOpen = fields === 'all' || fields === 'open';
+        const emailOpen = fields === 'all' || (fields === 'open' && !row.locked);
+        const emailCell = emailOpen ? box(row, 'email', row.email, 'Email', 'email') : escapeHtml(row.email || '—');
+        const esCell = detailsOpen ? box(row, 'es', row.es, 'ES number', 'text') : escapeHtml(row.es || '—');
+        const phoneCell = detailsOpen ? box(row, 'phone', row.phone, 'Phone', 'tel') : escapeHtml(row.phone || '—');
         const teamCell = showTeam ? `<td>${escapeHtml(row.team)}</td>` : '';
         return `<tr>${teamCell}<td>${escapeHtml(row.name)}</td><td>${emailCell}</td><td>${esCell}</td><td>${phoneCell}</td></tr>`;
       })
@@ -1051,17 +1052,17 @@ const scoresHref = url('/captains/admin/minigame/');
     const clubEditable = hasClubRole && !account.playerOnly;
     const teamEditable = (hasClubRole || hasTeamRole) && !account.playerOnly;
     clubNote.textContent = account.isAdmin
-      ? 'Every club. Email, ES number, and phone can be changed for players. Club captains and team captains stay as they are on League Master. Leave a box and it is saved.'
+      ? 'Every club. Email, ES number, and phone can be changed for players. A club captain or team captain keeps their name and email from League Master. Their ES number and phone can still be changed. Leave a box and it is saved.'
       : account.playerOnly
-        ? 'Your club. You can change your own email, ES number, and phone. A club captain or team captain stays as they are on League Master.'
+        ? 'Your club. You can change your own email, ES number, and phone. A club captain or team captain keeps their name and email from League Master, and can still change ES number and phone.'
         : clubEditable || hasTeamRole
-          ? 'The players you can see. Email, ES number, and phone can be changed. Club captains and team captains stay as they are on League Master. Leave a box and it is saved.'
+          ? 'The players you can see. Email, ES number, and phone can be changed. A club captain or team captain keeps their name and email from League Master. Their ES number and phone can still be changed. Leave a box and it is saved.'
           : 'Your club is read-only. Other teams at the club are not listed.';
     teamNote.textContent = account.isAdmin
-      ? 'Every team. Email, ES number, and phone can be changed for players. Club captains and team captains stay as they are on League Master. Leave a box and it is saved.'
+      ? 'Every team. Email, ES number, and phone can be changed for players. A club captain or team captain keeps their name and email from League Master. Their ES number and phone can still be changed. Leave a box and it is saved.'
       : account.playerOnly
-        ? 'Your team. You can change your own email, ES number, and phone. A club captain or team captain stays as they are on League Master.'
-        : 'Your team. Email, ES number, and phone can be changed for players. Club captains and team captains stay as they are on League Master. Leave a box and it is saved.';
+        ? 'Your team. You can change your own email, ES number, and phone. A club captain or team captain keeps their name and email from League Master, and can still change ES number and phone.'
+        : 'Your team. Email, ES number, and phone can be changed for players. A club captain or team captain keeps their name and email from League Master. Their ES number and phone can still be changed. Leave a box and it is saved.';
     playerNote.textContent = account.playerOnly
       ? 'You can change your own email, ES number, and phone. Leave a box and it is saved. The email is shown on LM Player.'
       : 'You can change the email, ES number, and phone for the players you look after. A player can change only their own row. Leave a box and it is saved. The email is shown on LM Player, and the player role follows it. Only an admin can add someone who is not on the League Master list.';
