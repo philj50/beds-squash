@@ -12,7 +12,8 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     <div class="container captain" id="captain-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
       <h1>Squad</h1>
       <p class="lede">
-        Captains add players to the squad and set each player's email. Nothing is emailed.
+        League Master names the players. Set each email here, or on Administration under Player.
+        Only an admin can add or remove a player. Nothing is emailed.
         Players mark whether they can play on
         <a href={`${import.meta.env.BASE_URL}captains/matches/`}>Matches</a>.
         Your name, team and password are on your <a href={`${import.meta.env.BASE_URL}captains/profile/`}>profile</a>.
@@ -65,6 +66,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   const playerPlaces = root.querySelector<HTMLElement>('[data-player-places]')!;
   const adminLink = root.querySelector<HTMLElement>('[data-admin-link]')!;
   const whoEl = root.querySelector<HTMLElement>('[data-who]')!;
+  let viewerIsAdmin = false;
 
   const setStatus = (message: string) => {
     statusEl.textContent = message;
@@ -77,7 +79,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
   squadHost.addEventListener('submit', async (event) => {
     const form = event.target as HTMLFormElement;
-    if (!form.matches('[data-form="player"]')) return;
+    if (!form.matches('[data-form="player"]') || !viewerIsAdmin) return;
     event.preventDefault();
     const data = new FormData(form);
     const email = String(data.get('email') ?? '').trim();
@@ -119,7 +121,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
   squadHost.addEventListener('click', async (event) => {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-remove-player]');
-    if (!button) return;
+    if (!button || !viewerIsAdmin) return;
     const { error } = await supabase.from('squad_players').delete().eq('id', Number(button.dataset.removePlayer));
     if (error) setStatus(error.message);
     else await showSession();
@@ -137,6 +139,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       return;
     }
     whoEl.textContent = `Signed in as ${account.displayName || account.email}`;
+    viewerIsAdmin = account.isAdmin;
     adminLink.hidden = !account.isAdmin;
     if (account.playerOnly) {
       squadHost.replaceChildren();
@@ -165,18 +168,33 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
           .sort((a, b) => a.display_name.localeCompare(b.display_name, 'en'));
         const rows = players.length
           ? players
-              .map(
-                (player) =>
+              .map((player) => {
+                const removeCell = viewerIsAdmin
+                  ? `<td class="col-remove"><button class="btn btn--ghost btn--sm" type="button" data-remove-player="${player.id}">Remove</button></td>`
+                  : '';
+                return (
                   `<tr>` +
                   `<td>${escapeHtml(player.display_name)}</td>` +
                   `<td><input data-player-email="${player.id}" data-player-name="${escapeHtml(player.display_name)}" data-saved="${escapeHtml(player.email ?? '')}" aria-label="Email for ${escapeHtml(player.display_name)}" type="email" value="${escapeHtml(player.email ?? '')}" autocomplete="off" /></td>` +
                   `<td>${player.england_squash_id ? escapeHtml(player.england_squash_id) : '<span class="muted">—</span>'}</td>` +
                   `<td>${player.phone ? escapeHtml(player.phone) : '<span class="muted">—</span>'}</td>` +
-                  `<td class="col-remove"><button class="btn btn--ghost btn--sm" type="button" data-remove-player="${player.id}">Remove</button></td>` +
-                  `</tr>`,
-              )
+                  removeCell +
+                  `</tr>`
+                );
+              })
               .join('')
-          : '<tr class="empty"><td colspan="4">No players yet.</td><td class="col-remove"></td></tr>';
+          : `<tr class="empty"><td colspan="4">No players yet.</td>${viewerIsAdmin ? '<td class="col-remove"></td>' : ''}</tr>`;
+        const addRow = viewerIsAdmin
+          ? `<tfoot>
+                    <tr>
+                      <td><input name="display_name" aria-label="Name" placeholder="Name" required minlength="2" maxlength="80" autocomplete="off" /></td>
+                      <td><input name="email" aria-label="Email" placeholder="Email" type="email" autocomplete="off" /></td>
+                      <td></td>
+                      <td><input name="phone" aria-label="Phone" placeholder="Phone" type="tel" autocomplete="off" /></td>
+                      <td class="col-remove"><button class="btn btn--primary btn--sm" type="submit">Add</button></td>
+                    </tr>
+                  </tfoot>`
+          : '';
         card.innerHTML = `
           <div class="card__body">
             <h2>${escapeHtml(squad.name)}</h2>
@@ -188,7 +206,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
                     <col class="col-email" />
                     <col class="col-es" />
                     <col class="col-phone" />
-                    <col class="col-remove" />
+                    ${viewerIsAdmin ? '<col class="col-remove" />' : ''}
                   </colgroup>
                   <thead>
                     <tr>
@@ -196,19 +214,11 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
                       <th>Email</th>
                       <th>ES number</th>
                       <th>Phone</th>
-                      <th class="col-remove">Remove</th>
+                      ${viewerIsAdmin ? '<th class="col-remove">Remove</th>' : ''}
                     </tr>
                   </thead>
                   <tbody>${rows}</tbody>
-                  <tfoot>
-                    <tr>
-                      <td><input name="display_name" aria-label="Name" placeholder="Name" required minlength="2" maxlength="80" autocomplete="off" /></td>
-                      <td><input name="email" aria-label="Email" placeholder="Email" type="email" autocomplete="off" /></td>
-                      <td></td>
-                      <td><input name="phone" aria-label="Phone" placeholder="Phone" type="tel" autocomplete="off" /></td>
-                      <td class="col-remove"><button class="btn btn--primary btn--sm" type="submit">Add</button></td>
-                    </tr>
-                  </tfoot>
+                  ${addRow}
                 </table>
               </div>
             </form>

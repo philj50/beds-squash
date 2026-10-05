@@ -1,48 +1,6 @@
--- Our email for a League Master player. The name stays on the nomination list.
--- Club and captain emails stay on the club and team rows copied from League Master.
-
-create table public.lm_player_contacts (
-  id bigint generated always as identity primary key,
-  team_id bigint not null,
-  player_name text not null,
-  email text,
-  unique (team_id, player_name)
-);
-
-alter table public.lm_player_contacts enable row level security;
-
-create policy "admins read player contacts"
-  on public.lm_player_contacts
-  for select
-  to authenticated
-  using (is_admin());
-
-create policy "admins add player contacts"
-  on public.lm_player_contacts
-  for insert
-  to authenticated
-  with check (is_admin());
-
-create policy "admins update player contacts"
-  on public.lm_player_contacts
-  for update
-  to authenticated
-  using (is_admin())
-  with check (is_admin());
-
-grant select, insert, update on public.lm_player_contacts to authenticated;
-
--- Keep an email we already stored, when the name is on the nomination list.
-insert into public.lm_player_contacts (team_id, player_name, email)
-select distinct n.team_id, n.player_name, lower(sp.email)
-from public.nominations n
-join public.captain_squads s on s.team_id = n.team_id
-join public.squad_players sp
-  on sp.squad_id = s.id
- and lower(sp.display_name) = lower(n.player_name)
-where sp.email is not null
-  and btrim(sp.email) <> ''
-on conflict (team_id, player_name) do nothing;
+-- Player emails live on the website squad record. League Master names the player.
+-- When that record has an email, it replaces any address stored against the nomination.
+-- The player role follows the website email.
 
 create or replace function public.apply_lm_roles()
 returns void
@@ -124,3 +82,46 @@ $$;
 
 revoke all on function public.apply_lm_roles() from public;
 grant execute on function public.apply_lm_roles() to authenticated;
+
+create or replace function public.sync_website_player_emails()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'not allowed' using errcode = '42501';
+  end if;
+
+  update public.lm_player_contacts c
+  set email = nullif(lower(btrim(sp.email)), '')
+  from public.squad_players sp
+  join public.captain_squads s on s.id = sp.squad_id
+  where s.team_id = c.team_id
+    and lower(sp.display_name) = lower(c.player_name);
+
+  insert into public.lm_player_contacts (team_id, player_name, email)
+  select distinct on (s.team_id, lower(sp.display_name))
+    s.team_id,
+    sp.display_name,
+    nullif(lower(btrim(sp.email)), '')
+  from public.squad_players sp
+  join public.captain_squads s on s.id = sp.squad_id
+  where s.team_id is not null
+    and sp.email is not null
+    and btrim(sp.email) <> ''
+    and not exists (
+      select 1
+      from public.lm_player_contacts c
+      where c.team_id = s.team_id
+        and lower(c.player_name) = lower(sp.display_name)
+    )
+  order by s.team_id, lower(sp.display_name), sp.id;
+
+  perform public.apply_lm_roles();
+end;
+$$;
+
+revoke all on function public.sync_website_player_emails() from public;
+grant execute on function public.sync_website_player_emails() to authenticated;

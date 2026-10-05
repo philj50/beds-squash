@@ -99,6 +99,7 @@ const scoresHref = url('/captains/admin/minigame/');
             </form>
             <ChangePassword />
             <div class="site-facts" data-own-facts></div>
+            <div data-site-player-list></div>
           </section>
 
           <section class="admin-panel" data-tab="site-sl" hidden>
@@ -146,7 +147,7 @@ const scoresHref = url('/captains/admin/minigame/');
 
           <section class="admin-panel" data-tab="lm-players" data-lm-only hidden>
             <h2>LM Player</h2>
-            <p class="muted small">Names come from the League Master nomination list. The email is the one we use here. Leave the box and it is saved. Nothing is sent to League Master. A matching login is a player.</p>
+            <p class="muted small">Names come from the League Master nomination list. The email is the one saved on the Player tab. If that record has an email, it is the one shown here. Nothing on this list is typed, and nothing is sent back to League Master. A matching login is a player.</p>
             <label class="directory-search">
               Search
               <input type="search" data-player-search placeholder="Club, team, player or email" autocomplete="off" />
@@ -171,7 +172,7 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="accounts" data-lm-only hidden>
             <h2>People</h2>
             <p class="muted small">
-              Create the login with the email already on LM Club, LM Captain or LM Player. The role is applied from that list.
+              Create the login with the email already on LM Club, LM Captain, or Player. The role is applied from that list.
               Set the first password and tell them yourself. Nothing is emailed. They change it on their profile.
               An inactive account cannot sign in.
             </p>
@@ -190,7 +191,7 @@ const scoresHref = url('/captains/admin/minigame/');
                 <label>
                   First password
                   <span class="pw-field">
-                    <input name="password" type="password" required minlength="12" maxlength="72" autocomplete="new-password" passwordrules="minlength: 12; required: lower; required: upper; required: digit; required: special;" />
+                    <input name="password" type="password" required minlength="12" maxlength="72" autocomplete="new-password" />
                     <button class="btn btn--ghost btn--sm" type="button" data-toggle-password>Show</button>
                   </span>
                   <PasswordRules />
@@ -227,7 +228,7 @@ const scoresHref = url('/captains/admin/minigame/');
                   <h3>Team captain</h3>
                   <p class="muted small">Everything a player can do, for their own team, plus:</p>
                   <ul>
-                    <li>See the players on their team and set each player's email.</li>
+                    <li>See the players on their team and set each player's email on the Player tab.</li>
                     <li>See who is in, maybe, or out.</li>
                     <li>Set the playing order for a match.</li>
                   </ul>
@@ -279,7 +280,7 @@ const scoresHref = url('/captains/admin/minigame/');
                 <label>
                   New password
                   <span class="pw-field">
-                    <input name="password" type="password" required minlength="12" maxlength="72" autocomplete="new-password" passwordrules="minlength: 12; required: lower; required: upper; required: digit; required: special;" />
+                    <input name="password" type="password" required minlength="12" maxlength="72" autocomplete="new-password" />
                     <button class="btn btn--ghost btn--sm" type="button" data-toggle-password>Show</button>
                   </span>
                   <PasswordRules />
@@ -303,7 +304,7 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="admins" data-lm-only hidden>
             <h2>Admins</h2>
             <p class="muted small">
-              Admins cover every club and team. The default admin cannot be deleted or turned off.
+              Admins cover every club and team. The county admin cannot be deleted or turned off.
               League roles stay on the League Master tabs.
             </p>
             <form class="card" data-form="create-admin">
@@ -314,7 +315,7 @@ const scoresHref = url('/captains/admin/minigame/');
                 <label>
                   First password
                   <span class="pw-field">
-                    <input name="password" type="password" required minlength="12" maxlength="72" autocomplete="new-password" passwordrules="minlength: 12; required: lower; required: upper; required: digit; required: special;" />
+                    <input name="password" type="password" required minlength="12" maxlength="72" autocomplete="new-password" />
                     <button class="btn btn--ghost btn--sm" type="button" data-toggle-password>Show</button>
                   </span>
                   <PasswordRules />
@@ -592,7 +593,7 @@ const scoresHref = url('/captains/admin/minigame/');
   };
 
   let viewerIsAdmin = false;
-  const allowedTabs = () => (viewerIsAdmin ? tabs : siteTabs);
+  const allowedTabs = (): readonly Tab[] => (viewerIsAdmin ? tabs : siteTabs);
 
   const showTab = (tab: Tab) => {
     const next = allowedTabs().includes(tab) ? tab : viewerIsAdmin ? 'lm-clubs' : 'site-club';
@@ -668,9 +669,10 @@ const scoresHref = url('/captains/admin/minigame/');
       setStatus(message);
       return;
     }
+    await supabase.rpc('sync_website_player_emails');
     await supabase.rpc('apply_lm_roles');
     createAccountForm.reset();
-    setStatus('Account created. Their role follows the League Master email. Tell them the email and password. Nothing was emailed.');
+    setStatus('Account created. Their role follows the email on the Player tab. Tell them the email and password. Nothing was emailed.');
     await showSession();
   });
 
@@ -763,7 +765,7 @@ const scoresHref = url('/captains/admin/minigame/');
     const removePerson = target.closest<HTMLButtonElement>('[data-delete-person]');
     if (removePerson) {
       if (removePerson.dataset.deletePerson === protectedAdminId) {
-        setStatus('The default admin cannot be deleted.');
+        setStatus('The county admin cannot be deleted.');
         return;
       }
       const who = removePerson.dataset.personName || 'this person';
@@ -822,7 +824,7 @@ const scoresHref = url('/captains/admin/minigame/');
     const setAdmin = target.closest<HTMLButtonElement>('[data-set-admin]');
     if (!setAdmin) return;
     if (setAdmin.dataset.setAdmin === protectedAdminId && setAdmin.dataset.adminNext === 'false') {
-      setStatus('The default admin cannot lose admin access.');
+      setStatus('The county admin cannot lose admin access.');
       return;
     }
     const makingAdmin = setAdmin.dataset.adminNext === 'true';
@@ -844,7 +846,7 @@ const scoresHref = url('/captains/admin/minigame/');
     const setAdmin = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-set-admin]');
     if (!setAdmin || setAdmin.dataset.adminNext !== 'false') return;
     if (setAdmin.dataset.setAdmin === protectedAdminId) {
-      setStatus('The default admin cannot lose admin access.');
+      setStatus('The county admin cannot lose admin access.');
       return;
     }
     setStatus('Removing admin…');
@@ -896,6 +898,9 @@ const scoresHref = url('/captains/admin/minigame/');
   const ownName = root.querySelector<HTMLInputElement>('[data-own-name]')!;
   const ownEmail = root.querySelector<HTMLElement>('[data-own-email]')!;
   const ownFacts = root.querySelector<HTMLElement>('[data-own-facts]')!;
+  const playerListHost = root.querySelector<HTMLElement>('[data-site-player-list]')!;
+  type WebsitePlayer = { teamId: number; name: string; email: string; playerId: number };
+  let websitePlayers: WebsitePlayer[] = [];
   const slNote = root.querySelector<HTMLElement>('[data-site-sl-note]')!;
   const slHost = root.querySelector<HTMLElement>('[data-site-sl]')!;
   type SlPlayer = { id: number; display_name: string; current_level: number | null; updated_at: string | null };
@@ -952,7 +957,7 @@ const scoresHref = url('/captains/admin/minigame/');
     const body = rows
       .map((row) => {
         const emailCell = editable
-          ? `<input data-squad-email="${row.playerId}" data-player-name="${escapeHtml(row.name)}" data-saved="${escapeHtml(row.email)}" aria-label="Email for ${escapeHtml(row.name)}" type="email" value="${escapeHtml(row.email)}" autocomplete="off" />`
+          ? `<input data-squad-email="${row.playerId || ''}" data-team-id="${row.teamId ?? ''}" data-team-name="${escapeHtml(row.team)}" data-player-name="${escapeHtml(row.name)}" data-saved="${escapeHtml(row.email)}" aria-label="Email for ${escapeHtml(row.name)}" type="email" value="${escapeHtml(row.email)}" autocomplete="off" />`
           : escapeHtml(row.email || '—');
         const teamCell = showTeam ? `<td>${escapeHtml(row.team)}</td>` : '';
         return `<tr>${teamCell}<td>${escapeHtml(row.name)}</td><td>${emailCell}</td><td>${escapeHtml(row.es || '—')}</td><td>${escapeHtml(row.phone || '—')}</td></tr>`;
@@ -985,6 +990,7 @@ const scoresHref = url('/captains/admin/minigame/');
     }[];
     const squads = (squadRows ?? []) as SiteSquad[];
     const nominations = (nomRows ?? []) as { team_id: number; player_name: string }[];
+    websitePlayers = [];
     const slPlayers = (slRows ?? []) as SlPlayer[];
     const clubBySlug = new Map(clubList.map((club) => [club.slug, club]));
     const teamById = new Map(teamList.map((team) => [team.id, team]));
@@ -1004,6 +1010,14 @@ const scoresHref = url('/captains/admin/minigame/');
       const club = clubBySlug.get(clubSlug);
       const teamLabel = team ? (team.division ? `${team.name} · ${team.division}` : team.name) : squad.name;
       for (const player of squad.squad_players ?? []) {
+        if (squad.team_id != null) {
+          websitePlayers.push({
+            teamId: squad.team_id,
+            name: player.display_name,
+            email: player.email ?? '',
+            playerId: player.id,
+          });
+        }
         rows.push({
           playerId: player.id,
           teamId: squad.team_id,
@@ -1016,6 +1030,25 @@ const scoresHref = url('/captains/admin/minigame/');
           phone: player.phone ?? '',
         });
       }
+    }
+    const listed = new Set(rows.map((row) => `${row.teamId ?? ''}:${row.name.toLowerCase()}`));
+    for (const nom of nominations) {
+      const key = `${nom.team_id}:${nom.player_name.toLowerCase()}`;
+      if (listed.has(key)) continue;
+      listed.add(key);
+      const team = teamById.get(nom.team_id);
+      const club = team ? clubBySlug.get(team.club_slug) : undefined;
+      rows.push({
+        playerId: 0,
+        teamId: nom.team_id,
+        clubSlug: team?.club_slug ?? '',
+        club: club?.name ?? 'Club',
+        team: team ? (team.division ? `${team.name} · ${team.division}` : team.name) : 'Team',
+        name: nom.player_name,
+        email: '',
+        es: '',
+        phone: '',
+      });
     }
     rows.sort((a, b) => a.club.localeCompare(b.club, 'en') || a.team.localeCompare(b.team, 'en') || a.name.localeCompare(b.name, 'en'));
     const visible = (row: SiteRow) => {
@@ -1030,23 +1063,25 @@ const scoresHref = url('/captains/admin/minigame/');
     const clubEditable = hasClubRole && !account.playerOnly;
     const teamEditable = (hasClubRole || hasTeamRole) && !account.playerOnly;
     clubNote.textContent = account.isAdmin
-      ? 'Every club on this website. Leave an email box and it is saved.'
+      ? 'Every club on this website. Set each email on the Player tab.'
       : account.playerOnly
         ? 'Your club on this website.'
         : clubEditable
-          ? 'The players at your club. The email is the one this website uses. Leave the box and it is saved.'
+          ? 'The players at your club. Set each email on the Player tab.'
           : 'Your club is read-only. Other teams at the club are not listed.';
     teamNote.textContent = account.isAdmin
-      ? 'Every team. Leave an email box and it is saved.'
+      ? 'Every team. Set each email on the Player tab.'
       : account.playerOnly
         ? 'Your team on this website.'
         : hasClubRole
-          ? 'Every team at your club. Leave an email box and it is saved.'
-          : 'Your team on this website. Leave an email box and it is saved.';
-    playerNote.textContent = 'Your profile for this website, your League Master line, and the team and club you play for.';
+          ? 'Every team at your club. Set each email on the Player tab.'
+          : 'Your team on this website. Set each email on the Player tab.';
+    playerNote.textContent = account.playerOnly
+      ? 'Your profile for this website, your League Master line, and the team and club you play for.'
+      : 'League Master names the players. The email saved here is shown on LM Player, and the player role follows it. If this record has an email, it takes the place of any older one. Leave the box and it is saved. Only an admin can add someone who is not on the League Master list.';
 
     const clubsHere = clubList.filter((club) => (account.playerOnly ? homeClubSlugs.has(club.slug) : hasClubRole ? clubSlugs.has(club.slug) : homeClubSlugs.has(club.slug)));
-    const paintClub = (heading: string, group: SiteRow[]) => {
+    const paintClub = (heading: string) => {
       const club = clubsHere.find((item) => item.name === heading) ?? clubList.find((item) => item.name === heading);
       const contact = [club?.contact_name, club?.contact_email].filter(Boolean).join(' · ');
       return contact ? `<p class="muted small">${escapeHtml(contact)}</p>` : '';
@@ -1057,7 +1092,7 @@ const scoresHref = url('/captains/admin/minigame/');
       ? byClub
           .map((club) => {
             const group = clubRowsScoped.filter((row) => row.club === club);
-            return `<article class="site-card"><h3>${escapeHtml(club)}</h3>${paintClub(club, group)}${siteTable(group, clubEditable, true)}</article>`;
+            return `<article class="site-card"><h3>${escapeHtml(club)}</h3>${paintClub(club)}${siteTable(group, false, true)}</article>`;
           })
           .join('')
       : '<p class="muted small">No club players on this website yet.</p>';
@@ -1071,10 +1106,28 @@ const scoresHref = url('/captains/admin/minigame/');
             const group = teamRowsScoped.filter((row) => row.team === label);
             const team = teamsHere.find((item) => (item.division ? `${item.name} · ${item.division}` : item.name) === label);
             const captain = team?.captain_name ? `Captain ${team.captain_name}${team.captain_email ? ` · ${team.captain_email}` : ''}` : '';
-            return `<article class="site-card"><h3>${escapeHtml(label)}</h3>${captain ? `<p class="muted small">${escapeHtml(captain)}</p>` : ''}${siteTable(group, teamEditable, false)}</article>`;
+            return `<article class="site-card"><h3>${escapeHtml(label)}</h3>${captain ? `<p class="muted small">${escapeHtml(captain)}</p>` : ''}${siteTable(group, false, false)}</article>`;
           })
           .join('')
       : '<p class="muted small">No team on this account yet.</p>';
+
+    const playerRows = account.playerOnly ? [] : account.isAdmin || clubEditable ? clubRowsScoped : teamRowsScoped;
+    const teamChoices = teamList
+      .filter((team) => account.isAdmin || clubSlugs.has(team.club_slug) || teamIds.has(team.id))
+      .slice()
+      .sort((a, b) => (clubBySlug.get(a.club_slug)?.name || '').localeCompare(clubBySlug.get(b.club_slug)?.name || '', 'en') || a.name.localeCompare(b.name, 'en'));
+    const addPlayer = account.isAdmin
+      ? `<form class="card" data-form="add-player"><div class="card__body stack"><h3>Add a player</h3><p class="muted small">League Master is the list of players. Use this for someone who is not on it. Their email is stored on this website and their login role follows it.</p><label>Team <select name="team_id" required><option value="">Choose a team</option>${teamChoices
+          .map((team) => {
+            const clubName = clubBySlug.get(team.club_slug)?.name || '';
+            const label = [clubName, team.division ? `${team.name} · ${team.division}` : team.name].filter(Boolean).join(' — ');
+            return `<option value="${team.id}">${escapeHtml(label)}</option>`;
+          })
+          .join('')}</select></label><label>Player name <input name="display_name" required minlength="2" maxlength="80" autocomplete="off" /></label><label>Email <input name="email" type="email" autocomplete="off" /></label><button class="btn btn--primary btn--sm" type="submit">Add player</button></div></form>`
+      : '';
+    playerListHost.innerHTML = account.playerOnly
+      ? ''
+      : `${playerRows.length ? siteTable(playerRows, account.isAdmin || teamEditable, true) : '<p class="muted small">No players on this list yet.</p>'}${addPlayer}`;
 
     const slByName = new Map<string, SlPlayer>();
     for (const player of slPlayers) {
@@ -1173,7 +1226,29 @@ const scoresHref = url('/captains/admin/minigame/');
     await showSession();
   });
 
-  const saveSquadEmail = async (input: HTMLInputElement) => {
+  const rememberWebsiteEmail = (teamId: number, name: string, email: string, playerId: number) => {
+    const current = websitePlayers.find((player) => player.teamId === teamId && player.name.toLowerCase() === name.toLowerCase());
+    if (current) {
+      current.email = email;
+      if (playerId) current.playerId = playerId;
+    } else if (teamId) {
+      websitePlayers.push({ teamId, name, email, playerId });
+    }
+    const listed = directoryRows.find((row) => row.teamId === teamId && row.name.toLowerCase() === name.toLowerCase());
+    if (listed) listed.email = email;
+    if (viewerIsAdmin) paintDirectory();
+  };
+
+  const ensureSquad = async (teamId: number, teamName: string) => {
+    const { data: existing, error: readError } = await supabase.from('captain_squads').select('id').eq('team_id', teamId).limit(1).maybeSingle();
+    if (readError) return { id: 0, error: readError.message };
+    if (existing?.id) return { id: existing.id as number, error: '' };
+    const { data: created, error } = await supabase.from('captain_squads').insert({ name: teamName, team_id: teamId }).select('id').single();
+    if (error || !created) return { id: 0, error: error?.message || 'Could not add the team list.' };
+    return { id: created.id as number, error: '' };
+  };
+
+  const saveWebsiteEmail = async (input: HTMLInputElement) => {
     const email = input.value.trim().toLowerCase();
     if (email === (input.dataset.saved ?? '')) return;
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -1181,21 +1256,84 @@ const scoresHref = url('/captains/admin/minigame/');
       return;
     }
     const name = input.dataset.playerName || 'this player';
+    const teamId = Number(input.dataset.teamId || 0);
+    let playerId = Number(input.dataset.squadEmail || 0);
     setStatus('Saving email…');
-    const { error } = await supabase.from('squad_players').update({ email: email || null }).eq('id', Number(input.dataset.squadEmail));
+    if (playerId) {
+      const { error } = await supabase.from('squad_players').update({ email: email || null }).eq('id', playerId);
+      if (error) {
+        setStatus(error.message);
+        return;
+      }
+    } else {
+      const squad = await ensureSquad(teamId, input.dataset.teamName || name);
+      if (!squad.id) {
+        setStatus(squad.error);
+        return;
+      }
+      const { data: created, error } = await supabase
+        .from('squad_players')
+        .insert({ squad_id: squad.id, display_name: name, email: email || null })
+        .select('id')
+        .single();
+      if (error || !created) {
+        setStatus(error?.message || 'Could not save the email.');
+        return;
+      }
+      playerId = created.id as number;
+      input.dataset.squadEmail = String(playerId);
+    }
+    input.dataset.saved = email;
+    rememberWebsiteEmail(teamId, name, email, playerId);
+    if (viewerIsAdmin) {
+      await supabase.rpc('sync_website_player_emails');
+      await supabase.rpc('apply_lm_roles');
+    }
+    setStatus(`Email saved for ${name}. LM Player shows this address, and the player role follows it.`);
+  };
+
+  playerListHost.addEventListener('focusout', (event) => {
+    const input = (event.target as HTMLElement).closest<HTMLInputElement>('[data-squad-email]');
+    if (input) void saveWebsiteEmail(input);
+  });
+
+  playerListHost.addEventListener('submit', async (event) => {
+    const form = (event.target as HTMLElement).closest<HTMLFormElement>('[data-form="add-player"]');
+    if (!form || !viewerIsAdmin) return;
+    event.preventDefault();
+    const data = new FormData(form);
+    const teamId = Number(data.get('team_id'));
+    const name = String(data.get('display_name') ?? '').trim();
+    const email = String(data.get('email') ?? '').trim().toLowerCase();
+    if (!teamId || name.length < 2) {
+      setStatus('Choose a team and enter the player name.');
+      return;
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setStatus('Enter a valid email, or leave it blank.');
+      return;
+    }
+    if (websitePlayers.some((player) => player.teamId === teamId && player.name.toLowerCase() === name.toLowerCase())) {
+      setStatus(`${name} is already on that team. Set the email in the list.`);
+      return;
+    }
+    setStatus('Adding player…');
+    const teamLabel = form.querySelector('select')?.selectedOptions[0]?.textContent || 'Team';
+    const squad = await ensureSquad(teamId, teamLabel);
+    if (!squad.id) {
+      setStatus(squad.error);
+      return;
+    }
+    const { error } = await supabase.from('squad_players').insert({ squad_id: squad.id, display_name: name, email: email || null });
     if (error) {
       setStatus(error.message);
       return;
     }
-    input.dataset.saved = email;
-    setStatus(`Email saved for ${name}.`);
-  };
-  for (const host of [siteClubHost, siteTeamHost]) {
-    host.addEventListener('focusout', (event) => {
-      const input = (event.target as HTMLElement).closest<HTMLInputElement>('[data-squad-email]');
-      if (input) void saveSquadEmail(input);
-    });
-  }
+    await supabase.rpc('sync_website_player_emails');
+    await supabase.rpc('apply_lm_roles');
+    setStatus(`${name} added on this website. League Master is unchanged.`);
+    await showSession();
+  });
 
   async function showSession() {
     const account = await loadAccount(supabase);
@@ -1212,6 +1350,7 @@ const scoresHref = url('/captains/admin/minigame/');
     whoEl.textContent = `Signed in as ${account.displayName || account.email}`;
     viewerIsAdmin = account.isAdmin;
     workspace.hidden = false;
+    if (!root) return;
     for (const el of root.querySelectorAll<HTMLElement>('[data-lm-only]')) el.hidden = !account.isAdmin;
     juniorLink.hidden = !account.isAdmin;
     shareLink.hidden = !account.isAdmin;
@@ -1224,6 +1363,7 @@ const scoresHref = url('/captains/admin/minigame/');
 
     if (location.hash.slice(1) === 'traffic' && !trafficLoaded) void loadTraffic();
 
+    await supabase.rpc('sync_website_player_emails');
     await supabase.rpc('apply_lm_roles');
 
     const [
@@ -1247,7 +1387,7 @@ const scoresHref = url('/captains/admin/minigame/');
       setStatus(peopleError?.message || clubError?.message || orgError?.message || roleError?.message || 'Could not load the lists.');
       return;
     }
-    if (nomError || contactError) setStatus(nomError?.message || contactError?.message || 'Could not load players.');
+    if (nomError) setStatus(nomError.message);
 
     clubs = (clubRows ?? []) as Club[];
     orgTeams = (orgRows ?? []) as OrgTeam[];
@@ -1290,13 +1430,14 @@ const scoresHref = url('/captains/admin/minigame/');
       .map((nom) => {
         const team = orgTeams.find((item) => item.id === nom.team_id);
         const contact = contacts.find((item) => item.team_id === nom.team_id && item.player_name.toLowerCase() === nom.player_name.toLowerCase());
+        const website = websitePlayers.find((item) => item.teamId === nom.team_id && item.name.toLowerCase() === nom.player_name.toLowerCase());
         const teamLabel = team ? (team.division ? `${team.name} · ${team.division}` : team.name) : 'Team';
         return {
           club: clubNames.get(team?.club_slug ?? '') || dash,
           team: teamLabel,
           teamId: nom.team_id,
           name: nom.player_name,
-          email: contact?.email || '',
+          email: website ? website.email : contact?.email || '',
         };
       })
       .sort((a, b) => a.club.localeCompare(b.club, 'en') || a.team.localeCompare(b.team, 'en') || a.name.localeCompare(b.name, 'en'));
@@ -1425,7 +1566,7 @@ const scoresHref = url('/captains/admin/minigame/');
           const marker = teamIndex === 0 && playerIndex === 0 ? ' class="club-start"' : playerIndex === 0 ? ' class="team-start"' : '';
           html.push(
             `<tr${marker}>${clubCell}${teamCell}<td>${escapeHtml(row.name)}</td>` +
-              `<td><input data-player-email="${row.teamId}" data-player-name="${escapeHtml(row.name)}" data-saved="${escapeHtml(row.email)}" aria-label="Email for ${escapeHtml(row.name)}" type="email" value="${escapeHtml(row.email)}" autocomplete="off" /></td>` +
+              `<td>${escapeHtml(row.email || '—')}</td>` +
               `<td>Player</td></tr>`,
           );
         }
@@ -1443,36 +1584,6 @@ const scoresHref = url('/captains/admin/minigame/');
   }
 
   playerSearch.addEventListener('input', () => paintDirectory());
-
-  lmPlayersHost.addEventListener('focusout', async (event) => {
-    const input = (event.target as HTMLElement).closest<HTMLInputElement>('[data-player-email]');
-    if (!input) return;
-    const email = input.value.trim().toLowerCase();
-    if (email === (input.dataset.saved ?? '')) return;
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setStatus('Enter a valid email, or leave it blank.');
-      return;
-    }
-    const teamId = Number(input.dataset.playerEmail);
-    const name = input.dataset.playerName || '';
-    setStatus('Saving email…');
-    const { data: existing } = await supabase
-      .from('lm_player_contacts')
-      .select('id')
-      .eq('team_id', teamId)
-      .eq('player_name', name)
-      .maybeSingle();
-    const { error } = existing
-      ? await supabase.from('lm_player_contacts').update({ email: email || null }).eq('id', existing.id)
-      : await supabase.from('lm_player_contacts').insert({ team_id: teamId, player_name: name, email: email || null });
-    if (error) {
-      setStatus(error.message);
-      return;
-    }
-    await supabase.rpc('apply_lm_roles');
-    input.dataset.saved = email;
-    setStatus(`Email saved for ${name}. Their login role follows that address.`);
-  });
 
   showSession();
 </script>

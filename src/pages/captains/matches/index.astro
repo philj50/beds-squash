@@ -96,6 +96,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   let currentFixture: Fixture | null = null;
   let players: Player[] = [];
   let playerOnly = false;
+  let canAddPlayers = false;
   let accountEmail = '';
 
   const setStatus = (message: string) => {
@@ -142,7 +143,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       return;
     }
     const nomButton = target.closest<HTMLButtonElement>('[data-add-nomination]');
-    if (nomButton && currentSquad && !playerOnly) {
+    if (nomButton && currentSquad && canAddPlayers) {
       const { error } = await supabase
         .from('squad_players')
         .insert({ squad_id: currentSquad.id, display_name: nomButton.dataset.addNomination });
@@ -170,7 +171,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
   matchHost.addEventListener('submit', async (event) => {
     const form = event.target as HTMLFormElement;
-    if (!form.matches('[data-form="player"]') || !currentSquad || playerOnly) return;
+    if (!form.matches('[data-form="player"]') || !currentSquad || !canAddPlayers) return;
     event.preventDefault();
     const data = new FormData(form);
     const email = String(data.get('email') ?? '').trim();
@@ -247,6 +248,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     }
     userId = account.userId;
     playerOnly = account.playerOnly;
+    canAddPlayers = account.isAdmin;
     accountEmail = account.email.toLowerCase();
     root!.querySelector('[data-who]')!.textContent = `Signed in as ${account.displayName || account.email}`;
     root!.querySelector('[data-squad-link]')!.textContent = account.playerOnly ? 'Your team' : 'Squad';
@@ -502,7 +504,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
           rows ||
           (playerOnly
             ? '<tr><td colspan="2" class="muted">Your captain has not added your email to this squad yet, so you cannot mark availability.</td></tr>'
-            : '<tr><td colspan="3" class="muted">No players in this squad yet. Add them below.</td></tr>')
+            : '<tr><td colspan="3" class="muted">No players in this squad yet.</td></tr>')
         }</tbody>
       </table>
       ${
@@ -517,7 +519,9 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
             : '<p class="muted">Use the Order column to pick who plays at each string.</p>'
         }
       </div>
-      <details class="extras">
+      ${
+        canAddPlayers
+          ? `<details class="extras">
         <summary>Add players</summary>
         <form class="player-form" data-form="player">
           <label>Name <input name="display_name" required minlength="2" maxlength="80" /></label>
@@ -538,6 +542,8 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
               : '<p class="muted">League Master has not published a nomination list for this team yet. Names are pulled in automatically when it does.</p>'
         }
       </details>`
+          : ''
+      }`
       }`;
   }
 
