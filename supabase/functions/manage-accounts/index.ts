@@ -8,6 +8,8 @@ const cors = {
 
 const PASSWORD_MIN = 12;
 const PASSWORD_MAX = 72;
+/** This login stays an admin so a person can try the other roles on their own account. */
+const PERMANENT_ADMIN_EMAIL = 'county-admin@players.invalid';
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -84,9 +86,12 @@ Deno.serve(async (req) => {
   }
 
   const protectedAdminId = async () => {
-    const { data: admins, error } = await admin.from('profiles').select('id').eq('is_admin', true);
+    const { data: admins, error } = await admin.from('profiles').select('id, email').eq('is_admin', true);
     if (error) return { id: null as string | null, error: error.message };
-    const adminIds = new Set((admins ?? []).map((row) => row.id as string));
+    const rows = (admins ?? []) as { id: string; email: string | null }[];
+    const permanent = rows.find((row) => String(row.email ?? '').toLowerCase() === PERMANENT_ADMIN_EMAIL);
+    if (permanent?.id) return { id: permanent.id, error: null as string | null };
+    const adminIds = new Set(rows.map((row) => row.id));
     let earliest: { id: string; created_at: string } | null = null;
     for (let page = 1; page <= 20; page += 1) {
       const { data, error: listError } = await admin.auth.admin.listUsers({ page, perPage: 200 });
@@ -184,7 +189,7 @@ Deno.serve(async (req) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'Enter a valid email.' }, 400);
     const keeper = await protectedAdminId();
     if (keeper.error) return json({ error: keeper.error }, 500);
-    if (userId === keeper.id) return json({ error: 'The default admin email stays as it is.' }, 400);
+    if (userId === keeper.id) return json({ error: 'The county admin email stays as it is.' }, 400);
     const { error } = await admin.auth.admin.updateUserById(userId, { email, email_confirm: true });
     if (error) return json({ error: error.message }, 400);
     const { error: profileError } = await admin.from('profiles').update({ email }).eq('id', userId);
@@ -198,7 +203,7 @@ Deno.serve(async (req) => {
     if (!/^[0-9a-f-]{36}$/i.test(userId)) return json({ error: 'Choose an account.' }, 400);
     const keeper = await protectedAdminId();
     if (keeper.error) return json({ error: keeper.error }, 500);
-    if (userId === keeper.id) return json({ error: 'The default admin stays active.' }, 400);
+    if (userId === keeper.id) return json({ error: 'The county admin stays active.' }, 400);
     if (userId === userData.user.id) return json({ error: 'You cannot turn off your own account.' }, 400);
     const { error } = await admin.auth.admin.updateUserById(userId, { ban_duration: active ? 'none' : '876600h' });
     if (error) return json({ error: error.message }, 400);
@@ -223,7 +228,7 @@ Deno.serve(async (req) => {
     if (!/^[0-9a-f-]{36}$/i.test(userId)) return json({ error: 'Choose an account.' }, 400);
     const keeper = await protectedAdminId();
     if (keeper.error) return json({ error: keeper.error }, 500);
-    if (!isAdmin && userId === keeper.id) return json({ error: 'The default admin cannot lose admin access.' }, 400);
+    if (!isAdmin && userId === keeper.id) return json({ error: 'The county admin cannot lose admin access.' }, 400);
     if (!isAdmin && userId === userData.user.id) return json({ error: 'You cannot remove your own admin access.' }, 400);
 
     const { error } = await admin.from('profiles').update({ is_admin: isAdmin }).eq('id', userId);
@@ -243,7 +248,7 @@ Deno.serve(async (req) => {
     if (!/^[0-9a-f-]{36}$/i.test(userId)) return json({ error: 'Choose an account.' }, 400);
     const keeper = await protectedAdminId();
     if (keeper.error) return json({ error: keeper.error }, 500);
-    if (userId === keeper.id) return json({ error: 'The default admin cannot be deleted.' }, 400);
+    if (userId === keeper.id) return json({ error: 'The county admin cannot be deleted.' }, 400);
     const { error: roleError } = await admin.from('memberships').delete().eq('profile_id', userId);
     if (roleError) return json({ error: roleError.message }, 400);
     const { error } = await admin.auth.admin.deleteUser(userId);
