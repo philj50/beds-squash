@@ -39,6 +39,7 @@ const scoresHref = url('/captains/admin/minigame/');
           <a class="btn btn--ghost btn--sm" href={articlesHref}>Match articles</a>
           <a class="btn btn--ghost btn--sm" data-share-link hidden href={shareHref}>Shared content</a>
           <a class="btn btn--ghost btn--sm" data-scores-link hidden href={scoresHref}>Minigame scores</a>
+          <button class="btn btn--ghost btn--sm" type="button" data-lm-only data-tab-button="traffic" hidden>Traffic</button>
           <a class="btn btn--ghost btn--sm" href={`${captainsHref}profile/`}>Profile</a>
           <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
         </p>
@@ -46,26 +47,28 @@ const scoresHref = url('/captains/admin/minigame/');
           <nav class="admin-tabs" aria-label="Administration">
             <span class="tab-group" data-lm-only>
               <span class="tab-label">League Master</span>
-              <button type="button" data-tab-button="lm-clubs">LM Club</button>
-              <button type="button" data-tab-button="lm-captains">LM Captain</button>
-              <button type="button" data-tab-button="lm-players">LM Player</button>
+              <span class="tab-buttons">
+                <button type="button" data-tab-button="lm-clubs">LM Club</button>
+                <button type="button" data-tab-button="lm-captains">LM Captain</button>
+                <button type="button" data-tab-button="lm-players">LM Player</button>
+              </span>
             </span>
             <span class="tab-group">
               <span class="tab-label">SquashLevels</span>
-              <button type="button" data-tab-button="site-sl">SL</button>
+              <span class="tab-buttons">
+                <button type="button" data-tab-button="site-sl">SL</button>
+              </span>
             </span>
             <span class="tab-group">
               <span class="tab-label">This website</span>
-              <button type="button" data-tab-button="site-club">Club</button>
-              <button type="button" data-tab-button="site-team">Team</button>
-              <button type="button" data-tab-button="site-player">Player</button>
-              <button type="button" data-lm-only data-tab-button="accounts">People</button>
-              <button type="button" data-lm-only data-tab-button="admins">Admins</button>
+              <span class="tab-buttons">
+                <button type="button" data-tab-button="site-club">Club</button>
+                <button type="button" data-tab-button="site-team">Team</button>
+                <button type="button" data-tab-button="site-player">Player</button>
+                <button type="button" data-lm-only data-tab-button="accounts">People</button>
+                <button type="button" data-lm-only data-tab-button="admins">Admins</button>
+              </span>
             </span>
-          </nav>
-          <nav class="admin-tabs admin-tabs--aside" aria-label="Site" data-lm-only>
-            <button type="button" data-tab-button="activities">Activities</button>
-            <button type="button" data-tab-button="traffic">Traffic</button>
           </nav>
 
           <section class="admin-panel" data-tab="site-club">
@@ -172,6 +175,7 @@ const scoresHref = url('/captains/admin/minigame/');
               Set the first password and tell them yourself. Nothing is emailed. They change it on their profile.
               An inactive account cannot sign in.
             </p>
+            <div class="people-split">
             <form class="card" data-form="create-account">
               <div class="card__body stack">
                 <h3>Add a person</h3>
@@ -205,6 +209,49 @@ const scoresHref = url('/captains/admin/minigame/');
                 </div>
               </div>
             </form>
+            <div class="activity-list">
+              <h3>Activities</h3>
+              <p class="muted small">Each role includes everything above it. A person with two roles can do both.</p>
+              <article class="card">
+                <div class="card__body">
+                  <h3>Player</h3>
+                  <ul>
+                    <li>See their profile, and change their name and password.</li>
+                    <li>See their own matches and mark whether they can play.</li>
+                    <li>Send a photo, video, link or article. An admin publishes it before it appears on the site.</li>
+                  </ul>
+                </div>
+              </article>
+              <article class="card">
+                <div class="card__body">
+                  <h3>Team captain</h3>
+                  <p class="muted small">Everything a player can do, for their own team, plus:</p>
+                  <ul>
+                    <li>See the players on their team and set each player's email.</li>
+                    <li>See who is in, maybe, or out.</li>
+                    <li>Set the playing order for a match.</li>
+                  </ul>
+                </div>
+              </article>
+              <article class="card">
+                <div class="card__body">
+                  <h3>Club captain</h3>
+                  <p class="muted small">Everything a team captain can do, for every team at their club.</p>
+                </div>
+              </article>
+              <article class="card">
+                <div class="card__body">
+                  <h3>Admin</h3>
+                  <p class="muted small">Everything a club captain can do, for every club, plus:</p>
+                  <ul>
+                    <li>The League Master lists, People accounts, and Admins.</li>
+                    <li>Site traffic and sign-ins.</li>
+                    <li>Publish shared photos and articles, match reports, minigame scores, and junior entries.</li>
+                  </ul>
+                </div>
+              </article>
+            </div>
+            </div>
             <h3>Everyone</h3>
             <p class="muted small">Sorted by role, then by name. Last login is the last time they signed in with a password. A random email is only a login name.</p>
             <div class="overview-box">
@@ -309,51 +356,6 @@ const scoresHref = url('/captains/admin/minigame/');
                 <button class="btn btn--primary btn--sm" type="submit">Make admin</button>
               </div>
             </form>
-          </section>
-
-          <section class="admin-panel" data-tab="activities" data-lm-only hidden>
-            <h2>Activities</h2>
-            <p class="muted small">Each role includes everything above it. A person with two roles can do both.</p>
-            <div class="activity-list">
-              <article class="card">
-                <div class="card__body">
-                  <h3>Player</h3>
-                  <ul>
-                    <li>See their profile, and change their name and password.</li>
-                    <li>See their own matches and mark whether they can play.</li>
-                    <li>Send a photo, video, link or article. An admin publishes it before it appears on the site.</li>
-                  </ul>
-                </div>
-              </article>
-              <article class="card">
-                <div class="card__body">
-                  <h3>Team captain</h3>
-                  <p class="muted small">Everything a player can do, for their own team, plus:</p>
-                  <ul>
-                    <li>See the players on their team and set each player's email.</li>
-                    <li>See who is in, maybe, or out.</li>
-                    <li>Set the playing order for a match.</li>
-                  </ul>
-                </div>
-              </article>
-              <article class="card">
-                <div class="card__body">
-                  <h3>Club captain</h3>
-                  <p class="muted small">Everything a team captain can do, for every team at their club.</p>
-                </div>
-              </article>
-              <article class="card">
-                <div class="card__body">
-                  <h3>Admin</h3>
-                  <p class="muted small">Everything a club captain can do, for every club, plus:</p>
-                  <ul>
-                    <li>The League Master lists, People accounts, and Admins.</li>
-                    <li>Site traffic and sign-ins.</li>
-                    <li>Publish shared photos and articles, match reports, minigame scores, and junior entries.</li>
-                  </ul>
-                </div>
-              </article>
-            </div>
           </section>
 
           <section class="admin-panel" data-tab="traffic" data-lm-only hidden>
@@ -496,13 +498,14 @@ const scoresHref = url('/captains/admin/minigame/');
   const grantAdmin = root.querySelector<HTMLSelectElement>('[data-grant-admin]')!;
   let protectedAdminId = '';
   const siteTabs = ['site-club', 'site-team', 'site-player', 'site-sl'] as const;
-  const tabs = [...siteTabs, 'lm-clubs', 'lm-captains', 'lm-players', 'accounts', 'admins', 'activities', 'traffic'] as const;
+  const tabs = [...siteTabs, 'lm-clubs', 'lm-captains', 'lm-players', 'accounts', 'admins', 'traffic'] as const;
   type Tab = (typeof tabs)[number];
   const tabAlias: Record<string, Tab> = {
     overview: 'lm-clubs',
     clubs: 'lm-clubs',
     players: 'lm-players',
     roles: 'admins',
+    activities: 'accounts',
   };
   let trafficLoaded = false;
   const trafficStatus = root.querySelector<HTMLElement>('[data-traffic-status]')!;
@@ -1511,18 +1514,19 @@ const scoresHref = url('/captains/admin/minigame/');
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;
-    gap: 0.35rem 1rem;
+    gap: 0.75rem;
     margin: 0 0 0.75rem;
     border-bottom: 2px solid var(--gold-500);
   }
-  #setup-app .admin-tabs--aside {
-    margin-top: -0.35rem;
-    border-bottom-color: var(--border-strong);
-  }
   #setup-app .tab-group {
-    display: inline-flex;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  #setup-app .tab-buttons {
+    display: flex;
     flex-wrap: wrap;
-    align-items: flex-end;
+    justify-content: center;
   }
   #setup-app .tab-group[hidden],
   #setup-app .admin-tabs[hidden],
@@ -1530,13 +1534,19 @@ const scoresHref = url('/captains/admin/minigame/');
     display: none !important;
   }
   #setup-app .admin-tabs .tab-label {
-    align-self: center;
-    margin: 0 0.45rem 0.15rem 0;
+    display: block;
+    margin: 0;
+    padding: 0.28rem 0.6rem;
+    text-align: center;
     font-size: 0.72rem;
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--text-muted);
+    color: var(--gold-400);
+    background: var(--ink-800);
+    border: 1px solid var(--gold-500);
+    border-bottom: none;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   }
   #setup-app .site-card {
     margin: 0 0 1rem;
@@ -1594,10 +1604,21 @@ const scoresHref = url('/captains/admin/minigame/');
   #setup-app .admin-panel > h2 {
     margin-top: 0;
   }
+  #setup-app .people-split {
+    display: grid;
+    grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr);
+    gap: 1rem;
+    align-items: start;
+    margin-bottom: 1.25rem;
+  }
+  @media (max-width: 800px) {
+    #setup-app .people-split {
+      grid-template-columns: 1fr;
+    }
+  }
   #setup-app .activity-list {
     display: grid;
     gap: 0.75rem;
-    max-width: 40rem;
   }
   #setup-app .activity-list h3 {
     margin: 0 0 0.35rem;

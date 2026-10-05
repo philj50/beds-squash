@@ -392,14 +392,13 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.getByRole('heading', { name: 'Admins' })).toBeVisible();
     await expect(page.locator('[data-admins]')).toContainText('County Admin');
 
-    await page.getByRole('button', { name: 'Activities' }).click();
+    await page.getByRole('button', { name: 'People' }).click();
+    await expect(page.getByRole('heading', { name: 'Add a person' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Player' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Team captain' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Club captain' })).toBeVisible();
-    await expect(page.locator('[data-tab="activities"]')).toContainText('mark whether they can play');
-    await expect(page.locator('[data-tab="activities"]')).toContainText('every team at their club');
-
-    await page.getByRole('button', { name: 'People' }).click();
+    await expect(page.locator('[data-tab="accounts"]')).toContainText('mark whether they can play');
+    await expect(page.locator('[data-tab="accounts"]')).toContainText('every team at their club');
     await expect(page.getByRole('columnheader', { name: 'Last login' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Status' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Random' })).toBeVisible();
