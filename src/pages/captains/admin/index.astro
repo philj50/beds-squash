@@ -971,6 +971,16 @@ const scoresHref = url('/captains/admin/minigame/');
     return Boolean(left) && left === name.trim().toLowerCase();
   };
 
+  let slCatalog: SlPlayer[] = [];
+  let slLinks: { id: number; lm_player_name: string | null; squashlevels_player_id: number | null }[] = [];
+  let canPickSl = false;
+
+  const slMatch = (lmName: string) => {
+    const link = slLinks.find((item) => item.lm_player_name && nameKey(item.lm_player_name) === nameKey(lmName) && item.squashlevels_player_id != null);
+    if (link) return slCatalog.find((player) => player.id === link.squashlevels_player_id) ?? null;
+    return slCatalog.find((player) => nameKey(player.display_name) === nameKey(lmName)) ?? null;
+  };
+
   const siteTable = (rows: SiteRow[], fields: 'all' | 'open' | 'none', showTeam: boolean) => {
     const box = (row: SiteRow, field: 'email' | 'es' | 'phone', value: string, label: string, type: string) =>
       `<input data-squad-field="${field}" data-squad-email="${row.playerId || ''}" data-team-id="${row.teamId ?? ''}" data-team-name="${escapeHtml(row.team)}" data-player-name="${escapeHtml(row.name)}" data-saved="${escapeHtml(value)}" aria-label="${label} for ${escapeHtml(row.name)}" type="${type}" value="${escapeHtml(value)}" autocomplete="off" />`;
@@ -982,11 +992,20 @@ const scoresHref = url('/captains/admin/minigame/');
         const esCell = detailsOpen ? box(row, 'es', row.es, 'ES number', 'text') : escapeHtml(row.es || '—');
         const phoneCell = detailsOpen ? box(row, 'phone', row.phone, 'Phone', 'tel') : escapeHtml(row.phone || '—');
         const teamCell = showTeam ? `<td>${escapeHtml(row.team)}</td>` : '';
-        return `<tr>${teamCell}<td>${escapeHtml(row.name)}</td><td>${emailCell}</td><td>${esCell}</td><td>${phoneCell}</td></tr>`;
+        const matched = slMatch(row.name);
+        const slName = matched
+          ? escapeHtml(matched.display_name)
+          : canPickSl
+            ? `<select data-sl-pick data-player-name="${escapeHtml(row.name)}" aria-label="SquashLevels for ${escapeHtml(row.name)}"><option value="">Choose</option>${slCatalog
+                .map((player) => `<option value="${player.id}">${escapeHtml(player.display_name)}</option>`)
+                .join('')}</select>`
+            : '—';
+        const slLevel = matched ? levelText(matched.current_level) : '—';
+        return `<tr>${teamCell}<td>${escapeHtml(row.name)}</td><td>${slName}</td><td data-sl-level>${slLevel}</td><td>${emailCell}</td><td>${esCell}</td><td>${phoneCell}</td></tr>`;
       })
       .join('');
     const teamHead = showTeam ? '<th>Team</th>' : '';
-    return `<div class="overview-box"><table class="overview"><thead><tr>${teamHead}<th>Name</th><th>Email</th><th>ES number</th><th>Phone</th></tr></thead><tbody>${body}</tbody></table></div>`;
+    return `<div class="overview-box"><table class="overview"><thead><tr>${teamHead}<th>LM name</th><th>SL name</th><th>SL level</th><th>Email</th><th>ES number</th><th>Phone</th></tr></thead><tbody>${body}</tbody></table></div>`;
   };
 
   async function loadWebsite(account: Account) {
@@ -999,7 +1018,7 @@ const scoresHref = url('/captains/admin/minigame/');
       supabase.from('captain_squads').select('id, name, team_id, squad_players(id, display_name, email, england_squash_id, phone)'),
       supabase.from('nominations').select('team_id, player_name, season').eq('season', SEASON),
       supabase.from('squashlevels_players').select('id, display_name, current_level, updated_at').order('display_name', { ascending: true }),
-      supabase.from('player_links').select('profile_id, squashlevels_player_id, lm_player_name'),
+      supabase.from('player_links').select('id, profile_id, squashlevels_player_id, lm_player_name'),
       supabase.from('profiles').select('id, email'),
     ]);
     const mine = (mineRows ?? []) as Mine[];
@@ -1016,8 +1035,11 @@ const scoresHref = url('/captains/admin/minigame/');
     const nominations = (nomRows ?? []) as { team_id: number; player_name: string }[];
     websitePlayers = [];
     const slPlayers = (slRows ?? []) as SlPlayer[];
-    type PlayerLink = { profile_id: string | null; squashlevels_player_id: number | null; lm_player_name: string | null };
+    slCatalog = slPlayers;
+    canPickSl = account.isAdmin;
+    type PlayerLink = { id: number; profile_id: string | null; squashlevels_player_id: number | null; lm_player_name: string | null };
     const playerLinks = (linkResult.error ? [] : (linkResult.data ?? [])) as PlayerLink[];
+    slLinks = playerLinks;
     const emailToProfile = new Map<string, string>();
     if (!profileResult.error) {
       for (const row of (profileResult.data ?? []) as { id: string; email: string | null }[]) {
@@ -1129,7 +1151,7 @@ const scoresHref = url('/captains/admin/minigame/');
           ? 'The players you can see. Email, ES number, and phone can be changed. A club captain or team captain keeps their name and email from League Master. Their ES number and phone can still be changed. Leave a box and it is saved.'
           : 'Your club is read-only. Other teams at the club are not listed.';
     teamNote.textContent = account.isAdmin
-      ? 'Every team. Email, ES number, and phone can be changed for players. A club captain or team captain keeps their name and email from League Master. Their ES number and phone can still be changed. Leave a box and it is saved.'
+      ? 'Every team. When the League Master name matches SquashLevels, that name and level stay fixed. Otherwise choose the SquashLevels name and the level fills in. Email, ES number, and phone can be changed. A club captain or team captain keeps their name and email from League Master.'
       : account.playerOnly
         ? 'Your team. You can change your own email, ES number, and phone. A club captain or team captain keeps their name and email from League Master, and can still change ES number and phone.'
         : 'Your team. Email, ES number, and phone can be changed for players. A club captain or team captain keeps their name and email from League Master. Their ES number and phone can still be changed. Leave a box and it is saved.';
@@ -1377,7 +1399,45 @@ const scoresHref = url('/captains/admin/minigame/');
       const input = (event.target as HTMLElement).closest<HTMLInputElement>('[data-squad-field]');
       if (input) void savePlayerField(input);
     });
+    host.addEventListener('change', (event) => {
+      const select = (event.target as HTMLElement).closest<HTMLSelectElement>('[data-sl-pick]');
+      if (select) void saveSlPick(select);
+    });
   }
+
+  const saveSlPick = async (select: HTMLSelectElement) => {
+    const lmName = select.dataset.playerName ?? '';
+    const slId = Number(select.value);
+    const chosen = slCatalog.find((player) => player.id === slId);
+    const levelCell = select.closest('td')?.nextElementSibling;
+    if (!lmName || !chosen || !levelCell) return;
+    setStatus('Saving SquashLevels…');
+    const existing = slLinks.find((link) => link.lm_player_name && nameKey(link.lm_player_name) === nameKey(lmName));
+    if (existing?.id) {
+      const { error } = await supabase.from('player_links').delete().eq('id', existing.id);
+      if (error) {
+        setStatus(error.message);
+        select.value = '';
+        return;
+      }
+    }
+    const { data, error } = await supabase
+      .from('player_links')
+      .insert({ lm_player_name: lmName, squashlevels_player_id: slId })
+      .select('id')
+      .single();
+    if (error || !data) {
+      setStatus(error?.code === '23505' ? 'That SquashLevels player is already linked to someone else.' : error?.message || 'Could not save the SquashLevels name.');
+      select.value = '';
+      return;
+    }
+    slLinks = slLinks.filter((link) => link.id !== existing?.id);
+    slLinks.push({ id: data.id as number, lm_player_name: lmName, squashlevels_player_id: slId });
+    const nameCell = select.closest('td');
+    if (nameCell) nameCell.textContent = chosen.display_name;
+    levelCell.textContent = levelText(chosen.current_level);
+    setStatus(`SquashLevels saved for ${lmName}.`);
+  };
 
   playerListHost.addEventListener('submit', async (event) => {
     const form = (event.target as HTMLElement).closest<HTMLFormElement>('[data-form="add-player"]');

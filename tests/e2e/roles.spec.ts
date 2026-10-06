@@ -166,6 +166,11 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.locator('[data-site-player-list]')).not.toContainText('Test Team 2');
     await page.getByRole('button', { name: 'Team', exact: true }).click();
     await expect(page.locator('[data-site-team]')).toContainText('Pat Player');
+    await expect(page.getByRole('columnheader', { name: 'LM name' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'SL name' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'SL level' })).toBeVisible();
+    await expect(page.locator('[data-site-team] tr', { hasText: 'Pat Player' })).toContainText('4,321');
+    await expect(page.locator('[data-site-team]').getByRole('combobox', { name: 'SquashLevels for Pat Player' })).toHaveCount(0);
     await expect(page.locator('[data-site-team]').getByRole('textbox', { name: 'Email for Pat Player' })).toBeVisible();
     await expect(page.locator('[data-site-team]').getByRole('textbox', { name: 'Phone for Pat Player' })).toBeVisible();
     await expect(page.locator('[data-site-team]').getByRole('textbox', { name: 'Email for Taylor Team' })).toHaveCount(0);
@@ -514,6 +519,16 @@ test.describe('Club captain, team captain, and player', () => {
     await linked.getByRole('button', { name: 'Unlink' }).click();
     await expect(page.getByText('Link removed.')).toBeVisible();
     await expect(page.locator('[data-links]')).toContainText('No links yet.');
+
+    await page.getByRole('button', { name: 'Team', exact: true }).click();
+    const zoe = page.locator('[data-site-team] tr', { hasText: 'Zoe Player' });
+    await expect(zoe.getByRole('combobox', { name: 'SquashLevels for Zoe Player' })).toBeVisible();
+    await zoe.getByRole('combobox', { name: 'SquashLevels for Zoe Player' }).selectOption({ label: 'Pat Player' });
+    await expect(zoe).toContainText('4,321');
+    await expect(zoe.getByRole('combobox')).toHaveCount(0);
+    const patTeam = page.getByRole('row', { name: /Pat Player Pat Player 4,321/ });
+    await expect(patTeam).toHaveCount(1);
+    await expect(patTeam.getByRole('combobox')).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Traffic' }).click();
     await expect(page.getByRole('heading', { name: 'Sign-ins (30 days)' })).toBeVisible();
