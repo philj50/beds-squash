@@ -1,0 +1,362 @@
+---
+import Base from '@/layouts/Base.astro';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
+import { url } from '@/lib/site';
+---
+
+<Base title="Your squash" description="Your next matches, last results, SquashLevels level and uploads." noindex>
+  <section class="section">
+    <div class="container you" id="you-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
+      <h1>Your squash</h1>
+      <p class="lede">
+        This page is only for the person signed in. It shows your next team matches, the last time you played that opposition, your SquashLevels level, and what you have sent to the site.
+      </p>
+      <p class="status" data-status role="status"></p>
+      <div data-panel="signed-in" hidden>
+        <p class="who" data-who></p>
+        <p class="places" data-places></p>
+        <p class="actions">
+          <a class="btn btn--ghost btn--sm" href={url('/captains/matches/')}>Matches</a>
+          <a class="btn btn--ghost btn--sm" href={url('/share/')}>Send something in</a>
+          <a class="btn btn--ghost btn--sm" href={url('/captains/profile/')}>Profile</a>
+          <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
+        </p>
+
+        <h2>Next matches</h2>
+        <div data-matches></div>
+
+        <h2>SquashLevels</h2>
+        <div data-level></div>
+
+        <h2>Sent to the site</h2>
+        <div data-uploads></div>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+  import { loadAccount, sendToLogin, type Account } from '@/lib/account';
+
+  type Membership = { role: string; club_slug: string | null; team_id: number | null };
+  type Squad = { id: number; name: string; team_id: number };
+  type Side = { id: number; name: string; club_slug: string | null; team_id: number | null };
+  type Fixture = {
+    id: number;
+    starts_at: string;
+    status: string;
+    home_points: number | null;
+    away_points: number | null;
+    home: Side;
+    away: Side;
+    divisions: { name: string } | null;
+  };
+  type Level = { display_name: string; current_level: number | null; updated_at: string | null };
+  type Upload = {
+    id: string;
+    kind: string;
+    title: string | null;
+    caption: string | null;
+    status: string;
+    created_at: string;
+    credit: string;
+  };
+
+  const root = document.getElementById('you-app');
+  if (!root) throw new Error('your squash missing');
+  const supabase = createClient(root.dataset.url!, root.dataset.key!);
+  const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
+  const signedIn = root.querySelector<HTMLElement>('[data-panel="signed-in"]')!;
+  const whoEl = root.querySelector<HTMLElement>('[data-who]')!;
+  const placesEl = root.querySelector<HTMLElement>('[data-places]')!;
+  const matchesEl = root.querySelector<HTMLElement>('[data-matches]')!;
+  const levelEl = root.querySelector<HTMLElement>('[data-level]')!;
+  const uploadsEl = root.querySelector<HTMLElement>('[data-uploads]')!;
+
+  const esc = (value: string | null | undefined) =>
+    String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
+
+  function one<T>(value: T | T[] | null | undefined): T | null {
+    if (Array.isArray(value)) return value[0] ?? null;
+    return value ?? null;
+  }
+
+  const when = (iso: string) =>
+    new Date(iso).toLocaleString('en-GB', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+  const day = (iso: string) =>
+    new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+  function normalise(row: Fixture): Fixture {
+    return { ...row, home: one(row.home)!, away: one(row.away)!, divisions: one(row.divisions) };
+  }
+
+  function pairKey(fixture: Fixture) {
+    const ids = [fixture.home.team_id, fixture.away.team_id].filter((id): id is number => id != null).sort((a, b) => a - b);
+    return ids.join(':');
+  }
+
+  root.querySelector('[data-sign-out]')!.addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    sendToLogin();
+  });
+
+  async function squadsFor(account: Account) {
+    const [{ data: membershipRows }, squadResult] = await Promise.all([
+      supabase.from('memberships').select('role, club_slug, team_id').eq('profile_id', account.userId),
+      supabase.from('captain_squads').select('id, name, team_id').not('team_id', 'is', null).order('name'),
+    ]);
+    const memberships = (membershipRows ?? []) as Membership[];
+    const teamIds = new Set(memberships.map((row) => row.team_id).filter((id): id is number => id != null));
+    const clubSlugs = memberships.filter((row) => row.role === 'club_captain' && row.club_slug).map((row) => row.club_slug!);
+    if (clubSlugs.length) {
+      const { data: clubTeams } = await supabase.from('teams').select('id, club_slug').in('club_slug', clubSlugs);
+      for (const team of (clubTeams ?? []) as { id: number; club_slug: string }[]) {
+        if (clubSlugs.includes(team.club_slug)) teamIds.add(team.id);
+      }
+    }
+    let squads = ((squadResult.data ?? []) as { id: number; name: string; team_id: number | null }[]).filter(
+      (squad): squad is Squad => squad.team_id != null,
+    );
+    if (!squads.length && account.email) {
+      const { data: ownPlayers } = await supabase.from('squad_players').select('squad_id').ilike('email', account.email);
+      const ids = [...new Set((ownPlayers ?? []).map((row: { squad_id: number }) => row.squad_id))];
+      if (ids.length) {
+        const { data: ownSquads } = await supabase.from('captain_squads').select('id, name, team_id').in('id', ids).not('team_id', 'is', null);
+        squads = ((ownSquads ?? []) as Squad[]).filter((squad) => squad.team_id != null);
+      }
+    }
+    const scoped = squads.filter((squad) => teamIds.has(squad.team_id));
+    return { squads: scoped, teamIds: [...teamIds] };
+  }
+
+  function drawMatches(squads: Squad[], teamIds: number[], fixtures: Fixture[]) {
+    const ids = new Set(teamIds);
+    const squadByTeam = new Map(squads.map((squad) => [squad.team_id, squad]));
+    const sideOf = (fixture: Fixture) => {
+      const home = fixture.home.team_id != null && ids.has(fixture.home.team_id);
+      const away = fixture.away.team_id != null && ids.has(fixture.away.team_id);
+      if (home) return 'home' as const;
+      if (away) return 'away' as const;
+      return null;
+    };
+    if (!teamIds.length) {
+      matchesEl.innerHTML = '<p class="muted">No team is linked to this account yet. An admin sets that from People.</p>';
+      return;
+    }
+    const upcoming = fixtures
+      .filter((fixture) => sideOf(fixture) && fixture.status !== 'played' && new Date(fixture.starts_at).getTime() > Date.now() - 6 * 3600_000)
+      .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
+      .slice(0, 3);
+    if (!upcoming.length) {
+      matchesEl.innerHTML = '<p class="muted">No upcoming matches for your team.</p>';
+      return;
+    }
+    const played = fixtures
+      .filter((fixture) => sideOf(fixture) && fixture.status === 'played' && fixture.home_points != null && fixture.away_points != null)
+      .sort((a, b) => b.starts_at.localeCompare(a.starts_at));
+    matchesEl.innerHTML = upcoming
+      .map((fixture) => {
+        const side = sideOf(fixture)!;
+        const teamId = side === 'home' ? fixture.home.team_id : fixture.away.team_id;
+        const squad = teamId != null ? squadByTeam.get(teamId) : undefined;
+        const us = side === 'home' ? fixture.home : fixture.away;
+        const opponent = side === 'home' ? fixture.away : fixture.home;
+        const previous = played.find((past) => past.starts_at < fixture.starts_at && pairKey(past) === pairKey(fixture) && pairKey(fixture).includes(':'));
+        const last = previous
+          ? `Last time: ${esc(previous.home.name)} ${previous.home_points}–${previous.away_points} ${esc(previous.away.name)}, ${esc(day(previous.starts_at))}.`
+          : 'No earlier match against them.';
+        const team = teamIds.length > 1 ? `${esc(squad?.name ?? us.name)} · ` : '';
+        return `<article class="card"><div class="card__body">
+          <p class="eyebrow">${team}${esc(fixture.divisions?.name ?? 'League match')}</p>
+          <h3>${esc(us.name)} ${side === 'home' ? 'v' : 'at'} ${esc(opponent.name)}</h3>
+          <p class="meta">${esc(when(fixture.starts_at))} · ${side === 'home' ? 'Home' : 'Away'}</p>
+          <p class="last">${last}</p>
+        </div></article>`;
+      })
+      .join('');
+  }
+
+  function drawLevel(level: Level | null) {
+    if (!level || level.current_level == null) {
+      levelEl.innerHTML = '<p class="muted">No SquashLevels record matches your name.</p>';
+      return;
+    }
+    const updated = level.updated_at ? ` Updated ${esc(day(level.updated_at))}.` : '';
+    levelEl.innerHTML = `<p class="level"><strong>${esc(level.current_level.toLocaleString('en-GB'))}</strong>${updated}</p>`;
+  }
+
+  function drawUploads(rows: Upload[]) {
+    if (!rows.length) {
+      uploadsEl.innerHTML = '<p class="muted">Nothing sent in under this login yet.</p>';
+      return;
+    }
+    const kindLabel: Record<string, string> = { photo: 'Photo', video: 'Video', link: 'Link', article: 'Article' };
+    uploadsEl.innerHTML = `<ul class="uploads">${rows
+      .map((row) => {
+        const label = row.title || row.caption || kindLabel[row.kind] || 'Upload';
+        const state = row.status === 'published' ? 'On the site' : 'Pending';
+        return `<li><span>${esc(kindLabel[row.kind] ?? row.kind)}</span><span>${esc(label)}</span><span>${esc(state)}</span><span>${esc(day(row.created_at))}</span></li>`;
+      })
+      .join('')}</ul>`;
+  }
+
+  async function loadLevel(account: Account) {
+    const name = account.displayName.trim();
+    if (!name) return null;
+    const { data } = await supabase
+      .from('squashlevels_players')
+      .select('display_name, current_level, updated_at')
+      .ilike('display_name', name)
+      .limit(1)
+      .maybeSingle();
+    return (data ?? null) as Level | null;
+  }
+
+  async function loadUploads(account: Account) {
+    const own = await supabase
+      .from('contributions')
+      .select('id, kind, title, caption, status, created_at, credit')
+      .eq('submitted_by', account.userId)
+      .order('created_at', { ascending: false });
+    const named = account.displayName.trim()
+      ? await supabase
+          .from('contributions')
+          .select('id, kind, title, caption, status, created_at, credit')
+          .eq('credit_key', account.displayName.trim().toLowerCase())
+          .eq('status', 'published')
+          .order('created_at', { ascending: false })
+      : { data: [], error: null };
+    if (own.error && named.error) return { rows: [] as Upload[], error: own.error.message };
+    const merged = new Map<string, Upload>();
+    for (const row of [...((own.data ?? []) as Upload[]), ...((named.data ?? []) as Upload[])]) merged.set(row.id, row);
+    return {
+      rows: [...merged.values()].sort((a, b) => b.created_at.localeCompare(a.created_at)),
+      error: null as string | null,
+    };
+  }
+
+  async function showSession() {
+    const account = await loadAccount(supabase);
+    signedIn.hidden = !account;
+    if (!account) {
+      sendToLogin();
+      return;
+    }
+    whoEl.textContent = `Signed in as ${account.displayName || account.email}`;
+    placesEl.textContent = account.places.length ? account.places.map((place) => place.label).join('. ') : 'No club or team on this account yet.';
+    statusEl.textContent = '';
+    const [{ squads, teamIds }, level, uploads] = await Promise.all([squadsFor(account), loadLevel(account), loadUploads(account)]);
+    let fixtures: Fixture[] = [];
+    if (teamIds.length) {
+      const { data: leagueTeams, error: teamError } = await supabase.from('league_teams').select('id, team_id').in('team_id', teamIds);
+      if (teamError) statusEl.textContent = teamError.message;
+      const ids = [...new Set(((leagueTeams ?? []) as { id: number; team_id: number | null }[]).filter((team) => team.team_id != null && teamIds.includes(team.team_id)).map((team) => team.id))];
+      if (ids.length) {
+        const { data, error } = await supabase
+          .from('fixtures')
+          .select(
+            'id, starts_at, status, home_points, away_points, divisions (name), home:league_teams!fixtures_home_team_id_fkey (id, name, club_slug, team_id), away:league_teams!fixtures_away_team_id_fkey (id, name, club_slug, team_id)',
+          )
+          .or(`home_team_id.in.(${ids.join(',')}),away_team_id.in.(${ids.join(',')})`)
+          .order('starts_at');
+        if (error) statusEl.textContent = error.message;
+        fixtures = ((data ?? []) as unknown as Fixture[]).map(normalise).filter((fixture) => fixture.home && fixture.away);
+      }
+    }
+    drawMatches(squads, teamIds, fixtures);
+    drawLevel(level);
+    if (uploads.error) statusEl.textContent = uploads.error;
+    drawUploads(uploads.rows);
+  }
+
+  void showSession();
+</script>
+
+<style>
+  .you {
+    max-width: 44rem;
+  }
+  .lede,
+  .places,
+  .muted {
+    color: var(--ink-200);
+  }
+  .status:empty {
+    display: none;
+  }
+  .status {
+    color: var(--gold-400);
+  }
+  .who {
+    margin-bottom: 0.25rem;
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0 0 1.25rem;
+  }
+  h2 {
+    margin: 1.4rem 0 0.6rem;
+  }
+  .card {
+    margin-bottom: 0.75rem;
+  }
+  .card__body {
+    padding: 0.9rem 1rem;
+  }
+  .eyebrow {
+    margin: 0;
+    color: var(--gold-400);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  h3 {
+    margin: 0.2rem 0;
+  }
+  .meta,
+  .last,
+  .level {
+    margin: 0.2rem 0 0;
+  }
+  .level strong {
+    font-size: 1.6rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .uploads {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .uploads li {
+    display: grid;
+    grid-template-columns: 5.5rem minmax(0, 1fr) auto auto;
+    gap: 0.75rem;
+    align-items: baseline;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .uploads li span:first-child {
+    color: var(--gold-400);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  @media (max-width: 640px) {
+    .uploads li {
+      grid-template-columns: 1fr auto;
+    }
+  }
+</style>

@@ -51,6 +51,7 @@ test.describe('Signed out', () => {
     'captains/',
     'captains/matches/',
     'captains/profile/',
+    'captains/you/',
     'captains/admin/',
     'captains/admin/articles/',
     'captains/admin/share/',
@@ -503,6 +504,18 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.getByText('Removed from the board.')).toBeVisible();
     await expect(page.getByText('No scores on the board.')).toBeVisible();
   });
+
+  test('a player sees their next match, last result, level and uploads', async ({ page }) => {
+    await signIn(page, 'team_player');
+    await page.goto('captains/you/', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { level: 1, name: 'Your squash' })).toBeVisible();
+    await expect(page.getByText('Signed in as Pat Player')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Test Team 1 v Visitors' })).toBeVisible();
+    await expect(page.getByText('Visitors 4–1 Test Team 1')).toBeVisible();
+    await expect(page.getByText('4,321')).toBeVisible();
+    await expect(page.getByText('Club night')).toBeVisible();
+    await expect(page.getByText('Pending')).toBeVisible();
+  });
 });
 
 test.describe('Junior admin stays off the public juniors pages', () => {
@@ -579,6 +592,18 @@ async function signIn(page: Page, role: RoleName) {
     divisions: { name: 'Division 1', scoring: 'PAR 11' },
     home: { id: 20, name: 'Test Team 1', club_slug: 'test-club', team_id: 5 },
     away: { id: 21, name: 'Visitors', club_slug: 'other-club', team_id: 6 },
+  };
+  const earlier = {
+    id: 90,
+    starts_at: '2026-01-14T18:00:00.000Z',
+    status: 'played',
+    home_points: 4,
+    away_points: 1,
+    home_games: null,
+    away_games: null,
+    divisions: { name: 'Division 1', scoring: 'PAR 11' },
+    home: { id: 21, name: 'Visitors', club_slug: 'other-club', team_id: 6 },
+    away: { id: 20, name: 'Test Team 1', club_slug: 'test-club', team_id: 5 },
   };
 
   await page.route(`${SUPABASE}/**`, async (route) => {
@@ -661,12 +686,16 @@ async function signIn(page: Page, role: RoleName) {
       ]);
     }
     if (path.endsWith('/squashlevels_players')) {
-      return send([
+      const rows = [
         { id: 90, display_name: 'Pat Player', current_level: 4321, updated_at: '2026-09-01' },
         { id: 91, display_name: 'Sam Spare', current_level: 2100, updated_at: '2026-08-01' },
         { id: 92, display_name: 'Sam Squad', current_level: 3000, updated_at: '2026-07-01' },
         { id: 93, display_name: 'Away Player', current_level: 1500, updated_at: '2026-06-01' },
-      ]);
+      ];
+      const name = url.searchParams.get('display_name') ?? '';
+      const wanted = name.replace(/^ilike\./i, '').replaceAll('*', '').trim().toLowerCase();
+      const matched = wanted ? rows.filter((row) => row.display_name.toLowerCase() === wanted) : rows;
+      return send(single ? (matched[0] ?? null) : matched);
     }
     if (path.endsWith('/squashlevels_ratings')) {
       return send([
@@ -683,8 +712,27 @@ async function signIn(page: Page, role: RoleName) {
         { id: 1, name: '2025-26', starts_on: '2025-09-01' },
       ]);
     }
-    if (path.endsWith('/league_teams')) return send([{ id: 20 }]);
-    if (path.endsWith('/fixtures')) return send([fixture]);
+    if (path.endsWith('/league_teams')) {
+      return send([
+        { id: 20, name: 'Test Team 1', club_slug: 'test-club', team_id: 5 },
+        { id: 21, name: 'Visitors', club_slug: 'other-club', team_id: 6 },
+      ]);
+    }
+    if (path.endsWith('/fixtures')) return send([fixture, earlier]);
+    if (path.endsWith('/contributions')) {
+      return send([
+        {
+          id: 'c1',
+          kind: 'photo',
+          title: null,
+          caption: 'Club night',
+          status: 'pending',
+          created_at: '2026-10-01T12:00:00.000Z',
+          credit: 'Pat Player',
+          submitted_by: person.id,
+        },
+      ]);
+    }
     if (path.endsWith('/nominations')) {
       const season = url.searchParams.get('season') ?? '';
       if (season.includes('Winter')) {
