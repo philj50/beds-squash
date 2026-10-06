@@ -255,7 +255,7 @@ const scoresHref = url('/captains/admin/minigame/');
             </div>
             </div>
             <h3>Everyone</h3>
-            <p class="muted small">Sorted by role, then by name. Last login is the last time they signed in with a password.</p>
+            <p class="muted small">Sorted by role, then by name. Last login is the last time they signed in with a password. An admin is shown with the club they belong to. An admin with no club is listed as admin only.</p>
             <div class="overview-box">
               <table class="overview">
                 <thead>
@@ -907,6 +907,7 @@ const scoresHref = url('/captains/admin/minigame/');
     es: string;
     phone: string;
     locked: boolean;
+    role: string;
   };
   const clubNote = root.querySelector<HTMLElement>('[data-site-club-note]')!;
   const teamNote = root.querySelector<HTMLElement>('[data-site-team-note]')!;
@@ -1001,17 +1002,17 @@ const scoresHref = url('/captains/admin/minigame/');
                 .join('')}</select>`
             : '—';
         const slLevel = matched ? levelText(matched.current_level) : '—';
-        return `<tr>${teamCell}<td>${escapeHtml(row.name)}</td><td>${slName}</td><td data-sl-level>${slLevel}</td><td>${emailCell}</td><td>${esCell}</td><td>${phoneCell}</td></tr>`;
+        return `<tr>${teamCell}<td>${escapeHtml(row.name)}</td><td>${slName}</td><td data-sl-level>${slLevel}</td><td>${emailCell}</td><td>${esCell}</td><td>${phoneCell}</td><td>${escapeHtml(row.role)}</td></tr>`;
       })
       .join('');
     const teamHead = showTeam ? '<th>Team</th>' : '';
-    return `<div class="overview-box"><table class="overview"><thead><tr>${teamHead}<th>LM name</th><th>SL name</th><th>SL level</th><th>Email</th><th>ES number</th><th>Phone</th></tr></thead><tbody>${body}</tbody></table></div>`;
+    return `<div class="overview-box"><table class="overview"><thead><tr>${teamHead}<th>LM name</th><th>SL name</th><th>SL level</th><th>Email</th><th>ES number</th><th>Phone</th><th>Role</th></tr></thead><tbody>${body}</tbody></table></div>`;
   };
 
   async function loadWebsite(account: Account) {
     ownName.value = account.displayName;
     ownEmail.textContent = account.email || '—';
-    const [{ data: mineRows }, { data: clubRows }, { data: teamRows }, { data: squadRows }, { data: nomRows }, { data: slRows }, linkResult, profileResult] = await Promise.all([
+    const [{ data: mineRows }, { data: clubRows }, { data: teamRows }, { data: squadRows }, { data: nomRows }, { data: slRows }, linkResult, profileResult, roleMembershipResult] = await Promise.all([
       supabase.from('memberships').select('role, club_slug, team_id').eq('profile_id', account.userId),
       supabase.from('clubs').select('slug, name, contact_name, contact_email').order('name', { ascending: true }),
       supabase.from('teams').select('id, club_slug, name, division, captain_name, captain_email').order('name', { ascending: true }),
@@ -1019,7 +1020,8 @@ const scoresHref = url('/captains/admin/minigame/');
       supabase.from('nominations').select('team_id, player_name, season').eq('season', SEASON),
       supabase.from('squashlevels_players').select('id, display_name, current_level, updated_at').order('display_name', { ascending: true }),
       supabase.from('player_links').select('id, profile_id, squashlevels_player_id, lm_player_name'),
-      supabase.from('profiles').select('id, email'),
+      supabase.from('profiles').select('id, email, is_admin, display_name'),
+      supabase.from('memberships').select('profile_id, role, club_slug, team_id'),
     ]);
     const mine = (mineRows ?? []) as Mine[];
     const clubList = (clubRows ?? []) as { slug: string; name: string; contact_name: string | null; contact_email: string | null }[];
@@ -1040,12 +1042,14 @@ const scoresHref = url('/captains/admin/minigame/');
     type PlayerLink = { id: number; profile_id: string | null; squashlevels_player_id: number | null; lm_player_name: string | null };
     const playerLinks = (linkResult.error ? [] : (linkResult.data ?? [])) as PlayerLink[];
     slLinks = playerLinks;
+    type SiteProfile = { id: string; email: string | null; is_admin: boolean | null; display_name: string | null };
+    const siteProfiles = (profileResult.error ? [] : (profileResult.data ?? [])) as SiteProfile[];
+    type RoleMembership = { profile_id: string; role: string; club_slug: string | null; team_id: number | null };
+    const roleMemberships = (roleMembershipResult.error ? [] : (roleMembershipResult.data ?? [])) as RoleMembership[];
     const emailToProfile = new Map<string, string>();
-    if (!profileResult.error) {
-      for (const row of (profileResult.data ?? []) as { id: string; email: string | null }[]) {
-        const email = (row.email ?? '').trim().toLowerCase();
-        if (email) emailToProfile.set(email, row.id);
-      }
+    for (const row of siteProfiles) {
+      const email = (row.email ?? '').trim().toLowerCase();
+      if (email) emailToProfile.set(email, row.id);
     }
     const levelFromLink = (link: PlayerLink | undefined) =>
       link?.squashlevels_player_id != null ? slPlayers.find((player) => player.id === link.squashlevels_player_id) : undefined;
@@ -1072,6 +1076,36 @@ const scoresHref = url('/captains/admin/minigame/');
       if (club && (sameText(name, club.contact_name) || (address && address === clubEmail))) return true;
       if (team && (sameText(name, team.captain_name) || (address && address === captainEmail))) return true;
       return false;
+    };
+    const profileFor = (name: string, email: string) => {
+      const address = email.trim().toLowerCase();
+      const byEmail = address ? siteProfiles.find((profile) => (profile.email ?? '').trim().toLowerCase() === address) : undefined;
+      if (byEmail) return byEmail;
+      const link = playerLinks.find((item) => item.profile_id && item.lm_player_name && nameKey(item.lm_player_name) === nameKey(name));
+      return link?.profile_id ? siteProfiles.find((profile) => profile.id === link.profile_id) : undefined;
+    };
+    const roleFor = (name: string, email: string) => {
+      const address = email.trim().toLowerCase();
+      const profile = profileFor(name, email);
+      const held = profile ? roleMemberships.filter((membership) => membership.profile_id === profile.id) : [];
+      const codes: string[] = [];
+      if (profile?.is_admin || (account.isAdmin && isSelf(account, name, email))) codes.push('A');
+      const clubCaptain =
+        held.some((membership) => membership.role === 'club_captain') ||
+        clubList.some((club) => {
+          const clubEmail = (club.contact_email ?? '').trim().toLowerCase();
+          return sameText(name, club.contact_name) || Boolean(address && clubEmail && address === clubEmail);
+        });
+      if (clubCaptain) codes.push('C');
+      const teamCaptain =
+        held.some((membership) => membership.role === 'team_captain') ||
+        teamList.some((team) => {
+          const captainEmail = (team.captain_email ?? '').trim().toLowerCase();
+          return sameText(name, team.captain_name) || Boolean(address && captainEmail && address === captainEmail);
+        });
+      if (teamCaptain) codes.push('T');
+      codes.push('P');
+      return codes.join(';');
     };
     const clubSlugs = new Set(mine.filter((row) => row.role === 'club_captain' && row.club_slug).map((row) => row.club_slug as string));
     const teamIds = new Set(mine.filter((row) => row.team_id != null).map((row) => row.team_id as number));
@@ -1108,6 +1142,7 @@ const scoresHref = url('/captains/admin/minigame/');
           es: player.england_squash_id ?? '',
           phone: player.phone ?? '',
           locked: lockedFromLm(player.display_name, player.email ?? '', clubSlug, squad.team_id),
+          role: roleFor(player.display_name, player.email ?? ''),
         });
       }
     }
@@ -1129,6 +1164,7 @@ const scoresHref = url('/captains/admin/minigame/');
         es: '',
         phone: '',
         locked: lockedFromLm(nom.player_name, '', team?.club_slug ?? '', nom.team_id),
+        role: roleFor(nom.player_name, ''),
       });
     }
     rows.sort((a, b) => a.club.localeCompare(b.club, 'en') || a.team.localeCompare(b.team, 'en') || a.name.localeCompare(b.name, 'en'));
@@ -1143,21 +1179,22 @@ const scoresHref = url('/captains/admin/minigame/');
     const teamRowsScoped = clubRowsScoped.filter((row) => account.isAdmin || hasClubRole || (row.teamId != null && teamIds.has(row.teamId)));
     const clubEditable = hasClubRole && !account.playerOnly;
     const teamEditable = (hasClubRole || hasTeamRole) && !account.playerOnly;
-    clubNote.textContent = account.isAdmin
+    const roleNote = ' Role is read-only: A admin, C club captain, T team captain, P player.';
+    clubNote.textContent = (account.isAdmin
       ? 'Every club. Email, ES number, and phone can be changed for players. A club captain or team captain keeps their name and email from League Master. Their ES number and phone can still be changed. Leave a box and it is saved.'
       : account.playerOnly
         ? 'Your club. You can change your own email, ES number, and phone. A club captain or team captain keeps their name and email from League Master, and can still change ES number and phone.'
         : clubEditable || hasTeamRole
           ? 'The players you can see. Email, ES number, and phone can be changed. A club captain or team captain keeps their name and email from League Master. Their ES number and phone can still be changed. Leave a box and it is saved.'
-          : 'Your club is read-only. Other teams at the club are not listed.';
-    teamNote.textContent = account.isAdmin
+          : 'Your club is read-only. Other teams at the club are not listed.') + roleNote;
+    teamNote.textContent = (account.isAdmin
       ? 'Every team. When the League Master name matches SquashLevels, that name and level stay fixed. Otherwise choose the SquashLevels name and the level fills in. Email, ES number, and phone can be changed. A club captain or team captain keeps their name and email from League Master.'
       : account.playerOnly
         ? 'Your team. You can change your own email, ES number, and phone. A club captain or team captain keeps their name and email from League Master, and can still change ES number and phone.'
-        : 'Your team. Email, ES number, and phone can be changed for players. A club captain or team captain keeps their name and email from League Master. Their ES number and phone can still be changed. Leave a box and it is saved.';
-    playerNote.textContent = account.playerOnly
+        : 'Your team. Email, ES number, and phone can be changed for players. A club captain or team captain keeps their name and email from League Master. Their ES number and phone can still be changed. Leave a box and it is saved.') + roleNote;
+    playerNote.textContent = (account.playerOnly
       ? 'You can change your own email, ES number, and phone. Leave a box and it is saved. The email is shown on LM Player.'
-      : 'You can change the email, ES number, and phone for the players you look after. A player can change only their own row. Leave a box and it is saved. The email is shown on LM Player, and the player role follows it. Only an admin can add someone who is not on the League Master list.';
+      : 'You can change the email, ES number, and phone for the players you look after. A player can change only their own row. Leave a box and it is saved. The email is shown on LM Player, and the player role follows it. Only an admin can add someone who is not on the League Master list.') + roleNote;
 
     const clubsHere = clubList.filter((club) => (account.playerOnly ? homeClubSlugs.has(club.slug) : hasClubRole ? clubSlugs.has(club.slug) : homeClubSlugs.has(club.slug)));
     const paintClub = (heading: string) => {
@@ -1597,7 +1634,22 @@ const scoresHref = url('/captains/admin/minigame/');
       const club = clubs.find((item) => item.slug === membership.club_slug);
       if (team) return `${team.name}${team.division ? `, ${team.division}` : ''}`;
       if (club) return club.name;
-      return membership.role === 'admin' ? 'All clubs' : '—';
+      return '—';
+    };
+    const clubsFor = (personId: string) => {
+      const names = new Set<string>();
+      for (const membership of rolesFor(personId)) {
+        if (membership.club_slug) {
+          const name = clubNames.get(membership.club_slug);
+          if (name) names.add(name);
+        }
+        if (membership.team_id != null) {
+          const team = orgTeams.find((item) => item.id === membership.team_id);
+          const name = team ? clubNames.get(team.club_slug) : undefined;
+          if (name) names.add(name);
+        }
+      }
+      return [...names].sort((a, b) => a.localeCompare(b, 'en')).join('; ');
     };
     const rolesFor = (personId: string) =>
       memberships
@@ -1625,7 +1677,7 @@ const scoresHref = url('/captains/admin/minigame/');
               ...roles.filter((membership) => membership.role !== 'admin').map((membership) => roleLabel[membership.role]),
             ].filter(Boolean);
             const placeText = person.is_admin || isDefault
-              ? 'All clubs'
+              ? clubsFor(person.id) || '—'
               : roles.map((membership) => whereFor(membership)).filter((place) => place !== '—').join('; ') || '—';
             const state = stateById.get(person.id);
             const active = state ? state.active : true;

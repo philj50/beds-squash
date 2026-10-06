@@ -169,6 +169,10 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.getByRole('columnheader', { name: 'LM name' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'SL name' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'SL level' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Role' })).toBeVisible();
+    await expect(page.locator('[data-site-team] tr', { hasText: 'Pat Player' }).getByRole('cell', { name: 'P', exact: true })).toBeVisible();
+    await expect(page.locator('[data-site-team] tr', { hasText: 'Taylor Team' }).getByRole('cell', { name: 'T;P', exact: true })).toBeVisible();
+    await expect(page.locator('[data-site-team] tr', { hasText: 'Chris Club' }).getByRole('cell', { name: 'C;P', exact: true })).toBeVisible();
     await expect(page.locator('[data-site-team] tr', { hasText: 'Pat Player' })).toContainText('4,321');
     await expect(page.locator('[data-site-team]').getByRole('combobox', { name: 'SquashLevels for Pat Player' })).toHaveCount(0);
     await expect(page.locator('[data-site-team]').getByRole('textbox', { name: 'Email for Pat Player' })).toBeVisible();
@@ -290,8 +294,48 @@ test.describe('Club captain, team captain, and player', () => {
         return send({ user_id: adminId });
       }
       if (path.endsWith('/profiles')) {
-        const row = { id: adminId, display_name: 'County Admin', email: 'admin@example.test', is_admin: true };
-        return send((route.request().headers().accept ?? '').includes('application/vnd.pgrst.object+json') ? row : [row]);
+        const county = { id: adminId, display_name: 'County Admin', email: 'admin@example.test', is_admin: true };
+        const people = [
+          county,
+          { id: '55555555-5555-4555-8555-555555555555', display_name: 'Gail', email: 'gail@example.test', is_admin: true },
+          { id: '66666666-6666-4666-8666-666666666666', display_name: 'Sam Morris', email: 'sam.morris@example.test', is_admin: true },
+        ];
+        const id = url.searchParams.get('id') ?? '';
+        const wanted = id.startsWith('eq.') ? id.slice(3) : '';
+        const row = wanted ? people.find((person) => person.id === wanted) ?? null : county;
+        const single = (route.request().headers().accept ?? '').includes('application/vnd.pgrst.object+json');
+        return send(single || wanted ? row : people);
+      }
+      if (path.endsWith('/memberships')) {
+        return send([
+          {
+            id: 1,
+            profile_id: '66666666-6666-4666-8666-666666666666',
+            role: 'club_captain',
+            club_slug: 'test-club',
+            team_id: null,
+            profiles: { display_name: 'Sam Morris', email: 'sam.morris@example.test' },
+            teams: null,
+          },
+          {
+            id: 2,
+            profile_id: '66666666-6666-4666-8666-666666666666',
+            role: 'team_captain',
+            club_slug: null,
+            team_id: 5,
+            profiles: { display_name: 'Sam Morris', email: 'sam.morris@example.test' },
+            teams: { name: 'Test Team 1', division: 'Division 1' },
+          },
+          {
+            id: 3,
+            profile_id: '66666666-6666-4666-8666-666666666666',
+            role: 'team_player',
+            club_slug: null,
+            team_id: 5,
+            profiles: { display_name: 'Sam Morris', email: 'sam.morris@example.test' },
+            teams: { name: 'Test Team 1', division: 'Division 1' },
+          },
+        ]);
       }
       if (path.endsWith('/clubs')) {
         return send([
@@ -349,6 +393,7 @@ test.describe('Club captain, team captain, and player', () => {
             squad_players: [
               { id: 1, display_name: 'Pat Player', email: 'pat.player@example.test', phone: '07000000000', england_squash_id: '123456' },
               { id: 2, display_name: 'Zoe Player', email: 'zoe.player@example.test', phone: null, england_squash_id: null },
+              { id: 5, display_name: 'Sam Morris', email: 'sam.morris@example.test', phone: null, england_squash_id: null },
             ],
           },
           {
@@ -504,6 +549,14 @@ test.describe('Club captain, team captain, and player', () => {
     const adminRow = page.locator('[data-people] tr', { hasText: 'County Admin' });
     await expect(adminRow).toContainText('Active');
     await expect(adminRow).toContainText('4 Oct 2026');
+    await expect(adminRow).not.toContainText('All clubs');
+    const gail = page.locator('[data-people] tr', { hasText: 'Gail' });
+    await expect(gail).toContainText('Admin');
+    await expect(gail).not.toContainText('All clubs');
+    await expect(gail).not.toContainText('Test Club');
+    const samPeople = page.locator('[data-people] tr', { hasText: 'Sam Morris' });
+    await expect(samPeople).toContainText('Test Club');
+    await expect(samPeople).not.toContainText('All clubs');
 
     await page.getByRole('button', { name: 'Links' }).click();
     await expect(page.getByRole('heading', { name: 'Links', exact: true })).toBeVisible();
@@ -529,6 +582,8 @@ test.describe('Club captain, team captain, and player', () => {
     const patTeam = page.getByRole('row', { name: /Pat Player Pat Player 4,321/ });
     await expect(patTeam).toHaveCount(1);
     await expect(patTeam.getByRole('combobox')).toHaveCount(0);
+    await expect(patTeam.getByRole('cell', { name: 'P', exact: true })).toBeVisible();
+    await expect(page.locator('[data-site-team] tr', { hasText: 'Sam Morris' }).getByRole('cell', { name: 'A;C;T;P', exact: true })).toBeVisible();
 
     await page.getByRole('button', { name: 'Traffic' }).click();
     await expect(page.getByRole('heading', { name: 'Sign-ins (30 days)' })).toBeVisible();
