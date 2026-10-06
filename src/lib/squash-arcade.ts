@@ -14,6 +14,10 @@ const FRONT = 48;
 const BACK = 633;
 const RACKET_W = 74;
 const RACKET_Y = BACK - 16;
+/** Short line, the service line: 5.49 m from the front wall on a 9.75 m court. */
+const SERVICE_Y = FRONT + (BACK - FRONT) * (5.49 / 9.75);
+/** The racket head is drawn this far in front of the hit line. */
+const RACKET_HEAD = 22;
 const BALL = 6;
 const LIVES = 3;
 const BONUS_POINTS = 5;
@@ -46,7 +50,7 @@ export type Arcade = {
   score: number;
   lives: number;
   racketX: number;
-  /** Court position of the racket. The back line is the default. */
+  /** Court position of the racket. The back line is the default, and it cannot cross the service line. */
   racketY: number;
   balls: Ball[];
   twin: boolean;
@@ -89,6 +93,7 @@ export function beginServe(game: Arcade) {
 
 /** fractionX is 0 at the left sideline and 1 at the right.
  * fractionY is 0 at the front wall and 1 at the back. Leave it out to keep the racket on the back line.
+ * The racket head stops on the service line, so it cannot be parked at the front wall.
  */
 export function setRacket(game: Arcade, fractionX: number, fractionY?: number) {
   const t = Math.min(1, Math.max(0, fractionX));
@@ -98,7 +103,7 @@ export function setRacket(game: Arcade, fractionX: number, fractionY?: number) {
     return;
   }
   const y = FRONT + Math.min(1, Math.max(0, fractionY)) * (BACK - FRONT);
-  game.racketY = Math.min(RACKET_Y, Math.max(FRONT + 22, y));
+  game.racketY = Math.min(RACKET_Y, Math.max(SERVICE_Y + RACKET_HEAD, y));
 }
 
 function pace(game: Arcade) {
@@ -313,7 +318,7 @@ export function drawCourt(ctx: CanvasRenderingContext2D, game: Arcade) {
   ctx.fillStyle = '#123056';
   ctx.fillRect(LEFT, FRONT, floorW, floorH);
 
-  const shortY = FRONT + floorH * (5.49 / 9.75);
+  const shortY = SERVICE_Y;
   const boxDepth = floorH * (1.6 / 9.75);
   const boxWidth = floorW * (1.6 / 6.4);
 

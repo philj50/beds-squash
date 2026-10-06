@@ -27,7 +27,7 @@ export const NAV = [
   { label: 'Documents', href: '/documents/' },
   { label: 'About', href: '/about/' },
   { label: 'Contact', href: '/contact/' },
-  { label: 'Minigame', href: '/minigame/' },
+  { label: 'Minigame mk2', href: '/minigame/' },
   { label: 'Administration', href: '/captains/admin/' },
 ];
 

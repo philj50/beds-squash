@@ -4,12 +4,12 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 import { url } from '@/lib/site';
 ---
 
-<Base title="Minigame scores" description="Remove a name from the minigame high-score board." noindex>
+<Base title="Minigame mk2 scores" description="Remove a name from the Minigame mk2 high-score board." noindex>
   <section class="section">
     <div class="container scores-admin" id="minigame-admin" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
-      <h1>Minigame scores</h1>
+      <h1>Minigame mk2 scores</h1>
       <p class="lede">
-        These names are on the <a href={url('/minigame/')}>minigame</a> high-score board.
+        These names are on the <a href={url('/minigame/')}>Minigame mk2</a> high-score board.
         Remove a row to take that name and score off the board.
       </p>
       <p class="status" data-status role="status"></p>
@@ -17,7 +17,7 @@ import { url } from '@/lib/site';
         <p class="who" data-who></p>
         <p class="actions">
           <a class="btn btn--ghost btn--sm" href={url('/captains/admin/')}>Admin</a>
-          <a class="btn btn--ghost btn--sm" href={url('/minigame/')}>Minigame</a>
+          <a class="btn btn--ghost btn--sm" href={url('/minigame/')}>Minigame mk2</a>
           <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
         </p>
         <p data-denied hidden>This account cannot change the minigame board.</p>
@@ -35,6 +35,11 @@ import { url } from '@/lib/site';
               <tbody data-rows></tbody>
             </table>
           </div>
+          <nav class="pager" data-pager aria-label="Score pages" hidden>
+            <button class="btn btn--ghost btn--sm" type="button" data-prev>Previous</button>
+            <span data-page-label></span>
+            <button class="btn btn--ghost btn--sm" type="button" data-next>Next</button>
+          </nav>
           <h2>Disallowed initials</h2>
           <p class="hint">
             ASS, ARS, CUL, CUM, CUN, DIK, FAG, FAP, FUC, FUK, JAP, KKK, NIG, SEX, TIT and XXX are already stopped.
@@ -76,10 +81,17 @@ import { url } from '@/lib/site';
   const admin = root.querySelector<HTMLElement>('[data-admin]')!;
   const whoEl = root.querySelector<HTMLElement>('[data-who]')!;
   const rowsEl = root.querySelector<HTMLElement>('[data-rows]')!;
+  const pager = root.querySelector<HTMLElement>('[data-pager]')!;
+  const pageLabel = root.querySelector<HTMLElement>('[data-page-label]')!;
+  const prevBtn = root.querySelector<HTMLButtonElement>('[data-prev]')!;
+  const nextBtn = root.querySelector<HTMLButtonElement>('[data-next]')!;
   const blockedEl = root.querySelector<HTMLElement>('[data-blocked]')!;
   const blockForm = root.querySelector<HTMLFormElement>('[data-block]')!;
   const confirmDialog = root.querySelector<HTMLDialogElement>('[data-confirm]')!;
   const confirmLine = root.querySelector<HTMLElement>('[data-confirm-line]')!;
+  const PAGE_SIZE = 15;
+  let page = 0;
+  let total = 0;
   let pendingId: number | null = null;
 
   const escapeHtml = (value: string) =>
@@ -112,6 +124,18 @@ import { url } from '@/lib/site';
       .join('');
   }
 
+  function drawPager() {
+    const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    const show = total > PAGE_SIZE;
+    pager.hidden = !show;
+    if (!show) return;
+    const start = page * PAGE_SIZE + 1;
+    const end = Math.min(total, start + PAGE_SIZE - 1);
+    pageLabel.textContent = `${start}–${end} of ${total}`;
+    prevBtn.disabled = page <= 0;
+    nextBtn.disabled = page >= pages - 1;
+  }
+
   type Blocked = { id: number; initials: string };
 
   function drawBlocked(names: Blocked[]) {
@@ -140,18 +164,39 @@ import { url } from '@/lib/site';
   }
 
   async function loadScores() {
-    const { data, error } = await supabase
+    const from = page * PAGE_SIZE;
+    const { data, error, count } = await supabase
       .from('minigame_scores')
-      .select('id, player_name, score, created_at')
+      .select('id, player_name, score, created_at', { count: 'exact' })
       .order('score', { ascending: false })
       .order('created_at', { ascending: true })
-      .limit(100);
+      .range(from, from + PAGE_SIZE - 1);
     if (error) {
       statusEl.textContent = error.message;
       return;
     }
-    draw((data ?? []) as Score[]);
+    const rows = (data ?? []) as Score[];
+    if (!rows.length && page > 0) {
+      page = count != null ? Math.max(0, Math.ceil(count / PAGE_SIZE) - 1) : page - 1;
+      await loadScores();
+      return;
+    }
+    total = count ?? from + rows.length;
+    draw(rows);
+    drawPager();
   }
+
+  prevBtn.addEventListener('click', () => {
+    if (page <= 0) return;
+    page -= 1;
+    void loadScores();
+  });
+
+  nextBtn.addEventListener('click', () => {
+    if ((page + 1) * PAGE_SIZE >= total) return;
+    page += 1;
+    void loadScores();
+  });
 
   rowsEl.addEventListener('click', (event) => {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-remove]');
@@ -249,6 +294,21 @@ import { url } from '@/lib/site';
   .overview-box {
     overflow-x: auto;
     margin-top: 1rem;
+  }
+  .pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+  }
+  .pager span {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .pager button:disabled {
+    opacity: 0.45;
   }
   table {
     width: 100%;

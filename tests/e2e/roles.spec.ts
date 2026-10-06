@@ -257,7 +257,15 @@ test.describe('Club captain, team captain, and player', () => {
       localStorage.setItem('sb-klxyjmwiaivvqjbhxzak-auth-token', JSON.stringify(stored));
     }, session);
 
-    const scores = [{ id: 9, player_name: 'Philip Jenkins', score: 2, created_at: '2026-10-04T11:00:00.000Z' }];
+    const scores = [
+      { id: 9, player_name: 'Philip Jenkins', score: 40, created_at: '2026-10-04T11:00:00.000Z' },
+      ...Array.from({ length: 15 }, (_, index) => ({
+        id: 10 + index,
+        player_name: `P${index}`,
+        score: 30 - index,
+        created_at: '2026-10-04T11:00:00.000Z',
+      })),
+    ];
     await page.route(`${SUPABASE}/**`, async (route) => {
       const url = new URL(route.request().url());
       const path = url.pathname;
@@ -372,7 +380,21 @@ test.describe('Club captain, team captain, and player', () => {
       if (path.endsWith('/lm_player_contacts')) {
         return send([{ id: 1, team_id: 5, player_name: 'Pat Player', email: 'old.contact@example.test' }]);
       }
-      if (path.endsWith('/minigame_scores')) return send(scores);
+      if (path.endsWith('/minigame_scores')) {
+        const offset = Number(url.searchParams.get('offset') ?? 0);
+        const limit = Number(url.searchParams.get('limit') ?? scores.length);
+        const slice = scores.slice(offset, offset + limit);
+        const last = slice.length ? offset + slice.length - 1 : offset;
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          headers: {
+            'content-range': `${slice.length ? offset : 0}-${last}/${scores.length}`,
+            'access-control-expose-headers': 'Content-Range',
+          },
+          body: JSON.stringify(slice),
+        });
+      }
       if (path.endsWith('/rpc/get_site_traffic_stats')) {
         return send({
           total_7d: 3,
@@ -462,14 +484,21 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(adminMenu.getByRole('menuitem', { name: 'County Closed entries' })).toBeVisible();
 
     await page.goto('captains/admin/minigame/', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('heading', { level: 1, name: 'Minigame scores' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Minigame mk2 scores' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Disallowed initials' })).toBeVisible();
+    await expect(page.locator('[data-pager]')).toContainText('1–15 of 16');
     await expect(page.getByRole('cell', { name: 'Philip Jenkins' })).toBeVisible();
-    await page.getByRole('button', { name: 'Remove' }).click();
+    await expect(page.getByRole('cell', { name: 'P14' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Next' }).click();
+    await expect(page.locator('[data-pager]')).toContainText('16–16 of 16');
+    await expect(page.getByRole('cell', { name: 'P14' })).toBeVisible();
+    await page.getByRole('button', { name: 'Previous' }).click();
+    await expect(page.getByRole('cell', { name: 'Philip Jenkins' })).toBeVisible();
+    await page.locator('tr', { hasText: 'Philip Jenkins' }).getByRole('button', { name: 'Remove' }).click();
     await expect(page.getByRole('dialog')).toContainText('Philip Jenkins');
     await page.getByRole('button', { name: 'Keep it' }).click();
     await expect(page.getByRole('cell', { name: 'Philip Jenkins' })).toBeVisible();
-    await page.getByRole('button', { name: 'Remove' }).click();
+    await page.locator('tr', { hasText: 'Philip Jenkins' }).getByRole('button', { name: 'Remove' }).click();
     await page.getByRole('button', { name: 'Remove it' }).click();
     await expect(page.getByText('Removed from the board.')).toBeVisible();
     await expect(page.getByText('No scores on the board.')).toBeVisible();

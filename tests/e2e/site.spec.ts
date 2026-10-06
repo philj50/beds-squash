@@ -29,8 +29,8 @@ test.describe('Public site', () => {
     await expect(nav.getByRole('link', { name: 'News', exact: true })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Leagues', exact: true })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Juniors', exact: true })).toBeVisible();
-    const labels = await nav.getByRole('link').allTextContents();
-    expect(labels.indexOf('Minigame')).toBe(labels.indexOf('Contact') + 1);
+    const labels = (await nav.getByRole('link').allTextContents()).map((label) => label.trim());
+    expect(labels.indexOf('Minigame mk2')).toBe(labels.indexOf('Contact') + 1);
   });
 
   test('news index and a league match article', async ({ page }) => {
@@ -327,7 +327,7 @@ test.describe('Public site', () => {
 
   test('minigame asks for initials and serves from the court', async ({ page }) => {
     await open(page, 'minigame/');
-    await expect(page.getByRole('heading', { level: 1, name: 'Minigame' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Minigame mk2' })).toBeVisible();
     await expect(page.getByLabel('Your initials')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'High scores' })).toBeVisible();
@@ -355,6 +355,33 @@ test.describe('Public site', () => {
     expect(serveBox!.y).toBeGreaterThan(courtBox!.y);
     expect(serveBox!.x + serveBox!.width).toBeLessThan(courtBox!.x + courtBox!.width);
     expect(serveBox!.y + serveBox!.height).toBeLessThan(courtBox!.y + courtBox!.height);
+    const racketTop = await court.evaluate((node) => {
+      const canvas = node as HTMLCanvasElement;
+      const rect = canvas.getBoundingClientRect();
+      canvas.dispatchEvent(
+        new PointerEvent('pointermove', {
+          bubbles: true,
+          clientX: rect.left + rect.width / 2,
+          clientY: rect.top + 4,
+          pointerType: 'mouse',
+        }),
+      );
+      const bitmap = canvas.getContext('2d');
+      if (!bitmap) return -1;
+      const { data, width, height } = bitmap.getImageData(0, 0, canvas.width, canvas.height);
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const i = (y * width + x) * 4;
+          const r = data[i] ?? 0;
+          const g = data[i + 1] ?? 0;
+          const b = data[i + 2] ?? 0;
+          if (b > 220 && g > 180 && r > 120 && r < 190 && b > g) return y;
+        }
+      }
+      return height;
+    });
+    expect(racketTop).toBeGreaterThanOrEqual(360);
+    expect(racketTop).toBeLessThanOrEqual(420);
   });
 
   test('junior closed signup form', async ({ page }) => {
