@@ -258,6 +258,8 @@ test.describe('Club captain, team captain, and player', () => {
       localStorage.setItem('sb-klxyjmwiaivvqjbhxzak-auth-token', JSON.stringify(stored));
     }, session);
 
+    const playerLinks: { id: number; profile_id: string | null; squashlevels_player_id: number | null; lm_player_name: string | null }[] = [];
+    let nextLinkId = 1;
     const scores = [
       { id: 9, player_name: 'Philip Jenkins', score: 40, created_at: '2026-10-04T11:00:00.000Z' },
       ...Array.from({ length: 15 }, (_, index) => ({
@@ -327,7 +329,7 @@ test.describe('Club captain, team captain, and player', () => {
         ]);
       }
       if (path.endsWith('/squashlevels_players')) {
-        return send([{ display_name: 'Pat Player', current_level: 4321 }]);
+        return send([{ id: 90, display_name: 'Pat Player', current_level: 4321 }]);
       }
       if (path.endsWith('/captain_squads')) {
         return send([
@@ -415,12 +417,37 @@ test.describe('Club captain, team captain, and player', () => {
         scores.length = 0;
         return send(null);
       }
+      if (path.endsWith('/player_links')) {
+        const method = route.request().method();
+        if (method === 'POST') {
+          const body = route.request().postDataJSON() as {
+            profile_id?: string | null;
+            squashlevels_player_id?: number | null;
+            lm_player_name?: string | null;
+          };
+          const row = {
+            id: nextLinkId++,
+            profile_id: body.profile_id ?? null,
+            squashlevels_player_id: body.squashlevels_player_id ?? null,
+            lm_player_name: body.lm_player_name ?? null,
+          };
+          playerLinks.push(row);
+          return send(row);
+        }
+        if (method === 'DELETE') {
+          const target = url.searchParams.get('id') ?? '';
+          const index = playerLinks.findIndex((row) => `eq.${row.id}` === target);
+          if (index >= 0) playerLinks.splice(index, 1);
+          return send([]);
+        }
+        return send(playerLinks);
+      }
       return send([]);
     });
 
     await page.goto('captains/admin/#lm-players', { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: 'LM Player' })).toBeVisible();
-    await expect(page.locator('.admin-tabs .tab-label')).toHaveText(['League Master', 'SquashLevels', 'This website']);
+    await expect(page.locator('.admin-tabs .tab-label')).toHaveText(['League Master', 'SquashLevels', 'This website', 'Links']);
     await expect(page.locator('[data-junior-link]')).toBeVisible();
     await expect(page.locator('[data-share-link]')).toBeVisible();
     await expect(page.locator('[data-scores-link]')).toBeVisible();
@@ -472,6 +499,21 @@ test.describe('Club captain, team captain, and player', () => {
     const adminRow = page.locator('[data-people] tr', { hasText: 'County Admin' });
     await expect(adminRow).toContainText('Active');
     await expect(adminRow).toContainText('4 Oct 2026');
+
+    await page.getByRole('button', { name: 'Links' }).click();
+    await expect(page.getByRole('heading', { name: 'Links', exact: true })).toBeVisible();
+    await expect(page.locator('[data-links]')).toContainText('No links yet.');
+    await page.getByRole('combobox', { name: 'This website', exact: true }).selectOption({ label: 'County Admin · admin@example.test' });
+    await page.getByRole('combobox', { name: 'SquashLevels', exact: true }).selectOption({ label: 'Pat Player · 4,321' });
+    await page.getByRole('combobox', { name: 'League Master', exact: true }).selectOption('Pat Player');
+    await page.getByRole('button', { name: 'Link', exact: true }).click();
+    await expect(page.getByText('Link saved.')).toBeVisible();
+    const linked = page.locator('[data-links] tr', { hasText: 'County Admin' });
+    await expect(linked).toContainText('Pat Player · 4,321');
+    await expect(linked).toContainText('Pat Player');
+    await linked.getByRole('button', { name: 'Unlink' }).click();
+    await expect(page.getByText('Link removed.')).toBeVisible();
+    await expect(page.locator('[data-links]')).toContainText('No links yet.');
 
     await page.getByRole('button', { name: 'Traffic' }).click();
     await expect(page.getByRole('heading', { name: 'Sign-ins (30 days)' })).toBeVisible();

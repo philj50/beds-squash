@@ -210,6 +210,16 @@ import { url } from '@/lib/site';
   }
 
   async function loadLevel(account: Account) {
+    const linked = await supabase.from('player_links').select('squashlevels_player_id').eq('profile_id', account.userId).maybeSingle();
+    const linkedId = !linked.error && linked.data?.squashlevels_player_id != null ? linked.data.squashlevels_player_id : null;
+    if (linkedId != null) {
+      const { data } = await supabase
+        .from('squashlevels_players')
+        .select('display_name, current_level, updated_at')
+        .eq('id', linkedId)
+        .maybeSingle();
+      if (data) return data as Level;
+    }
     const name = account.displayName.trim();
     if (!name) return null;
     const { data } = await supabase
