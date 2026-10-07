@@ -370,25 +370,8 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="links" data-lm-only hidden>
             <h2>Links</h2>
             <p class="muted small">
-              Choose the League Master player and their SquashLevels name. The link stays when the names differ. Remove a link when it is wrong.
+              Type the SquashLevels name. Steve Davies is first. Everyone else here has no exact SquashLevels name. Remove a link when it is wrong.
             </p>
-            <form class="card" data-form="player-link">
-              <div class="card__body stack">
-                <div class="link-fields">
-                  <label>
-                    LM Player
-                    <input type="search" data-link-filter="lm" aria-label="Filter LM Player" placeholder="Filter" autocomplete="off" />
-                    <select name="lm_player_name" aria-label="LM Player" required></select>
-                  </label>
-                  <label>
-                    SL
-                    <input type="search" data-link-filter="sl" aria-label="Filter SL" placeholder="Filter" autocomplete="off" />
-                    <select name="squashlevels_player_id" aria-label="SL" required></select>
-                  </label>
-                </div>
-                <button class="btn btn--primary btn--sm" type="submit">Link</button>
-              </div>
-            </form>
             <div class="overview-box">
               <table class="overview">
                 <thead>
@@ -1852,52 +1835,24 @@ const scoresHref = url('/captains/admin/minigame/');
   }
 
   type LinkRow = { id: number; profile_id: string | null; squashlevels_player_id: number | null; lm_player_name: string | null };
-  type LinkOption = { value: string; label: string };
-  const linkForm = root.querySelector<HTMLFormElement>('[data-form="player-link"]')!;
+  type SlNamed = { id: number; display_name: string; current_level: number | null };
   const linksHost = root.querySelector<HTMLElement>('[data-links]')!;
-  const linkSelects = {
-    sl: linkForm.querySelector<HTMLSelectElement>('[name="squashlevels_player_id"]')!,
-    lm: linkForm.querySelector<HTMLSelectElement>('[name="lm_player_name"]')!,
-  };
-  let linkOptions: Record<'sl' | 'lm', LinkOption[]> = { sl: [], lm: [] };
-
-  const fillLinkSelect = (key: 'sl' | 'lm', query: string) => {
-    const select = linkSelects[key];
-    const selected = select.value;
-    const needle = query.trim().toLowerCase();
-    const visible = linkOptions[key].filter((option) => !needle || option.label.toLowerCase().includes(needle) || option.value === selected);
-    select.replaceChildren();
-    const blank = document.createElement('option');
-    blank.value = '';
-    blank.textContent = 'None';
-    select.append(blank);
-    for (const option of visible) {
-      const node = document.createElement('option');
-      node.value = option.value;
-      node.textContent = option.label;
-      select.append(node);
-    }
-    if ([...select.options].some((option) => option.value === selected)) select.value = selected;
-  };
-
-  for (const input of linkForm.querySelectorAll<HTMLInputElement>('[data-link-filter]')) {
-    input.addEventListener('input', () => {
-      const key = input.dataset.linkFilter as 'sl' | 'lm';
-      if (key === 'sl' || key === 'lm') fillLinkSelect(key, input.value);
-    });
-  }
+  let linkLevels: SlNamed[] = [];
 
   async function paintLinks() {
-    const [{ data: linkRows, error }, { data: slRows }, { data: nomRows }] = await Promise.all([
+    const [linkResult, { data: slRows }, { data: nomRows }] = await Promise.all([
       supabase.from('player_links').select('id, profile_id, squashlevels_player_id, lm_player_name').order('id'),
       allSlPlayers(),
       supabase.from('nominations').select('player_name').eq('season', SEASON),
     ]);
-    if (error) {
-      linksHost.innerHTML = `<tr><td colspan="3">${escapeHtml(error.message)}</td></tr>`;
-      return;
+    if (linkResult.error?.code === 'PGRST205') {
+      setStatus('The links table is not on the database yet, so a typed name cannot be saved.');
+    } else if (linkResult.error) {
+      setStatus(linkResult.error.message);
     }
-    const levels = (slRows ?? []) as { id: number; display_name: string; current_level: number | null }[];
+    const levels = (slRows ?? []) as SlNamed[];
+    linkLevels = levels;
+    const slNames = new Set(levels.map((player) => nameKey(player.display_name)));
     const names = new Map<string, string>();
     const addLmName = (value: string) => {
       const trimmed = value.trim();
@@ -1906,52 +1861,71 @@ const scoresHref = url('/captains/admin/minigame/');
     };
     for (const player of websitePlayers) addLmName(player.name);
     for (const row of (nomRows ?? []) as { player_name: string }[]) addLmName(row.player_name);
-    linkOptions = {
-      sl: levels
-        .filter((player) => player.current_level != null)
-        .map((player) => ({ value: String(player.id), label: `${player.display_name} · ${levelText(player.current_level)}` }))
-        .sort((a, b) => a.label.localeCompare(b.label, 'en')),
-      lm: [...names.values()].sort((a, b) => a.localeCompare(b, 'en')).map((name) => ({ value: name, label: name })),
-    };
-    for (const input of linkForm.querySelectorAll<HTMLInputElement>('[data-link-filter]')) {
-      const key = input.dataset.linkFilter as 'sl' | 'lm';
-      if (key === 'sl' || key === 'lm') fillLinkSelect(key, input.value);
+    const saved = (linkResult.error ? [] : (linkResult.data ?? [])) as LinkRow[];
+    const linked = new Set(saved.map((row) => nameKey(row.lm_player_name ?? '')));
+    const suggestions: { lm: string; sl: string }[] = [];
+    const steve = [...names.values()].find((name) => nameKey(name) === 'steve davies');
+    if (steve && !linked.has('steve davies')) suggestions.push({ lm: steve, sl: 'Steven Davies' });
+    for (const name of [...names.values()].sort((a, b) => a.localeCompare(b, 'en'))) {
+      const key = nameKey(name);
+      if (key === 'steve davies' || linked.has(key) || slNames.has(key)) continue;
+      suggestions.push({ lm: name, sl: '' });
     }
+    const lmNames = [...names.values()].sort((a, b) => a.localeCompare(b, 'en'));
     const levelById = new Map(levels.map((player) => [player.id, player]));
-    const rows = (linkRows ?? []) as LinkRow[];
-    linksHost.innerHTML = rows.length
-      ? rows
-          .map((row) => {
-            const level = row.squashlevels_player_id != null ? levelById.get(row.squashlevels_player_id) : undefined;
-            const sl = level ? `${level.display_name} · ${levelText(level.current_level)}` : '—';
-            const lm = row.lm_player_name?.trim() || '—';
-            return `<tr><td>${escapeHtml(lm)}</td><td>${escapeHtml(sl)}</td><td><button class="btn btn--ghost btn--sm" type="button" data-unlink="${row.id}">Unlink</button></td></tr>`;
-          })
-          .join('')
-      : '<tr><td colspan="3">No links yet.</td></tr>';
+    const suggestionHtml = suggestions
+      .map((row) => {
+        const options = lmNames
+          .map((name) => `<option value="${escapeHtml(name)}"${name === row.lm ? ' selected' : ''}>${escapeHtml(name)}</option>`)
+          .join('');
+        return `<tr>
+          <td><select data-link-lm aria-label="LM Player">${options}</select></td>
+          <td><input data-link-sl aria-label="SL" value="${escapeHtml(row.sl)}" autocomplete="off" /></td>
+          <td><button class="btn btn--primary btn--sm" type="button" data-link-save>Link</button></td>
+        </tr>`;
+      })
+      .join('');
+    const savedHtml = saved
+      .map((row) => {
+        const level = row.squashlevels_player_id != null ? levelById.get(row.squashlevels_player_id) : undefined;
+        const sl = level ? `${level.display_name} · ${levelText(level.current_level)}` : '—';
+        const lm = row.lm_player_name?.trim() || '—';
+        return `<tr><td>${escapeHtml(lm)}</td><td>${escapeHtml(sl)}</td><td><button class="btn btn--ghost btn--sm" type="button" data-unlink="${row.id}">Unlink</button></td></tr>`;
+      })
+      .join('');
+    linksHost.innerHTML = suggestionHtml + savedHtml || '<tr><td colspan="3">No links yet.</td></tr>';
   }
 
-  linkForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const data = new FormData(linkForm);
-    const slRaw = String(data.get('squashlevels_player_id') ?? '').trim();
-    const slId = slRaw ? Number(slRaw) : null;
-    const lmName = String(data.get('lm_player_name') ?? '').trim() || null;
-    if (!lmName || slId == null) {
-      setStatus('Choose an LM Player and an SL name.');
+  linksHost.addEventListener('click', async (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-link-save]');
+    if (!button) return;
+    const row = button.closest('tr');
+    const lmName = row?.querySelector<HTMLSelectElement>('[data-link-lm]')?.value.trim() ?? '';
+    const typed = row?.querySelector<HTMLInputElement>('[data-link-sl]')?.value.trim() ?? '';
+    if (!lmName || !typed) {
+      setStatus('Choose an LM Player and type an SL name.');
+      return;
+    }
+    const matches = linkLevels.filter((player) => nameKey(player.display_name) === nameKey(typed) && player.current_level != null);
+    if (matches.length !== 1) {
+      setStatus(matches.length ? `More than one SquashLevels player is called ${typed}.` : `No SquashLevels player is called ${typed}.`);
       return;
     }
     setStatus('Saving link…');
     const { error } = await supabase.from('player_links').insert({
-      squashlevels_player_id: slId,
+      squashlevels_player_id: matches[0].id,
       lm_player_name: lmName,
     });
     if (error) {
-      setStatus(error.code === '23505' ? 'One of those records is already linked. Unlink it first.' : error.message);
+      setStatus(
+        error.code === 'PGRST205'
+          ? 'The links table is not on the database yet, so a typed name cannot be saved.'
+          : error.code === '23505'
+            ? 'One of those records is already linked. Unlink it first.'
+            : error.message,
+      );
       return;
     }
-    linkForm.reset();
-    for (const input of linkForm.querySelectorAll<HTMLInputElement>('[data-link-filter]')) input.value = '';
     setStatus('Link saved.');
     await showSession();
   });
@@ -2101,16 +2075,6 @@ const scoresHref = url('/captains/admin/minigame/');
     color: var(--gold-400);
     border-color: var(--gold-500);
     border-bottom: 2px solid var(--ink-800);
-  }
-  #setup-app [data-form='player-link'] .link-fields {
-    display: grid;
-    gap: 0.75rem;
-  }
-  @media (min-width: 900px) {
-    #setup-app [data-form='player-link'] .link-fields {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      align-items: end;
-    }
   }
   #setup-app .admin-panel > h2 {
     margin-top: 0;

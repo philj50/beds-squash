@@ -471,11 +471,10 @@ test.describe('Club captain, team captain, and player', () => {
       if (path.endsWith('/player_links')) {
         const method = route.request().method();
         if (method === 'POST') {
-          const body = route.request().postDataJSON() as {
-            profile_id?: string | null;
-            squashlevels_player_id?: number | null;
-            lm_player_name?: string | null;
-          };
+          const raw = route.request().postDataJSON() as
+            | { profile_id?: string | null; squashlevels_player_id?: number | null; lm_player_name?: string | null }
+            | { profile_id?: string | null; squashlevels_player_id?: number | null; lm_player_name?: string | null }[];
+          const body = Array.isArray(raw) ? raw[0] : raw;
           const row = {
             id: nextLinkId++,
             profile_id: body.profile_id ?? null,
@@ -593,16 +592,16 @@ test.describe('Club captain, team captain, and player', () => {
 
     await page.getByRole('button', { name: 'Links' }).click();
     await expect(page.getByRole('heading', { name: 'Links', exact: true })).toBeVisible();
-    await expect(page.locator('[data-links]')).toContainText('No links yet.');
-    await page.getByRole('combobox', { name: 'LM Player', exact: true }).selectOption('Pat Player');
-    await page.getByRole('combobox', { name: 'SL', exact: true }).selectOption({ label: 'Pat Player · 4,321' });
-    await page.getByRole('button', { name: 'Link', exact: true }).click();
+    const linkZoe = page.locator('[data-links] tr', { has: page.locator('option[selected][value="Zoe Player"]') });
+    await expect(linkZoe.getByRole('combobox', { name: 'LM Player' })).toHaveValue('Zoe Player');
+    await linkZoe.getByRole('textbox', { name: 'SL' }).fill('Pat Player');
+    await linkZoe.getByRole('button', { name: 'Link' }).click();
     await expect(page.getByText('Link saved.')).toBeVisible();
-    const linked = page.locator('[data-links] tr', { hasText: 'Pat Player' });
-    await expect(linked).toContainText('Pat Player · 4,321');
+    const linked = page.getByRole('row', { name: /Zoe Player.*4,321/ });
+    await expect(linked).toBeVisible();
     await linked.getByRole('button', { name: 'Unlink' }).click();
     await expect(page.getByText('Link removed.')).toBeVisible();
-    await expect(page.locator('[data-links]')).toContainText('No links yet.');
+    await expect(page.locator('[data-links] tr', { has: page.locator('option[selected][value="Zoe Player"]') }).getByRole('textbox', { name: 'SL' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Team', exact: true }).click();
     const zoe = page.locator('[data-site-team] tr', { hasText: 'Zoe Player' });
