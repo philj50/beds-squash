@@ -594,14 +594,12 @@ test.describe('Club captain, team captain, and player', () => {
     await page.getByRole('button', { name: 'Links' }).click();
     await expect(page.getByRole('heading', { name: 'Links', exact: true })).toBeVisible();
     await expect(page.locator('[data-links]')).toContainText('No links yet.');
-    await page.getByRole('combobox', { name: 'This website', exact: true }).selectOption({ label: 'County Admin · admin@example.test' });
-    await page.getByRole('combobox', { name: 'SquashLevels', exact: true }).selectOption({ label: 'Pat Player · 4,321' });
-    await page.getByRole('combobox', { name: 'League Master', exact: true }).selectOption('Pat Player');
+    await page.getByRole('combobox', { name: 'LM Player', exact: true }).selectOption('Pat Player');
+    await page.getByRole('combobox', { name: 'SL', exact: true }).selectOption({ label: 'Pat Player · 4,321' });
     await page.getByRole('button', { name: 'Link', exact: true }).click();
     await expect(page.getByText('Link saved.')).toBeVisible();
-    const linked = page.locator('[data-links] tr', { hasText: 'County Admin' });
+    const linked = page.locator('[data-links] tr', { hasText: 'Pat Player' });
     await expect(linked).toContainText('Pat Player · 4,321');
-    await expect(linked).toContainText('Pat Player');
     await linked.getByRole('button', { name: 'Unlink' }).click();
     await expect(page.getByText('Link removed.')).toBeVisible();
     await expect(page.locator('[data-links]')).toContainText('No links yet.');

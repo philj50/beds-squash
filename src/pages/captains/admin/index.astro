@@ -25,7 +25,7 @@ const scoresHref = url('/captains/admin/minigame/');
         <strong>SquashLevels</strong> shows each player’s level.
         <strong>This website</strong> is Club, Team and Player, plus People and Admins.
         The groups are <strong>Admins</strong>, <strong>LM Clubs</strong>, <strong>LM Captains</strong>, <strong>LM Players</strong>, <strong>BC Juniors</strong>, and <strong>Beds Closed</strong>. The first four are filled for you. BC Juniors and Beds Closed are set on People, and the import leaves them alone.
-        <strong>Links</strong> joins one person across the three when the names do not match.
+        <strong>Links</strong> joins a League Master player to their SquashLevels name when the names differ.
         A club captain sees their club. A team captain sees their team. A player sees their own row. Nothing is emailed.
       </p>
       <p class="status" data-status role="status"></p>
@@ -370,25 +370,20 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="links" data-lm-only hidden>
             <h2>Links</h2>
             <p class="muted small">
-              Choose the same person in League Master, SquashLevels, and this website. The link stays when the names differ. Pick at least two. Remove a link when it is wrong.
+              Choose the League Master player and their SquashLevels name. The link stays when the names differ. Remove a link when it is wrong.
             </p>
             <form class="card" data-form="player-link">
               <div class="card__body stack">
                 <div class="link-fields">
                   <label>
-                    This website
-                    <input type="search" data-link-filter="website" aria-label="Filter this website" placeholder="Filter" autocomplete="off" />
-                    <select name="profile_id" aria-label="This website"></select>
+                    LM Player
+                    <input type="search" data-link-filter="lm" aria-label="Filter LM Player" placeholder="Filter" autocomplete="off" />
+                    <select name="lm_player_name" aria-label="LM Player" required></select>
                   </label>
                   <label>
-                    SquashLevels
-                    <input type="search" data-link-filter="sl" aria-label="Filter SquashLevels" placeholder="Filter" autocomplete="off" />
-                    <select name="squashlevels_player_id" aria-label="SquashLevels"></select>
-                  </label>
-                  <label>
-                    League Master
-                    <input type="search" data-link-filter="lm" aria-label="Filter League Master" placeholder="Filter" autocomplete="off" />
-                    <select name="lm_player_name" aria-label="League Master"></select>
+                    SL
+                    <input type="search" data-link-filter="sl" aria-label="Filter SL" placeholder="Filter" autocomplete="off" />
+                    <select name="squashlevels_player_id" aria-label="SL" required></select>
                   </label>
                 </div>
                 <button class="btn btn--primary btn--sm" type="submit">Link</button>
@@ -398,9 +393,8 @@ const scoresHref = url('/captains/admin/minigame/');
               <table class="overview">
                 <thead>
                   <tr>
-                    <th>This website</th>
-                    <th>SquashLevels</th>
-                    <th>League Master</th>
+                    <th>LM Player</th>
+                    <th>SL</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -1862,13 +1856,12 @@ const scoresHref = url('/captains/admin/minigame/');
   const linkForm = root.querySelector<HTMLFormElement>('[data-form="player-link"]')!;
   const linksHost = root.querySelector<HTMLElement>('[data-links]')!;
   const linkSelects = {
-    website: linkForm.querySelector<HTMLSelectElement>('[name="profile_id"]')!,
     sl: linkForm.querySelector<HTMLSelectElement>('[name="squashlevels_player_id"]')!,
     lm: linkForm.querySelector<HTMLSelectElement>('[name="lm_player_name"]')!,
   };
-  let linkOptions: Record<'website' | 'sl' | 'lm', LinkOption[]> = { website: [], sl: [], lm: [] };
+  let linkOptions: Record<'sl' | 'lm', LinkOption[]> = { sl: [], lm: [] };
 
-  const fillLinkSelect = (key: 'website' | 'sl' | 'lm', query: string) => {
+  const fillLinkSelect = (key: 'sl' | 'lm', query: string) => {
     const select = linkSelects[key];
     const selected = select.value;
     const needle = query.trim().toLowerCase();
@@ -1889,77 +1882,67 @@ const scoresHref = url('/captains/admin/minigame/');
 
   for (const input of linkForm.querySelectorAll<HTMLInputElement>('[data-link-filter]')) {
     input.addEventListener('input', () => {
-      const key = input.dataset.linkFilter as 'website' | 'sl' | 'lm';
-      if (key === 'website' || key === 'sl' || key === 'lm') fillLinkSelect(key, input.value);
+      const key = input.dataset.linkFilter as 'sl' | 'lm';
+      if (key === 'sl' || key === 'lm') fillLinkSelect(key, input.value);
     });
   }
 
   async function paintLinks() {
-    const [{ data: linkRows, error }, { data: slRows }, { data: peopleRows }, { data: nomRows }] = await Promise.all([
+    const [{ data: linkRows, error }, { data: slRows }, { data: nomRows }] = await Promise.all([
       supabase.from('player_links').select('id, profile_id, squashlevels_player_id, lm_player_name').order('id'),
       allSlPlayers(),
-      supabase.from('profiles').select('id, display_name, email').order('display_name'),
       supabase.from('nominations').select('player_name').eq('season', SEASON),
     ]);
     if (error) {
-      linksHost.innerHTML = `<tr><td colspan="4">${escapeHtml(error.message)}</td></tr>`;
+      linksHost.innerHTML = `<tr><td colspan="3">${escapeHtml(error.message)}</td></tr>`;
       return;
     }
-    const people = (peopleRows ?? []) as { id: string; display_name: string; email: string | null }[];
     const levels = (slRows ?? []) as { id: number; display_name: string; current_level: number | null }[];
     const names = new Map<string, string>();
-    for (const row of (nomRows ?? []) as { player_name: string }[]) {
-      const trimmed = row.player_name.trim();
+    const addLmName = (value: string) => {
+      const trimmed = value.trim();
       const key = nameKey(trimmed);
       if (key && !names.has(key)) names.set(key, trimmed);
-    }
+    };
+    for (const player of websitePlayers) addLmName(player.name);
+    for (const row of (nomRows ?? []) as { player_name: string }[]) addLmName(row.player_name);
     linkOptions = {
-      website: people
-        .map((person) => ({
-          value: person.id,
-          label: [person.display_name || 'Unnamed', person.email].filter(Boolean).join(' · '),
-        }))
-        .sort((a, b) => a.label.localeCompare(b.label, 'en')),
       sl: levels
-        .filter((player) => player.id != null)
-        .map((player) => ({ value: String(player.id), label: `${player.display_name} · ${levelText(player.current_level)}` })),
+        .filter((player) => player.current_level != null)
+        .map((player) => ({ value: String(player.id), label: `${player.display_name} · ${levelText(player.current_level)}` }))
+        .sort((a, b) => a.label.localeCompare(b.label, 'en')),
       lm: [...names.values()].sort((a, b) => a.localeCompare(b, 'en')).map((name) => ({ value: name, label: name })),
     };
     for (const input of linkForm.querySelectorAll<HTMLInputElement>('[data-link-filter]')) {
-      const key = input.dataset.linkFilter as 'website' | 'sl' | 'lm';
-      if (key === 'website' || key === 'sl' || key === 'lm') fillLinkSelect(key, input.value);
+      const key = input.dataset.linkFilter as 'sl' | 'lm';
+      if (key === 'sl' || key === 'lm') fillLinkSelect(key, input.value);
     }
-    const personById = new Map(people.map((person) => [person.id, person]));
     const levelById = new Map(levels.map((player) => [player.id, player]));
     const rows = (linkRows ?? []) as LinkRow[];
     linksHost.innerHTML = rows.length
       ? rows
           .map((row) => {
-            const person = row.profile_id ? personById.get(row.profile_id) : undefined;
             const level = row.squashlevels_player_id != null ? levelById.get(row.squashlevels_player_id) : undefined;
-            const website = person ? [person.display_name || 'Unnamed', person.email].filter(Boolean).join(' · ') : '—';
             const sl = level ? `${level.display_name} · ${levelText(level.current_level)}` : '—';
             const lm = row.lm_player_name?.trim() || '—';
-            return `<tr><td>${escapeHtml(website)}</td><td>${escapeHtml(sl)}</td><td>${escapeHtml(lm)}</td><td><button class="btn btn--ghost btn--sm" type="button" data-unlink="${row.id}">Unlink</button></td></tr>`;
+            return `<tr><td>${escapeHtml(lm)}</td><td>${escapeHtml(sl)}</td><td><button class="btn btn--ghost btn--sm" type="button" data-unlink="${row.id}">Unlink</button></td></tr>`;
           })
           .join('')
-      : '<tr><td colspan="4">No links yet.</td></tr>';
+      : '<tr><td colspan="3">No links yet.</td></tr>';
   }
 
   linkForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     const data = new FormData(linkForm);
-    const profileId = String(data.get('profile_id') ?? '').trim() || null;
     const slRaw = String(data.get('squashlevels_player_id') ?? '').trim();
     const slId = slRaw ? Number(slRaw) : null;
     const lmName = String(data.get('lm_player_name') ?? '').trim() || null;
-    if ([profileId, slId, lmName].filter((value) => value != null && value !== '').length < 2) {
-      setStatus('Choose at least two records to link.');
+    if (!lmName || slId == null) {
+      setStatus('Choose an LM Player and an SL name.');
       return;
     }
     setStatus('Saving link…');
     const { error } = await supabase.from('player_links').insert({
-      profile_id: profileId,
       squashlevels_player_id: slId,
       lm_player_name: lmName,
     });
@@ -2125,7 +2108,7 @@ const scoresHref = url('/captains/admin/minigame/');
   }
   @media (min-width: 900px) {
     #setup-app [data-form='player-link'] .link-fields {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       align-items: end;
     }
   }
