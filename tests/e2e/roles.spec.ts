@@ -131,6 +131,10 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.locator('[data-site-sl]')).toContainText('Sam Squad');
     await expect(page.locator('[data-site-sl]')).not.toContainText('Away Player');
     await expect(page.getByRole('button', { name: 'People' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Admins' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Groups' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Roles' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Users' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Activities' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Traffic' })).toHaveCount(0);
     await expect(page.locator('[data-junior-link]')).toBeHidden();
@@ -511,6 +515,16 @@ test.describe('Club captain, team captain, and player', () => {
         }
         return send(playerLinks);
       }
+      if (path.endsWith('/groups')) {
+        return send([
+          { slug: 'admins', name: 'Admins', source: 'account', managed: true, position: 1 },
+          { slug: 'lm_clubs', name: 'LM Clubs', source: 'leaguemaster', managed: true, position: 2 },
+          { slug: 'lm_captains', name: 'LM Captains', source: 'leaguemaster', managed: true, position: 3 },
+          { slug: 'lm_players', name: 'LM Players', source: 'leaguemaster', managed: true, position: 4 },
+          { slug: 'bc_juniors', name: 'BC Juniors', source: 'website', managed: false, position: 5 },
+          { slug: 'beds_closed', name: 'Beds Closed', source: 'website', managed: false, position: 6 },
+        ]);
+      }
       if (path.endsWith('/group_members')) {
         const method = route.request().method();
         if (method === 'POST') {
@@ -568,25 +582,28 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.locator('[data-lm-captains]')).toContainText('Taylor Team');
     await expect(page.locator('[data-lm-captains]')).toContainText('taylor@example.test');
 
-    await page.getByRole('button', { name: 'Admins' }).click();
-    await expect(page.getByRole('heading', { name: 'Admins' })).toBeVisible();
-    await expect(page.locator('[data-admins]')).toContainText('County Admin');
+    await page.getByRole('button', { name: 'Roles' }).click();
+    await expect(page.getByRole('heading', { name: 'Roles', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Admin', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Club captain' })).toBeVisible();
+    const adminRole = page.locator('[data-roles] article', { has: page.getByRole('heading', { name: 'Admin', exact: true }) });
+    await expect(adminRole).toContainText('County Admin');
+    await expect(adminRole.locator('tr', { hasText: 'County Admin' }).getByRole('button', { name: 'Remove admin' })).toHaveCount(0);
+    const clubCaptain = page.locator('[data-roles] article', { has: page.getByRole('heading', { name: 'Club captain' }) });
+    await expect(clubCaptain).toContainText('Sam Morris');
+    await expect(clubCaptain).toContainText('Test Club');
+    await expect(clubCaptain).toContainText('Filled by the import');
 
-    await page.getByRole('button', { name: 'People' }).click();
+    await page.getByRole('button', { name: 'Users' }).click();
     await expect(page.getByRole('heading', { name: 'Add a person' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'LM Players' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'LM Captains' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'LM Clubs' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'BC Juniors' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Beds Closed' })).toBeVisible();
-    await expect(page.locator('[data-tab="accounts"]')).toContainText('mark whether they can play');
-    await expect(page.locator('[data-tab="accounts"]')).toContainText('every team at their club');
+    await expect(page.getByRole('button', { name: 'People' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Admins' })).toHaveCount(0);
     await expect(page.getByRole('columnheader', { name: 'Last login' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Status' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Groups' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Random' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Random email' })).toHaveCount(0);
-    const adminRow = page.locator('[data-people] tr', { hasText: 'County Admin' });
+    const adminRow = page.locator('[data-users] tr', { hasText: 'County Admin' });
     await expect(adminRow).toContainText('Default admin');
     await expect(adminRow).toContainText('Active');
     await expect(adminRow).toContainText('4 Oct 2026');
@@ -595,19 +612,35 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(adminRow.getByRole('button', { name: 'Delete' })).toHaveCount(0);
     await expect(adminRow.getByRole('button', { name: 'Make inactive' })).toHaveCount(0);
     await expect(adminRow).not.toContainText('All clubs');
-    const gail = page.locator('[data-people] tr', { hasText: 'Gail' });
+    const gail = page.locator('[data-users] tr', { hasText: 'Gail' });
     await expect(gail).toContainText('Admin');
     await expect(gail).not.toContainText('All clubs');
     await expect(gail).not.toContainText('Test Club');
-    const samPeople = page.locator('[data-people] tr', { hasText: 'Sam Morris' });
+    const samPeople = page.locator('[data-users] tr', { hasText: 'Sam Morris' });
     await expect(samPeople).toContainText('Test Club');
     await expect(samPeople).not.toContainText('All clubs');
-    await adminRow.getByRole('combobox', { name: 'Add County Admin to a group' }).selectOption('bc_juniors|organiser');
+
+    await page.getByRole('button', { name: 'Groups' }).click();
+    await expect(page.getByRole('heading', { name: 'LM Players' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'LM Captains' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'LM Clubs' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'BC Juniors' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Beds Closed' })).toBeVisible();
+    const leaguePlayers = page.locator('[data-groups] article', { has: page.getByRole('heading', { name: 'LM Players' }) });
+    await expect(leaguePlayers).toContainText('Filled by the import');
+    await expect(leaguePlayers.getByRole('button', { name: 'Add to LM Players' })).toHaveCount(0);
+    const juniors = page.locator('[data-groups] article', { has: page.getByRole('heading', { name: 'BC Juniors' }) });
+    await expect(juniors).toContainText('Website');
+    await expect(juniors).toContainText('Set here');
+    await juniors.getByRole('combobox', { name: 'Person for BC Juniors' }).selectOption({ label: 'County Admin' });
+    await juniors.getByRole('combobox', { name: 'Role for BC Juniors' }).selectOption('organiser');
+    await juniors.getByRole('button', { name: 'Add to BC Juniors' }).click();
     await expect(page.getByText('County Admin is in BC Juniors.')).toBeVisible();
-    await expect(adminRow).toContainText('BC Juniors · organiser');
-    await adminRow.getByRole('button', { name: 'Remove' }).click();
+    const juniorMember = juniors.locator('tr', { hasText: 'County Admin' });
+    await expect(juniorMember).toContainText('Organiser');
+    await juniorMember.getByRole('button', { name: 'Remove' }).click();
     await expect(page.getByText('County Admin removed from BC Juniors.')).toBeVisible();
-    await expect(adminRow).not.toContainText('BC Juniors · organiser');
+    await expect(juniors.locator('tr', { hasText: 'County Admin' })).toHaveCount(0);
 
     await page.getByRole('button', { name: 'SL', exact: true }).click();
     const slZoe = page.locator('[data-site-sl] tr', { hasText: 'Zoe Player' });

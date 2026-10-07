@@ -94,7 +94,7 @@ import { url } from '@/lib/site';
     emailEl.textContent = account.email || '—';
     placesEl.textContent = account.places.length
       ? account.places.map((place) => place.label).join('. ')
-      : 'No club or team yet. An admin sets that on the People tab.';
+      : 'No club or team yet. An admin sets that from Administration.';
     adminLink.hidden = !account.isAdmin;
     squadLink.textContent = account.playerOnly ? 'Your team' : 'Squad';
   }

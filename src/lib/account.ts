@@ -89,11 +89,12 @@ export async function loadAccount(supabase: SupabaseClient): Promise<Account | n
   const session = data.session;
   if (!session) return null;
 
-  const [{ data: me }, membershipResult, { data: clubs }, groupResult] = await Promise.all([
+  const [{ data: me }, membershipResult, { data: clubs }, groupResult, catalogResult] = await Promise.all([
     supabase.from('profiles').select('display_name, is_admin').eq('id', session.user.id).maybeSingle(),
     supabase.from('memberships').select('role, club_slug, teams(name)').eq('profile_id', session.user.id),
     supabase.from('clubs').select('slug, name'),
     supabase.from('group_members').select('role, group_slug').eq('profile_id', session.user.id),
+    supabase.from('groups').select('slug, name, position'),
   ]);
 
   const clubNames = new Map((clubs ?? []).map((club: { slug: string; name: string }) => [club.slug, club.name]));
@@ -111,7 +112,13 @@ export async function loadAccount(supabase: SupabaseClient): Promise<Account | n
   }
 
   const groups = ((groupResult.error ? [] : groupResult.data) ?? []) as { role: 'member' | 'organiser'; group_slug: string }[];
-  groups.sort((a, b) => GROUP_ORDER.indexOf(a.group_slug) - GROUP_ORDER.indexOf(b.group_slug));
+  const catalog = ((catalogResult.error ? [] : catalogResult.data) ?? []) as { slug: string; name: string; position: number }[];
+  const catalogBySlug = new Map(catalog.map((group) => [group.slug, group]));
+  groups.sort((a, b) => {
+    const left = catalogBySlug.get(a.group_slug)?.position ?? GROUP_ORDER.indexOf(a.group_slug);
+    const right = catalogBySlug.get(b.group_slug)?.position ?? GROUP_ORDER.indexOf(b.group_slug);
+    return left - right;
+  });
 
   return {
     userId: session.user.id,
@@ -123,7 +130,7 @@ export async function loadAccount(supabase: SupabaseClient): Promise<Account | n
     places,
     groups: groups.map((group) => ({
       slug: group.group_slug,
-      name: GROUP_NAME[group.group_slug] ?? group.group_slug,
+      name: catalogBySlug.get(group.group_slug)?.name ?? GROUP_NAME[group.group_slug] ?? group.group_slug,
       role: group.role,
     })),
   };
