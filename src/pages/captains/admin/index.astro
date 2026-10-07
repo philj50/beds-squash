@@ -14,20 +14,19 @@ const scoresHref = url('/captains/admin/minigame/');
 
 <Base
   title="Administration"
-  description="League Master lists, SquashLevels, and the club, team and player details for this website."
+  description="League Master lists, SquashLevels, website groups, and the club, team and player details."
   noindex
 >
   <section class="section section--tight">
     <div class="container setup" id="setup-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
       <h1>Administration</h1>
       <p class="lede">
-        <strong>League Master</strong> is the club, captain and player list copied from League Master.
-        <strong>SquashLevels</strong> shows levels for those players: a club sees each player’s level and team, and a player sees their own level and the full history.
-        <strong>This website</strong> is Club, Team and Player, plus People and Admins for an administrator.
+        <strong>League Master</strong> is the source for clubs, captains, and player names, emails, and England Squash numbers. The next import replaces those copies. Phone stays on this website.
+        <strong>SquashLevels</strong> shows each player’s level.
+        <strong>This website</strong> is Club, Team and Player, plus People and Admins.
+        The groups are <strong>Admins</strong>, <strong>LM Clubs</strong>, <strong>LM Captains</strong>, <strong>LM Players</strong>, <strong>BC Juniors</strong>, and <strong>Beds Closed</strong>. The first four are filled for you. BC Juniors and Beds Closed are set on People, and the import leaves them alone.
         <strong>Links</strong> joins one person across the three when the names do not match.
-        A club captain sees their club. A team captain sees their team, and their club as read-only, not the other teams.
-        A player sees their profile, their League Master line, and the team and club they play for.
-        Nothing is emailed.
+        A club captain sees their club. A team captain sees their team. A player sees their own row. Nothing is emailed.
       </p>
       <p class="status" data-status role="status"></p>
 
@@ -49,9 +48,9 @@ const scoresHref = url('/captains/admin/minigame/');
             <span class="tab-group" data-lm-only>
               <span class="tab-label">League Master</span>
               <span class="tab-buttons">
-                <button type="button" data-tab-button="lm-clubs">LM Club</button>
-                <button type="button" data-tab-button="lm-captains">LM Captain</button>
-                <button type="button" data-tab-button="lm-players">LM Player</button>
+                <button type="button" data-tab-button="lm-clubs">LM Clubs</button>
+                <button type="button" data-tab-button="lm-captains">LM Captains</button>
+                <button type="button" data-tab-button="lm-players">LM Players</button>
               </span>
             </span>
             <span class="tab-group">
@@ -116,8 +115,8 @@ const scoresHref = url('/captains/admin/minigame/');
           </section>
 
           <section class="admin-panel" data-tab="lm-clubs" data-lm-only hidden>
-            <h2>LM Club</h2>
-            <p class="muted small">Each club and its contact email are copied from League Master. Change them there. A matching login is a club captain.</p>
+            <h2>LM Clubs</h2>
+            <p class="muted small">Club contacts are copied from League Master. Change them there. A matching login is put in the LM Clubs group.</p>
             <div class="overview-box">
               <table class="overview">
                 <thead>
@@ -125,7 +124,7 @@ const scoresHref = url('/captains/admin/minigame/');
                     <th>Club</th>
                     <th>Contact</th>
                     <th>Email</th>
-                    <th>Role</th>
+                    <th>Group</th>
                   </tr>
                 </thead>
                 <tbody data-lm-clubs></tbody>
@@ -134,8 +133,8 @@ const scoresHref = url('/captains/admin/minigame/');
           </section>
 
           <section class="admin-panel" data-tab="lm-captains" data-lm-only hidden>
-            <h2>LM Captain</h2>
-            <p class="muted small">Each team captain and their email are copied from League Master. Change them there. A matching login is a team captain.</p>
+            <h2>LM Captains</h2>
+            <p class="muted small">Team captains are copied from League Master. Change them there. A matching login is put in the LM Captains group.</p>
             <div class="overview-box">
               <table class="overview">
                 <thead>
@@ -144,7 +143,7 @@ const scoresHref = url('/captains/admin/minigame/');
                     <th>Team</th>
                     <th>Captain</th>
                     <th>Email</th>
-                    <th>Role</th>
+                    <th>Group</th>
                   </tr>
                 </thead>
                 <tbody data-lm-captains></tbody>
@@ -153,8 +152,8 @@ const scoresHref = url('/captains/admin/minigame/');
           </section>
 
           <section class="admin-panel" data-tab="lm-players" data-lm-only hidden>
-            <h2>LM Player</h2>
-            <p class="muted small">Names, England Squash numbers, and emails are copied from League Master. A change there replaces the copy here on the next import. Nothing on this list is typed, and nothing is sent back to League Master. A matching login is a player.</p>
+            <h2>LM Players</h2>
+            <p class="muted small">Names, England Squash numbers, and emails are copied from League Master. A change there replaces the copy here on the next import. Nothing on this list is typed, and nothing is sent back. A matching login is put in the LM Players group.</p>
             <label class="directory-search">
               Search
               <input type="search" data-player-search placeholder="Club, team, player or email" autocomplete="off" />
@@ -168,7 +167,7 @@ const scoresHref = url('/captains/admin/minigame/');
                     <th class="col-team">Team</th>
                     <th>Player</th>
                     <th>Email</th>
-                    <th>Role</th>
+                    <th>Group</th>
                   </tr>
                 </thead>
                 <tbody data-lm-players></tbody>
@@ -179,10 +178,9 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="accounts" data-lm-only hidden>
             <h2>People</h2>
             <p class="muted small">
-              Create the login with the email already on LM Club, LM Captain, or Player. The role is applied from that list.
-              Someone who is not on League Master can still have a login. Put them in BC Juniors or Beds Closed.
-              Set the first password and tell them yourself. Nothing is emailed. They change it on their profile.
-              An inactive account cannot sign in.
+              Create the login, set the first password, and tell them yourself. Nothing is emailed. They change it on their profile. An inactive account cannot sign in.
+              If that email is already on League Master, the next import puts them in LM Clubs, LM Captains, or LM Players.
+              Someone who is not on League Master can still sign in. Put them in BC Juniors or Beds Closed. The import does not remove those two groups.
             </p>
             <div class="people-split">
             <form class="card" data-form="create-account">
@@ -213,50 +211,56 @@ const scoresHref = url('/captains/admin/minigame/');
               </div>
             </form>
             <div class="activity-list">
-              <h3>Activities</h3>
-              <p class="muted small">Each role includes everything above it. A person with two roles can do both. Groups are separate. League Master fills LM Players, LM Captains and LM Clubs, and the admin flag fills Admins. BC Juniors and Beds Closed are set on each person: a member sees their own games, an organiser sees the whole group.</p>
+              <h3>Groups</h3>
+              <p class="muted small">A person can be in more than one group. Which club or team they see still comes from League Master. A member sees their own games. An organiser sees the whole group.</p>
               <article class="card">
                 <div class="card__body">
-                  <h3>Player</h3>
+                  <h3>LM Players</h3>
                   <ul>
-                    <li>See their profile, and change their own name, email, ES number, phone, and password.</li>
                     <li>See their own matches and mark whether they can play.</li>
-                    <li>Send a photo, video, link or article. An admin publishes it before it appears on the site.</li>
+                    <li>Name, email, and ES number come from League Master. Phone stays here.</li>
                   </ul>
                 </div>
               </article>
               <article class="card">
                 <div class="card__body">
-                  <h3>Team captain</h3>
-                  <p class="muted small">Everything a player can do, for their own team, plus:</p>
+                  <h3>LM Captains</h3>
                   <ul>
-                    <li>See the players on their team and set each player's email, ES number, and phone.</li>
-                    <li>See who is in, maybe, or out.</li>
-                    <li>Set the playing order for a match.</li>
+                    <li>See the players on their own team, who is in, maybe, or out, and set the playing order.</li>
                   </ul>
                 </div>
               </article>
               <article class="card">
                 <div class="card__body">
-                  <h3>Club captain</h3>
-                  <p class="muted small">Everything a team captain can do, for every team at their club.</p>
+                  <h3>LM Clubs</h3>
+                  <p class="muted small">Sees every team at their club, including who is in and the playing order.</p>
                 </div>
               </article>
               <article class="card">
                 <div class="card__body">
-                  <h3>Admin</h3>
-                  <p class="muted small">Everything a club captain can do, for every club, plus:</p>
+                  <h3>Admins</h3>
                   <ul>
-                    <li>The League Master lists, People accounts, and Admins.</li>
-                    <li>Site traffic and sign-ins.</li>
-                    <li>Publish shared photos and articles, match reports, Minigame mk2 scores, and junior entries.</li>
+                    <li>Every club and team, People, traffic, and publishing.</li>
+                    <li>Filled from the Admins list, not from League Master.</li>
                   </ul>
+                </div>
+              </article>
+              <article class="card">
+                <div class="card__body">
+                  <h3>BC Juniors</h3>
+                  <p class="muted small">Set here. An organiser sees every Junior County Closed entry. The import does not change this group.</p>
+                </div>
+              </article>
+              <article class="card">
+                <div class="card__body">
+                  <h3>Beds Closed</h3>
+                  <p class="muted small">Set here, for the January Closed. The import does not change this group.</p>
                 </div>
               </article>
             </div>
             </div>
             <h3>Everyone</h3>
-            <p class="muted small">Sorted by role, then by name. Last login is the last time they signed in with a password. An admin is shown with the club they belong to. An admin with no club is listed as admin only. League Master groups cannot be edited here.</p>
+            <p class="muted small">Sorted by role, then by name. Last login is the last time they signed in with a password. An admin is shown with the club they belong to. League Master groups are filled by the import. Use the list on each row for BC Juniors and Beds Closed.</p>
             <p class="muted small" data-groups-note hidden></p>
             <div class="overview-box">
               <table class="overview">
@@ -308,8 +312,8 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="admins" data-lm-only hidden>
             <h2>Admins</h2>
             <p class="muted small">
-              Admins cover every club and team. The county admin cannot be deleted or turned off.
-              League roles stay on the League Master tabs.
+              People on this list are the Admins group. They cover every club and team. The county admin cannot be deleted or turned off.
+              LM Clubs, LM Captains, and LM Players are filled by the import.
             </p>
             <form class="card" data-form="create-admin">
               <div class="card__body stack">
@@ -1215,22 +1219,20 @@ const scoresHref = url('/captains/admin/minigame/');
     const teamRowsScoped = clubRowsScoped.filter((row) => account.isAdmin || hasClubRole || (row.teamId != null && teamIds.has(row.teamId)));
     const clubEditable = hasClubRole && !account.playerOnly;
     const teamEditable = (hasClubRole || hasTeamRole) && !account.playerOnly;
-    const roleNote = ' Role is read-only: A admin, C club captain, T team captain, P player. Name, email, and ES number are copied from League Master and replaced on the next import.';
+    const roleNote = ' Name, email, and ES number are copied from League Master and replaced on the next import. Phone stays on this website. Role is read-only: A admin, C club captain, T team captain, P player.';
     clubNote.textContent = (account.isAdmin
-      ? 'Every club. Email, ES number, and phone can be changed for players. A club captain or team captain keeps their name and email from League Master. Their ES number and phone can still be changed. Leave a box and it is saved.'
+      ? 'Every club.'
       : account.playerOnly
-        ? 'Your club. You can change your own email, ES number, and phone. A club captain or team captain keeps their name and email from League Master, and can still change ES number and phone.'
+        ? 'Your club.'
         : clubEditable || hasTeamRole
-          ? 'The players you can see. Email, ES number, and phone can be changed. A club captain or team captain keeps their name and email from League Master. Their ES number and phone can still be changed. Leave a box and it is saved.'
+          ? 'The players you can see.'
           : 'Your club is read-only. Other teams at the club are not listed.') + roleNote;
     teamNote.textContent = (account.isAdmin
-      ? 'Every team. When the League Master name matches SquashLevels, that name and level stay fixed. Otherwise choose the SquashLevels name and the level fills in. Email, ES number, and phone can be changed. A club captain or team captain keeps their name and email from League Master.'
-      : account.playerOnly
-        ? 'Your team. You can change your own email, ES number, and phone. A club captain or team captain keeps their name and email from League Master, and can still change ES number and phone.'
-        : 'Your team. Email, ES number, and phone can be changed for players. A club captain or team captain keeps their name and email from League Master. Their ES number and phone can still be changed. Leave a box and it is saved.') + roleNote;
+      ? 'Every team. When the League Master name matches SquashLevels, that name and level stay fixed. Otherwise choose the SquashLevels name and the level fills in.'
+      : 'Your team.') + roleNote;
     playerNote.textContent = (account.playerOnly
-      ? 'You can change your own email, ES number, and phone. Leave a box and it is saved. The email is shown on LM Player.'
-      : 'You can change the email, ES number, and phone for the players you look after. A player can change only their own row. Leave a box and it is saved. The email is shown on LM Player, and the player role follows it. Only an admin can add someone who is not on the League Master list.') + roleNote;
+      ? 'Your own row.'
+      : 'The players you look after. A player can change only their own row. Only an admin can add someone who is not on League Master.') + roleNote;
 
     const clubsHere = clubList.filter((club) => (account.playerOnly ? homeClubSlugs.has(club.slug) : hasClubRole ? clubSlugs.has(club.slug) : homeClubSlugs.has(club.slug)));
     const paintClub = (heading: string) => {
@@ -1461,7 +1463,7 @@ const scoresHref = url('/captains/admin/minigame/');
         await supabase.rpc('sync_website_player_emails');
         await supabase.rpc('apply_lm_roles');
       }
-      setStatus(`Email saved for ${name}. LM Player shows this address, and the player role follows it.`);
+      setStatus(`Email saved for ${name}. League Master replaces the name, email, and ES number on the next import.`);
       return;
     }
     setStatus(`${label} saved for ${name}.`);
@@ -1625,7 +1627,7 @@ const scoresHref = url('/captains/admin/minigame/');
       ? leagueClubs
           .map(
             (club) =>
-              `<tr><td>${escapeHtml(club.name)}</td><td>${escapeHtml(club.contact_name || dash)}</td><td>${escapeHtml(club.contact_email || dash)}</td><td>Club</td></tr>`,
+              `<tr><td>${escapeHtml(club.name)}</td><td>${escapeHtml(club.contact_name || dash)}</td><td>${escapeHtml(club.contact_email || dash)}</td><td>LM Clubs</td></tr>`,
           )
           .join('')
       : `<tr><td colspan="4">No clubs copied from League Master yet.</td></tr>`;
@@ -1636,7 +1638,7 @@ const scoresHref = url('/captains/admin/minigame/');
       ? captainRows
           .map(
             (team) =>
-              `<tr><td>${escapeHtml(clubNames.get(team.club_slug) || dash)}</td><td>${escapeHtml(team.division ? `${team.name} · ${team.division}` : team.name)}</td><td>${escapeHtml(team.captain_name || dash)}</td><td>${escapeHtml(team.captain_email || dash)}</td><td>Captain</td></tr>`,
+              `<tr><td>${escapeHtml(clubNames.get(team.club_slug) || dash)}</td><td>${escapeHtml(team.division ? `${team.name} · ${team.division}` : team.name)}</td><td>${escapeHtml(team.captain_name || dash)}</td><td>${escapeHtml(team.captain_email || dash)}</td><td>LM Captains</td></tr>`,
           )
           .join('')
       : `<tr><td colspan="5">No captains copied from League Master yet.</td></tr>`;
@@ -1828,7 +1830,7 @@ const scoresHref = url('/captains/admin/minigame/');
           html.push(
             `<tr${marker}>${clubCell}${teamCell}<td>${escapeHtml(row.name)}</td>` +
               `<td>${escapeHtml(row.email || '—')}</td>` +
-              `<td>Player</td></tr>`,
+              `<td>LM Players</td></tr>`,
           );
         }
         teamIndex += teamCount;

@@ -556,9 +556,11 @@ test.describe('Club captain, team captain, and player', () => {
 
     await page.getByRole('button', { name: 'People' }).click();
     await expect(page.getByRole('heading', { name: 'Add a person' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Player' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Team captain' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Club captain' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'LM Players' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'LM Captains' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'LM Clubs' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'BC Juniors' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Beds Closed' })).toBeVisible();
     await expect(page.locator('[data-tab="accounts"]')).toContainText('mark whether they can play');
     await expect(page.locator('[data-tab="accounts"]')).toContainText('every team at their club');
     await expect(page.getByRole('columnheader', { name: 'Last login' })).toBeVisible();
