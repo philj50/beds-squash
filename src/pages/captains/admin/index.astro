@@ -1016,6 +1016,21 @@ const scoresHref = url('/captains/admin/minigame/');
   let slLinks: { id: number; lm_player_name: string | null; squashlevels_player_id: number | null }[] = [];
   let canPickSl = false;
 
+  const allSlPlayers = async () => {
+    const rows: SlPlayer[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase
+        .from('squashlevels_players')
+        .select('id, display_name, current_level, updated_at')
+        .order('id', { ascending: true })
+        .range(from, from + 999);
+      if (error) return { data: null as SlPlayer[] | null, error };
+      const page = (data ?? []) as SlPlayer[];
+      rows.push(...page);
+      if (page.length < 1000) return { data: rows, error: null };
+    }
+  };
+
   const slMatch = (lmName: string) => {
     const link = slLinks.find((item) => item.lm_player_name && nameKey(item.lm_player_name) === nameKey(lmName) && item.squashlevels_player_id != null);
     if (link) return slCatalog.find((player) => player.id === link.squashlevels_player_id) ?? null;
@@ -1058,7 +1073,7 @@ const scoresHref = url('/captains/admin/minigame/');
       supabase.from('teams').select('id, club_slug, name, division, captain_name, captain_email').order('name', { ascending: true }),
       supabase.from('captain_squads').select('id, name, team_id, squad_players(id, display_name, email, england_squash_id, phone)'),
       supabase.from('nominations').select('team_id, player_name, season').eq('season', SEASON),
-      supabase.from('squashlevels_players').select('id, display_name, current_level, updated_at').order('display_name', { ascending: true }),
+      allSlPlayers(),
       supabase.from('player_links').select('id, profile_id, squashlevels_player_id, lm_player_name'),
       supabase.from('profiles').select('id, email, is_admin, display_name'),
       supabase.from('memberships').select('profile_id, role, club_slug, team_id'),
@@ -1882,7 +1897,7 @@ const scoresHref = url('/captains/admin/minigame/');
   async function paintLinks() {
     const [{ data: linkRows, error }, { data: slRows }, { data: peopleRows }, { data: nomRows }] = await Promise.all([
       supabase.from('player_links').select('id, profile_id, squashlevels_player_id, lm_player_name').order('id'),
-      supabase.from('squashlevels_players').select('id, display_name, current_level').order('display_name'),
+      allSlPlayers(),
       supabase.from('profiles').select('id, display_name, email').order('display_name'),
       supabase.from('nominations').select('player_name').eq('season', SEASON),
     ]);
