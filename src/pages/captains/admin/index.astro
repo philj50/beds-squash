@@ -1671,7 +1671,8 @@ const scoresHref = url('/captains/admin/minigame/');
 
     const fetchedAdmin = await fetchProtectedAdmin(supabase);
     const onlyAdmin = accounts.filter((person) => person.is_admin);
-    protectedAdminId = fetchedAdmin || (onlyAdmin.length === 1 ? onlyAdmin[0].id : '');
+    const countyAdmin = accounts.find((person) => person.is_admin && (person.email || '').toLowerCase() === 'county-admin@players.invalid');
+    protectedAdminId = countyAdmin?.id || fetchedAdmin || (onlyAdmin.length === 1 ? onlyAdmin[0].id : '');
     const selfId = account.userId;
     const one = (value: { display_name?: string; email?: string | null; name?: string; division?: string | null } | { display_name?: string; email?: string | null; name?: string; division?: string | null }[] | null) =>
       Array.isArray(value) ? value[0] : value;
@@ -1732,9 +1733,12 @@ const scoresHref = url('/captains/admin/minigame/');
               : roles.map((membership) => whereFor(membership)).filter((place) => place !== '—').join('; ') || '—';
             const state = stateById.get(person.id);
             const active = state ? state.active : true;
-            const deleteButton = protectedAdminId && !isDefault
-              ? `<button class="btn btn--ghost btn--sm" type="button" data-delete-person="${person.id}" data-person-name="${escapeHtml(name)}">Delete</button>`
-              : '';
+            const deleteButton = isDefault
+              ? ''
+              : `<button class="btn btn--ghost btn--sm" type="button" data-delete-person="${person.id}" data-person-name="${escapeHtml(name)}">Delete</button>`;
+            const passwordButton = isDefault
+              ? ''
+              : `<button class="btn btn--ghost btn--sm" type="button" data-open-password="${person.id}" data-password-name="${escapeHtml(name)}" data-password-email="${escapeHtml(person.email || '')}">Set password</button> `;
             const activeButton = isDefault || person.id === selfId
               ? ''
               : `<button class="btn btn--ghost btn--sm" type="button" data-set-active="${person.id}" data-active-next="${active ? 'false' : 'true'}" data-person-name="${escapeHtml(name)}">${active ? 'Make inactive' : 'Make active'}</button>`;
@@ -1764,17 +1768,13 @@ const scoresHref = url('/captains/admin/minigame/');
               `</select>`;
             row.innerHTML =
               `<td>${escapeHtml(name)}${person.id === selfId ? ' <span class="muted">(you)</span>' : ''}${isDefault ? ' <span class="pill">Default admin</span>' : ''}</td>` +
-              `<td>${escapeHtml(person.email || '—')}</td>` +
+              `<td>${isDefault ? '—' : escapeHtml(person.email || '—')}</td>` +
               `<td>${escapeHtml(roleText.join(', ') || 'No role yet')}</td>` +
               `<td>${escapeHtml(placeText)}</td>` +
               `<td>${groupLines || '<span class="muted">None</span>'}${groupSelect}</td>` +
               `<td>${statusText}</td>` +
               `<td>${escapeHtml(state ? formatWhen(state.last_sign_in_at) : '—')}</td>` +
-              `<td class="col-action col-action--wrap">` +
-              `<button class="btn btn--ghost btn--sm" type="button" data-open-password="${person.id}" data-password-name="${escapeHtml(name)}" data-password-email="${escapeHtml(person.email || '')}">Set password</button> ` +
-              `${activeButton}` +
-              (deleteButton ? ` ${deleteButton}` : '') +
-              `</td>`;
+              `<td class="col-action col-action--wrap">${passwordButton}${activeButton}${deleteButton ? ` ${deleteButton}` : ''}</td>`;
             return row;
           })
         : [Object.assign(document.createElement('tr'), { innerHTML: '<td colspan="8">No accounts yet.</td>' })]),
@@ -1789,7 +1789,7 @@ const scoresHref = url('/captains/admin/minigame/');
             const remove = locked
               ? '<span class="muted">Kept</span>'
               : `<button class="btn btn--ghost btn--sm" type="button" data-set-admin="${person.id}" data-admin-next="false" data-person-name="${escapeHtml(name)}">Remove admin</button>`;
-            return `<tr><td>${escapeHtml(name)}${locked ? ' <span class="pill">Default admin</span>' : ''}</td><td>${escapeHtml(person.email || '—')}</td><td class="col-action">${remove}</td></tr>`;
+            return `<tr><td>${escapeHtml(name)}${locked ? ' <span class="pill">Default admin</span>' : ''}</td><td>${locked ? '—' : escapeHtml(person.email || '—')}</td><td class="col-action">${remove}</td></tr>`;
           })
           .join('')
       : '<tr><td colspan="3">No admins yet.</td></tr>';

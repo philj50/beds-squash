@@ -569,8 +569,13 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.getByRole('button', { name: 'Random' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Random email' })).toHaveCount(0);
     const adminRow = page.locator('[data-people] tr', { hasText: 'County Admin' });
+    await expect(adminRow).toContainText('Default admin');
     await expect(adminRow).toContainText('Active');
     await expect(adminRow).toContainText('4 Oct 2026');
+    await expect(adminRow).not.toContainText('admin@example.test');
+    await expect(adminRow.getByRole('button', { name: 'Set password' })).toHaveCount(0);
+    await expect(adminRow.getByRole('button', { name: 'Delete' })).toHaveCount(0);
+    await expect(adminRow.getByRole('button', { name: 'Make inactive' })).toHaveCount(0);
     await expect(adminRow).not.toContainText('All clubs');
     const gail = page.locator('[data-people] tr', { hasText: 'Gail' });
     await expect(gail).toContainText('Admin');
