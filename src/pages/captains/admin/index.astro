@@ -944,6 +944,13 @@ const scoresHref = url('/captains/admin/minigame/');
 
   const levelText = (n: number | null) => (n == null ? '—' : n.toLocaleString('en-GB'));
   const nameKey = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
+  const looseKey = (value: string) =>
+    value
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
 
   const slChart = (points: SlRating[]) => {
     if (points.length < 2) return '';
@@ -1008,6 +1015,22 @@ const scoresHref = url('/captains/admin/minigame/');
     }
   };
 
+  const allSlNames = async () => {
+    const rows: { name_key: string; player_id: number | null }[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase
+        .from('squashlevels_names')
+        .select('name_key, player_id')
+        .eq('status', 'matched')
+        .order('name_key', { ascending: true })
+        .range(from, from + 999);
+      if (error) return { data: null as { name_key: string; player_id: number | null }[] | null, error };
+      const page = (data ?? []) as { name_key: string; player_id: number | null }[];
+      rows.push(...page);
+      if (page.length < 1000) return { data: rows, error: null };
+    }
+  };
+
   const slMatch = (lmName: string) => {
     const link = slLinks.find((item) => item.lm_player_name && nameKey(item.lm_player_name) === nameKey(lmName) && item.squashlevels_player_id != null);
     if (link) return slCatalog.find((player) => player.id === link.squashlevels_player_id) ?? null;
@@ -1044,7 +1067,7 @@ const scoresHref = url('/captains/admin/minigame/');
   async function loadWebsite(account: Account) {
     ownName.value = account.displayName;
     ownEmail.textContent = account.email || '—';
-    const [{ data: mineRows }, { data: clubRows }, { data: teamRows }, { data: squadRows }, { data: nomRows }, { data: slRows }, linkResult, profileResult, roleMembershipResult] = await Promise.all([
+    const [{ data: mineRows }, { data: clubRows }, { data: teamRows }, { data: squadRows }, { data: nomRows }, { data: slRows }, linkResult, profileResult, roleMembershipResult, nameResult] = await Promise.all([
       supabase.from('memberships').select('role, club_slug, team_id').eq('profile_id', account.userId),
       supabase.from('clubs').select('slug, name, contact_name, contact_email').order('name', { ascending: true }),
       supabase.from('teams').select('id, club_slug, name, division, captain_name, captain_email').order('name', { ascending: true }),
@@ -1054,6 +1077,7 @@ const scoresHref = url('/captains/admin/minigame/');
       supabase.from('player_links').select('id, profile_id, squashlevels_player_id, lm_player_name'),
       supabase.from('profiles').select('id, email, is_admin, display_name'),
       supabase.from('memberships').select('profile_id, role, club_slug, team_id'),
+      allSlNames(),
     ]);
     const mine = (mineRows ?? []) as Mine[];
     const clubList = (clubRows ?? []) as { slug: string; name: string; contact_name: string | null; contact_email: string | null }[];
@@ -1085,13 +1109,15 @@ const scoresHref = url('/captains/admin/minigame/');
     }
     const levelFromLink = (link: PlayerLink | undefined) =>
       link?.squashlevels_player_id != null ? slPlayers.find((player) => player.id === link.squashlevels_player_id) : undefined;
+    const slByName = new Map<string, SlPlayer>();
+    const slByLoose = new Map<string, SlPlayer>();
     const levelFor = (row: SiteRow) => {
       const byLm = levelFromLink(playerLinks.find((link) => link.lm_player_name && nameKey(link.lm_player_name) === nameKey(row.name)));
       if (byLm) return byLm;
       const profileId = row.email ? emailToProfile.get(row.email.trim().toLowerCase()) : undefined;
       const byAccount = levelFromLink(playerLinks.find((link) => profileId && link.profile_id === profileId));
       if (byAccount) return byAccount;
-      return slByName.get(nameKey(row.name));
+      return slByName.get(nameKey(row.name)) ?? slByLoose.get(looseKey(row.name));
     };
     const clubBySlug = new Map(clubList.map((club) => [club.slug, club]));
     const teamById = new Map(teamList.map((team) => [team.id, team]));
@@ -1274,19 +1300,26 @@ const scoresHref = url('/captains/admin/minigame/');
       : '';
     playerListHost.innerHTML = `${playerRows.length ? siteTable(playerRows, playerEditable ? 'all' : 'none', true) : '<p class="muted small">No players on this list yet.</p>'}${addPlayer}`;
 
-    const slByName = new Map<string, SlPlayer>();
+    const playerById = new Map(slPlayers.map((player) => [player.id, player]));
     for (const player of slPlayers) {
       const key = nameKey(player.display_name);
       if (!slByName.has(key)) slByName.set(key, player);
     }
+    for (const stored of (nameResult.error ? [] : (nameResult.data ?? [])) as { name_key: string; player_id: number | null }[]) {
+      if (stored.player_id == null || slByLoose.has(stored.name_key)) continue;
+      const player = playerById.get(stored.player_id);
+      if (player) slByLoose.set(stored.name_key, player);
+    }
     const slScope = account.playerOnly ? clubRowsScoped.filter((row) => isSelf(account, row.name, row.email)) : clubRowsScoped;
     slNote.textContent = account.playerOnly
       ? 'Your SquashLevels record, and the full history.'
-      : account.isAdmin
-        ? 'SquashLevels for every player on this website, with their team.'
-        : hasClubRole
-          ? 'SquashLevels for the players at your club, with their team.'
-          : 'SquashLevels for the players on your team.';
+      : `${
+          account.isAdmin
+            ? 'SquashLevels for every player on this website, with their team.'
+            : hasClubRole
+              ? 'SquashLevels for the players at your club, with their team.'
+              : 'SquashLevels for the players on your team.'
+        } Linked marks a SquashLevels name that is not an exact match.`;
     const mineLink = playerLinks.find((link) => link.profile_id === account.userId);
     const selfSl =
       levelFromLink(mineLink) ??
@@ -1328,7 +1361,9 @@ const scoresHref = url('/captains/admin/minigame/');
             .map((row) => {
               const level = levelFor(row);
               const updated = level?.updated_at ? formatDay(level.updated_at.slice(0, 10)) : '—';
-              return `<tr><td>${escapeHtml(row.club)}</td><td>${escapeHtml(row.team)}</td><td>${escapeHtml(row.name)}</td><td>${levelText(level?.current_level ?? null)}</td><td>${escapeHtml(updated)}</td></tr>`;
+              const linked = level != null && nameKey(level.display_name) !== nameKey(row.name);
+              const playerCell = `${escapeHtml(row.name)}${linked ? ' <span class="pill">Linked</span>' : ''}`;
+              return `<tr><td>${escapeHtml(row.club)}</td><td>${escapeHtml(row.team)}</td><td>${playerCell}</td><td>${levelText(level?.current_level ?? null)}</td><td>${escapeHtml(updated)}</td></tr>`;
             })
             .join('')
         : '<tr><td colspan="5">No players on this list yet.</td></tr>';

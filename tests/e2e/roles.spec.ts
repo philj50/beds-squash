@@ -379,7 +379,10 @@ test.describe('Club captain, team captain, and player', () => {
         ]);
       }
       if (path.endsWith('/squashlevels_players')) {
-        return send([{ id: 90, display_name: 'Pat Player', current_level: 4321 }]);
+        return send([{ id: 90, display_name: 'Pat Player', current_level: 4321, updated_at: '2026-01-10' }]);
+      }
+      if (path.endsWith('/squashlevels_names')) {
+        return send([{ name_key: 'zoe player', player_id: 90, status: 'matched' }]);
       }
       if (path.endsWith('/captain_squads')) {
         return send([
@@ -589,6 +592,12 @@ test.describe('Club captain, team captain, and player', () => {
     await adminRow.getByRole('button', { name: 'Remove' }).click();
     await expect(page.getByText('County Admin removed from BC Juniors.')).toBeVisible();
     await expect(adminRow).not.toContainText('BC Juniors · organiser');
+
+    await page.getByRole('button', { name: 'SL', exact: true }).click();
+    const slZoe = page.locator('[data-site-sl] tr', { hasText: 'Zoe Player' });
+    await expect(slZoe).toContainText('Linked');
+    await expect(slZoe).toContainText('4,321');
+    await expect(page.locator('[data-site-sl] tr', { hasText: 'Pat Player' })).not.toContainText('Linked');
 
     await page.getByRole('button', { name: 'Links' }).click();
     await expect(page.getByRole('heading', { name: 'Links', exact: true })).toBeVisible();
