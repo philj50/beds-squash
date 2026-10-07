@@ -28,7 +28,7 @@ import { url } from '@/lib/site';
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { sendToLogin } from '@/lib/account';
+  import { organisesGroup, sendToLogin } from '@/lib/account';
   import { AGE_CATEGORIES } from '@/lib/junior-age';
 
   type Entry = {
@@ -88,8 +88,7 @@ import { url } from '@/lib/site';
       return;
     }
     whoEl.textContent = `Signed in as ${session.user.email ?? 'organiser'}`;
-    const { data: me } = await supabase.from('profiles').select('is_admin').eq('id', session.user.id).maybeSingle();
-    if (!me?.is_admin) {
+    if (!(await organisesGroup(supabase, session.user.id, 'bc_juniors'))) {
       denied.hidden = false;
       list.hidden = true;
       return;

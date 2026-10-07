@@ -154,7 +154,7 @@ const scoresHref = url('/captains/admin/minigame/');
 
           <section class="admin-panel" data-tab="lm-players" data-lm-only hidden>
             <h2>LM Player</h2>
-            <p class="muted small">Names come from the League Master nomination list. The email is the one saved on the Player tab. If that record has an email, it is the one shown here. Nothing on this list is typed, and nothing is sent back to League Master. A matching login is a player.</p>
+            <p class="muted small">Names, England Squash numbers, and emails are copied from League Master. A change there replaces the copy here on the next import. Nothing on this list is typed, and nothing is sent back to League Master. A matching login is a player.</p>
             <label class="directory-search">
               Search
               <input type="search" data-player-search placeholder="Club, team, player or email" autocomplete="off" />
@@ -180,6 +180,7 @@ const scoresHref = url('/captains/admin/minigame/');
             <h2>People</h2>
             <p class="muted small">
               Create the login with the email already on LM Club, LM Captain, or Player. The role is applied from that list.
+              Someone who is not on League Master can still have a login. Put them in BC Juniors or Beds Closed.
               Set the first password and tell them yourself. Nothing is emailed. They change it on their profile.
               An inactive account cannot sign in.
             </p>
@@ -213,7 +214,7 @@ const scoresHref = url('/captains/admin/minigame/');
             </form>
             <div class="activity-list">
               <h3>Activities</h3>
-              <p class="muted small">Each role includes everything above it. A person with two roles can do both.</p>
+              <p class="muted small">Each role includes everything above it. A person with two roles can do both. Groups are separate. League Master fills LM Players, LM Captains and LM Clubs, and the admin flag fills Admins. BC Juniors and Beds Closed are set on each person: a member sees their own games, an organiser sees the whole group.</p>
               <article class="card">
                 <div class="card__body">
                   <h3>Player</h3>
@@ -255,7 +256,8 @@ const scoresHref = url('/captains/admin/minigame/');
             </div>
             </div>
             <h3>Everyone</h3>
-            <p class="muted small">Sorted by role, then by name. Last login is the last time they signed in with a password. An admin is shown with the club they belong to. An admin with no club is listed as admin only.</p>
+            <p class="muted small">Sorted by role, then by name. Last login is the last time they signed in with a password. An admin is shown with the club they belong to. An admin with no club is listed as admin only. League Master groups cannot be edited here.</p>
+            <p class="muted small" data-groups-note hidden></p>
             <div class="overview-box">
               <table class="overview">
                 <thead>
@@ -264,6 +266,7 @@ const scoresHref = url('/captains/admin/minigame/');
                     <th>Email</th>
                     <th>Role</th>
                     <th>Club / team</th>
+                    <th>Groups</th>
                     <th>Status</th>
                     <th>Last login</th>
                     <th></th>
@@ -484,7 +487,7 @@ const scoresHref = url('/captains/admin/minigame/');
 <script>
   import { createClient } from '@supabase/supabase-js';
   import { bindPasswordRules, bindPasswordToggles, callManageAccounts, fetchAccountStates, fetchProtectedAdmin, fillSuggestedPassword, passwordIssue } from '@/lib/passwords';
-  import { loadAccount, saveDisplayName, sendToLogin, type Account } from '@/lib/account';
+  import { GROUP_NAME, loadAccount, saveDisplayName, sendToLogin, type Account } from '@/lib/account';
 
   type Person = { id: string; display_name: string; email: string | null; is_admin: boolean };
   type Club = { slug: string; name: string; contact_name: string | null; contact_email: string | null; leaguemaster_club_id?: string | null };
@@ -838,6 +841,20 @@ const scoresHref = url('/captains/admin/minigame/');
       await showSession();
       return;
     }
+    const removeGroup = target.closest<HTMLButtonElement>('[data-group-remove]');
+    if (removeGroup) {
+      const who = removeGroup.dataset.personName || 'this person';
+      const slug = removeGroup.dataset.groupSlug || '';
+      setStatus('Updating groups…');
+      const { error } = await supabase.from('group_members').delete().eq('profile_id', removeGroup.dataset.groupRemove!).eq('group_slug', slug);
+      if (error) {
+        setStatus(error.message);
+        return;
+      }
+      setStatus(`${who} removed from ${GROUP_NAME[slug] ?? slug}.`);
+      await showSession();
+      return;
+    }
     const setAdmin = target.closest<HTMLButtonElement>('[data-set-admin]');
     if (!setAdmin) return;
     if (setAdmin.dataset.setAdmin === protectedAdminId && setAdmin.dataset.adminNext === 'false') {
@@ -856,6 +873,25 @@ const scoresHref = url('/captains/admin/minigame/');
       return;
     }
     setStatus(makingAdmin ? 'Admin access granted.' : 'Admin access removed.');
+    await showSession();
+  });
+
+  peopleHost.addEventListener('change', async (event) => {
+    const select = (event.target as HTMLElement).closest<HTMLSelectElement>('[data-group-add]');
+    if (!select?.value) return;
+    const [slug, role] = select.value.split('|');
+    const who = select.dataset.personName || 'this person';
+    setStatus('Updating groups…');
+    const { error } = await supabase.from('group_members').upsert(
+      { profile_id: select.dataset.groupAdd, group_slug: slug, role },
+      { onConflict: 'profile_id,group_slug' },
+    );
+    select.value = '';
+    if (error) {
+      setStatus(error.message);
+      return;
+    }
+    setStatus(`${who} is in ${GROUP_NAME[slug] ?? slug}.`);
     await showSession();
   });
 
@@ -1179,7 +1215,7 @@ const scoresHref = url('/captains/admin/minigame/');
     const teamRowsScoped = clubRowsScoped.filter((row) => account.isAdmin || hasClubRole || (row.teamId != null && teamIds.has(row.teamId)));
     const clubEditable = hasClubRole && !account.playerOnly;
     const teamEditable = (hasClubRole || hasTeamRole) && !account.playerOnly;
-    const roleNote = ' Role is read-only: A admin, C club captain, T team captain, P player.';
+    const roleNote = ' Role is read-only: A admin, C club captain, T team captain, P player. Name, email, and ES number are copied from League Master and replaced on the next import.';
     clubNote.textContent = (account.isAdmin
       ? 'Every club. Email, ES number, and phone can be changed for players. A club captain or team captain keeps their name and email from League Master. Their ES number and phone can still be changed. Leave a box and it is saved.'
       : account.playerOnly
@@ -1553,6 +1589,7 @@ const scoresHref = url('/captains/admin/minigame/');
       { data: roleRows, error: roleError },
       { data: nomRows, error: nomError },
       { data: contactRows, error: contactError },
+      { data: groupRows, error: groupError },
     ] = await Promise.all([
       supabase.from('profiles').select('id, display_name, email, is_admin').order('display_name', { ascending: true }),
       fetchAccountStates(supabase),
@@ -1561,6 +1598,7 @@ const scoresHref = url('/captains/admin/minigame/');
       supabase.from('memberships').select('id, profile_id, role, club_slug, team_id, profiles(display_name, email), teams(name, division)').order('role', { ascending: true }),
       supabase.from('nominations').select('team_id, player_name, period, position, season').eq('season', SEASON),
       supabase.from('lm_player_contacts').select('id, team_id, player_name, email'),
+      supabase.from('group_members').select('profile_id, group_slug, role'),
     ]);
     if (peopleError || clubError || orgError || roleError) {
       setStatus(peopleError?.message || clubError?.message || orgError?.message || roleError?.message || 'Could not load the lists.');
@@ -1573,6 +1611,12 @@ const scoresHref = url('/captains/admin/minigame/');
     const accounts = (people ?? []) as Person[];
     const stateById = new Map((accountStates ?? []).map((state) => [state.id, state]));
     const memberships = (roleRows ?? []) as Membership[];
+    const groupMembers = (groupError ? [] : groupRows ?? []) as { profile_id: string; group_slug: string; role: string }[];
+    const groupsNote = root.querySelector<HTMLElement>('[data-groups-note]');
+    if (groupsNote) {
+      groupsNote.hidden = !groupError;
+      groupsNote.textContent = groupError ? 'Groups are not on the database yet. Apply the groups migration, then reload.' : '';
+    }
     const winterTeams = orgTeams.filter((team) => team.last_season === SEASON && team.leaguemaster_team_id);
     const clubNames = new Map(clubs.map((club) => [club.slug, club.name]));
     const leagueClubs = clubs.filter((club) => club.leaguemaster_club_id || winterTeams.some((team) => team.club_slug === club.slug));
@@ -1655,6 +1699,11 @@ const scoresHref = url('/captains/admin/minigame/');
       memberships
         .filter((membership) => membership.profile_id === personId)
         .sort((a, b) => roleRank[a.role] - roleRank[b.role] || whereFor(a).localeCompare(whereFor(b), 'en'));
+    const groupOrder = ['admins', 'lm_clubs', 'lm_captains', 'lm_players', 'bc_juniors', 'beds_closed'];
+    const groupsFor = (personId: string) =>
+      groupMembers
+        .filter((group) => group.profile_id === personId)
+        .sort((a, b) => groupOrder.indexOf(a.group_slug) - groupOrder.indexOf(b.group_slug));
     const personRank = (person: Person) => {
       if (person.is_admin || person.id === protectedAdminId) return 0;
       const roles = rolesFor(person.id);
@@ -1692,11 +1741,31 @@ const scoresHref = url('/captains/admin/minigame/');
               : active
                 ? 'Active'
                 : '<span class="pill">Inactive</span>';
+            const groupLines = groupsFor(person.id)
+              .map((group) => {
+                const label = GROUP_NAME[group.group_slug] ?? group.group_slug;
+                const text = group.role === 'organiser' && group.group_slug !== 'admins' ? `${label} · organiser` : label;
+                const managed = group.group_slug === 'admins' || group.group_slug.startsWith('lm_');
+                const remove = managed
+                  ? ''
+                  : ` <button class="btn btn--ghost btn--sm" type="button" data-group-remove="${person.id}" data-group-slug="${group.group_slug}" data-person-name="${escapeHtml(name)}">Remove</button>`;
+                return `<div>${escapeHtml(text)}${remove}</div>`;
+              })
+              .join('');
+            const groupSelect =
+              `<select data-group-add="${person.id}" data-person-name="${escapeHtml(name)}" aria-label="Add ${escapeHtml(name)} to a group">` +
+              `<option value="">Add to a group</option>` +
+              `<option value="bc_juniors|member">BC Juniors member</option>` +
+              `<option value="bc_juniors|organiser">BC Juniors organiser</option>` +
+              `<option value="beds_closed|member">Beds Closed member</option>` +
+              `<option value="beds_closed|organiser">Beds Closed organiser</option>` +
+              `</select>`;
             row.innerHTML =
               `<td>${escapeHtml(name)}${person.id === selfId ? ' <span class="muted">(you)</span>' : ''}${isDefault ? ' <span class="pill">Default admin</span>' : ''}</td>` +
               `<td>${escapeHtml(person.email || '—')}</td>` +
               `<td>${escapeHtml(roleText.join(', ') || 'No role yet')}</td>` +
               `<td>${escapeHtml(placeText)}</td>` +
+              `<td>${groupLines || '<span class="muted">None</span>'}${groupSelect}</td>` +
               `<td>${statusText}</td>` +
               `<td>${escapeHtml(state ? formatWhen(state.last_sign_in_at) : '—')}</td>` +
               `<td class="col-action col-action--wrap">` +
@@ -1706,7 +1775,7 @@ const scoresHref = url('/captains/admin/minigame/');
               `</td>`;
             return row;
           })
-        : [Object.assign(document.createElement('tr'), { innerHTML: '<td colspan="7">No accounts yet.</td>' })]),
+        : [Object.assign(document.createElement('tr'), { innerHTML: '<td colspan="8">No accounts yet.</td>' })]),
     );
 
     const adminRows = sortedAccounts.filter((person) => person.is_admin || person.id === protectedAdminId);

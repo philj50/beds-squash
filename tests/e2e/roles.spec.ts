@@ -269,6 +269,7 @@ test.describe('Club captain, team captain, and player', () => {
 
     const playerLinks: { id: number; profile_id: string | null; squashlevels_player_id: number | null; lm_player_name: string | null }[] = [];
     let nextLinkId = 1;
+    const groupMembers: { profile_id: string; group_slug: string; role: string }[] = [];
     const scores = [
       { id: 9, player_name: 'Philip Jenkins', score: 40, created_at: '2026-10-04T11:00:00.000Z' },
       ...Array.from({ length: 15 }, (_, index) => ({
@@ -492,6 +493,24 @@ test.describe('Club captain, team captain, and player', () => {
         }
         return send(playerLinks);
       }
+      if (path.endsWith('/group_members')) {
+        const method = route.request().method();
+        if (method === 'POST') {
+          const body = route.request().postDataJSON() as { profile_id: string; group_slug: string; role: string };
+          const index = groupMembers.findIndex((row) => row.profile_id === body.profile_id && row.group_slug === body.group_slug);
+          if (index >= 0) groupMembers[index] = body;
+          else groupMembers.push(body);
+          return send(body);
+        }
+        if (method === 'DELETE') {
+          const profile = url.searchParams.get('profile_id') ?? '';
+          const slug = url.searchParams.get('group_slug') ?? '';
+          const index = groupMembers.findIndex((row) => `eq.${row.profile_id}` === profile && `eq.${row.group_slug}` === slug);
+          if (index >= 0) groupMembers.splice(index, 1);
+          return send([]);
+        }
+        return send(groupMembers);
+      }
       return send([]);
     });
 
@@ -544,6 +563,7 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.locator('[data-tab="accounts"]')).toContainText('every team at their club');
     await expect(page.getByRole('columnheader', { name: 'Last login' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Status' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Groups' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Random' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Random email' })).toHaveCount(0);
     const adminRow = page.locator('[data-people] tr', { hasText: 'County Admin' });
@@ -557,6 +577,12 @@ test.describe('Club captain, team captain, and player', () => {
     const samPeople = page.locator('[data-people] tr', { hasText: 'Sam Morris' });
     await expect(samPeople).toContainText('Test Club');
     await expect(samPeople).not.toContainText('All clubs');
+    await adminRow.getByRole('combobox', { name: 'Add County Admin to a group' }).selectOption('bc_juniors|organiser');
+    await expect(page.getByText('County Admin is in BC Juniors.')).toBeVisible();
+    await expect(adminRow).toContainText('BC Juniors · organiser');
+    await adminRow.getByRole('button', { name: 'Remove' }).click();
+    await expect(page.getByText('County Admin removed from BC Juniors.')).toBeVisible();
+    await expect(adminRow).not.toContainText('BC Juniors · organiser');
 
     await page.getByRole('button', { name: 'Links' }).click();
     await expect(page.getByRole('heading', { name: 'Links', exact: true })).toBeVisible();

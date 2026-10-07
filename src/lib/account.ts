@@ -40,6 +40,23 @@ function one<T>(value: T | T[] | null): T | null {
   return value;
 }
 
+export type AccountGroup = {
+  slug: string;
+  name: string;
+  role: 'member' | 'organiser';
+};
+
+export const GROUP_NAME: Record<string, string> = {
+  admins: 'Admins',
+  lm_clubs: 'LM Clubs',
+  lm_captains: 'LM Captains',
+  lm_players: 'LM Players',
+  bc_juniors: 'BC Juniors',
+  beds_closed: 'Beds Closed',
+};
+
+const GROUP_ORDER = ['admins', 'lm_clubs', 'lm_captains', 'lm_players', 'bc_juniors', 'beds_closed'];
+
 export type Account = {
   userId: string;
   email: string;
@@ -50,17 +67,33 @@ export type Account = {
   /** A player account with no captain role. */
   playerOnly: boolean;
   places: AccountPlace[];
+  groups: AccountGroup[];
 };
+
+/** True when this login organises a website group, or is an admin. */
+export async function organisesGroup(supabase: SupabaseClient, userId: string, slug: string) {
+  const { data: me } = await supabase.from('profiles').select('is_admin').eq('id', userId).maybeSingle();
+  if (me?.is_admin) return true;
+  const { data, error } = await supabase
+    .from('group_members')
+    .select('role')
+    .eq('profile_id', userId)
+    .eq('group_slug', slug)
+    .eq('role', 'organiser')
+    .maybeSingle();
+  return !error && Boolean(data);
+}
 
 export async function loadAccount(supabase: SupabaseClient): Promise<Account | null> {
   const { data } = await supabase.auth.getSession();
   const session = data.session;
   if (!session) return null;
 
-  const [{ data: me }, membershipResult, { data: clubs }] = await Promise.all([
+  const [{ data: me }, membershipResult, { data: clubs }, groupResult] = await Promise.all([
     supabase.from('profiles').select('display_name, is_admin').eq('id', session.user.id).maybeSingle(),
     supabase.from('memberships').select('role, club_slug, teams(name)').eq('profile_id', session.user.id),
     supabase.from('clubs').select('slug, name'),
+    supabase.from('group_members').select('role, group_slug').eq('profile_id', session.user.id),
   ]);
 
   const clubNames = new Map((clubs ?? []).map((club: { slug: string; name: string }) => [club.slug, club.name]));
@@ -77,6 +110,9 @@ export async function loadAccount(supabase: SupabaseClient): Promise<Account | n
     places.push({ role: row.role, label: where ? `${title} · ${where}` : title });
   }
 
+  const groups = ((groupResult.error ? [] : groupResult.data) ?? []) as { role: 'member' | 'organiser'; group_slug: string }[];
+  groups.sort((a, b) => GROUP_ORDER.indexOf(a.group_slug) - GROUP_ORDER.indexOf(b.group_slug));
+
   return {
     userId: session.user.id,
     email: session.user.email ?? '',
@@ -85,6 +121,11 @@ export async function loadAccount(supabase: SupabaseClient): Promise<Account | n
     canManageSquad,
     playerOnly: !canManageSquad && rows.some((row) => row.role === 'team_player'),
     places,
+    groups: groups.map((group) => ({
+      slug: group.group_slug,
+      name: GROUP_NAME[group.group_slug] ?? group.group_slug,
+      role: group.role,
+    })),
   };
 }
 

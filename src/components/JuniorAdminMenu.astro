@@ -14,6 +14,7 @@ import { url } from '@/lib/site';
 
 <script>
   import { createClient } from '@supabase/supabase-js';
+  import { organisesGroup } from '@/lib/account';
 
   const roots = [...document.querySelectorAll<HTMLElement>('[data-junior-admin]')];
   const first = roots[0];
@@ -52,8 +53,7 @@ import { url } from '@/lib/site';
     const { data } = await supabase.auth.getSession();
     const session = data.session;
     if (session) {
-      const { data: me } = await supabase.from('profiles').select('is_admin').eq('id', session.user.id).maybeSingle();
-      if (me?.is_admin) {
+      if (await organisesGroup(supabase, session.user.id, 'bc_juniors')) {
         for (const root of roots) root.hidden = false;
       }
     }

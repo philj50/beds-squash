@@ -9,12 +9,13 @@ import { url } from '@/lib/site';
     <div class="container you" id="you-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
       <h1>Your squash</h1>
       <p class="lede">
-        This page is only for the person signed in. It shows your next team matches, the last time you played that opposition, your SquashLevels level, and what you have sent to the site.
+        This page is only for the person signed in. It shows your groups, your next team matches, the last time you played that opposition, your SquashLevels level, and what you have sent to the site.
       </p>
       <p class="status" data-status role="status"></p>
       <div data-panel="signed-in" hidden>
         <p class="who" data-who></p>
         <p class="places" data-places></p>
+        <p class="places" data-groups></p>
         <p class="actions">
           <a class="btn btn--ghost btn--sm" href={url('/captains/matches/')}>Matches</a>
           <a class="btn btn--ghost btn--sm" href={url('/share/')}>Send something in</a>
@@ -70,6 +71,7 @@ import { url } from '@/lib/site';
   const signedIn = root.querySelector<HTMLElement>('[data-panel="signed-in"]')!;
   const whoEl = root.querySelector<HTMLElement>('[data-who]')!;
   const placesEl = root.querySelector<HTMLElement>('[data-places]')!;
+  const groupsEl = root.querySelector<HTMLElement>('[data-groups]')!;
   const matchesEl = root.querySelector<HTMLElement>('[data-matches]')!;
   const levelEl = root.querySelector<HTMLElement>('[data-level]')!;
   const uploadsEl = root.querySelector<HTMLElement>('[data-uploads]')!;
@@ -138,7 +140,7 @@ import { url } from '@/lib/site';
     return { squads: scoped, teamIds: [...teamIds] };
   }
 
-  function drawMatches(squads: Squad[], teamIds: number[], fixtures: Fixture[]) {
+  function drawMatches(squads: Squad[], teamIds: number[], fixtures: Fixture[], account: Account) {
     const ids = new Set(teamIds);
     const squadByTeam = new Map(squads.map((squad) => [squad.team_id, squad]));
     const sideOf = (fixture: Fixture) => {
@@ -149,7 +151,10 @@ import { url } from '@/lib/site';
       return null;
     };
     if (!teamIds.length) {
-      matchesEl.innerHTML = '<p class="muted">No team is linked to this account yet. An admin sets that from People.</p>';
+      const competition = account.groups.filter((group) => group.slug === 'bc_juniors' || group.slug === 'beds_closed');
+      matchesEl.innerHTML = competition.length
+        ? `<p class="muted">You are in ${competition.map((group) => group.name).join(' and ')}. League matches are not linked to this account. Your competition appears here when its draws are on the site.</p>`
+        : '<p class="muted">No team is linked to this account yet. An admin sets that from People.</p>';
       return;
     }
     const upcoming = fixtures
@@ -263,6 +268,9 @@ import { url } from '@/lib/site';
     }
     whoEl.textContent = `Signed in as ${account.displayName || account.email}`;
     placesEl.textContent = account.places.length ? account.places.map((place) => place.label).join('. ') : 'No club or team on this account yet.';
+    groupsEl.textContent = account.groups.length
+      ? `Groups: ${account.groups.map((group) => (group.role === 'organiser' && group.slug !== 'admins' ? `${group.name} organiser` : group.name)).join(', ')}`
+      : '';
     statusEl.textContent = '';
     const [{ squads, teamIds }, level, uploads] = await Promise.all([squadsFor(account), loadLevel(account), loadUploads(account)]);
     let fixtures: Fixture[] = [];
@@ -282,7 +290,7 @@ import { url } from '@/lib/site';
         fixtures = ((data ?? []) as unknown as Fixture[]).map(normalise).filter((fixture) => fixture.home && fixture.away);
       }
     }
-    drawMatches(squads, teamIds, fixtures);
+    drawMatches(squads, teamIds, fixtures, account);
     drawLevel(level);
     if (uploads.error) statusEl.textContent = uploads.error;
     drawUploads(uploads.rows);

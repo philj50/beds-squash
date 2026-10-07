@@ -2,21 +2,27 @@
  * Copy the current Bedfordshire League Master season into our database.
  *
  * Reads: seasons, divisions, teams, fixtures, results, individual rubbers,
- * and the period 1 / period 2 nomination lists. Nothing is sent to anyone.
+ * and the period 1 / period 2 nomination lists. The club player list supplies
+ * each player's name, England Squash number, and email, and those replace the
+ * copies on this website. Nothing is sent to anyone.
  *
  * Usage:
  *   node scripts/sync-leaguemaster.mjs                  # import into Supabase
+ *   node scripts/sync-leaguemaster.mjs --players        # copy player name, ES number, and email only
  *   node scripts/sync-leaguemaster.mjs --out file.json  # write the payload only
  *   node scripts/sync-leaguemaster.mjs --season "Winter 2025/26"
  *
  * Needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY unless --out is used.
  */
+import { readFileSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 
 const BASE = 'https://bedfordshiresquash.leaguemaster.co.uk';
 const args = process.argv.slice(2);
 const outFile = args.includes('--out') ? args[args.indexOf('--out') + 1] : null;
 const wantSeason = args.includes('--season') ? args[args.indexOf('--season') + 1] : null;
+const playersOnly = args.includes('--players');
+const selfTest = args.includes('--self-test');
 
 let cookie = '';
 
@@ -284,11 +290,83 @@ async function importPayload(payload) {
   return text;
 }
 
+function loadEnvFile() {
+  try {
+    const text = readFileSync(new URL('../.env', import.meta.url), 'utf8');
+    for (const line of text.split(/\r?\n/)) {
+      const match = line.match(/^([A-Za-z0-9_]+)=(.*)$/);
+      if (match && !process.env[match[1]]) process.env[match[1]] = match[2].trim();
+    }
+  } catch {
+    // The daily run has no .env file. GitHub Actions supplies the variables.
+  }
+}
+
+function sameName(left, right) {
+  return left.trim().toLowerCase().replace(/\s+/g, ' ') === right.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function closeName(left, right) {
+  if (sameName(left, right)) return true;
+  const parts = (name) => {
+    const words = name.trim().toLowerCase().replace(/\s+/g, ' ').split(' ').filter(Boolean);
+    return { first: words[0] || '', last: words[words.length - 1] || '' };
+  };
+  const a = parts(left);
+  const b = parts(right);
+  if (!a.last || a.last !== b.last) return false;
+  const short = a.first.length <= b.first.length ? a.first : b.first;
+  const long = a.first.length <= b.first.length ? b.first : a.first;
+  return short.length >= 3 && long.startsWith(short);
+}
+
+/** Rows from the logged-in club player list: name, England Squash number, email. */
+function parseAdminPlayers(html) {
+  const players = [];
+  for (const match of html.matchAll(/<tr[^>]*class="[^"]*Row"[\s\S]*?<\/tr>/gi)) {
+    const row = match[0];
+    const id = (row.match(/playerid=(\d+)/i) || [])[1];
+    if (!id) continue;
+    const tds = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map((cell) => decode(cell[1]));
+    const name = [tds[0], tds[1]].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    if (!name) continue;
+    const es = (tds[2] || '').trim();
+    const email = (tds[5] || '').trim().toLowerCase();
+    players.push({
+      id,
+      name,
+      es: es && es !== '-' ? es : null,
+      email: email.includes('@') ? email : null,
+    });
+  }
+  return players;
+}
+
+function assertPlayerParse() {
+  const html = `<tr class="firstRow"><input value="24"><td><a href="editplayer?playerid=24">Samuel</a></td><td><a href="editplayer?playerid=24">Morris</a></td><td>1234567</td><td></td><td><img title="Valid"></td><td>sam@example.test</td><td>07000</td></tr>`;
+  const parsed = parseAdminPlayers(html);
+  const row = parsed[0];
+  if (!row || row.id !== '24' || row.name !== 'Samuel Morris' || row.es !== '1234567' || row.email !== 'sam@example.test') {
+    throw new Error('player row did not parse');
+  }
+}
+
 async function main() {
+  if (selfTest) {
+    assertPlayerParse();
+    console.error('player parse ok');
+    return;
+  }
+  loadEnvFile();
   const seasons = parseSeasons(await request('/cgi-county/icounty.exe'));
   if (!seasons.length) throw new Error('No seasons found on League Master.');
   const season = wantSeason ? seasons.find((s) => s.name === wantSeason) : seasons[0];
   if (!season) throw new Error(`Season not found: ${wantSeason}. Seen: ${seasons.map((s) => s.name).join(', ')}`);
+
+  if (playersOnly) {
+    await refreshPlayerDetails(season.id);
+    return;
+  }
 
   const payload = await buildPayload(season);
   if (outFile) {
@@ -298,6 +376,7 @@ async function main() {
   }
   console.log(await importPayload(payload));
   await refreshContacts();
+  await refreshPlayerDetails(season.id);
 }
 
 function labelled(html) {
@@ -389,6 +468,83 @@ async function refreshContacts() {
     await pause(40);
   }
   console.error(`League Master contacts: ${clubCount} clubs, ${captainCount} captains updated`);
+}
+
+/** Replace squad name, England Squash number, and email from the League Master player list. */
+async function refreshPlayerDetails(seasonId) {
+  const username = process.env.LEAGUEMASTER_USERNAME;
+  const password = process.env.LEAGUEMASTER_PASSWORD;
+  if (!username || !password) {
+    console.error('League Master player details skipped. Set LEAGUEMASTER_USERNAME and LEAGUEMASTER_PASSWORD.');
+    return;
+  }
+  const logged = await request('/cgi-county/icounty.exe/login?', {
+    method: 'POST',
+    body: new URLSearchParams({ id: username, password, button: 'Login' }).toString(),
+  });
+  if (!/log out/i.test(logged)) throw new Error('League Master login failed.');
+  await request('/cgi-county/icounty.exe/changecompetition?', { method: 'POST', body: `compselect=${seasonId}` });
+  await request('/cgi-county/icadmin.exe/showleaguenoms?', {
+    method: 'POST',
+    body: new URLSearchParams({ source: 'home', compselect: String(seasonId) }).toString(),
+  });
+
+  const clubs = await rest('clubs?select=slug,leaguemaster_club_id&leaguemaster_club_id=not.is.null');
+  const teams = await rest('teams?select=id,club_slug&limit=5000');
+  const squads = await rest('captain_squads?select=id,team_id&limit=5000');
+  let squadPlayers;
+  let hasLmId = true;
+  try {
+    squadPlayers = await rest('squad_players?select=id,squad_id,display_name,email,england_squash_id,leaguemaster_player_id&limit=5000');
+  } catch (error) {
+    if (!String(error.message).includes('leaguemaster_player_id')) throw error;
+    hasLmId = false;
+    squadPlayers = await rest('squad_players?select=id,squad_id,display_name,email,england_squash_id&limit=5000');
+  }
+  const squadById = new Map((squads ?? []).map((squad) => [squad.id, squad]));
+  const teamById = new Map((teams ?? []).map((team) => [team.id, team]));
+  const clubOf = (player) => {
+    const squad = squadById.get(player.squad_id);
+    return teamById.get(squad?.team_id)?.club_slug ?? '';
+  };
+
+  let seen = 0;
+  let updated = 0;
+  for (const club of clubs ?? []) {
+    const html = await request(`/cgi-county/icadmin.exe/showadminplayers?clubid=${club.leaguemaster_club_id}&source=leaguenoms`);
+    for (const lm of parseAdminPlayers(html)) {
+      seen += 1;
+      let targets = (squadPlayers ?? []).filter((player) => hasLmId && player.leaguemaster_player_id === lm.id);
+      if (!targets.length) {
+        targets = (squadPlayers ?? []).filter((player) => sameName(player.display_name || '', lm.name) && clubOf(player) === club.slug);
+      }
+      if (!targets.length) {
+        const close = (squadPlayers ?? []).filter((player) => clubOf(player) === club.slug && closeName(player.display_name || '', lm.name));
+        const names = new Set(close.map((player) => (player.display_name || '').trim().toLowerCase().replace(/\s+/g, ' ')));
+        if (names.size === 1) targets = close;
+      }
+      for (const player of targets) {
+        const nextEmail = lm.email;
+        const nextEs = lm.es;
+        const same =
+          sameName(player.display_name || '', lm.name) &&
+          (player.email || null) === nextEmail &&
+          (player.england_squash_id || null) === nextEs &&
+          (!hasLmId || player.leaguemaster_player_id === lm.id);
+        if (same) continue;
+        const body = { display_name: lm.name, email: nextEmail, england_squash_id: nextEs };
+        if (hasLmId) body.leaguemaster_player_id = lm.id;
+        await rest(`squad_players?id=eq.${player.id}`, { method: 'PATCH', body: JSON.stringify(body) });
+        player.display_name = lm.name;
+        player.email = nextEmail;
+        player.england_squash_id = nextEs;
+        if (hasLmId) player.leaguemaster_player_id = lm.id;
+        updated += 1;
+      }
+    }
+    await pause(40);
+  }
+  console.error(`League Master players: ${seen} read, ${updated} squad rows updated`);
 }
 
 main().catch((err) => {

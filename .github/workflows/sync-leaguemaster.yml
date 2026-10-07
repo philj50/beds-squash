@@ -29,6 +29,8 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          LEAGUEMASTER_USERNAME: ${{ secrets.LEAGUEMASTER_USERNAME }}
+          LEAGUEMASTER_PASSWORD: ${{ secrets.LEAGUEMASTER_PASSWORD }}
         run: |
           set -o pipefail
           if [ -n "${{ inputs.season }}" ]; then
