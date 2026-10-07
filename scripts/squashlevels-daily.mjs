@@ -6,6 +6,7 @@
  *   node scripts/squashlevels-daily.mjs            # yesterday in London
  *   node scripts/squashlevels-daily.mjs --latest   # most recent day with a result
  *   node scripts/squashlevels-daily.mjs --date 2026-08-11
+ *   node scripts/squashlevels-daily.mjs --backfill # Beds lists, then clubs, then leftover league names
  *
  * Writes need SUPABASE_SERVICE_ROLE_KEY. Without it, SQL is written to the
  * temp directory and a news file is still written when publishing is automatic.
@@ -30,6 +31,7 @@ loadEnv();
 
 const args = process.argv.slice(2);
 const wantLatest = args.includes('--latest');
+const wantBackfill = args.includes('--backfill');
 const wantDate = args.includes('--date') ? args[args.indexOf('--date') + 1] : null;
 const canWrite = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -158,7 +160,7 @@ async function signIn() {
   if (page !== 'dashboard') throw new Error(`SquashLevels sign-in failed (${page ?? 'no page'}).`);
 }
 
-async function rest(path, { method = 'GET', body, write = false } = {}) {
+async function rest(path, { method = 'GET', body, write = false, range, prefer } = {}) {
   const key = write ? process.env.SUPABASE_SERVICE_ROLE_KEY : process.env.SUPABASE_SERVICE_ROLE_KEY || PUBLISHABLE_KEY;
   const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     method,
@@ -166,7 +168,8 @@ async function rest(path, { method = 'GET', body, write = false } = {}) {
       apikey: key,
       authorization: `Bearer ${key}`,
       'content-type': 'application/json',
-      ...(method === 'GET' ? {} : { prefer: 'resolution=merge-duplicates,return=minimal' }),
+      ...(range ? { range } : {}),
+      ...(method === 'GET' ? {} : { prefer: prefer ?? 'resolution=merge-duplicates,return=minimal' }),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
@@ -227,7 +230,7 @@ function clubTokens(team) {
 }
 
 async function searchPlayer(name, team) {
-  const html = await sl(`players?search=${encodeURIComponent(name)}`);
+  const html = await sl(`players?all&search=${encodeURIComponent(name)}&nocss=true&nojs=true`);
   const hits = [];
   for (const match of html.matchAll(/player_detail\?player=(\d+)[^>]*>([^<]+)/g)) {
     const displayName = plain(match[2]);
@@ -247,6 +250,303 @@ async function searchPlayer(name, team) {
   if (chosen.length === 1) return { status: 'matched', playerId: chosen[0].id, displayName: chosen[0].name };
   if (unique.length > 1) return { status: 'ambiguous', playerId: null, displayName: null };
   return { status: 'missing', playerId: null, displayName: null };
+}
+
+function pause() {
+  return new Promise((resolve) => setTimeout(resolve, 300));
+}
+
+function listedPlayers(html, bedsOnly) {
+  const found = new Map();
+  for (const match of html.matchAll(/player_detail\?player=(\d+)[^>]*>([^<]+)/g)) {
+    const id = Number(match[1]);
+    const displayName = plain(match[2]);
+    if (!displayName || found.has(id)) continue;
+    if (bedsOnly) {
+      const around = nameKey(plain(html.slice(match.index, match.index + 450)));
+      if (!around.includes('beds') && !around.includes('bedford')) continue;
+    }
+    found.set(id, displayName);
+  }
+  return found;
+}
+
+async function eachListPage(path, bedsOnly) {
+  const found = new Map();
+  for (let start = 0; start < 800; start += 26) {
+    const html = await sl(`${path}${path.includes('?') ? '&' : '?'}start=${start}`);
+    const page = listedPlayers(html, bedsOnly);
+    let added = 0;
+    for (const [id, displayName] of page) {
+      if (found.has(id)) continue;
+      found.set(id, displayName);
+      added += 1;
+    }
+    if (!added) break;
+    await pause();
+  }
+  return found;
+}
+
+async function bedsClubs() {
+  const html = await sl('players?all&county=52');
+  const select = html.match(/<select[^>]*id=['"]club_select['"][^>]*>([\s\S]*?)<\/select>/i)?.[1] ?? '';
+  const clubs = [];
+  for (const option of select.matchAll(/<option[^>]*value=['"](\d+)['"][^>]*>([^<]+)/gi)) {
+    const name = plain(option[2]);
+    if (!name || /^all\b/i.test(name) || /^none$/i.test(name)) continue;
+    clubs.push({ id: option[1], name });
+  }
+  return clubs;
+}
+
+async function restAll(path) {
+  const rows = [];
+  for (let from = 0; ; from += 1000) {
+    const page = await rest(path, { range: `${from}-${from + 999}` });
+    if (!Array.isArray(page) || !page.length) break;
+    rows.push(...page);
+    if (page.length < 1000) break;
+  }
+  return rows;
+}
+
+async function leaguePeople() {
+  const fixtures = await restAll(
+    'fixtures?select=id,starts_at,home:league_teams!fixtures_home_team_id_fkey(name),away:league_teams!fixtures_away_team_id_fkey(name)',
+  );
+  const fixtureById = new Map(fixtures.map((fixture) => [fixture.id, fixture]));
+  const people = new Map();
+  const consider = (name, team, when) => {
+    const key = nameKey(name ?? '');
+    if (!key.includes(' ') || key.includes('walkover')) return;
+    const current = people.get(key);
+    if (!current || when > current.when) people.set(key, { name, team: team || current?.team || '', when });
+  };
+  const rubbers = await restAll('rubbers?select=fixture_id,home_player,away_player,winner');
+  for (const rubber of rubbers) {
+    if (rubber.winner !== 'home' && rubber.winner !== 'away') continue;
+    const fixture = fixtureById.get(rubber.fixture_id);
+    const when = fixture?.starts_at ?? '';
+    consider(rubber.home_player, oneName(fixture?.home), when);
+    consider(rubber.away_player, oneName(fixture?.away), when);
+  }
+  const nominations = await restAll('nominations?select=player_name,team_id');
+  const teams = nominations.length ? await restAll('teams?select=id,name') : [];
+  const teamName = new Map(teams.map((team) => [team.id, team.name]));
+  for (const nomination of nominations) consider(nomination.player_name, teamName.get(nomination.team_id) ?? '', '');
+  return people;
+}
+
+function oneName(value) {
+  if (Array.isArray(value)) return value[0]?.name ?? '';
+  return value?.name ?? '';
+}
+
+function ratingsFor(players, matches) {
+  const ratings = [];
+  const today = londonDate(new Date());
+  for (const match of matches.values()) {
+    for (const side of [
+      [match.playerId, match.playerLevelBefore, match.playerLevelAfter],
+      [match.opponentId, match.opponentLevelBefore, match.opponentLevelAfter],
+    ]) {
+      const [playerId, before, after] = side;
+      if (!players.has(playerId)) continue;
+      if (before !== null) ratings.push({ playerId, recordedOn: match.playedOn, level: before, matchId: match.id, kind: 'before' });
+      if (after !== null) ratings.push({ playerId, recordedOn: match.playedOn, level: after, matchId: match.id, kind: 'after' });
+    }
+  }
+  for (const player of players.values()) {
+    if (player.currentLevel === null) continue;
+    const kindRank = { before: 0, after: 1, snapshot: 2 };
+    const latest = ratings
+      .filter((rating) => rating.playerId === player.id)
+      .sort((left, right) => right.recordedOn.localeCompare(left.recordedOn) || kindRank[right.kind] - kindRank[left.kind])[0];
+    if (latest && latest.level === player.currentLevel) continue;
+    ratings.push({ playerId: player.id, recordedOn: today, level: player.currentLevel, matchId: '', kind: 'snapshot' });
+  }
+  return ratings;
+}
+
+async function backfill() {
+  if (!canWrite) throw new Error('Backfill needs SUPABASE_SERVICE_ROLE_KEY.');
+  await signIn();
+  const ids = new Map();
+  const take = (found, label) => {
+    let added = 0;
+    for (const [id, displayName] of found) {
+      if (ids.has(id)) continue;
+      ids.set(id, displayName);
+      added += 1;
+    }
+    console.error(`${label}: ${found.size} listed, ${added} new`);
+  };
+
+  for (const term of ['Bedfordshire', 'Beds']) {
+    take(await eachListPage(`players?all&search=${encodeURIComponent(term)}&nocss=true&nojs=true`, true), `search ${term}`);
+  }
+  take(await eachListPage('players?all&county=52', false), 'county Beds');
+  const clubs = await bedsClubs();
+  console.error(`clubs: ${clubs.map((club) => club.name).join(', ') || 'none'}`);
+  for (const club of clubs) {
+    take(await eachListPage(`players?all&club=${club.id}`, false), club.name);
+  }
+
+  const knownNames = new Map();
+  for (const row of await restAll('squashlevels_names?select=name_key,player_id,status')) {
+    knownNames.set(row.name_key, { status: row.status, playerId: row.player_id });
+  }
+  const knownIds = new Set(
+    (await restAll('squashlevels_players?select=id,current_level'))
+      .filter((player) => player.current_level != null)
+      .map((player) => player.id),
+  );
+  const covered = new Set([...ids.values()].map((displayName) => nameKey(displayName)));
+  const people = await leaguePeople();
+  const wanted = [...people.values()].filter((person) => {
+    const key = nameKey(person.name);
+    return !covered.has(key) && !knownNames.has(key);
+  });
+  console.error(`league names still to search: ${wanted.length}`);
+  let searches = 0;
+  for (const person of wanted) {
+    const key = nameKey(person.name);
+    let found = await searchPlayer(person.name, person.team);
+    searches += 1;
+    if (found.status === 'missing') {
+      const alias = person.name.replace(/^Daniel\b/i, 'Dan');
+      if (alias !== person.name) {
+        found = await searchPlayer(alias, person.team);
+        searches += 1;
+        await pause();
+      }
+    }
+    knownNames.set(key, found);
+    if (found.playerId && !ids.has(found.playerId)) ids.set(found.playerId, found.displayName || person.name);
+    console.error(`${found.status} ${person.name}${found.playerId ? ` ${found.playerId}` : ''}`);
+    await pause();
+  }
+
+  const players = new Map();
+  const matches = new Map();
+  const namePayload = (chunk) => {
+    const rows = [];
+    const seen = new Set();
+    const add = (key, playerId, status) => {
+      if (!key || seen.has(key)) return;
+      if (playerId != null && !chunk.has(playerId) && !knownIds.has(playerId)) return;
+      seen.add(key);
+      rows.push({ nameKey: key, playerId, status });
+    };
+    for (const [key, value] of knownNames) add(key, value.playerId ?? null, value.status);
+    for (const player of chunk.values()) {
+      if (player.currentLevel == null) continue;
+      add(nameKey(player.displayName), player.id, 'matched');
+    }
+    return rows;
+  };
+  const saveChunk = async () => {
+    await save({
+      players: [...players.values()],
+      matches: [...matches.values()],
+      ratings: ratingsFor(players, matches),
+      names: namePayload(players),
+      article: null,
+      summary: { backfill: true, listed: ids.size, fetched, searches },
+    });
+    for (const player of players.values()) {
+      if (player.currentLevel != null) knownIds.add(player.id);
+    }
+    players.clear();
+    matches.clear();
+  };
+  let fetched = 0;
+  for (const [id, displayName] of ids) {
+    if (knownIds.has(id)) continue;
+    let page;
+    try {
+      page = parsePlayerPage(await sl(`player_detail?player=${id}&show=last12m`), id);
+    } catch (error) {
+      console.error(`skipped ${displayName} ${id}: ${error.message}`);
+      await pause();
+      continue;
+    }
+    if (!page.displayName || !page.currentLevel) {
+      console.error(`no level for ${displayName} ${id}`);
+      await pause();
+      continue;
+    }
+    players.set(id, {
+      id,
+      displayName: page.displayName,
+      currentLevel: page.currentLevel,
+      confidence: page.confidence,
+    });
+    for (const match of page.matches) {
+      matches.set(match.id, match);
+      if (match.opponentId && match.opponentName && !players.has(match.opponentId) && !knownIds.has(match.opponentId)) {
+        players.set(match.opponentId, {
+          id: match.opponentId,
+          displayName: match.opponentName,
+          currentLevel: null,
+          confidence: null,
+        });
+      }
+    }
+    knownNames.set(nameKey(page.displayName), { status: 'matched', playerId: id });
+    fetched += 1;
+    console.error(`${page.displayName} ${page.currentLevel} (${page.matches.length} matches)`);
+    if (fetched % 20 === 0) {
+      await saveChunk();
+      console.error(`saved ${fetched}`);
+    }
+    await pause();
+  }
+  await saveChunk();
+  const leagueKeys = new Set([...people.keys()]);
+  const hidden = (await restAll('squashlevels_players?select=id,display_name&current_level=is.null')).filter(
+    (player) => leagueKeys.has(nameKey(player.display_name)) && !knownIds.has(player.id),
+  );
+  console.error(`league names found on other players' matches: ${hidden.length}`);
+  for (const player of hidden) {
+    let page;
+    try {
+      page = parsePlayerPage(await sl(`player_detail?player=${player.id}&show=last12m`), player.id);
+    } catch (error) {
+      console.error(`skipped ${player.display_name} ${player.id}: ${error.message}`);
+      await pause();
+      continue;
+    }
+    if (!page.displayName || !page.currentLevel) {
+      console.error(`no level for ${player.display_name} ${player.id}`);
+      await pause();
+      continue;
+    }
+    players.set(player.id, {
+      id: player.id,
+      displayName: page.displayName,
+      currentLevel: page.currentLevel,
+      confidence: page.confidence,
+    });
+    knownNames.set(nameKey(page.displayName), { status: 'matched', playerId: player.id });
+    for (const match of page.matches) {
+      matches.set(match.id, match);
+      if (match.opponentId && match.opponentName && !players.has(match.opponentId) && !knownIds.has(match.opponentId)) {
+        players.set(match.opponentId, {
+          id: match.opponentId,
+          displayName: match.opponentName,
+          currentLevel: null,
+          confidence: null,
+        });
+      }
+    }
+    fetched += 1;
+    console.error(`${page.displayName} ${page.currentLevel} (${page.matches.length} matches)`);
+    await pause();
+  }
+  await saveChunk();
+  console.error(JSON.stringify({ backfill: true, listed: ids.size, fetched, searches, fromMatches: hidden.length }));
 }
 
 function parsePlayerPage(html, playerId) {
@@ -548,17 +848,29 @@ async function save(payload) {
       await rest(`${table}?on_conflict=${conflict}`, { method: 'POST', write: true, body: rows.slice(index, index + 200) });
     }
   };
+  const playerRows = (player) => ({
+    id: player.id,
+    display_name: player.displayName,
+    current_level: player.currentLevel,
+    confidence: player.confidence,
+    updated_at: new Date().toISOString(),
+  });
   await batches(
     'squashlevels_players',
-    payload.players.map((player) => ({
-      id: player.id,
-      display_name: player.displayName,
-      current_level: player.currentLevel,
-      confidence: player.confidence,
-      updated_at: new Date().toISOString(),
-    })),
+    payload.players.filter((player) => player.currentLevel != null).map(playerRows),
     'id',
   );
+  for (let index = 0; index < payload.players.length; index += 200) {
+    const stubs = payload.players.slice(index, index + 200).filter((player) => player.currentLevel == null).map(playerRows);
+    if (stubs.length) {
+      await rest('squashlevels_players?on_conflict=id', {
+        method: 'POST',
+        write: true,
+        prefer: 'resolution=ignore-duplicates,return=minimal',
+        body: stubs,
+      });
+    }
+  }
   await batches('squashlevels_matches', payload.matches.map((match) => ({
     id: match.id,
     played_on: match.playedOn,
@@ -631,6 +943,10 @@ async function publishApproved() {
 }
 
 async function main() {
+  if (wantBackfill) {
+    await backfill();
+    return;
+  }
   const days = await leagueDays();
   if (!days.length) {
     console.error('No scored rubbers to read.');
