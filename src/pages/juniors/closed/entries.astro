@@ -29,7 +29,7 @@ import { url } from '@/lib/site';
 <script>
   import { createClient } from '@supabase/supabase-js';
   import { organisesGroup, sendToLogin } from '@/lib/account';
-  import { AGE_CATEGORIES } from '@/lib/junior-age';
+  import { ENTRY_GROUPS } from '@/lib/junior-age';
 
   type Entry = {
     id: number;
@@ -104,13 +104,13 @@ import { url } from '@/lib/site';
     }
     const entries = (rows ?? []) as Entry[];
     list.hidden = false;
-    list.replaceChildren(
-      ...AGE_CATEGORIES.flatMap((category) =>
-        (['Boys', 'Girls'] as const).map((draw) => {
-          const group = entries.filter((entry) => entry.age_category === category && entry.draw === draw);
-          const section = document.createElement('section');
-          section.innerHTML = `
-            <h2>${escapeHtml(category)} · ${draw} <span class="muted">(${group.length})</span></h2>
+    const placed = new Set<number>();
+    const sections = ENTRY_GROUPS.map((category) => {
+      const group = entries.filter((entry) => entry.age_category === category.age && entry.draw === category.draw);
+      for (const entry of group) placed.add(entry.id);
+      const section = document.createElement('section');
+      section.innerHTML = `
+            <h2>${escapeHtml(category.label)} <span class="muted">(${group.length})</span></h2>
             ${
               group.length
                 ? `<div class="table-wrap"><table>
@@ -132,10 +132,34 @@ import { url } from '@/lib/site';
                   </table></div>`
                 : '<p class="muted">No entries.</p>'
             }`;
-          return section;
-        }),
-      ),
-    );
+      return section;
+    });
+    const leftover = entries.filter((entry) => !placed.has(entry.id));
+    if (leftover.length) {
+      const section = document.createElement('section');
+      section.innerHTML = `
+        <h2>Other <span class="muted">(${leftover.length})</span></h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Player</th><th>Born</th><th>Category</th><th>Club</th><th>Parent</th><th>Emergency</th><th>Notes</th><th></th></tr></thead>
+          <tbody>${leftover
+            .map((entry) => {
+              const player = `${entry.player_first_name} ${entry.player_last_name}`;
+              return `<tr>
+                <td>${escapeHtml(player)}</td>
+                <td>${escapeHtml(when.format(new Date(`${entry.date_of_birth}T12:00:00`)))}</td>
+                <td>${escapeHtml(entry.draw)} ${escapeHtml(entry.age_category)}</td>
+                <td>${escapeHtml(entry.club)}</td>
+                <td>${escapeHtml(entry.guardian_name)}<br><span class="muted">${escapeHtml(entry.guardian_email)}</span><br><span class="muted">${escapeHtml(entry.guardian_phone)}</span></td>
+                <td>${escapeHtml(entry.emergency_name)}<br><span class="muted">${escapeHtml(entry.emergency_phone)}</span></td>
+                <td>${escapeHtml(entry.notes ?? '')}</td>
+                <td><button class="btn btn--ghost btn--sm" type="button" data-remove="${entry.id}" data-name="${escapeHtml(player)}">Remove</button></td>
+              </tr>`;
+            })
+            .join('')}</tbody>
+        </table></div>`;
+      sections.push(section);
+    }
+    list.replaceChildren(...sections);
   }
 
   showSession();

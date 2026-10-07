@@ -1,7 +1,7 @@
 ---
 title: Juniors
 intro: Junior squash in Bedfordshire — county squads, coaching and a path towards junior county teams.
-updated: 2026-09-23
+updated: 2026-10-07
 ---
 
 ## County squad programme
@@ -12,7 +12,7 @@ The junior programme has been rebuilt over the last 18 months. Sessions are orga
 
 ## Coming up
 
-- **Junior County Closed** — November. Scan the code at the top of this page, or [enter a player](/juniors/closed/). The exact date will be added here once it is fixed.
+- **Junior County Closed** — Sunday 8th November, 10am–5pm at Towers Health & Racquets Club. Entries close on Sunday 25th October. Scan the code at the top of this page, or [enter a player](/juniors/closed/). Queries: [bsrajunior@gmail.com](mailto:bsrajunior@gmail.com).
 - **Northants Grand Prix** — February
 - **Beds schools** — March / April
 

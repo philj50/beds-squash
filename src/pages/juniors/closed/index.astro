@@ -3,7 +3,7 @@ import Base from '@/layouts/Base.astro';
 import JuniorAdminMenu from '@/components/JuniorAdminMenu.astro';
 import JuniorClosedQr from '@/components/JuniorClosedQr.astro';
 import { getClubs } from '@/lib/content';
-import { AGE_REFERENCE } from '@/lib/junior-age';
+import { AGE_REFERENCE, ENTRY_CLOSES, TOURNAMENT_ON } from '@/lib/junior-age';
 import { url } from '@/lib/site';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
@@ -27,10 +27,25 @@ const clubs = (await getClubs()).map((club) => club.data.name);
           <JuniorAdminMenu />
           <JuniorClosedQr showEnter={false} />
           <p class="lede">
-            November. The playing date is still to be fixed. A parent or guardian enters the player here. The age group is worked out from the date of birth, using age on {AGE_REFERENCE}: Under 11, Under 13, Under 15, Under 17 and Under 19.
+            Sunday 8th November, 10am–5pm at Towers Health &amp; Racquets Club. Entries close on Sunday 25th October. A parent or guardian enters the player here. The age group is worked out from the date of birth, using age on {AGE_REFERENCE}.
           </p>
+          <ul class="categories">
+            <li>Mixed U9</li>
+            <li>Girls U11</li>
+            <li>Girls U13</li>
+            <li>Girls U15</li>
+            <li>Girls U17</li>
+            <li>Girls U19</li>
+            <li>Boys U11</li>
+            <li>Boys U13</li>
+            <li>Boys U15</li>
+            <li>Boys U17</li>
+            <li>Boys U19</li>
+          </ul>
+          <p class="note">*actual categories we run and format will depend on entry number</p>
+          <p class="lede">Any queries please email <a href="mailto:bsrajunior@gmail.com">bsrajunior@gmail.com</a>.</p>
           <p class="status" data-status role="status"></p>
-          <p class="thanks" data-thanks hidden>Entry received. The organiser has these details and will be in touch when the date is fixed. Nothing has been emailed.</p>
+          <p class="thanks" data-thanks hidden>Entry received. The organiser has these details. Nothing has been emailed.</p>
 
           <form class="card entry-form" data-form>
             <div class="card__body stack">
@@ -39,11 +54,11 @@ const clubs = (await getClubs()).map((club) => club.data.name);
                 <label>First name <input name="player_first_name" required maxlength="60" autocomplete="given-name" /></label>
                 <label>Last name <input name="player_last_name" required maxlength="60" autocomplete="family-name" /></label>
               </div>
-              <label>Date of birth <input name="date_of_birth" type="date" required min="2007-09-02" max="2026-09-01" /></label>
+              <label>Date of birth <input name="date_of_birth" type="date" required min="2007-11-09" max={TOURNAMENT_ON} /></label>
               <p class="category" data-category>Choose a date of birth to see the age group.</p>
-              <label>
+              <label data-section>
                 Section
-                <select name="draw" required>
+                <select name="draw" required data-draw>
                   <option value="">Choose</option>
                   <option>Boys</option>
                   <option>Girls</option>
@@ -86,7 +101,7 @@ const clubs = (await getClubs()).map((club) => club.data.name);
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { ageCategory } from '@/lib/junior-age';
+  import { ageCategory, ENTRY_CLOSES, entryLabel } from '@/lib/junior-age';
 
   const root = document.getElementById('closed-app');
   if (!root) throw new Error('entry form missing');
@@ -96,18 +111,44 @@ const clubs = (await getClubs()).map((club) => club.data.name);
   const thanks = root.querySelector<HTMLElement>('[data-thanks]')!;
   const categoryEl = root.querySelector<HTMLElement>('[data-category]')!;
   const dob = form.querySelector<HTMLInputElement>('[name="date_of_birth"]')!;
+  const draw = form.querySelector<HTMLSelectElement>('[data-draw]')!;
+  const section = form.querySelector<HTMLElement>('[data-section]')!;
+
+  const londonToday = () =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 
   const showCategory = () => {
+    const mixed = draw.querySelector('option[value="Mixed"]');
     if (!dob.value) {
       categoryEl.textContent = 'Choose a date of birth to see the age group.';
       return;
     }
     const category = ageCategory(dob.value);
-    categoryEl.textContent = category
-      ? `Age group: ${category}`
-      : 'That date of birth is outside the junior age groups, so this player cannot be entered.';
+    if (!category) {
+      categoryEl.textContent = 'That date of birth is outside the junior age groups, so this player cannot be entered.';
+      return;
+    }
+    if (category === 'Under 9') {
+      if (!mixed) draw.add(new Option('Mixed', 'Mixed'));
+      draw.value = 'Mixed';
+      section.hidden = true;
+      categoryEl.textContent = 'Age group: Mixed U9';
+      return;
+    }
+    mixed?.remove();
+    if (draw.value === 'Mixed') draw.value = '';
+    section.hidden = false;
+    categoryEl.textContent =
+      draw.value === 'Boys' || draw.value === 'Girls'
+        ? `Age group: ${entryLabel(category, draw.value)}`
+        : 'Choose Boys or Girls to see the age group.';
   };
   dob.addEventListener('change', showCategory);
+  draw.addEventListener('change', showCategory);
+  if (londonToday() > ENTRY_CLOSES) {
+    form.hidden = true;
+    statusEl.textContent = 'Entries closed on Sunday 25th October.';
+  }
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -117,9 +158,14 @@ const clubs = (await getClubs()).map((club) => club.data.name);
       thanks.hidden = false;
       return;
     }
+    if (londonToday() > ENTRY_CLOSES) {
+      statusEl.textContent = 'Entries closed on Sunday 25th October.';
+      return;
+    }
     const dateOfBirth = String(data.get('date_of_birth'));
     const category = ageCategory(dateOfBirth);
-    if (!category) {
+    const sectionChoice = category === 'Under 9' ? 'Mixed' : String(data.get('draw'));
+    if (!category || (sectionChoice !== 'Boys' && sectionChoice !== 'Girls' && sectionChoice !== 'Mixed')) {
       statusEl.textContent = 'That date of birth is outside the junior age groups.';
       return;
     }
@@ -129,7 +175,7 @@ const clubs = (await getClubs()).map((club) => club.data.name);
       player_last_name: String(data.get('player_last_name')).trim(),
       date_of_birth: dateOfBirth,
       age_category: category,
-      draw: String(data.get('draw')),
+      draw: sectionChoice,
       club: String(data.get('club')).trim(),
       guardian_name: String(data.get('guardian_name')).trim(),
       guardian_email: String(data.get('guardian_email')).trim(),
@@ -159,6 +205,18 @@ const clubs = (await getClubs()).map((club) => club.data.name);
   .lede {
     color: var(--ink-200);
   }
+  .categories {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+    gap: 0.2rem 1rem;
+    margin: 0.75rem 0;
+    padding-left: 1.1rem;
+  }
+  .note {
+    margin: 0 0 0.75rem;
+    color: var(--ink-200);
+    font-size: 0.9rem;
+  }
   .stack {
     display: grid;
     gap: 0.75rem;
@@ -176,6 +234,9 @@ const clubs = (await getClubs()).map((club) => club.data.name);
     display: grid;
     gap: 0.3rem;
     font-size: 0.9rem;
+  }
+  [data-section][hidden] {
+    display: none;
   }
   input,
   select,
