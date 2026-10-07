@@ -370,7 +370,7 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="links" data-lm-only hidden>
             <h2>Links</h2>
             <p class="muted small">
-              Type the SquashLevels name. Steve Davies is first. Everyone else here has no exact SquashLevels name. Remove a link when it is wrong.
+              Steve Davies is first. Under him are names already linked where the SquashLevels name is not an exact match. Everyone else has no exact SquashLevels name. Type that name, and remove a link when it is wrong.
             </p>
             <div class="overview-box">
               <table class="overview">
@@ -1875,10 +1875,11 @@ const scoresHref = url('/captains/admin/minigame/');
   let linkLevels: SlNamed[] = [];
 
   async function paintLinks() {
-    const [linkResult, { data: slRows }, { data: nomRows }] = await Promise.all([
+    const [linkResult, { data: slRows }, { data: nomRows }, nameResult] = await Promise.all([
       supabase.from('player_links').select('id, profile_id, squashlevels_player_id, lm_player_name').order('id'),
       allSlPlayers(),
       supabase.from('nominations').select('player_name').eq('season', SEASON),
+      allSlNames(),
     ]);
     if (linkResult.error?.code === 'PGRST205') {
       setStatus('The links table is not on the database yet, so a typed name cannot be saved.');
@@ -1898,16 +1899,57 @@ const scoresHref = url('/captains/admin/minigame/');
     for (const row of (nomRows ?? []) as { player_name: string }[]) addLmName(row.player_name);
     const saved = (linkResult.error ? [] : (linkResult.data ?? [])) as LinkRow[];
     const linked = new Set(saved.map((row) => nameKey(row.lm_player_name ?? '')));
-    const suggestions: { lm: string; sl: string }[] = [];
-    const steve = [...names.values()].find((name) => nameKey(name) === 'steve davies');
-    if (steve && !linked.has('steve davies')) suggestions.push({ lm: steve, sl: 'Steven Davies' });
+    const levelById = new Map(levels.map((player) => [player.id, player]));
+    const storedByKey = new Map<string, SlNamed>();
+    for (const stored of (nameResult.error ? [] : (nameResult.data ?? [])) as { name_key: string; player_id: number | null }[]) {
+      if (stored.player_id == null || storedByKey.has(stored.name_key)) continue;
+      const player = levelById.get(stored.player_id);
+      if (player) storedByKey.set(stored.name_key, player);
+    }
+    const slText = (player: SlNamed | undefined) => (player ? `${player.display_name} · ${levelText(player.current_level)}` : '—');
+    const savedLevel = (row: LinkRow) => (row.squashlevels_player_id != null ? levelById.get(row.squashlevels_player_id) : undefined);
+    const savedIsExact = (row: LinkRow) => {
+      const level = savedLevel(row);
+      return Boolean(level) && nameKey(level!.display_name) === nameKey(row.lm_player_name ?? '');
+    };
+    const savedHtmlFor = (row: LinkRow) => {
+      const lm = row.lm_player_name?.trim() || '—';
+      return `<tr><td>${escapeHtml(lm)}</td><td>${escapeHtml(slText(savedLevel(row)))}</td><td><button class="btn btn--ghost btn--sm" type="button" data-unlink="${row.id}">Unlink</button></td></tr>`;
+    };
+    const shown = new Set<string>();
+    const steveSaved = saved.find((row) => nameKey(row.lm_player_name ?? '') === 'steve davies');
+    const placed: string[] = [];
+    if (steveSaved) {
+      placed.push(savedHtmlFor(steveSaved));
+      shown.add('steve davies');
+    }
+    const otherSaved = saved
+      .filter((row) => {
+        const key = nameKey(row.lm_player_name ?? '');
+        return Boolean(key) && !shown.has(key) && !savedIsExact(row);
+      })
+      .sort((a, b) => (a.lm_player_name ?? '').localeCompare(b.lm_player_name ?? '', 'en'));
+    for (const row of otherSaved) {
+      placed.push(savedHtmlFor(row));
+      shown.add(nameKey(row.lm_player_name ?? ''));
+    }
     for (const name of [...names.values()].sort((a, b) => a.localeCompare(b, 'en'))) {
       const key = nameKey(name);
-      if (key === 'steve davies' || linked.has(key) || slNames.has(key)) continue;
+      if (shown.has(key) || linked.has(key)) continue;
+      const player = storedByKey.get(looseKey(name));
+      if (!player || nameKey(player.display_name) === key) continue;
+      placed.push(`<tr><td>${escapeHtml(name)}</td><td>${escapeHtml(slText(player))}</td><td></td></tr>`);
+      shown.add(key);
+    }
+    const suggestions: { lm: string; sl: string }[] = [];
+    const steve = [...names.values()].find((name) => nameKey(name) === 'steve davies');
+    if (steve && !shown.has('steve davies')) suggestions.push({ lm: steve, sl: 'Steven Davies' });
+    for (const name of [...names.values()].sort((a, b) => a.localeCompare(b, 'en'))) {
+      const key = nameKey(name);
+      if (shown.has(key) || key === 'steve davies' || linked.has(key) || slNames.has(key)) continue;
       suggestions.push({ lm: name, sl: '' });
     }
     const lmNames = [...names.values()].sort((a, b) => a.localeCompare(b, 'en'));
-    const levelById = new Map(levels.map((player) => [player.id, player]));
     const suggestionHtml = suggestions
       .map((row) => {
         const options = lmNames
@@ -1920,15 +1962,14 @@ const scoresHref = url('/captains/admin/minigame/');
         </tr>`;
       })
       .join('');
-    const savedHtml = saved
-      .map((row) => {
-        const level = row.squashlevels_player_id != null ? levelById.get(row.squashlevels_player_id) : undefined;
-        const sl = level ? `${level.display_name} · ${levelText(level.current_level)}` : '—';
-        const lm = row.lm_player_name?.trim() || '—';
-        return `<tr><td>${escapeHtml(lm)}</td><td>${escapeHtml(sl)}</td><td><button class="btn btn--ghost btn--sm" type="button" data-unlink="${row.id}">Unlink</button></td></tr>`;
+    const exactSaved = saved
+      .filter((row) => {
+        const key = nameKey(row.lm_player_name ?? '');
+        return Boolean(key) && !shown.has(key) && savedIsExact(row);
       })
+      .map(savedHtmlFor)
       .join('');
-    linksHost.innerHTML = suggestionHtml + savedHtml || '<tr><td colspan="3">No links yet.</td></tr>';
+    linksHost.innerHTML = placed.join('') + suggestionHtml + exactSaved || '<tr><td colspan="3">No links yet.</td></tr>';
   }
 
   linksHost.addEventListener('click', async (event) => {

@@ -601,16 +601,19 @@ test.describe('Club captain, team captain, and player', () => {
 
     await page.getByRole('button', { name: 'Links' }).click();
     await expect(page.getByRole('heading', { name: 'Links', exact: true })).toBeVisible();
-    const linkZoe = page.locator('[data-links] tr', { has: page.locator('option[selected][value="Zoe Player"]') });
-    await expect(linkZoe.getByRole('combobox', { name: 'LM Player' })).toHaveValue('Zoe Player');
-    await linkZoe.getByRole('textbox', { name: 'SL' }).fill('Pat Player');
-    await linkZoe.getByRole('button', { name: 'Link' }).click();
+    const placedZoe = page.locator('[data-links] tr').filter({ hasText: 'Zoe Player' }).filter({ hasNot: page.locator('select') });
+    await expect(placedZoe).toContainText('Pat Player · 4,321');
+    await expect(placedZoe.getByRole('textbox', { name: 'SL' })).toHaveCount(0);
+    const linkSam = page.locator('[data-links] tr', { has: page.locator('option[selected][value="Sam Morris"]') });
+    await expect(linkSam.getByRole('combobox', { name: 'LM Player' })).toHaveValue('Sam Morris');
+    await linkSam.getByRole('textbox', { name: 'SL' }).fill('Pat Player');
+    await linkSam.getByRole('button', { name: 'Link' }).click();
     await expect(page.getByText('Link saved.')).toBeVisible();
-    const linked = page.getByRole('row', { name: /Zoe Player.*4,321/ });
+    const linked = page.getByRole('row', { name: /Sam Morris.*4,321/ });
     await expect(linked).toBeVisible();
     await linked.getByRole('button', { name: 'Unlink' }).click();
     await expect(page.getByText('Link removed.')).toBeVisible();
-    await expect(page.locator('[data-links] tr', { has: page.locator('option[selected][value="Zoe Player"]') }).getByRole('textbox', { name: 'SL' })).toBeVisible();
+    await expect(page.locator('[data-links] tr', { has: page.locator('option[selected][value="Sam Morris"]') }).getByRole('textbox', { name: 'SL' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Team', exact: true }).click();
     const zoe = page.locator('[data-site-team] tr', { hasText: 'Zoe Player' });
