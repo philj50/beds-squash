@@ -924,6 +924,7 @@ const scoresHref = url('/captains/admin/minigame/');
     es: string;
     phone: string;
     locked: boolean;
+    emailLocked: boolean;
     role: string;
   };
   const clubNote = root.querySelector<HTMLElement>('[data-site-club-note]')!;
@@ -1044,7 +1045,7 @@ const scoresHref = url('/captains/admin/minigame/');
       .map((row) => {
         const detailsOpen = fields === 'all' || fields === 'open';
         const emailOpen = fields === 'all' || (fields === 'open' && !row.locked);
-        const emailCell = emailOpen ? box(row, 'email', row.email, 'Email', 'email') : escapeHtml(row.email || '—');
+        const emailCell = row.emailLocked || !emailOpen ? escapeHtml(row.email || '—') : box(row, 'email', row.email, 'Email', 'email');
         const esCell = detailsOpen ? box(row, 'es', row.es, 'ES number', 'text') : escapeHtml(row.es || '—');
         const phoneCell = detailsOpen ? box(row, 'phone', row.phone, 'Phone', 'tel') : escapeHtml(row.phone || '—');
         const teamCell = showTeam ? `<td>${escapeHtml(row.team)}</td>` : '';
@@ -1067,12 +1068,13 @@ const scoresHref = url('/captains/admin/minigame/');
   async function loadWebsite(account: Account) {
     ownName.value = account.displayName;
     ownEmail.textContent = account.email || '—';
-    const [{ data: mineRows }, { data: clubRows }, { data: teamRows }, { data: squadRows }, { data: nomRows }, { data: slRows }, linkResult, profileResult, roleMembershipResult, nameResult] = await Promise.all([
+    const [{ data: mineRows }, { data: clubRows }, { data: teamRows }, { data: squadRows }, { data: nomRows }, contactResult, { data: slRows }, linkResult, profileResult, roleMembershipResult, nameResult] = await Promise.all([
       supabase.from('memberships').select('role, club_slug, team_id').eq('profile_id', account.userId),
       supabase.from('clubs').select('slug, name, contact_name, contact_email').order('name', { ascending: true }),
       supabase.from('teams').select('id, club_slug, name, division, captain_name, captain_email').order('name', { ascending: true }),
       supabase.from('captain_squads').select('id, name, team_id, squad_players(id, display_name, email, england_squash_id, phone)'),
       supabase.from('nominations').select('team_id, player_name, season').eq('season', SEASON),
+      supabase.from('lm_player_contacts').select('team_id, player_name, email'),
       allSlPlayers(),
       supabase.from('player_links').select('id, profile_id, squashlevels_player_id, lm_player_name'),
       supabase.from('profiles').select('id, email, is_admin, display_name'),
@@ -1200,6 +1202,7 @@ const scoresHref = url('/captains/admin/minigame/');
           es: player.england_squash_id ?? '',
           phone: player.phone ?? '',
           locked: lockedFromLm(player.display_name, player.email ?? '', clubSlug, squad.team_id),
+          emailLocked: false,
           role: roleFor(player.display_name, player.email ?? ''),
         });
       }
@@ -1222,6 +1225,7 @@ const scoresHref = url('/captains/admin/minigame/');
         es: '',
         phone: '',
         locked: lockedFromLm(nom.player_name, '', team?.club_slug ?? '', nom.team_id),
+        emailLocked: false,
         role: roleFor(nom.player_name, ''),
       });
     }
@@ -1250,7 +1254,7 @@ const scoresHref = url('/captains/admin/minigame/');
       : 'Your team.') + roleNote;
     playerNote.textContent = (account.playerOnly
       ? 'Your own row.'
-      : 'The players you look after. A player can change only their own row. Only an admin can add someone who is not on League Master.') + roleNote;
+      : 'The players you look after. A player can change only their own row. Only an admin can add someone who is not on League Master.') + roleNote + ' An email that matches League Master is locked: a club contact, then a captain, then a player.';
 
     const clubsHere = clubList.filter((club) => (account.playerOnly ? homeClubSlugs.has(club.slug) : hasClubRole ? clubSlugs.has(club.slug) : homeClubSlugs.has(club.slug)));
     const paintClub = (heading: string) => {
@@ -1283,7 +1287,22 @@ const scoresHref = url('/captains/admin/minigame/');
           .join('')
       : '<p class="muted small">No team on this account yet.</p>';
 
-    const playerRows = account.playerOnly || account.isAdmin || clubEditable ? clubRowsScoped : teamRowsScoped;
+    const playerContacts = (contactResult.error ? [] : (contactResult.data ?? [])) as { team_id: number; player_name: string; email: string | null }[];
+    const addressOf = (value: string | null | undefined) => (value ?? '').trim().toLowerCase();
+    const lmEmailFor = (row: SiteRow) => {
+      const address = addressOf(row.email);
+      if (!address) return '';
+      const club = clubList.find((item) => addressOf(item.contact_email) === address);
+      if (club?.contact_email) return club.contact_email.trim();
+      const captain = teamList.find((item) => addressOf(item.captain_email) === address);
+      if (captain?.captain_email) return captain.captain_email.trim();
+      const contact = playerContacts.find((item) => addressOf(item.email) === address);
+      return contact?.email?.trim() ?? '';
+    };
+    const playerRows = (account.playerOnly || account.isAdmin || clubEditable ? clubRowsScoped : teamRowsScoped).map((row) => {
+      const fromLm = lmEmailFor(row);
+      return fromLm ? { ...row, email: fromLm, emailLocked: true } : row;
+    });
     const playerEditable = account.isAdmin || teamEditable || account.playerOnly;
     const teamChoices = teamList
       .filter((team) => account.isAdmin || clubSlugs.has(team.club_slug) || teamIds.has(team.id))

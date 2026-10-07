@@ -119,6 +119,9 @@ test.describe('Club captain, team captain, and player', () => {
     expect(world.players.find((player) => player.display_name === 'Pat Player')?.phone).toBe('07000999888');
     await page.getByRole('button', { name: 'Player', exact: true }).click();
     await expect(page.locator('[data-site-player-list]').getByRole('textbox', { name: 'Email for Pat Player' })).toBeVisible();
+    await expect(page.locator('[data-site-player-list]').getByRole('textbox', { name: 'Email for Chris Club' })).toHaveCount(0);
+    await expect(page.locator('[data-site-player-list]').getByRole('textbox', { name: 'Email for Taylor Team' })).toHaveCount(0);
+    await expect(page.locator('[data-site-player-list]').getByRole('textbox', { name: 'Phone for Chris Club' })).toBeVisible();
     await expect(page.locator('[data-site-player-list]').getByRole('textbox', { name: 'ES number for Pat Player' })).toBeVisible();
     await expect(page.locator('[data-site-player-list]').getByRole('textbox', { name: 'Phone for Pat Player' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Add a player' })).toHaveCount(0);
@@ -162,6 +165,7 @@ test.describe('Club captain, team captain, and player', () => {
     await page.goto('captains/admin/', { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'Player', exact: true }).click();
     await expect(page.locator('[data-site-player-list]').getByRole('textbox', { name: 'Email for Pat Player' })).toBeVisible();
+    await expect(page.locator('[data-site-player-list]').getByRole('textbox', { name: 'Email for Taylor Team' })).toHaveCount(0);
     await expect(page.locator('[data-site-player-list]').getByRole('textbox', { name: 'ES number for Pat Player' })).toBeVisible();
     await expect(page.locator('[data-site-player-list]')).not.toContainText('Test Team 2');
     await page.getByRole('button', { name: 'Team', exact: true }).click();
