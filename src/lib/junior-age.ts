@@ -2,7 +2,7 @@
 
 export const AGE_REFERENCE = 'tournament date';
 export const TOURNAMENT_ON = '2026-11-08';
-export const ENTRY_CLOSES = '2026-10-25';
+export const ENTRY_CLOSES = '2026-10-28';
 
 const GROUPS = [
   { label: 'Under 9', short: 'U9', after: '2017-11-08' },
