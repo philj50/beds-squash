@@ -45,6 +45,13 @@ jobs:
           fi
           summary="$(grep -E '^\{' daily.log | tail -1 || true)"
           echo "summary=${summary}" >> "$GITHUB_OUTPUT"
+      - name: Fill current names the directory missed
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SQUASHLEVELS_EMAIL: ${{ secrets.SQUASHLEVELS_EMAIL }}
+          SQUASHLEVELS_PASSWORD: ${{ secrets.SQUASHLEVELS_PASSWORD }}
+        run: node scripts/squashlevels-daily.mjs --exceptions
       - name: Notify via ntfy
         if: always()
         env:

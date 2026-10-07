@@ -370,7 +370,7 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="links" data-lm-only hidden>
             <h2>Links</h2>
             <p class="muted small">
-              Steve Davies is first. Under him are names already linked where the SquashLevels name is not an exact match. Everyone else has no exact SquashLevels name. Type that name, and remove a link when it is wrong.
+              Steve Davies is first. Under him are names already linked where the SquashLevels name is not an exact match. Everyone else has no exact SquashLevels name. Type the name exactly as it appears on SquashLevels. A stored record is used when that name is already here. Otherwise the player is fetched from SquashLevels. Remove a link when it is wrong.
             </p>
             <div class="overview-box">
               <table class="overview">
@@ -1982,14 +1982,44 @@ const scoresHref = url('/captains/admin/minigame/');
       setStatus('Choose an LM Player and type an SL name.');
       return;
     }
-    const matches = linkLevels.filter((player) => nameKey(player.display_name) === nameKey(typed) && player.current_level != null);
-    if (matches.length !== 1) {
-      setStatus(matches.length ? `More than one SquashLevels player is called ${typed}.` : `No SquashLevels player is called ${typed}.`);
+    const stored = linkLevels.filter((player) => nameKey(player.display_name) === nameKey(typed) && player.current_level != null);
+    if (stored.length > 1) {
+      setStatus(`More than one SquashLevels player is called ${typed}.`);
       return;
+    }
+    let squashlevelsPlayerId = stored[0]?.id;
+    if (!squashlevelsPlayerId) {
+      setStatus('Looking up that SquashLevels player…');
+      const { data: lookedUp, error: lookupError } = await supabase.functions.invoke('squashlevels-link', {
+        body: { name: typed },
+      });
+      if (lookupError) {
+        let message = lookupError.message;
+        const context = (lookupError as { context?: Response }).context;
+        if (context && typeof context.json === 'function') {
+          try {
+            const payload = (await context.json()) as { error?: string };
+            if (payload?.error) message = payload.error;
+          } catch {
+            /* The function body was not JSON. */
+          }
+        }
+        if (/failed to send a request|relay error|failed to fetch|not found/i.test(message)) {
+          message = `No stored SquashLevels player is called ${typed}, and the live lookup is not reachable yet.`;
+        }
+        setStatus(message);
+        return;
+      }
+      const found = lookedUp as { id?: number; error?: string } | null;
+      if (!found?.id) {
+        setStatus(found?.error || `No SquashLevels player is called ${typed}.`);
+        return;
+      }
+      squashlevelsPlayerId = found.id;
     }
     setStatus('Saving link…');
     const { error } = await supabase.from('player_links').insert({
-      squashlevels_player_id: matches[0].id,
+      squashlevels_player_id: squashlevelsPlayerId,
       lm_player_name: lmName,
     });
     if (error) {

@@ -6,7 +6,8 @@
  *   node scripts/squashlevels-daily.mjs            # yesterday in London
  *   node scripts/squashlevels-daily.mjs --latest   # most recent day with a result
  *   node scripts/squashlevels-daily.mjs --date 2026-08-11
- *   node scripts/squashlevels-daily.mjs --backfill # Beds lists, then clubs, then leftover league names
+ *   node scripts/squashlevels-daily.mjs --backfill    # county and club lists, then a name search
+ *   node scripts/squashlevels-daily.mjs --exceptions # current names those lists missed
  *
  * Writes need SUPABASE_SERVICE_ROLE_KEY. Without it, SQL is written to the
  * temp directory and a news file is still written when publishing is automatic.
@@ -32,6 +33,7 @@ loadEnv();
 const args = process.argv.slice(2);
 const wantLatest = args.includes('--latest');
 const wantBackfill = args.includes('--backfill');
+const wantExceptions = args.includes('--exceptions');
 const wantDate = args.includes('--date') ? args[args.indexOf('--date') + 1] : null;
 const canWrite = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -247,9 +249,53 @@ async function searchPlayer(name, team) {
     ? unique.filter((hit) => tokens.some((token) => hit.club.includes(token)))
     : unique;
   const chosen = narrowed.length === 1 ? narrowed : unique.length === 1 ? unique : [];
-  if (chosen.length === 1) return { status: 'matched', playerId: chosen[0].id, displayName: chosen[0].name };
-  if (unique.length > 1) return { status: 'ambiguous', playerId: null, displayName: null };
-  return { status: 'missing', playerId: null, displayName: null };
+  if (chosen.length === 1) return { status: 'matched', playerId: chosen[0].id, displayName: chosen[0].name, via: 'directory' };
+  if (unique.length > 1) return { status: 'ambiguous', playerId: null, displayName: null, via: 'directory' };
+  const site = await searchSite(name);
+  const siteExact = [...new Map(site.filter((hit) => nameKey(hit.name) === nameKey(name)).map((hit) => [hit.id, hit])).values()];
+  const siteNarrowed = tokens.length
+    ? siteExact.filter((hit) => tokens.some((token) => hit.club.includes(token)))
+    : siteExact;
+  const siteChosen = siteNarrowed.length === 1 ? siteNarrowed : siteExact.length === 1 ? siteExact : [];
+  if (siteChosen.length === 1) return { status: 'matched', playerId: siteChosen[0].id, displayName: siteChosen[0].name, via: 'site' };
+  if (siteExact.length > 1) return { status: 'ambiguous', playerId: null, displayName: null, via: 'site' };
+  return {
+    status: 'missing',
+    playerId: null,
+    displayName: null,
+    via: 'site',
+    nearby: site.slice(0, 5).map((hit) => hit.name),
+  };
+}
+
+async function searchSite(name) {
+  try {
+    const response = await fetch('https://api-leveltech.squashlevels.com/api/search', {
+      method: 'POST',
+      redirect: 'manual',
+      signal: AbortSignal.timeout(20000),
+      headers: {
+        'user-agent': 'Mozilla/5.0 BedsSquash/1.0',
+        'content-type': 'application/json',
+        cookie: [...jar.values()].join('; '),
+      },
+      body: JSON.stringify({ name: name.toLowerCase(), includeClubs: false, clubsOnly: false }),
+    });
+    storeCookies(response);
+    if (!response.ok) return [];
+    const body = await response.json();
+    const rows = Array.isArray(body?.data?.array) ? body.data.array : [];
+    const hits = [];
+    for (const row of rows) {
+      const displayName = plain(row.player);
+      const id = Number(row.playerid);
+      if (!displayName || !Number.isFinite(id) || id <= 0) continue;
+      hits.push({ id, name: displayName, club: nameKey(`${row.club ?? ''} ${row.county ?? ''}`) });
+    }
+    return [...new Map(hits.map((hit) => [hit.id, hit])).values()];
+  } catch {
+    return [];
+  }
 }
 
 function pause() {
@@ -335,6 +381,11 @@ async function leaguePeople() {
   const teams = nominations.length ? await restAll('teams?select=id,name') : [];
   const teamName = new Map(teams.map((team) => [team.id, team.name]));
   for (const nomination of nominations) consider(nomination.player_name, teamName.get(nomination.team_id) ?? '', '');
+  const squads = await restAll('captain_squads?select=name,squad_players(display_name)');
+  for (const squad of squads) {
+    const members = Array.isArray(squad.squad_players) ? squad.squad_players : [];
+    for (const player of members) consider(player.display_name, squad.name ?? '', '');
+  }
   return people;
 }
 
@@ -942,9 +993,149 @@ async function publishApproved() {
   }
 }
 
+async function exceptions() {
+  if (!canWrite) throw new Error('Exception lookup needs SUPABASE_SERVICE_ROLE_KEY.');
+  await signIn();
+  const nominations = await restAll('nominations?select=player_name,season,team_id');
+  const season = [...new Set(nominations.map((row) => row.season).filter(Boolean))].sort().at(-1) ?? '';
+  const teams = await restAll('teams?select=id,name');
+  const teamName = new Map(teams.map((team) => [team.id, team.name]));
+  const people = new Map();
+  const consider = (name, team) => {
+    const key = nameKey(name ?? '');
+    if (!key.includes(' ') || key.includes('walkover')) return;
+    if (!people.has(key)) people.set(key, { name: String(name).trim(), team: team || '' });
+  };
+  for (const row of nominations) {
+    if (row.season !== season) continue;
+    consider(row.player_name, teamName.get(row.team_id) ?? '');
+  }
+  const squads = await restAll('captain_squads?select=name,squad_players(display_name)');
+  for (const squad of squads) {
+    const members = Array.isArray(squad.squad_players) ? squad.squad_players : [];
+    for (const player of members) consider(player.display_name, squad.name ?? '');
+  }
+
+  const knownNames = new Map();
+  for (const row of await restAll('squashlevels_names?select=name_key,player_id,status')) {
+    knownNames.set(row.name_key, { status: row.status, playerId: row.player_id });
+  }
+  const stored = await restAll('squashlevels_players?select=id,display_name,current_level');
+  const knownIds = new Set(stored.filter((player) => player.current_level != null).map((player) => player.id));
+  const covered = new Set(stored.filter((player) => player.current_level != null).map((player) => nameKey(player.display_name)));
+  const wanted = [...people.values()].filter((person) => {
+    const key = nameKey(person.name);
+    const known = knownNames.get(key);
+    if (covered.has(key)) return false;
+    if (known?.status === 'matched' && known.playerId && knownIds.has(known.playerId)) return false;
+    return true;
+  });
+  console.error(`${season || 'current'} names still to find: ${wanted.length} of ${people.size}`);
+
+  const players = new Map();
+  const matches = new Map();
+  let searches = 0;
+  for (const person of wanted) {
+    const key = nameKey(person.name);
+    let found = await searchPlayer(person.name, person.team);
+    searches += 1;
+    if (found.status === 'missing') {
+      const alias = person.name.replace(/^Daniel\b/i, 'Dan');
+      if (alias !== person.name) {
+        found = await searchPlayer(alias, person.team);
+        searches += 1;
+        await pause();
+      }
+    }
+    knownNames.set(key, found);
+    const nearby = found.nearby?.length ? ` nearby ${found.nearby.join(', ')}` : '';
+    console.error(
+      `${found.status} ${person.name}${found.playerId ? ` ${found.playerId}` : ''}${found.via === 'site' ? ' via current search' : ''}${nearby}`,
+    );
+    if (found.playerId && knownIds.has(found.playerId)) {
+      console.error(`already stored ${person.name} ${found.playerId}`);
+    } else if (found.playerId && !players.has(found.playerId)) {
+      let page;
+      try {
+        page = parsePlayerPage(await sl(`player_detail?player=${found.playerId}&show=last12m`), found.playerId);
+      } catch (error) {
+        console.error(`skipped ${person.name} ${found.playerId}: ${error.message}`);
+        await pause();
+        continue;
+      }
+      if (!page.displayName) {
+        console.error(`no name for ${person.name} ${found.playerId}`);
+        knownNames.set(key, { status: 'missing', playerId: null, displayName: null });
+      } else if (!page.currentLevel) {
+        console.error(`no level yet for ${page.displayName} ${found.playerId}`);
+        players.set(found.playerId, {
+          id: found.playerId,
+          displayName: page.displayName,
+          currentLevel: null,
+          confidence: null,
+        });
+        knownNames.set(key, { status: 'matched', playerId: found.playerId, displayName: page.displayName });
+        knownNames.set(nameKey(page.displayName), { status: 'matched', playerId: found.playerId, displayName: page.displayName });
+      } else {
+        players.set(found.playerId, {
+          id: found.playerId,
+          displayName: page.displayName,
+          currentLevel: page.currentLevel,
+          confidence: page.confidence,
+        });
+        knownNames.set(nameKey(page.displayName), { status: 'matched', playerId: found.playerId });
+        for (const match of page.matches) {
+          matches.set(match.id, match);
+          if (match.opponentId && match.opponentName && !players.has(match.opponentId) && !knownIds.has(match.opponentId)) {
+            players.set(match.opponentId, {
+              id: match.opponentId,
+              displayName: match.opponentName,
+              currentLevel: null,
+              confidence: null,
+            });
+          }
+        }
+        console.error(`${page.displayName} ${page.currentLevel}`);
+      }
+    }
+    await pause();
+  }
+
+  const nameRows = [];
+  const seen = new Set();
+  const addName = (key, playerId, status) => {
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    nameRows.push({ nameKey: key, playerId, status });
+  };
+  for (const person of wanted) {
+    const value = knownNames.get(nameKey(person.name));
+    if (!value?.status) continue;
+    const playerId = value.playerId && (knownIds.has(value.playerId) || players.has(value.playerId)) ? value.playerId : null;
+    addName(nameKey(person.name), playerId, playerId ? value.status : value.status === 'ambiguous' ? 'ambiguous' : 'missing');
+  }
+  for (const player of players.values()) {
+    if (player.currentLevel == null) continue;
+    addName(nameKey(player.displayName), player.id, 'matched');
+  }
+  await save({
+    players: [...players.values()],
+    matches: [...matches.values()],
+    ratings: ratingsFor(players, matches),
+    names: nameRows,
+    article: null,
+    summary: { exceptions: true, season, wanted: wanted.length, found: [...players.values()].filter((player) => player.currentLevel != null).length, searches },
+  });
+  console.error(JSON.stringify({ exceptions: true, season, wanted: wanted.length, found: nameRows.filter((row) => row.status === 'matched').length, searches }));
+}
+
 async function main() {
   if (wantBackfill) {
     await backfill();
+    return;
+  }
+  if (wantExceptions) {
+    await exceptions();
     return;
   }
   const days = await leagueDays();

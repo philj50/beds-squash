@@ -285,6 +285,18 @@ test.describe('Club captain, team captain, and player', () => {
       const send = (payload: unknown) =>
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload) });
       if (path.startsWith('/auth/v1/')) return send(path.endsWith('/user') ? session.user : session);
+      if (path.endsWith('/functions/v1/squashlevels-link')) {
+        const payload = route.request().postDataJSON() as { name?: string } | null;
+        const name = (payload?.name ?? '').trim();
+        if (name.toLowerCase() !== 'pat player') {
+          return route.fulfill({
+            status: 404,
+            contentType: 'application/json',
+            body: JSON.stringify({ error: `No SquashLevels player is called ${name}.` }),
+          });
+        }
+        return send({ id: 90, display_name: 'Pat Player', current_level: 4321 });
+      }
       if (path.endsWith('/functions/v1/manage-accounts')) {
         const payload = route.request().postDataJSON() as { action?: string } | null;
         if (payload?.action === 'states') {
