@@ -265,19 +265,34 @@ Deno.serve(async (req) => {
     const userId = String(body.user_id ?? '');
     const slug = String(body.group_slug ?? '');
     const member = Boolean(body.member);
+    const personName = String(body.person_name ?? '').trim();
+    const hasUser = /^[0-9a-f-]{36}$/i.test(userId);
     const allowed = new Set(['jc_players', 'junior_organisers', 'bc_players', 'rb_players']);
-    if (!/^[0-9a-f-]{36}$/i.test(userId)) return json({ error: 'Choose an account.' }, 400);
+    if (userId && !hasUser) return json({ error: 'Choose an account.' }, 400);
+    if (!hasUser && !personName) return json({ error: 'Choose an account.' }, 400);
     if (!allowed.has(slug)) return json({ error: 'Choose a website role.' }, 400);
     if (!member) {
-      const { error } = await admin.from('group_members').delete().eq('profile_id', userId).eq('group_slug', slug);
+      const removal = hasUser
+        ? admin.from('group_members').delete().eq('profile_id', userId).eq('group_slug', slug)
+        : admin.from('group_members').delete().is('profile_id', null).eq('person_name', personName).eq('group_slug', slug);
+      const { error } = await removal;
       if (error) return json({ error: error.message }, 400);
       return json({ ok: true });
     }
-    const { data: person, error: personError } = await admin.from('profiles').select('display_name').eq('id', userId).maybeSingle();
-    if (personError) return json({ error: personError.message }, 400);
-    const name = String(person?.display_name ?? '').trim() || 'Unnamed';
-    await admin.from('group_members').delete().eq('profile_id', userId).eq('group_slug', slug);
-    const { error } = await admin.from('group_members').insert({ profile_id: userId, person_name: name, group_slug: slug });
+    let name = personName || 'Unnamed';
+    if (hasUser) {
+      const { data: person, error: personError } = await admin.from('profiles').select('display_name').eq('id', userId).maybeSingle();
+      if (personError) return json({ error: personError.message }, 400);
+      name = String(person?.display_name ?? '').trim() || personName || 'Unnamed';
+      await admin.from('group_members').delete().eq('profile_id', userId).eq('group_slug', slug);
+    } else {
+      await admin.from('group_members').delete().is('profile_id', null).eq('person_name', personName).eq('group_slug', slug);
+    }
+    const { error } = await admin.from('group_members').insert({
+      profile_id: hasUser ? userId : null,
+      person_name: name,
+      group_slug: slug,
+    });
     if (error) return json({ error: error.message }, 400);
     return json({ ok: true });
   }

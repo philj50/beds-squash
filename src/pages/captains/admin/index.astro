@@ -145,45 +145,39 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="members" data-lm-only hidden>
             <h2>Users</h2>
             <p class="muted small">
-              Every player from League Master. Update the email, ES number, and mobile in the row. Roles adds website roles. Password sets a password you can copy. Nothing is emailed.
+              Every player from League Master. Update the email, ES number, and mobile in the row. Choose website roles in the list. Password opens a dialog to generate a password. Nothing is emailed.
             </p>
             <p class="muted small" data-group-note>Filled from League Master. Each person has the LM Player role.</p>
             <div class="member-tools">
               <label class="directory-search">
                 Search
-                <input type="search" data-member-search placeholder="Name, team or email" autocomplete="off" />
+                <input type="search" data-member-search placeholder="Name, place or email" autocomplete="off" />
               </label>
             </div>
             <p class="muted small" data-member-count></p>
-            <div class="card" data-role-picker hidden>
-              <div class="card__body stack">
-                <h3 data-role-picker-who></h3>
-                <p class="muted small">Choose the roles to add. League Master and SquashLevels roles stay as they are.</p>
-                <div class="role-choices" data-role-options></div>
-                <div class="actions member-actions">
-                  <button class="btn btn--primary btn--sm" type="button" data-save-roles>Save roles</button>
-                </div>
-              </div>
-            </div>
-            <div class="card" data-reset-password hidden>
-              <div class="card__body stack">
-                <h3>Password for <span data-reset-who></span></h3>
-                <p class="muted small">Copy this and tell them. Nothing was emailed. It is not shown again after you leave this page.</p>
+            <dialog class="account-dialog" data-password-dialog>
+              <form method="dialog">
+                <h3>Password for <span data-password-dialog-who></span></h3>
+                <p class="muted small">Generate a password, then set it on this record. Copy it and tell them. Nothing is emailed.</p>
+                <p class="muted small" data-password-dialog-error></p>
                 <label>
                   Password
-                  <input type="text" readonly data-reset-value autocomplete="off" />
+                  <input type="text" readonly data-password-dialog-value autocomplete="off" />
                 </label>
                 <div class="actions member-actions">
-                  <button class="btn btn--primary btn--sm" type="button" data-copy-password>Copy</button>
+                  <button class="btn btn--ghost btn--sm" type="button" data-generate-password>Generate</button>
+                  <button class="btn btn--ghost btn--sm" type="button" data-copy-dialog-password>Copy</button>
+                  <button class="btn btn--primary btn--sm" type="button" data-apply-password>Set password</button>
+                  <button class="btn btn--ghost btn--sm" type="submit">Close</button>
                 </div>
-              </div>
-            </div>
+              </form>
+            </dialog>
             <div class="overview-box">
               <table class="overview">
                 <thead>
                   <tr>
                     <th>Name</th>
-                    <th>Team</th>
+                    <th>Place</th>
                     <th>Email</th>
                     <th>ES number</th>
                     <th>Mobile</th>
@@ -456,12 +450,10 @@ const scoresHref = url('/captains/admin/minigame/');
   const memberCount = root.querySelector<HTMLElement>('[data-member-count]')!;
   const membersHost = root.querySelector<HTMLElement>('[data-group-members]')!;
   const groupNote = root.querySelector<HTMLElement>('[data-group-note]')!;
-  const rolePicker = root.querySelector<HTMLElement>('[data-role-picker]')!;
-  const rolePickerWho = root.querySelector<HTMLElement>('[data-role-picker-who]')!;
-  const roleOptions = root.querySelector<HTMLElement>('[data-role-options]')!;
-  const resetPasswordPanel = root.querySelector<HTMLElement>('[data-reset-password]')!;
-  const resetWho = root.querySelector<HTMLElement>('[data-reset-who]')!;
-  const resetValue = root.querySelector<HTMLInputElement>('[data-reset-value]')!;
+  const passwordDialog = root.querySelector<HTMLDialogElement>('[data-password-dialog]')!;
+  const passwordDialogWho = root.querySelector<HTMLElement>('[data-password-dialog-who]')!;
+  const passwordDialogError = root.querySelector<HTMLElement>('[data-password-dialog-error]')!;
+  const passwordDialogValue = root.querySelector<HTMLInputElement>('[data-password-dialog-value]')!;
   const createName = root.querySelector<HTMLInputElement>('[data-create-name]')!;
   const createEmail = root.querySelector<HTMLInputElement>('[data-create-email]')!;
   let listedGroups: GroupMember[] = [];
@@ -493,7 +485,8 @@ const scoresHref = url('/captains/admin/minigame/');
   };
   let memberCards: MemberCard[] = [];
   let selectedMemberKey = '';
-  let selectedRoleKey = '';
+  let passwordCardKey = '';
+  const activityChoice = new Map<string, boolean>();
   let groupCatalogLive: GroupCatalog[] = [];
   let roleCatalogLive: RoleCatalog[] = [];
   let protectedAdminId = '';
@@ -718,50 +711,65 @@ const scoresHref = url('/captains/admin/minigame/');
     setStatus(`Password updated for ${passwordWho.textContent}. Nothing was emailed.`);
   });
 
-  root.querySelector('[data-save-roles]')!.addEventListener('click', async () => {
-    const card = memberCards.find((item) => item.key === selectedRoleKey);
-    if (!card?.profileId || !viewerIsAdmin) return;
-    setStatus('Saving roles…');
-    const boxes = [...roleOptions.querySelectorAll<HTMLInputElement>('[data-role-slug]')];
-    for (const box of boxes) {
-      const slug = box.dataset.roleSlug ?? '';
-      const want = box.checked;
-      if (slug === 'admins') {
-        const has = card.isAdmin || card.groupSlugs.includes('admins');
-        if (want === has) continue;
-        if (!want && (card.protectedAccount || card.profileId === viewerId)) {
-          setStatus('That admin access stays as it is.');
-          return;
-        }
-        const message = await callManageAccounts(supabase, { action: 'set-admin', user_id: card.profileId, is_admin: want });
-        if (message) {
-          setStatus(message);
-          return;
-        }
-        continue;
-      }
-      if (want === card.groupSlugs.includes(slug)) continue;
-      const message = await callManageAccounts(supabase, { action: 'set-group', user_id: card.profileId, group_slug: slug, member: want });
-      if (message) {
-        setStatus(message);
-        return;
-      }
-    }
-    rolePicker.hidden = true;
-    setStatus(`Roles saved for ${card.name}.`);
-    await showSession();
+  root.querySelector('[data-generate-password]')!.addEventListener('click', () => {
+    const card = memberCards.find((item) => item.key === passwordCardKey);
+    const email = card?.email.trim().toLowerCase() ?? '';
+    const password = suggestPassword();
+    const issue = passwordIssue(password, email);
+    passwordDialogError.textContent = issue ?? '';
+    if (issue) return;
+    passwordDialogValue.value = password;
+    passwordDialogValue.focus();
+    passwordDialogValue.select();
   });
-  root.querySelector('[data-copy-password]')!.addEventListener('click', async () => {
-    const password = resetValue.value;
-    if (!password) return;
+  root.querySelector('[data-copy-dialog-password]')!.addEventListener('click', async () => {
+    const password = passwordDialogValue.value;
+    if (!password) {
+      passwordDialogError.textContent = 'Generate a password first.';
+      return;
+    }
     try {
       await navigator.clipboard.writeText(password);
-      setStatus('Password copied.');
+      passwordDialogError.textContent = 'Password copied.';
     } catch {
-      resetValue.focus();
-      resetValue.select();
-      setStatus('Select the password and copy it.');
+      passwordDialogValue.focus();
+      passwordDialogValue.select();
+      passwordDialogError.textContent = 'Select the password and copy it.';
     }
+  });
+  root.querySelector('[data-apply-password]')!.addEventListener('click', async () => {
+    const card = memberCards.find((item) => item.key === passwordCardKey);
+    if (!card || !viewerIsAdmin || card.protectedAccount) return;
+    const email = card.email.trim().toLowerCase();
+    const password = passwordDialogValue.value;
+    if (!email) {
+      passwordDialogError.textContent = 'Add an email on the row before setting a password.';
+      return;
+    }
+    if (!password) {
+      passwordDialogError.textContent = 'Generate a password first.';
+      return;
+    }
+    const issue = passwordIssue(password, email);
+    if (issue) {
+      passwordDialogError.textContent = issue;
+      return;
+    }
+    passwordDialogError.textContent = card.profileId ? 'Setting the password…' : 'Creating the login…';
+    const message = card.profileId
+      ? await callManageAccounts(supabase, { action: 'set-password', user_id: card.profileId, password })
+      : await callManageAccounts(supabase, { action: 'create', display_name: card.name, email, password });
+    if (message) {
+      passwordDialogError.textContent = message;
+      return;
+    }
+    if (!card.profileId) {
+      await supabase.rpc('sync_website_player_emails');
+      await supabase.rpc('apply_lm_roles');
+    }
+    passwordDialogError.textContent = 'Password set. Copy it and tell them. Nothing was emailed.';
+    setStatus(`Password set for ${card.name}. Copy it and tell them. Nothing was emailed.`);
+    await showSession();
   });
 
   root.querySelector('[data-cancel-password]')!.addEventListener('click', () => {
@@ -771,56 +779,15 @@ const scoresHref = url('/captains/admin/minigame/');
 
   const onAccountAction = async (event: Event) => {
     const target = event.target as HTMLElement;
-    const openRoles = target.closest<HTMLButtonElement>('[data-open-roles]');
-    if (openRoles?.dataset.openRoles) {
-      const card = memberCards.find((item) => item.key === openRoles.dataset.openRoles);
-      if (!card) return;
-      if (!card.profileId) {
-        rolePicker.hidden = true;
-        setStatus(`Set a password for ${card.name} before adding roles.`);
-        return;
-      }
-      selectedRoleKey = card.key;
-      paintRolePicker(card);
-      rolePicker.hidden = false;
-      rolePicker.scrollIntoView({ block: 'nearest' });
-      return;
-    }
     const resetPassword = target.closest<HTMLButtonElement>('[data-reset-password]');
     if (resetPassword?.dataset.resetPassword) {
       const card = memberCards.find((item) => item.key === resetPassword.dataset.resetPassword);
       if (!card || !viewerIsAdmin || card.protectedAccount) return;
-      const email = card.email.trim().toLowerCase();
-      if (!email) {
-        setStatus(`Add an email for ${card.name} before setting a password.`);
-        return;
-      }
-      const password = suggestPassword();
-      const issue = passwordIssue(password, email);
-      if (issue) {
-        setStatus(issue);
-        return;
-      }
-      setStatus(card.profileId ? 'Setting a password…' : 'Creating the login…');
-      const message = card.profileId
-        ? await callManageAccounts(supabase, { action: 'set-password', user_id: card.profileId, password })
-        : await callManageAccounts(supabase, { action: 'create', display_name: card.name, email, password });
-      if (message) {
-        setStatus(message);
-        return;
-      }
-      if (!card.profileId) {
-        await supabase.rpc('sync_website_player_emails');
-        await supabase.rpc('apply_lm_roles');
-      }
-      resetWho.textContent = card.name;
-      resetValue.value = password;
-      resetPasswordPanel.hidden = false;
-      resetPasswordPanel.scrollIntoView({ block: 'nearest' });
-      resetValue.focus();
-      resetValue.select();
-      setStatus(`Password set for ${card.name}. Copy it and tell them. Nothing was emailed.`);
-      await showSession();
+      passwordCardKey = card.key;
+      passwordDialogWho.textContent = card.name;
+      passwordDialogValue.value = '';
+      passwordDialogError.textContent = card.email.trim() ? '' : 'Add an email on the row before setting a password.';
+      passwordDialog.showModal();
       return;
     }
     const openPassword = target.closest<HTMLButtonElement>('[data-open-password]');
@@ -849,7 +816,7 @@ const scoresHref = url('/captains/admin/minigame/');
         return;
       }
       const who = removePerson.dataset.personName || 'this person';
-      if (!window.confirm(`Delete ${who}? They will no longer be able to sign in.`)) return;
+      if (!window.confirm(`Delete the login for ${who}? Their League Master record stays.`)) return;
       setStatus('Deleting account…');
       const message = await callManageAccounts(supabase, {
         action: 'delete',
@@ -871,18 +838,19 @@ const scoresHref = url('/captains/admin/minigame/');
       }
       const who = setActive.dataset.personName || 'this person';
       const active = setActive.dataset.activeNext === 'true';
-      if (!active && !window.confirm(`Make ${who} inactive? They cannot sign in until you turn the account back on.`)) return;
+      const userId = setActive.dataset.setActive ?? '';
       setStatus(active ? 'Turning the account on…' : 'Turning the account off…');
       const message = await callManageAccounts(supabase, {
         action: 'set-active',
-        user_id: setActive.dataset.setActive,
+        user_id: userId,
         active,
       });
       if (message) {
         setStatus(message);
         return;
       }
-      setStatus(active ? `${who} can sign in.` : `${who} is inactive.`);
+      if (userId) activityChoice.set(userId, active);
+      setStatus(active ? `${who} is active.` : `${who} is inactive.`);
       await showSession();
       return;
     }
@@ -922,7 +890,7 @@ const scoresHref = url('/captains/admin/minigame/');
   };
   membersHost.addEventListener('click', (event) => {
     const target = event.target as HTMLElement;
-    if (target.closest('[data-open-roles], [data-set-active], [data-delete-person], [data-reset-password]')) {
+    if (target.closest('[data-set-active], [data-delete-person], [data-reset-password]')) {
       void onAccountAction(event);
       return;
     }
@@ -931,6 +899,11 @@ const scoresHref = url('/captains/admin/minigame/');
     if (!row?.dataset.memberKey) return;
     selectedMemberKey = row.dataset.memberKey;
     paintMembers();
+  });
+  membersHost.addEventListener('change', (event) => {
+    const select = (event.target as HTMLElement).closest<HTMLSelectElement>('[data-role-select]');
+    if (!select) return;
+    void saveRoleSelect(select);
   });
   membersHost.addEventListener('focusout', (event) => {
     const input = event.target as HTMLInputElement;
@@ -1112,6 +1085,21 @@ const scoresHref = url('/captains/admin/minigame/');
       return `<input data-row-field="${field}" data-row-key="${escapeHtml(card.key)}" aria-label="${label} for ${escapeHtml(card.name)}" type="${type}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" autocomplete="off" />`;
     };
     const actionButton = (label: string, attrs: string) => `<button class="btn btn--ghost btn--sm" type="button" ${attrs}>${label}</button>`;
+    const roleOptions = groupCatalogLive
+      .filter((group) => group.slug === 'admins' || !group.managed)
+      .slice()
+      .sort((a, b) => a.position - b.position);
+    const roleSelect = (card: MemberCard) => {
+      const options = roleOptions
+        .map((group) => {
+          const role = roleCatalogLive.find((item) => item.slug === group.role_slug)?.name ?? group.name;
+          const selected = group.slug === 'admins' ? card.isAdmin || card.groupSlugs.includes('admins') : card.groupSlugs.includes(group.slug);
+          const locked = group.slug === 'admins' && (!card.profileId || card.protectedAccount || card.profileId === viewerId);
+          return `<option value="${escapeHtml(group.slug)}" ${selected ? 'selected' : ''} ${locked ? 'disabled' : ''}>${escapeHtml(role)}</option>`;
+        })
+        .join('');
+      return `<select multiple data-role-select="${escapeHtml(card.key)}" aria-label="Roles for ${escapeHtml(card.name)}" size="${Math.max(roleOptions.length, 1)}">${options}</select>`;
+    };
     membersHost.innerHTML = shown.length
       ? shown
           .map((card) => {
@@ -1119,41 +1107,67 @@ const scoresHref = url('/captains/admin/minigame/');
             const email = contactCell(card, 'email', card.protectedAccount ? '' : card.email, 'Email', 'email', 'Add an email');
             const es = contactCell(card, 'es', card.es, 'ES number', 'text', 'Add an ES number');
             const mobile = contactCell(card, 'phone', card.phone, 'Mobile', 'tel', 'Add a mobile number');
-            const roles = actionButton('Roles', `data-open-roles="${escapeHtml(card.key)}" aria-label="Roles for ${escapeHtml(card.name)}"`);
+            const activeLabel = card.active ? 'Active' : 'Inactive';
             const active =
               viewerIsAdmin && card.profileId && !card.protectedAccount && card.profileId !== viewerId
-                ? actionButton(
-                    card.active ? 'Make inactive' : 'Make active',
-                    `data-set-active="${card.profileId}" data-active-next="${card.active ? 'false' : 'true'}" data-person-name="${escapeHtml(card.name)}" aria-label="${card.active ? 'Make inactive' : 'Make active'} ${escapeHtml(card.name)}"`,
-                  )
+                ? `<button class="btn btn--sm ${card.active ? 'status-active' : 'status-inactive'}" type="button" data-set-active="${card.profileId}" data-active-next="${card.active ? 'false' : 'true'}" data-person-name="${escapeHtml(card.name)}" aria-label="${activeLabel} for ${escapeHtml(card.name)}">${activeLabel}</button>`
                 : '—';
             const password = viewerIsAdmin && !card.protectedAccount ? actionButton('Password', `data-reset-password="${escapeHtml(card.key)}" aria-label="Password for ${escapeHtml(card.name)}"`) : '—';
             const remove =
               viewerIsAdmin && card.profileId && !card.protectedAccount
-                ? actionButton('Delete', `data-delete-person="${card.profileId}" data-person-name="${escapeHtml(card.name)}" aria-label="Delete ${escapeHtml(card.name)}"`)
+                ? actionButton('Delete', `data-delete-person="${card.profileId}" data-person-name="${escapeHtml(card.name)}" aria-label="Delete ${escapeHtml(card.name)}" title="Deletes the login only. The League Master record stays."`)
                 : '—';
-            return `<tr${selected} data-member-key="${escapeHtml(card.key)}"><td>${escapeHtml(card.label)}</td><td>${escapeHtml(card.teams || '—')}</td><td>${email}</td><td>${es}</td><td>${mobile}</td><td class="row-action">${roles}</td><td class="row-action">${active}</td><td class="row-action">${password}</td><td class="row-action">${remove}</td><td>${escapeHtml(card.statusHtml)}</td><td>${escapeHtml(card.lastLogin)}</td></tr>`;
+            return `<tr${selected} data-member-key="${escapeHtml(card.key)}"><td>${escapeHtml(card.label)}</td><td>${escapeHtml(card.teams || '—')}</td><td>${email}</td><td>${es}</td><td>${mobile}</td><td class="row-action">${roleSelect(card)}</td><td class="row-action">${active}</td><td class="row-action">${password}</td><td class="row-action">${remove}</td><td>${escapeHtml(card.statusHtml)}</td><td>${escapeHtml(card.lastLogin)}</td></tr>`;
           })
           .join('')
       : `<tr><td colspan="11">${players.length ? 'No players match that search.' : 'No League Master players yet.'}</td></tr>`;
     createAccountForm.hidden = true;
   }
-  function paintRolePicker(card: MemberCard) {
-    rolePickerWho.textContent = card.name;
-    const choices = groupCatalogLive
-      .filter((group) => group.slug === 'admins' || !group.managed)
-      .slice()
-      .sort((a, b) => a.position - b.position);
-    roleOptions.innerHTML = choices.length
-      ? choices
-          .map((group) => {
-            const role = roleCatalogLive.find((item) => item.slug === group.role_slug)?.name ?? group.name;
-            const checked = group.slug === 'admins' ? card.isAdmin || card.groupSlugs.includes('admins') : card.groupSlugs.includes(group.slug);
-            const locked = !card.profileId || (group.slug === 'admins' && (card.protectedAccount || card.profileId === viewerId));
-            return `<label><input type="checkbox" data-role-slug="${escapeHtml(group.slug)}" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''} /> ${escapeHtml(role)}</label>`;
-          })
-          .join('')
-      : '<p class="muted small">Roles are not on the database yet.</p>';
+  async function saveRoleSelect(select: HTMLSelectElement) {
+    const card = memberCards.find((item) => item.key === (select.dataset.roleSelect ?? ''));
+    if (!card || !viewerIsAdmin) return;
+    const wanted = new Set([...select.selectedOptions].map((option) => option.value));
+    const choices = groupCatalogLive.filter((group) => group.slug === 'admins' || !group.managed);
+    setStatus('Saving roles…');
+    for (const group of choices) {
+      const slug = group.slug;
+      const want = wanted.has(slug);
+      if (slug === 'admins') {
+        const has = card.isAdmin || card.groupSlugs.includes('admins');
+        if (want === has) continue;
+        if (!card.profileId) {
+          setStatus(`Set a password for ${card.name} before adding Admin.`);
+          paintMembers();
+          return;
+        }
+        if (!want && (card.protectedAccount || card.profileId === viewerId)) {
+          setStatus('That admin access stays as it is.');
+          paintMembers();
+          return;
+        }
+        const message = await callManageAccounts(supabase, { action: 'set-admin', user_id: card.profileId, is_admin: want });
+        if (message) {
+          setStatus(message);
+          paintMembers();
+          return;
+        }
+        continue;
+      }
+      if (want === card.groupSlugs.includes(slug)) continue;
+      const message = await callManageAccounts(
+        supabase,
+        card.profileId
+          ? { action: 'set-group', user_id: card.profileId, person_name: card.name, group_slug: slug, member: want }
+          : { action: 'set-group', person_name: card.name, group_slug: slug, member: want },
+      );
+      if (message) {
+        setStatus(message);
+        paintMembers();
+        return;
+      }
+    }
+    setStatus(`Roles saved for ${card.name}.`);
+    await showSession();
   }
   const looseKey = (value: string) =>
     value
@@ -1966,7 +1980,9 @@ const scoresHref = url('/captains/admin/minigame/');
         .map((role) => role.name);
       if (profile?.is_admin && !roleNames.includes('Admin')) roleNames.unshift('Admin');
       const state = profile ? stateById.get(profile.id) : undefined;
-      const active = state ? state.active : true;
+      const chosen = profile ? activityChoice.get(profile.id) : undefined;
+      if (profile && chosen !== undefined && state && state.active === chosen) activityChoice.delete(profile.id);
+      const active = profile ? (activityChoice.get(profile.id) ?? (state ? state.active : true)) : true;
       const isDefault = (profile?.email || '').trim().toLowerCase() === 'county-admin@players.invalid';
       const listed = directoryRows.filter((row) => contactNames.has(nameKey(row.name)) && row.team);
       const fromPlaces = groups.flatMap((group) =>
@@ -1981,7 +1997,8 @@ const scoresHref = url('/captains/admin/minigame/');
           })
           .filter(Boolean),
       );
-      const teams = [...new Set(listed.length ? listed.map((row) => row.team) : fromPlaces)];
+      const teamNameOnly = (label: string) => label.split(' · ')[0].trim();
+      const teams = [...new Set((listed.length ? listed.map((row) => row.team) : fromPlaces).map(teamNameOnly).filter(Boolean))];
       cards.set(key, {
         key,
         name: display,
@@ -2560,6 +2577,38 @@ const scoresHref = url('/captains/admin/minigame/');
     border-style: hidden;
     font-size: 0.82rem;
     line-height: 1.25;
+  }
+  #setup-app .overview td select {
+    width: 100%;
+    min-width: 9rem;
+    background: #fff;
+    color: #0e2744;
+    color-scheme: light;
+    border: 1px solid rgba(14, 39, 68, 0.25);
+    border-radius: var(--radius-sm);
+    font: inherit;
+    font-size: 0.82rem;
+  }
+  #setup-app .overview .status-active {
+    background: #15803d;
+    border-color: #15803d;
+    color: #fff;
+  }
+  #setup-app .overview .status-inactive {
+    background: #b91c1c;
+    border-color: #b91c1c;
+    color: #fff;
+  }
+  #setup-app .account-dialog {
+    border: 2px solid var(--gold-500);
+    border-radius: var(--radius);
+    background: #fff;
+    color: #0e2744;
+    padding: 1rem 1.1rem;
+    max-width: 28rem;
+  }
+  #setup-app .account-dialog::backdrop {
+    background: rgba(14, 39, 68, 0.45);
   }
   #setup-app .overview td input {
     width: 100%;
