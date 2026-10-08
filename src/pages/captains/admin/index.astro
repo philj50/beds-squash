@@ -21,7 +21,7 @@ const scoresHref = url('/captains/admin/minigame/');
       <h1>Administration</h1>
       <p class="lede">
         <strong>League Master</strong> lists club captains, team captains, and players. Those lists are read only. The next import replaces names, emails, and England Squash numbers. Phone stays on this website.
-        <strong>Juniors</strong> lists junior players. <strong>Beds Closed</strong> will be used later.
+        <strong>Juniors</strong> lists the Junior County Closed entries submitted on this website. <strong>Beds Closed</strong> will be used later.
         <strong>SquashLevels</strong> shows each player’s level.
         <strong>Permissions</strong> is Users, Groups, and Roles, and only an admin sees it. Users is every League Master player. Update the email, ES number, and phone there, and change the password, turn the account off, or delete it when a login exists. A group gives one role. League Master fills the club, team, and player groups. Someone in those groups who is on SquashLevels also receives SL Player.
         <strong>Links</strong> joins a League Master player to their SquashLevels name when the names differ.
@@ -108,13 +108,22 @@ const scoresHref = url('/captains/admin/minigame/');
 
           <section class="admin-panel" data-tab="juniors" hidden>
             <h2>Juniors</h2>
-            <p class="muted small">Junior players, kept on this website. Organisers are not listed here.</p>
+            <p class="muted small">Junior County Closed entries submitted on this website, with the details from the entry form.</p>
             <div class="overview-box">
               <table class="overview">
                 <thead>
                   <tr>
-                    <th>Name</th>
-                    <th>Place</th>
+                    <th>Player</th>
+                    <th>Date of birth</th>
+                    <th>Age group</th>
+                    <th>Section</th>
+                    <th>Club</th>
+                    <th>Parent</th>
+                    <th>Parent email</th>
+                    <th>Parent phone</th>
+                    <th>Emergency</th>
+                    <th>Emergency phone</th>
+                    <th>Notes</th>
                   </tr>
                 </thead>
                 <tbody data-juniors-people></tbody>
@@ -243,7 +252,7 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="permissions-groups" data-lm-only hidden>
             <h2>Groups</h2>
             <p class="muted small">
-              Each group gives one role. League Master refills the club, team, and player groups. SL Players are people in those groups who are also on SquashLevels. Admins are the admin accounts. The other groups are kept on this website. People are listed on Members.
+              Each group gives one role. The number of people opens the list. Choose a person to update the email, ES number, and phone, and to use the account actions.
             </p>
             <div class="overview-box">
               <table class="overview">
@@ -257,6 +266,20 @@ const scoresHref = url('/captains/admin/minigame/');
                 </thead>
                 <tbody data-permission-groups></tbody>
               </table>
+            </div>
+            <div data-group-people hidden>
+              <h3 data-group-people-title></h3>
+              <div class="overview-box">
+                <table class="overview">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Place</th>
+                    </tr>
+                  </thead>
+                  <tbody data-group-people-rows></tbody>
+                </table>
+              </div>
             </div>
           </section>
 
@@ -376,7 +399,7 @@ const scoresHref = url('/captains/admin/minigame/');
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { bindPasswordRules, bindPasswordToggles, callManageAccounts, fetchAccountStates, fetchProtectedAdmin, fillSuggestedPassword, passwordIssue } from '@/lib/passwords';
+  import { bindPasswordRules, bindPasswordToggles, callManageAccounts, fetchAccountStates, fillSuggestedPassword, passwordIssue } from '@/lib/passwords';
   import { loadAccount, sendToLogin, type Account } from '@/lib/account';
 
   type Person = { id: string; display_name: string; email: string | null; is_admin: boolean };
@@ -850,6 +873,10 @@ const scoresHref = url('/captains/admin/minigame/');
   const nameKey = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
   const permissionGroupsHost = root.querySelector<HTMLElement>('[data-permission-groups]')!;
   const permissionRolesHost = root.querySelector<HTMLElement>('[data-permission-roles]')!;
+  const groupPeoplePanel = root.querySelector<HTMLElement>('[data-group-people]')!;
+  const groupPeopleTitle = root.querySelector<HTMLElement>('[data-group-people-title]')!;
+  const groupPeopleRows = root.querySelector<HTMLElement>('[data-group-people-rows]')!;
+  let openGroupSlug = '';
   const filledFrom = (group: GroupCatalog) => {
     if (!group.managed) return 'This website';
     if (group.source === 'squashlevels') return 'SquashLevels';
@@ -862,7 +889,7 @@ const scoresHref = url('/captains/admin/minigame/');
           .map((group) => {
             const role = roleCatalog.find((item) => item.slug === group.role_slug)?.name ?? group.role_slug;
             const people = members.filter((member) => member.group_slug === group.slug).length;
-            return `<tr><td>${escapeHtml(group.name)}</td><td>${escapeHtml(role)}</td><td>${escapeHtml(filledFrom(group))}</td><td>${people}</td></tr>`;
+            return `<tr><td>${escapeHtml(group.name)}</td><td>${escapeHtml(role)}</td><td>${escapeHtml(filledFrom(group))}</td><td><button type="button" class="count-button" data-open-group="${escapeHtml(group.slug)}">${people}</button></td></tr>`;
           })
           .join('')
       : '<tr><td colspan="4">Groups are not on the database yet.</td></tr>';
@@ -875,14 +902,76 @@ const scoresHref = url('/captains/admin/minigame/');
           .join('')
       : '<tr><td colspan="2">Roles are not on the database yet.</td></tr>';
   }
+  function paintGroupPeople() {
+    const group = groupCatalogLive.find((item) => item.slug === openGroupSlug);
+    const people = listedGroups
+      .filter((member) => member.group_slug === openGroupSlug)
+      .slice()
+      .sort((a, b) => a.person_name.localeCompare(b.person_name, 'en'));
+    if (!group || !people.length) {
+      groupPeoplePanel.hidden = true;
+      groupPeopleRows.innerHTML = '';
+      return;
+    }
+    groupPeoplePanel.hidden = false;
+    const role = roleCatalogLive.find((item) => item.slug === group.role_slug)?.name ?? group.name;
+    groupPeopleTitle.textContent = `${group.name} · ${role}`;
+    groupPeopleRows.innerHTML = people
+      .map((member) => {
+        const card = memberCards.find(
+          (item) =>
+            (member.profile_id && item.profileId === member.profile_id) ||
+            nameKey(item.name) === nameKey(member.person_name) ||
+            nameKey(item.profileName) === nameKey(member.person_name),
+        );
+        const key = card?.key ?? '';
+        return `<tr><td><button type="button" class="count-button" data-open-person="${escapeHtml(key)}">${escapeHtml(member.person_name)}</button></td><td>${escapeHtml(member.place || '—')}</td></tr>`;
+      })
+      .join('');
+  }
+  permissionGroupsHost.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-open-group]');
+    if (!button?.dataset.openGroup) return;
+    openGroupSlug = openGroupSlug === button.dataset.openGroup ? '' : button.dataset.openGroup;
+    paintGroupPeople();
+  });
+  groupPeopleRows.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-open-person]');
+    if (!button?.dataset.openPerson) return;
+    selectedMemberKey = button.dataset.openPerson;
+    showTab('members');
+    paintMembers();
+    memberForm.scrollIntoView({ block: 'nearest' });
+  });
   const juniorsHost = root.querySelector<HTMLElement>('[data-juniors-people]')!;
-  function paintCompetitions(members: GroupMember[]) {
-    const juniors = members.filter((member) => member.group_slug === 'jc_players');
-    juniorsHost.innerHTML = juniors.length
-      ? juniors
-          .map((member) => `<tr><td>${escapeHtml(member.person_name)}</td><td>${escapeHtml(member.place || '—')}</td></tr>`)
+  type JuniorEntry = {
+    player_first_name: string;
+    player_last_name: string;
+    date_of_birth: string;
+    age_category: string;
+    draw: string;
+    club: string;
+    guardian_name: string;
+    guardian_email: string;
+    guardian_phone: string;
+    emergency_name: string;
+    emergency_phone: string;
+    notes: string | null;
+  };
+  function paintJuniorEntries(entries: JuniorEntry[], problem = '') {
+    if (problem) {
+      juniorsHost.innerHTML = `<tr><td colspan="11">${escapeHtml(problem)}</td></tr>`;
+      return;
+    }
+    const rows = entries.slice().sort((a, b) => a.player_last_name.localeCompare(b.player_last_name, 'en') || a.player_first_name.localeCompare(b.player_first_name, 'en'));
+    juniorsHost.innerHTML = rows.length
+      ? rows
+          .map((entry) => {
+            const born = entry.date_of_birth ? formatDay(entry.date_of_birth.slice(0, 10)) : '—';
+            return `<tr><td>${escapeHtml(`${entry.player_first_name} ${entry.player_last_name}`.trim())}</td><td>${escapeHtml(born)}</td><td>${escapeHtml(entry.age_category || '—')}</td><td>${escapeHtml(entry.draw || '—')}</td><td>${escapeHtml(entry.club || '—')}</td><td>${escapeHtml(entry.guardian_name || '—')}</td><td>${escapeHtml(entry.guardian_email || '—')}</td><td>${escapeHtml(entry.guardian_phone || '—')}</td><td>${escapeHtml(entry.emergency_name || '—')}</td><td>${escapeHtml(entry.emergency_phone || '—')}</td><td>${escapeHtml(entry.notes || '—')}</td></tr>`;
+          })
           .join('')
-      : '<tr><td colspan="2">No junior players yet.</td></tr>';
+      : '<tr><td colspan="11">No junior entries yet.</td></tr>';
   }
   function paintMembers() {
     const query = memberSearch.value.trim().toLowerCase();
@@ -1043,7 +1132,7 @@ const scoresHref = url('/captains/admin/minigame/');
     return linkedTo(slByLoose.get(looseKey(lmName)));
   };
 
-  const siteTable = (rows: SiteRow[], fields: 'all' | 'open' | 'none', showTeam: boolean, showRole = true) => {
+  const siteTable = (rows: SiteRow[], fields: 'all' | 'open' | 'none', showTeam: boolean) => {
     const box = (row: SiteRow, field: 'email' | 'es' | 'phone', value: string, label: string, type: string) =>
       `<input data-squad-field="${field}" data-squad-email="${row.playerId || ''}" data-team-id="${row.teamId ?? ''}" data-team-name="${escapeHtml(row.team)}" data-player-name="${escapeHtml(row.name)}" data-saved="${escapeHtml(value)}" aria-label="${label} for ${escapeHtml(row.name)}" type="${type}" value="${escapeHtml(value)}" autocomplete="off" />`;
     const body = rows
@@ -1059,13 +1148,11 @@ const scoresHref = url('/captains/admin/minigame/');
           ? `${escapeHtml(matched.player.display_name)}${matched.linked ? ' <span class="pill">Linked</span>' : ''}`
           : '—';
         const slLevel = matched.player ? levelText(matched.player.current_level) : '—';
-        const roleCell = showRole ? `<td>${escapeHtml(row.role)}</td>` : '';
-        return `<tr>${teamCell}<td>${escapeHtml(row.name)}</td><td>${slName}</td><td data-sl-level>${slLevel}</td><td>${emailCell}</td><td>${esCell}</td><td>${phoneCell}</td>${roleCell}</tr>`;
+        return `<tr>${teamCell}<td>${escapeHtml(row.name)}</td><td>${slName}</td><td data-sl-level>${slLevel}</td><td>${emailCell}</td><td>${esCell}</td><td>${phoneCell}</td></tr>`;
       })
       .join('');
     const teamHead = showTeam ? '<th>Team</th>' : '';
-    const roleHead = showRole ? '<th>Role</th>' : '';
-    return `<div class="overview-box"><table class="overview"><thead><tr>${teamHead}<th>LM name</th><th>SL name</th><th>SL level</th><th>Email</th><th>ES number</th><th>Phone</th>${roleHead}</tr></thead><tbody>${body}</tbody></table></div>`;
+    return `<div class="overview-box"><table class="overview"><thead><tr>${teamHead}<th>LM name</th><th>SL name</th><th>SL level</th><th>Email</th><th>ES number</th><th>Phone</th></tr></thead><tbody>${body}</tbody></table></div>`;
   };
 
   async function loadWebsite(account: Account) {
@@ -1584,6 +1671,7 @@ const scoresHref = url('/captains/admin/minigame/');
       { data: groupRows, error: groupError },
       { data: groupCatalogRows, error: groupCatalogError },
       { data: permissionRows, error: permissionError },
+      { data: juniorRows, error: juniorError },
     ] = await Promise.all([
       supabase.from('profiles').select('id, display_name, email, is_admin').order('display_name', { ascending: true }),
       fetchAccountStates(supabase),
@@ -1595,6 +1683,7 @@ const scoresHref = url('/captains/admin/minigame/');
       supabase.from('group_members').select('profile_id, person_name, place, group_slug'),
       supabase.from('groups').select('slug, name, role_slug, source, managed, position').order('position'),
       supabase.from('roles').select('slug, name, position').order('position'),
+      supabase.from('junior_entries').select('player_first_name, player_last_name, date_of_birth, age_category, draw, club, guardian_name, guardian_email, guardian_phone, emergency_name, emergency_phone, notes').order('player_last_name'),
     ]);
     if (peopleError || clubError || orgError || roleError) {
       setStatus(peopleError?.message || clubError?.message || orgError?.message || roleError?.message || 'Could not load the lists.');
@@ -1616,7 +1705,7 @@ const scoresHref = url('/captains/admin/minigame/');
     groupCatalogLive = groupCatalog;
     roleCatalogLive = roleCatalog;
     paintPermissionCatalog(groupCatalog, roleCatalog, groupMembers);
-    paintCompetitions(groupMembers);
+    paintJuniorEntries((juniorError ? [] : (juniorRows ?? [])) as JuniorEntry[], juniorError?.message ?? '');
     if (groupError || groupCatalogError || permissionError) groupNote.textContent = 'Groups are not on the database yet. Apply the groups migration, then reload.';
     const clubNames = new Map(clubs.map((club) => [club.slug, club.name]));
     const dash = '—';
@@ -1645,10 +1734,8 @@ const scoresHref = url('/captains/admin/minigame/');
       })
       .sort((a, b) => a.club.localeCompare(b.club, 'en') || a.team.localeCompare(b.team, 'en') || a.name.localeCompare(b.name, 'en'));
 
-    const fetchedAdmin = await fetchProtectedAdmin(supabase);
-    const onlyAdmin = accounts.filter((person) => person.is_admin);
     const countyAdmin = accounts.find((person) => (person.email || '').toLowerCase() === 'county-admin@players.invalid');
-    protectedAdminId = countyAdmin?.id || fetchedAdmin || (onlyAdmin.length === 1 ? onlyAdmin[0].id : '');
+    protectedAdminId = countyAdmin?.id || '';
     const selfId = account.userId;
     const one = (value: { display_name?: string; email?: string | null; name?: string; division?: string | null } | { display_name?: string; email?: string | null; name?: string; division?: string | null }[] | null) =>
       Array.isArray(value) ? value[0] : value;
@@ -1757,7 +1844,7 @@ const scoresHref = url('/captains/admin/minigame/');
       if (profile?.is_admin && !roleNames.includes('Admin')) roleNames.unshift('Admin');
       const state = profile ? stateById.get(profile.id) : undefined;
       const active = state ? state.active : true;
-      const isDefault = profile?.id === protectedAdminId;
+      const isDefault = (profile?.email || '').trim().toLowerCase() === 'county-admin@players.invalid';
       const listed = directoryRows.find((row) => nameKey(row.name) === nameKey(display));
       cards.set(key, {
         key,
@@ -2384,17 +2471,18 @@ const scoresHref = url('/captains/admin/minigame/');
   #setup-app .directory td[rowspan] {
     background: var(--ink-800);
   }
-  #setup-app .link-button {
+  #setup-app .count-button {
     background: none;
     border: none;
     padding: 0;
-    color: #fff;
+    color: var(--gold-600);
     font: inherit;
-    font-weight: 600;
+    font-weight: 700;
     text-align: left;
     cursor: pointer;
+    text-decoration: underline;
   }
-  #setup-app .link-button:hover {
+  #setup-app .count-button:hover {
     text-decoration: underline;
   }
 
