@@ -23,8 +23,8 @@ const scoresHref = url('/captains/admin/minigame/');
       <p class="lede">
         <strong>League Master</strong> is the source for clubs, captains, and player names, emails, and England Squash numbers. The next import replaces those copies. Phone stays on this website.
         <strong>SquashLevels</strong> shows each player’s level.
-        <strong>This website</strong> is Club, Team and Player, plus Members.
-        <strong>Permissions</strong> lists the groups and the role each group gives. People are not added to a role directly. League Master fills the club, team, and player groups. Someone in those groups who is on SquashLevels also receives SL Player. Admin accounts are the Admins group. Members lists everyone in those groups, and the filter chooses which group to see.
+        <strong>This website</strong> is Club, Team and Player.
+        <strong>Permissions</strong> is Members, Groups, and Roles. A group gives one role. People are not added to a role directly. League Master fills the club, team, and player groups. Someone in those groups who is on SquashLevels also receives SL Player. Admin accounts are the Admins group. Members lists everyone in those groups, and the filter chooses which group to see.
         <strong>Links</strong> joins a League Master player to their SquashLevels name when the names differ.
         A club captain sees their club. A team captain sees their team. A player sees their own row. Nothing is emailed.
       </p>
@@ -51,7 +51,6 @@ const scoresHref = url('/captains/admin/minigame/');
                 <button type="button" data-tab-button="site-club">Club</button>
                 <button type="button" data-tab-button="site-team">Team</button>
                 <button type="button" data-tab-button="site-player">Player</button>
-                <button type="button" data-lm-only data-tab-button="members">Members</button>
               </span>
             </span>
             <span class="tab-group">
@@ -63,6 +62,7 @@ const scoresHref = url('/captains/admin/minigame/');
             <span class="tab-group" data-lm-only>
               <span class="tab-label">Permissions</span>
               <span class="tab-buttons">
+                <button type="button" data-lm-only data-tab-button="members">Members</button>
                 <button type="button" data-lm-only data-tab-button="permissions-groups">Groups</button>
                 <button type="button" data-lm-only data-tab-button="permissions-roles">Roles</button>
               </span>
@@ -963,7 +963,8 @@ const scoresHref = url('/captains/admin/minigame/');
 
   let slCatalog: SlPlayer[] = [];
   let slLinks: { id: number; lm_player_name: string | null; squashlevels_player_id: number | null }[] = [];
-  let canPickSl = false;
+  let slByName = new Map<string, SlPlayer>();
+  let slByLoose = new Map<string, SlPlayer>();
 
   const allSlPlayers = async () => {
     const rows: SlPlayer[] = [];
@@ -997,9 +998,15 @@ const scoresHref = url('/captains/admin/minigame/');
   };
 
   const slMatch = (lmName: string) => {
+    const linkedTo = (player: SlPlayer | null | undefined) => {
+      if (!player) return { player: null as SlPlayer | null, linked: false };
+      return { player, linked: nameKey(player.display_name) !== nameKey(lmName) };
+    };
     const link = slLinks.find((item) => item.lm_player_name && nameKey(item.lm_player_name) === nameKey(lmName) && item.squashlevels_player_id != null);
-    if (link) return slCatalog.find((player) => player.id === link.squashlevels_player_id) ?? null;
-    return slCatalog.find((player) => nameKey(player.display_name) === nameKey(lmName)) ?? null;
+    if (link) return linkedTo(slCatalog.find((player) => player.id === link.squashlevels_player_id));
+    const exact = slCatalog.find((player) => nameKey(player.display_name) === nameKey(lmName)) ?? slByName.get(nameKey(lmName));
+    if (exact) return { player: exact, linked: false };
+    return linkedTo(slByLoose.get(looseKey(lmName)));
   };
 
   const siteTable = (rows: SiteRow[], fields: 'all' | 'open' | 'none', showTeam: boolean, showRole = true) => {
@@ -1014,14 +1021,10 @@ const scoresHref = url('/captains/admin/minigame/');
         const phoneCell = detailsOpen ? box(row, 'phone', row.phone, 'Phone', 'tel') : escapeHtml(row.phone || '—');
         const teamCell = showTeam ? `<td>${escapeHtml(row.team)}</td>` : '';
         const matched = slMatch(row.name);
-        const slName = matched
-          ? escapeHtml(matched.display_name)
-          : fields !== 'none' && canPickSl
-            ? `<select data-sl-pick data-player-name="${escapeHtml(row.name)}" aria-label="SquashLevels for ${escapeHtml(row.name)}"><option value="">Choose</option>${slCatalog
-                .map((player) => `<option value="${player.id}">${escapeHtml(player.display_name)}</option>`)
-                .join('')}</select>`
-            : '—';
-        const slLevel = matched ? levelText(matched.current_level) : '—';
+        const slName = matched.player
+          ? `${escapeHtml(matched.player.display_name)}${matched.linked ? ' <span class="pill">Linked</span>' : ''}`
+          : '—';
+        const slLevel = matched.player ? levelText(matched.player.current_level) : '—';
         const roleCell = showRole ? `<td>${escapeHtml(row.role)}</td>` : '';
         return `<tr>${teamCell}<td>${escapeHtml(row.name)}</td><td>${slName}</td><td data-sl-level>${slLevel}</td><td>${emailCell}</td><td>${esCell}</td><td>${phoneCell}</td>${roleCell}</tr>`;
       })
@@ -1063,7 +1066,17 @@ const scoresHref = url('/captains/admin/minigame/');
     personContacts = [];
     const slPlayers = (slRows ?? []) as SlPlayer[];
     slCatalog = slPlayers;
-    canPickSl = account.isAdmin;
+    slByName = new Map();
+    slByLoose = new Map();
+    for (const player of slPlayers) {
+      const key = nameKey(player.display_name);
+      if (!slByName.has(key)) slByName.set(key, player);
+    }
+    for (const stored of (nameResult.error ? [] : (nameResult.data ?? [])) as { name_key: string; player_id: number | null }[]) {
+      if (stored.player_id == null || slByLoose.has(stored.name_key)) continue;
+      const player = slPlayers.find((item) => item.id === stored.player_id);
+      if (player) slByLoose.set(stored.name_key, player);
+    }
     type PlayerLink = { id: number; profile_id: string | null; squashlevels_player_id: number | null; lm_player_name: string | null };
     const playerLinks = (linkResult.error ? [] : (linkResult.data ?? [])) as PlayerLink[];
     slLinks = playerLinks;
@@ -1078,8 +1091,6 @@ const scoresHref = url('/captains/admin/minigame/');
     }
     const levelFromLink = (link: PlayerLink | undefined) =>
       link?.squashlevels_player_id != null ? slPlayers.find((player) => player.id === link.squashlevels_player_id) : undefined;
-    const slByName = new Map<string, SlPlayer>();
-    const slByLoose = new Map<string, SlPlayer>();
     const levelFor = (row: SiteRow) => {
       const byLm = levelFromLink(playerLinks.find((link) => link.lm_player_name && nameKey(link.lm_player_name) === nameKey(row.name)));
       if (byLm) return byLm;
@@ -1228,7 +1239,7 @@ const scoresHref = url('/captains/admin/minigame/');
     teamNote.textContent = (account.isAdmin ? 'Every team.' : 'Your team.') + readOnlyNote;
     playerNote.textContent = (account.playerOnly
       ? 'Your own row.'
-      : 'The players you look after. A player can change only their own row. Only an admin can add someone who is not on League Master.') + roleNote + (account.isAdmin ? ' When the League Master name does not match SquashLevels, choose the SquashLevels name here.' : '') + ' An email that matches League Master is locked: a club contact, then a captain, then a player.';
+      : 'The players you look after. A player can change only their own row. Only an admin can add someone who is not on League Master.') + roleNote + ' SquashLevels names that are not an exact match come from Links, and are marked Linked.' + ' An email that matches League Master is locked: a club contact, then a captain, then a player.';
 
     const clubsHere = clubList.filter((club) => (account.playerOnly ? homeClubSlugs.has(club.slug) : hasClubRole ? clubSlugs.has(club.slug) : homeClubSlugs.has(club.slug)));
     const paintClub = (heading: string) => {
@@ -1293,16 +1304,6 @@ const scoresHref = url('/captains/admin/minigame/');
       : '';
     playerListHost.innerHTML = `${playerRows.length ? siteTable(playerRows, playerEditable ? 'all' : 'none', true) : '<p class="muted small">No players on this list yet.</p>'}${addPlayer}`;
 
-    const playerById = new Map(slPlayers.map((player) => [player.id, player]));
-    for (const player of slPlayers) {
-      const key = nameKey(player.display_name);
-      if (!slByName.has(key)) slByName.set(key, player);
-    }
-    for (const stored of (nameResult.error ? [] : (nameResult.data ?? [])) as { name_key: string; player_id: number | null }[]) {
-      if (stored.player_id == null || slByLoose.has(stored.name_key)) continue;
-      const player = playerById.get(stored.player_id);
-      if (player) slByLoose.set(stored.name_key, player);
-    }
     const slScope = account.playerOnly ? clubRowsScoped.filter((row) => isSelf(account, row.name, row.email)) : clubRowsScoped;
     slNote.textContent = account.playerOnly
       ? 'Your SquashLevels record, and the full history.'
@@ -1494,45 +1495,7 @@ const scoresHref = url('/captains/admin/minigame/');
       const input = (event.target as HTMLElement).closest<HTMLInputElement>('[data-squad-field]');
       if (input) void savePlayerField(input);
     });
-    host.addEventListener('change', (event) => {
-      const select = (event.target as HTMLElement).closest<HTMLSelectElement>('[data-sl-pick]');
-      if (select) void saveSlPick(select);
-    });
   }
-
-  const saveSlPick = async (select: HTMLSelectElement) => {
-    const lmName = select.dataset.playerName ?? '';
-    const slId = Number(select.value);
-    const chosen = slCatalog.find((player) => player.id === slId);
-    const levelCell = select.closest('td')?.nextElementSibling;
-    if (!lmName || !chosen || !levelCell) return;
-    setStatus('Saving SquashLevels…');
-    const existing = slLinks.find((link) => link.lm_player_name && nameKey(link.lm_player_name) === nameKey(lmName));
-    if (existing?.id) {
-      const { error } = await supabase.from('player_links').delete().eq('id', existing.id);
-      if (error) {
-        setStatus(error.message);
-        select.value = '';
-        return;
-      }
-    }
-    const { data, error } = await supabase
-      .from('player_links')
-      .insert({ lm_player_name: lmName, squashlevels_player_id: slId })
-      .select('id')
-      .single();
-    if (error || !data) {
-      setStatus(error?.code === '23505' ? 'That SquashLevels player is already linked to someone else.' : error?.message || 'Could not save the SquashLevels name.');
-      select.value = '';
-      return;
-    }
-    slLinks = slLinks.filter((link) => link.id !== existing?.id);
-    slLinks.push({ id: data.id as number, lm_player_name: lmName, squashlevels_player_id: slId });
-    const nameCell = select.closest('td');
-    if (nameCell) nameCell.textContent = chosen.display_name;
-    levelCell.textContent = levelText(chosen.current_level);
-    setStatus(`SquashLevels saved for ${lmName}.`);
-  };
 
   playerListHost.addEventListener('submit', async (event) => {
     const form = (event.target as HTMLElement).closest<HTMLFormElement>('[data-form="add-player"]');

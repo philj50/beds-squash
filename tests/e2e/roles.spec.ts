@@ -692,13 +692,14 @@ test.describe('Club captain, team captain, and player', () => {
 
     await page.getByRole('button', { name: 'Player', exact: true }).click();
     const zoe = page.locator('[data-site-player-list] tr', { hasText: 'Zoe Player' });
-    await expect(zoe.getByRole('combobox', { name: 'SquashLevels for Zoe Player' })).toBeVisible();
-    await zoe.getByRole('combobox', { name: 'SquashLevels for Zoe Player' }).selectOption({ label: 'Pat Player' });
-    await expect(zoe).toContainText('4,321');
     await expect(zoe.getByRole('combobox')).toHaveCount(0);
+    await expect(zoe).toContainText('Pat Player');
+    await expect(zoe).toContainText('Linked');
+    await expect(zoe).toContainText('4,321');
     const patTeam = page.getByRole('row', { name: /Pat Player Pat Player 4,321/ });
     await expect(patTeam).toHaveCount(1);
     await expect(patTeam.getByRole('combobox')).toHaveCount(0);
+    await expect(patTeam).not.toContainText('Linked');
     await expect(patTeam.getByRole('cell', { name: 'P', exact: true })).toBeVisible();
     await expect(page.locator('[data-site-player-list] tr', { hasText: 'Sam Morris' }).getByRole('cell', { name: 'A;C;T;P', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Team', exact: true }).click();
