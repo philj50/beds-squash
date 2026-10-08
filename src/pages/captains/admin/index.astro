@@ -24,7 +24,7 @@ const scoresHref = url('/captains/admin/minigame/');
         <strong>League Master</strong> is the source for clubs, captains, and player names, emails, and England Squash numbers. The next import replaces those copies. Phone stays on this website.
         <strong>SquashLevels</strong> shows each player’s level.
         <strong>This website</strong> is Club, Team and Player, plus Members.
-        A role is the permission a group gives. People are not added to a role directly. League Master fills the club, team, and player groups. Someone in those groups who is on SquashLevels also receives SL Player. Admin accounts are the Admins group. Members lists everyone in those groups, and the filter chooses which group to see.
+        <strong>Permissions</strong> lists the groups and the role each group gives. People are not added to a role directly. League Master fills the club, team, and player groups. Someone in those groups who is on SquashLevels also receives SL Player. Admin accounts are the Admins group. Members lists everyone in those groups, and the filter chooses which group to see.
         <strong>Links</strong> joins a League Master player to their SquashLevels name when the names differ.
         A club captain sees their club. A team captain sees their team. A player sees their own row. Nothing is emailed.
       </p>
@@ -58,6 +58,13 @@ const scoresHref = url('/captains/admin/minigame/');
               <span class="tab-label">SquashLevels</span>
               <span class="tab-buttons">
                 <button type="button" data-tab-button="site-sl">SL</button>
+              </span>
+            </span>
+            <span class="tab-group" data-lm-only>
+              <span class="tab-label">Permissions</span>
+              <span class="tab-buttons">
+                <button type="button" data-lm-only data-tab-button="permissions-groups">Groups</button>
+                <button type="button" data-lm-only data-tab-button="permissions-roles">Roles</button>
               </span>
             </span>
             <span class="tab-group" data-lm-only>
@@ -208,6 +215,42 @@ const scoresHref = url('/captains/admin/minigame/');
                 </div>
               </div>
             </form>
+          </section>
+
+          <section class="admin-panel" data-tab="permissions-groups" data-lm-only hidden>
+            <h2>Groups</h2>
+            <p class="muted small">
+              Each group gives one role. League Master refills the club, team, and player groups. SL Players are people in those groups who are also on SquashLevels. Admins are the admin accounts. The other groups are kept on this website. People are listed on Members.
+            </p>
+            <div class="overview-box">
+              <table class="overview">
+                <thead>
+                  <tr>
+                    <th>Group</th>
+                    <th>Gives</th>
+                    <th>Filled from</th>
+                    <th>People</th>
+                  </tr>
+                </thead>
+                <tbody data-permission-groups></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="admin-panel" data-tab="permissions-roles" data-lm-only hidden>
+            <h2>Roles</h2>
+            <p class="muted small">A role is the permission its group gives. There is no separate list of people on a role.</p>
+            <div class="overview-box">
+              <table class="overview">
+                <thead>
+                  <tr>
+                    <th>Role</th>
+                    <th>Given by</th>
+                  </tr>
+                </thead>
+                <tbody data-permission-roles></tbody>
+              </table>
+            </div>
           </section>
 
           <section class="admin-panel" data-tab="links" data-lm-only hidden>
@@ -401,7 +444,7 @@ const scoresHref = url('/captains/admin/minigame/');
   let roleCatalogLive: RoleCatalog[] = [];
   let protectedAdminId = '';
   const siteTabs = ['site-club', 'site-team', 'site-player', 'site-sl'] as const;
-  const tabs = [...siteTabs, 'members', 'links', 'traffic'] as const;
+  const tabs = [...siteTabs, 'members', 'permissions-groups', 'permissions-roles', 'links', 'traffic'] as const;
   type Tab = (typeof tabs)[number];
   const tabAlias: Record<string, Tab> = {
     overview: 'members',
@@ -414,8 +457,8 @@ const scoresHref = url('/captains/admin/minigame/');
     'lm-clubs': 'members',
     'lm-captains': 'members',
     'lm-players': 'members',
-    groups: 'members',
-    roles: 'members',
+    groups: 'permissions-groups',
+    roles: 'permissions-roles',
     users: 'members',
   };
   const groupFromHash: Record<string, string> = {
@@ -773,6 +816,33 @@ const scoresHref = url('/captains/admin/minigame/');
 
   const levelText = (n: number | null) => (n == null ? '—' : n.toLocaleString('en-GB'));
   const nameKey = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
+  const permissionGroupsHost = root.querySelector<HTMLElement>('[data-permission-groups]')!;
+  const permissionRolesHost = root.querySelector<HTMLElement>('[data-permission-roles]')!;
+  const filledFrom = (group: GroupCatalog) => {
+    if (!group.managed) return 'This website';
+    if (group.source === 'squashlevels') return 'SquashLevels';
+    if (group.source === 'account') return 'Admin accounts';
+    return 'League Master';
+  };
+  function paintPermissionCatalog(groupCatalog: GroupCatalog[], roleCatalog: RoleCatalog[], members: GroupMember[]) {
+    permissionGroupsHost.innerHTML = groupCatalog.length
+      ? groupCatalog
+          .map((group) => {
+            const role = roleCatalog.find((item) => item.slug === group.role_slug)?.name ?? group.role_slug;
+            const people = members.filter((member) => member.group_slug === group.slug).length;
+            return `<tr><td>${escapeHtml(group.name)}</td><td>${escapeHtml(role)}</td><td>${escapeHtml(filledFrom(group))}</td><td>${people}</td></tr>`;
+          })
+          .join('')
+      : '<tr><td colspan="4">Groups are not on the database yet.</td></tr>';
+    permissionRolesHost.innerHTML = roleCatalog.length
+      ? roleCatalog
+          .map((role) => {
+            const given = groupCatalog.filter((group) => group.role_slug === role.slug).map((group) => group.name);
+            return `<tr><td>${escapeHtml(role.name)}</td><td>${escapeHtml(given.join(', ') || 'No group')}</td></tr>`;
+          })
+          .join('')
+      : '<tr><td colspan="2">Roles are not on the database yet.</td></tr>';
+  }
   function paintMembers() {
     const query = memberSearch.value.trim().toLowerCase();
     const groupSlug = memberGroup.value || 'all';
@@ -932,7 +1002,7 @@ const scoresHref = url('/captains/admin/minigame/');
     return slCatalog.find((player) => nameKey(player.display_name) === nameKey(lmName)) ?? null;
   };
 
-  const siteTable = (rows: SiteRow[], fields: 'all' | 'open' | 'none', showTeam: boolean) => {
+  const siteTable = (rows: SiteRow[], fields: 'all' | 'open' | 'none', showTeam: boolean, showRole = true) => {
     const box = (row: SiteRow, field: 'email' | 'es' | 'phone', value: string, label: string, type: string) =>
       `<input data-squad-field="${field}" data-squad-email="${row.playerId || ''}" data-team-id="${row.teamId ?? ''}" data-team-name="${escapeHtml(row.team)}" data-player-name="${escapeHtml(row.name)}" data-saved="${escapeHtml(value)}" aria-label="${label} for ${escapeHtml(row.name)}" type="${type}" value="${escapeHtml(value)}" autocomplete="off" />`;
     const body = rows
@@ -946,17 +1016,19 @@ const scoresHref = url('/captains/admin/minigame/');
         const matched = slMatch(row.name);
         const slName = matched
           ? escapeHtml(matched.display_name)
-          : canPickSl
+          : fields !== 'none' && canPickSl
             ? `<select data-sl-pick data-player-name="${escapeHtml(row.name)}" aria-label="SquashLevels for ${escapeHtml(row.name)}"><option value="">Choose</option>${slCatalog
                 .map((player) => `<option value="${player.id}">${escapeHtml(player.display_name)}</option>`)
                 .join('')}</select>`
             : '—';
         const slLevel = matched ? levelText(matched.current_level) : '—';
-        return `<tr>${teamCell}<td>${escapeHtml(row.name)}</td><td>${slName}</td><td data-sl-level>${slLevel}</td><td>${emailCell}</td><td>${esCell}</td><td>${phoneCell}</td><td>${escapeHtml(row.role)}</td></tr>`;
+        const roleCell = showRole ? `<td>${escapeHtml(row.role)}</td>` : '';
+        return `<tr>${teamCell}<td>${escapeHtml(row.name)}</td><td>${slName}</td><td data-sl-level>${slLevel}</td><td>${emailCell}</td><td>${esCell}</td><td>${phoneCell}</td>${roleCell}</tr>`;
       })
       .join('');
     const teamHead = showTeam ? '<th>Team</th>' : '';
-    return `<div class="overview-box"><table class="overview"><thead><tr>${teamHead}<th>LM name</th><th>SL name</th><th>SL level</th><th>Email</th><th>ES number</th><th>Phone</th><th>Role</th></tr></thead><tbody>${body}</tbody></table></div>`;
+    const roleHead = showRole ? '<th>Role</th>' : '';
+    return `<div class="overview-box"><table class="overview"><thead><tr>${teamHead}<th>LM name</th><th>SL name</th><th>SL level</th><th>Email</th><th>ES number</th><th>Phone</th>${roleHead}</tr></thead><tbody>${body}</tbody></table></div>`;
   };
 
   async function loadWebsite(account: Account) {
@@ -1144,20 +1216,19 @@ const scoresHref = url('/captains/admin/minigame/');
     const teamRowsScoped = clubRowsScoped.filter((row) => account.isAdmin || hasClubRole || (row.teamId != null && teamIds.has(row.teamId)));
     const clubEditable = hasClubRole && !account.playerOnly;
     const teamEditable = (hasClubRole || hasTeamRole) && !account.playerOnly;
-    const roleNote = ' Name, email, and ES number are copied from League Master and replaced on the next import. Phone stays on this website. Role is read-only: A admin, C club captain, T team captain, P player.';
+    const readOnlyNote = ' This list is read only. Change email, ES number, and phone on the Player tab.';
+    const roleNote = ' Name, email, and ES number are copied from League Master and replaced on the next import. Phone stays on this website. Role is read-only: A admin, C club captain, T team captain, P player. The role itself comes from the group.';
     clubNote.textContent = (account.isAdmin
       ? 'Every club.'
       : account.playerOnly
         ? 'Your club.'
         : clubEditable || hasTeamRole
           ? 'The players you can see.'
-          : 'Your club is read-only. Other teams at the club are not listed.') + roleNote;
-    teamNote.textContent = (account.isAdmin
-      ? 'Every team. When the League Master name matches SquashLevels, that name and level stay fixed. Otherwise choose the SquashLevels name and the level fills in.'
-      : 'Your team.') + roleNote;
+          : 'Your club. Other teams at the club are not listed.') + readOnlyNote;
+    teamNote.textContent = (account.isAdmin ? 'Every team.' : 'Your team.') + readOnlyNote;
     playerNote.textContent = (account.playerOnly
       ? 'Your own row.'
-      : 'The players you look after. A player can change only their own row. Only an admin can add someone who is not on League Master.') + roleNote + ' An email that matches League Master is locked: a club contact, then a captain, then a player.';
+      : 'The players you look after. A player can change only their own row. Only an admin can add someone who is not on League Master.') + roleNote + (account.isAdmin ? ' When the League Master name does not match SquashLevels, choose the SquashLevels name here.' : '') + ' An email that matches League Master is locked: a club contact, then a captain, then a player.';
 
     const clubsHere = clubList.filter((club) => (account.playerOnly ? homeClubSlugs.has(club.slug) : hasClubRole ? clubSlugs.has(club.slug) : homeClubSlugs.has(club.slug)));
     const paintClub = (heading: string) => {
@@ -1171,7 +1242,7 @@ const scoresHref = url('/captains/admin/minigame/');
       ? byClub
           .map((club) => {
             const group = clubRowsScoped.filter((row) => row.club === club);
-            return `<article class="site-card"><h3>${escapeHtml(club)}</h3>${paintClub(club)}${siteTable(group, 'open', true)}</article>`;
+            return `<article class="site-card"><h3>${escapeHtml(club)}</h3>${paintClub(club)}${siteTable(group, 'none', true, false)}</article>`;
           })
           .join('')
       : '<p class="muted small">No club players on this website yet.</p>';
@@ -1185,7 +1256,7 @@ const scoresHref = url('/captains/admin/minigame/');
             const group = teamRowsScoped.filter((row) => row.team === label);
             const team = teamsHere.find((item) => (item.division ? `${item.name} · ${item.division}` : item.name) === label);
             const captain = team?.captain_name ? `Captain ${team.captain_name}${team.captain_email ? ` · ${team.captain_email}` : ''}` : '';
-            return `<article class="site-card"><h3>${escapeHtml(label)}</h3>${captain ? `<p class="muted small">${escapeHtml(captain)}</p>` : ''}${siteTable(group, 'open', false)}</article>`;
+            return `<article class="site-card"><h3>${escapeHtml(label)}</h3>${captain ? `<p class="muted small">${escapeHtml(captain)}</p>` : ''}${siteTable(group, 'none', false, false)}</article>`;
           })
           .join('')
       : '<p class="muted small">No team on this account yet.</p>';
@@ -1575,6 +1646,7 @@ const scoresHref = url('/captains/admin/minigame/');
     listedGroups = groupMembers;
     groupCatalogLive = groupCatalog;
     roleCatalogLive = roleCatalog;
+    paintPermissionCatalog(groupCatalog, roleCatalog, groupMembers);
     if (groupError || groupCatalogError || permissionError) groupNote.textContent = 'Groups are not on the database yet. Apply the groups migration, then reload.';
     const clubNames = new Map(clubs.map((club) => [club.slug, club.name]));
     const dash = '—';
