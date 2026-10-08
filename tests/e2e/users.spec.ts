@@ -75,18 +75,25 @@ test.describe('Users', () => {
     await page.getByRole('button', { name: 'Roles for Sam Morris' }).click();
     await expect(page.locator('[data-role-pop]')).toBeVisible();
     await expect(page.getByRole('checkbox', { name: 'Admin' })).toBeEnabled();
-    await expect(page.getByRole('checkbox', { name: 'JC Player' })).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: 'LM Player' })).toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'LM Player' })).toBeDisabled();
+    await expect(page.getByRole('checkbox', { name: 'JC Player' })).toBeDisabled();
     await page.getByRole('heading', { name: 'Users', exact: true }).click();
 
     await page.getByRole('button', { name: 'Roles for Pat Player' }).click();
     await expect(page.getByRole('checkbox', { name: 'Admin' })).toBeDisabled();
-    await page.getByRole('checkbox', { name: 'JC Player' }).check();
+    await expect(page.getByRole('checkbox', { name: 'LM Club Captain' })).toBeDisabled();
+    await expect(page.getByRole('checkbox', { name: 'LM Team Captain' })).toBeDisabled();
+    await expect(page.getByRole('checkbox', { name: 'LM Player' })).toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'JC Player' })).toBeDisabled();
+    await page.getByRole('checkbox', { name: 'RB Player' }).check();
     await page.getByRole('heading', { name: 'Users', exact: true }).click();
     await expect(page.locator('[data-status]')).toHaveText('Roles saved for Pat Player.');
     const patRoles = page.getByRole('button', { name: 'Roles for Pat Player' });
-    await expect(patRoles).toHaveText('JC Player');
+    await expect(patRoles).toHaveText('RB Player');
     await patRoles.click();
-    await expect(page.getByRole('checkbox', { name: 'JC Player' })).toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'RB Player' })).toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'LM Player' })).toBeDisabled();
   });
 
   test('Active is green, turns red, and stays red if the next account check fails', async ({ page }) => {
@@ -137,6 +144,7 @@ test.describe('Users', () => {
     await openUsers(page);
     const pat = page.locator('[data-users] tr', { hasText: 'Pat Player' });
     await expect(pat.locator('td').nth(1)).toHaveText('Test Team 1; Test Team 2');
+    await expect(page.locator('[data-users-pager]')).toBeHidden();
   });
 
   test('search finds a player by team and by email, and a miss says so', async ({ page }) => {
@@ -352,6 +360,8 @@ async function installAdmin(page: Page) {
     if (path.endsWith('/roles')) {
       await respond([
         { slug: 'admin', name: 'Admin', position: 1 },
+        { slug: 'lm_club_captain', name: 'LM Club Captain', position: 2 },
+        { slug: 'lm_team_captain', name: 'LM Team Captain', position: 3 },
         { slug: 'lm_player', name: 'LM Player', position: 4 },
         { slug: 'jc_player', name: 'JC Player', position: 6 },
         { slug: 'junior_organiser', name: 'Junior Organiser', position: 7 },
@@ -363,6 +373,8 @@ async function installAdmin(page: Page) {
     if (path.endsWith('/groups')) {
       await respond([
         { slug: 'admins', name: 'Admins', role_slug: 'admin', source: 'account', managed: true, position: 1 },
+        { slug: 'lm_club_captains', name: 'LM Club Captains', role_slug: 'lm_club_captain', source: 'leaguemaster', managed: true, position: 2 },
+        { slug: 'lm_team_captains', name: 'LM Team Captains', role_slug: 'lm_team_captain', source: 'leaguemaster', managed: true, position: 3 },
         { slug: 'lm_players', name: 'LM Players', role_slug: 'lm_player', source: 'leaguemaster', managed: true, position: 4 },
         { slug: 'jc_players', name: 'JC Players', role_slug: 'jc_player', source: 'website', managed: false, position: 6 },
         { slug: 'junior_organisers', name: 'Junior Organisers', role_slug: 'junior_organiser', source: 'website', managed: false, position: 7 },

@@ -145,7 +145,7 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="members" data-lm-only hidden>
             <h2>Users</h2>
             <p class="muted small">
-              Every player from League Master. Update the email, ES number, and mobile in the row. Choose website roles in the list. Password opens a dialog to generate a password. Nothing is emailed.
+              Every player from League Master. Update the email, ES number, and mobile in the row. LM Club Captain, LM Team Captain, LM Player and JC Player are ticked in Roles and stay as they are. Password opens a dialog to generate a password. Nothing is emailed.
             </p>
             <p class="muted small" data-group-note>Filled from League Master. Each person has the LM Player role.</p>
             <div class="member-tools">
@@ -155,6 +155,7 @@ const scoresHref = url('/captains/admin/minigame/');
               </label>
             </div>
             <p class="muted small" data-member-count></p>
+            <p class="status" data-users-status role="status"></p>
             <dialog class="account-dialog" data-password-dialog>
               <form method="dialog">
                 <h3>Password for <span data-password-dialog-who></span></h3>
@@ -178,6 +179,19 @@ const scoresHref = url('/captains/admin/minigame/');
             </div>
             <div class="overview-box users-box">
               <table class="overview">
+                <colgroup>
+                  <col class="col-name" />
+                  <col class="col-place" />
+                  <col class="col-email" />
+                  <col class="col-es" />
+                  <col class="col-mobile" />
+                  <col class="col-roles" />
+                  <col class="col-active" />
+                  <col class="col-password" />
+                  <col class="col-delete" />
+                  <col class="col-status" />
+                  <col class="col-login" />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>Name</th>
@@ -196,6 +210,11 @@ const scoresHref = url('/captains/admin/minigame/');
                 <tbody data-users data-group-members></tbody>
               </table>
             </div>
+            <nav class="pager" data-users-pager hidden aria-label="User pages">
+              <button class="btn btn--ghost btn--sm" type="button" data-users-prev>Previous</button>
+              <span data-users-range></span>
+              <button class="btn btn--ghost btn--sm" type="button" data-users-next>Next</button>
+            </nav>
             <form class="card" data-form="create-account" hidden>
               <div class="card__body stack">
                 <h3>Create the login</h3>
@@ -492,6 +511,13 @@ const scoresHref = url('/captains/admin/minigame/');
   };
   let memberCards: MemberCard[] = [];
   let selectedMemberKey = '';
+  const USER_PAGE = 25;
+  let memberPage = 0;
+  let pinMember = false;
+  const usersPager = root.querySelector<HTMLElement>('[data-users-pager]')!;
+  const usersRange = root.querySelector<HTMLElement>('[data-users-range]')!;
+  const usersPrev = root.querySelector<HTMLButtonElement>('[data-users-prev]')!;
+  const usersNext = root.querySelector<HTMLButtonElement>('[data-users-next]')!;
   let passwordCardKey = '';
   let openRoleKey = '';
   let rolePopDirty = false;
@@ -641,8 +667,11 @@ const scoresHref = url('/captains/admin/minigame/');
   let clubs: Club[] = [];
   let orgTeams: OrgTeam[] = [];
 
+  const usersStatus = root.querySelector<HTMLElement>('[data-users-status]')!;
   const setStatus = (message: string) => {
     statusEl.textContent = message;
+    const usersPanel = root.querySelector<HTMLElement>('[data-tab="members"]');
+    usersStatus.textContent = usersPanel && !usersPanel.hidden ? message : '';
   };
 
   const createAccountForm = root.querySelector<HTMLFormElement>('[data-form="create-account"]')!;
@@ -880,6 +909,7 @@ const scoresHref = url('/captains/admin/minigame/');
       });
       if (message) {
         setStatus(message);
+        setActive.title = message;
         return;
       }
       if (userId) activityChoice.set(userId, active);
@@ -1082,6 +1112,7 @@ const scoresHref = url('/captains/admin/minigame/');
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-open-person]');
     if (!button?.dataset.openPerson) return;
     selectedMemberKey = button.dataset.openPerson;
+    pinMember = true;
     showTab('members');
     paintMembers();
     membersHost.querySelector(`[data-member-key="${CSS.escape(selectedMemberKey)}"]`)?.scrollIntoView({ block: 'nearest' });
@@ -1116,6 +1147,7 @@ const scoresHref = url('/captains/admin/minigame/');
           .join('')
       : '<tr><td colspan="11">No junior entries yet.</td></tr>';
   }
+  const LOCKED_ROLE_SLUGS = new Set(['lm_club_captains', 'lm_team_captains', 'lm_players', 'jc_players']);
   function paintMembers() {
     const query = memberSearch.value.trim().toLowerCase();
     groupNote.textContent = 'Filled from League Master. Each person has the LM Player role.';
@@ -1130,8 +1162,22 @@ const scoresHref = url('/captains/admin/minigame/');
       return `<input data-row-field="${field}" data-row-key="${escapeHtml(card.key)}" aria-label="${label} for ${escapeHtml(card.name)}" type="${type}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" autocomplete="off" />`;
     };
     const actionButton = (label: string, attrs: string) => `<button class="btn btn--ghost btn--sm" type="button" ${attrs}>${label}</button>`;
+    const pageCount = Math.max(1, Math.ceil(shown.length / USER_PAGE));
+    if (pinMember && selectedMemberKey) {
+      const index = shown.findIndex((card) => card.key === selectedMemberKey);
+      if (index >= 0) memberPage = Math.floor(index / USER_PAGE);
+      pinMember = false;
+    }
+    if (memberPage > pageCount - 1) memberPage = pageCount - 1;
+    if (memberPage < 0) memberPage = 0;
+    const start = memberPage * USER_PAGE;
+    const pageRows = shown.slice(start, start + USER_PAGE);
+    usersPager.hidden = shown.length <= USER_PAGE;
+    usersRange.textContent = shown.length ? `${start + 1}–${start + pageRows.length} of ${shown.length}` : '';
+    usersPrev.disabled = memberPage <= 0;
+    usersNext.disabled = memberPage >= pageCount - 1;
     const websiteRoles = groupCatalogLive
-      .filter((group) => group.slug === 'admins' || !group.managed)
+      .filter((group) => (group.slug === 'admins' || !group.managed) && !LOCKED_ROLE_SLUGS.has(group.slug))
       .slice()
       .sort((a, b) => a.position - b.position);
     const roleLabel = (card: MemberCard) => {
@@ -1140,8 +1186,8 @@ const scoresHref = url('/captains/admin/minigame/');
         .map((group) => roleCatalogLive.find((item) => item.slug === group.role_slug)?.name ?? group.name);
       return names.length ? names.join(', ') : 'Roles';
     };
-    membersHost.innerHTML = shown.length
-      ? shown
+    membersHost.innerHTML = pageRows.length
+      ? pageRows
           .map((card) => {
             const selected = card.key === selectedMemberKey ? ' class="is-selected"' : '';
             const email = contactCell(card, 'email', card.protectedAccount ? '' : card.email, 'Email', 'email', 'Add an email');
@@ -1165,16 +1211,25 @@ const scoresHref = url('/captains/admin/minigame/');
     createAccountForm.hidden = true;
   }
   function websiteRoleChoices() {
-    return groupCatalogLive.filter((group) => group.slug === 'admins' || !group.managed).slice().sort((a, b) => a.position - b.position);
+    return groupCatalogLive
+      .filter((group) => (group.slug === 'admins' || !group.managed) && !LOCKED_ROLE_SLUGS.has(group.slug))
+      .slice()
+      .sort((a, b) => a.position - b.position);
+  }
+  function roleMenuChoices() {
+    return groupCatalogLive
+      .filter((group) => group.slug === 'admins' || !group.managed || LOCKED_ROLE_SLUGS.has(group.slug))
+      .slice()
+      .sort((a, b) => a.position - b.position);
   }
   function paintRolePop(card: MemberCard) {
     rolePopWho.textContent = card.name;
-    rolePopOptions.innerHTML = websiteRoleChoices()
+    rolePopOptions.innerHTML = roleMenuChoices()
       .map((group) => {
         const role = roleCatalogLive.find((item) => item.slug === group.role_slug)?.name ?? group.name;
         const checked = group.slug === 'admins' ? card.isAdmin || card.groupSlugs.includes('admins') : card.groupSlugs.includes(group.slug);
-        const locked = group.slug === 'admins' && (!card.profileId || card.protectedAccount || card.profileId === viewerId);
-        return `<label><input type="checkbox" data-role-slug="${escapeHtml(group.slug)}" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''} /> ${escapeHtml(role)}</label>`;
+        const locked = LOCKED_ROLE_SLUGS.has(group.slug) || (group.slug === 'admins' && (!card.profileId || card.protectedAccount || card.profileId === viewerId));
+        return `<label class="${locked ? 'is-locked' : ''}"><input type="checkbox" data-role-slug="${escapeHtml(group.slug)}" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''} /> ${escapeHtml(role)}</label>`;
       })
       .join('');
   }
@@ -1876,6 +1931,7 @@ const scoresHref = url('/captains/admin/minigame/');
       { data: groupCatalogRows, error: groupCatalogError },
       { data: permissionRows, error: permissionError },
       { data: juniorRows, error: juniorError },
+      { data: signInRows },
     ] = await Promise.all([
       supabase.from('profiles').select('id, display_name, email, is_admin').order('display_name', { ascending: true }),
       fetchAccountStates(supabase),
@@ -1888,6 +1944,7 @@ const scoresHref = url('/captains/admin/minigame/');
       supabase.from('groups').select('slug, name, role_slug, source, managed, position').order('position'),
       supabase.from('roles').select('slug, name, position').order('position'),
       supabase.from('junior_entries').select('player_first_name, player_last_name, date_of_birth, age_category, draw, club, guardian_name, guardian_email, guardian_phone, emergency_name, emergency_phone, notes').order('player_last_name'),
+      supabase.from('site_sign_ins').select('user_id, signed_in_at').order('signed_in_at', { ascending: false }).limit(1000),
     ]);
     if (peopleError || clubError || orgError || roleError) {
       setStatus(peopleError?.message || clubError?.message || orgError?.message || roleError?.message || 'Could not load the lists.');
@@ -1899,6 +1956,10 @@ const scoresHref = url('/captains/admin/minigame/');
     orgTeams = (orgRows ?? []) as OrgTeam[];
     const accounts = (people ?? []) as Person[];
     const stateById = new Map((accountStates ?? []).map((state) => [state.id, state]));
+    const latestSignIn = new Map<string, string>();
+    for (const row of (signInRows ?? []) as { user_id: string; signed_in_at: string }[]) {
+      if (row.user_id && row.signed_in_at && !latestSignIn.has(row.user_id)) latestSignIn.set(row.user_id, row.signed_in_at);
+    }
     const memberships = (roleRows ?? []) as Membership[];
     const groupMembers = (groupError ? [] : groupRows ?? []) as GroupMember[];
     const groupCatalog = ((groupCatalogError ? [] : groupCatalogRows ?? []) as GroupCatalog[]).slice().sort((a, b) => a.position - b.position);
@@ -2047,6 +2108,9 @@ const scoresHref = url('/captains/admin/minigame/');
         .map((role) => role.name);
       if (profile?.is_admin && !roleNames.includes('Admin')) roleNames.unshift('Admin');
       const state = profile ? stateById.get(profile.id) : undefined;
+      const authAt = state?.last_sign_in_at ?? null;
+      const recordedAt = profile ? latestSignIn.get(profile.id) ?? null : null;
+      const latest = [authAt, recordedAt].filter((value): value is string => Boolean(value)).sort().at(-1) ?? null;
       const chosen = profile ? activityChoice.get(profile.id) : undefined;
       if (profile && chosen !== undefined && state && state.active === chosen) activityChoice.delete(profile.id);
       const active = profile ? (activityChoice.get(profile.id) ?? (state ? state.active : true)) : true;
@@ -2085,7 +2149,7 @@ const scoresHref = url('/captains/admin/minigame/');
         teamId: listed[0]?.teamId ?? contacts.find((contact) => contact.teamId)?.teamId ?? null,
         teamName: listed[0]?.team || '',
         statusHtml: !profile ? 'No login' : active ? 'Active' : 'Inactive',
-        lastLogin: profile && state ? formatWhen(state.last_sign_in_at) : '—',
+        lastLogin: profile && latest ? formatWhen(latest) : '—',
         protectedAccount: Boolean(isDefault),
         active,
       });
@@ -2302,7 +2366,18 @@ const scoresHref = url('/captains/admin/minigame/');
     return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
   }
 
-  memberSearch.addEventListener('input', () => paintMembers());
+  memberSearch.addEventListener('input', () => {
+    memberPage = 0;
+    paintMembers();
+  });
+  usersPrev.addEventListener('click', () => {
+    memberPage -= 1;
+    paintMembers();
+  });
+  usersNext.addEventListener('click', () => {
+    memberPage += 1;
+    paintMembers();
+  });
   async function saveMemberDetails(card: MemberCard, email: string, es: string, phone: string, updateGroups: boolean) {
     if (!viewerIsAdmin) {
       setStatus('Only an admin can change a player.');
@@ -2647,19 +2722,61 @@ const scoresHref = url('/captains/admin/minigame/');
   }
   #setup-app .users-box {
     max-width: 100%;
-    overflow-x: auto;
+    overflow: hidden;
   }
   #setup-app .users-box .overview {
-    width: max-content;
-    min-width: 100%;
+    width: 100%;
+    table-layout: fixed;
+    font-size: 0.72rem;
   }
+  #setup-app .users-box .col-name { width: 12%; }
+  #setup-app .users-box .col-place { width: 11%; }
+  #setup-app .users-box .col-email { width: 16%; }
+  #setup-app .users-box .col-es { width: 8%; }
+  #setup-app .users-box .col-mobile { width: 9%; }
+  #setup-app .users-box .col-roles { width: 8%; }
+  #setup-app .users-box .col-active { width: 7%; }
+  #setup-app .users-box .col-password { width: 7%; }
+  #setup-app .users-box .col-delete { width: 6%; }
+  #setup-app .users-box .col-status { width: 7%; }
+  #setup-app .users-box .col-login { width: 9%; }
   #setup-app .users-box .overview th,
   #setup-app .users-box .overview td {
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    padding: 0.12rem 0.22rem;
   }
   #setup-app .users-box .overview td input {
-    width: 11rem;
-    min-width: 8rem;
+    width: 100%;
+    min-width: 0;
+    font-size: 0.72rem;
+    padding: 0.18rem 0.28rem;
+  }
+  #setup-app .users-box .overview .btn--sm {
+    max-width: 100%;
+    padding: 0.12rem 0.2rem;
+    font-size: 0.68rem;
+    letter-spacing: 0;
+    white-space: normal;
+    text-align: center;
+    justify-content: center;
+  }
+  #setup-app .users-box + .pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin: 0 0 1rem;
+  }
+  #setup-app .users-box + .pager[hidden] {
+    display: none;
+  }
+  #setup-app .users-box + .pager span {
+    color: var(--ink-200);
+    font-size: 0.8rem;
+  }
+  #setup-app [data-users-status]:empty {
+    display: none;
   }
   #setup-app .overview td input[aria-invalid='true'] {
     border-color: #b91c1c;
@@ -2692,6 +2809,14 @@ const scoresHref = url('/captains/admin/minigame/');
   }
   #setup-app .role-pop__list input {
     width: auto;
+    min-width: 0;
+  }
+  #setup-app .role-pop__list label.is-locked {
+    color: #8b9aab;
+    font-weight: 500;
+  }
+  #setup-app .role-pop__list label.is-locked input {
+    accent-color: #8b9aab;
   }
   #setup-app .overview td select {
     width: 100%;
