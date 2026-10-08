@@ -265,9 +265,9 @@ Deno.serve(async (req) => {
     const userId = String(body.user_id ?? '');
     const slug = String(body.group_slug ?? '');
     const member = Boolean(body.member);
-    const allowed = new Set(['junior_organisers', 'bc_players']);
+    const allowed = new Set(['jc_players', 'junior_organisers', 'bc_players', 'rb_players']);
     if (!/^[0-9a-f-]{36}$/i.test(userId)) return json({ error: 'Choose an account.' }, 400);
-    if (!allowed.has(slug)) return json({ error: 'Choose Juniors or BC.' }, 400);
+    if (!allowed.has(slug)) return json({ error: 'Choose a website role.' }, 400);
     if (!member) {
       const { error } = await admin.from('group_members').delete().eq('profile_id', userId).eq('group_slug', slug);
       if (error) return json({ error: error.message }, 400);

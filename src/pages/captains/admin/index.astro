@@ -145,46 +145,52 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="members" data-lm-only hidden>
             <h2>Users</h2>
             <p class="muted small">
-              Every player from League Master. Update the email, ES number, and phone here. When they have a login, change the password, turn the account off, or delete it. Nothing is emailed.
+              Every player from League Master. Update the email, ES number, and mobile in the row. Roles adds website roles. Password sets a password you can copy. Nothing is emailed.
             </p>
             <p class="muted small" data-group-note>Filled from League Master. Each person has the LM Player role.</p>
             <div class="member-tools">
               <label class="directory-search">
                 Search
-                <input type="search" data-member-search placeholder="Name, place, email or group" autocomplete="off" />
+                <input type="search" data-member-search placeholder="Name, team or email" autocomplete="off" />
               </label>
             </div>
             <p class="muted small" data-member-count></p>
-            <form class="card" data-form="member" hidden>
+            <div class="card" data-role-picker hidden>
               <div class="card__body stack">
-                <h3 data-member-who></h3>
-                <p class="muted small" data-member-meta></p>
-                <label>Email <input name="email" type="email" data-member-email autocomplete="off" placeholder="Add an email" /></label>
-                <label>ES number <input name="es" data-member-es maxlength="32" autocomplete="off" placeholder="Add an ES number" /></label>
-                <label>Phone <input name="phone" type="tel" data-member-phone autocomplete="off" placeholder="Add a phone number" /></label>
-                <fieldset class="stack">
-                  <legend>Groups</legend>
-                  <label><input type="checkbox" data-user-group="admins" /> Admins</label>
-                  <label><input type="checkbox" data-user-group="junior_organisers" /> Juniors</label>
-                  <label><input type="checkbox" data-user-group="bc_players" /> BC</label>
-                </fieldset>
+                <h3 data-role-picker-who></h3>
+                <p class="muted small">Choose the roles to add. League Master and SquashLevels roles stay as they are.</p>
+                <div class="role-choices" data-role-options></div>
                 <div class="actions member-actions">
-                  <button class="btn btn--primary btn--sm" type="submit">Save details</button>
-                  <span data-member-actions></span>
+                  <button class="btn btn--primary btn--sm" type="button" data-save-roles>Save roles</button>
                 </div>
               </div>
-            </form>
+            </div>
+            <div class="card" data-reset-password hidden>
+              <div class="card__body stack">
+                <h3>Password for <span data-reset-who></span></h3>
+                <p class="muted small">Copy this and tell them. Nothing was emailed. It is not shown again after you leave this page.</p>
+                <label>
+                  Password
+                  <input type="text" readonly data-reset-value autocomplete="off" />
+                </label>
+                <div class="actions member-actions">
+                  <button class="btn btn--primary btn--sm" type="button" data-copy-password>Copy</button>
+                </div>
+              </div>
+            </div>
             <div class="overview-box">
               <table class="overview">
                 <thead>
                   <tr>
                     <th>Name</th>
-                    <th>Place</th>
-                    <th>Groups</th>
-                    <th>Role</th>
+                    <th>Team</th>
                     <th>Email</th>
                     <th>ES number</th>
-                    <th>Phone</th>
+                    <th>Mobile</th>
+                    <th>Roles</th>
+                    <th>Active</th>
+                    <th>Password</th>
+                    <th>Delete</th>
                     <th>Status</th>
                     <th>Last login</th>
                   </tr>
@@ -399,7 +405,7 @@ const scoresHref = url('/captains/admin/minigame/');
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { bindPasswordRules, bindPasswordToggles, callManageAccounts, fetchAccountStates, fillSuggestedPassword, passwordIssue } from '@/lib/passwords';
+  import { bindPasswordRules, bindPasswordToggles, callManageAccounts, fetchAccountStates, fillSuggestedPassword, passwordIssue, suggestPassword } from '@/lib/passwords';
   import { loadAccount, sendToLogin, type Account } from '@/lib/account';
 
   type Person = { id: string; display_name: string; email: string | null; is_admin: boolean };
@@ -450,13 +456,12 @@ const scoresHref = url('/captains/admin/minigame/');
   const memberCount = root.querySelector<HTMLElement>('[data-member-count]')!;
   const membersHost = root.querySelector<HTMLElement>('[data-group-members]')!;
   const groupNote = root.querySelector<HTMLElement>('[data-group-note]')!;
-  const memberForm = root.querySelector<HTMLFormElement>('[data-form="member"]')!;
-  const memberWho = root.querySelector<HTMLElement>('[data-member-who]')!;
-  const memberMeta = root.querySelector<HTMLElement>('[data-member-meta]')!;
-  const memberEmail = root.querySelector<HTMLInputElement>('[data-member-email]')!;
-  const memberEs = root.querySelector<HTMLInputElement>('[data-member-es]')!;
-  const memberPhone = root.querySelector<HTMLInputElement>('[data-member-phone]')!;
-  const memberActions = root.querySelector<HTMLElement>('[data-member-actions]')!;
+  const rolePicker = root.querySelector<HTMLElement>('[data-role-picker]')!;
+  const rolePickerWho = root.querySelector<HTMLElement>('[data-role-picker-who]')!;
+  const roleOptions = root.querySelector<HTMLElement>('[data-role-options]')!;
+  const resetPasswordPanel = root.querySelector<HTMLElement>('[data-reset-password]')!;
+  const resetWho = root.querySelector<HTMLElement>('[data-reset-who]')!;
+  const resetValue = root.querySelector<HTMLInputElement>('[data-reset-value]')!;
   const createName = root.querySelector<HTMLInputElement>('[data-create-name]')!;
   const createEmail = root.querySelector<HTMLInputElement>('[data-create-email]')!;
   let listedGroups: GroupMember[] = [];
@@ -473,9 +478,11 @@ const scoresHref = url('/captains/admin/minigame/');
     es: string;
     phone: string;
     place: string;
+    teams: string;
     groupSlugs: string[];
     groupNames: string;
     roleNames: string;
+    isAdmin: boolean;
     squadIds: number[];
     teamId: number | null;
     teamName: string;
@@ -486,6 +493,7 @@ const scoresHref = url('/captains/admin/minigame/');
   };
   let memberCards: MemberCard[] = [];
   let selectedMemberKey = '';
+  let selectedRoleKey = '';
   let groupCatalogLive: GroupCatalog[] = [];
   let roleCatalogLive: RoleCatalog[] = [];
   let protectedAdminId = '';
@@ -710,6 +718,52 @@ const scoresHref = url('/captains/admin/minigame/');
     setStatus(`Password updated for ${passwordWho.textContent}. Nothing was emailed.`);
   });
 
+  root.querySelector('[data-save-roles]')!.addEventListener('click', async () => {
+    const card = memberCards.find((item) => item.key === selectedRoleKey);
+    if (!card?.profileId || !viewerIsAdmin) return;
+    setStatus('Saving roles…');
+    const boxes = [...roleOptions.querySelectorAll<HTMLInputElement>('[data-role-slug]')];
+    for (const box of boxes) {
+      const slug = box.dataset.roleSlug ?? '';
+      const want = box.checked;
+      if (slug === 'admins') {
+        const has = card.isAdmin || card.groupSlugs.includes('admins');
+        if (want === has) continue;
+        if (!want && (card.protectedAccount || card.profileId === viewerId)) {
+          setStatus('That admin access stays as it is.');
+          return;
+        }
+        const message = await callManageAccounts(supabase, { action: 'set-admin', user_id: card.profileId, is_admin: want });
+        if (message) {
+          setStatus(message);
+          return;
+        }
+        continue;
+      }
+      if (want === card.groupSlugs.includes(slug)) continue;
+      const message = await callManageAccounts(supabase, { action: 'set-group', user_id: card.profileId, group_slug: slug, member: want });
+      if (message) {
+        setStatus(message);
+        return;
+      }
+    }
+    rolePicker.hidden = true;
+    setStatus(`Roles saved for ${card.name}.`);
+    await showSession();
+  });
+  root.querySelector('[data-copy-password]')!.addEventListener('click', async () => {
+    const password = resetValue.value;
+    if (!password) return;
+    try {
+      await navigator.clipboard.writeText(password);
+      setStatus('Password copied.');
+    } catch {
+      resetValue.focus();
+      resetValue.select();
+      setStatus('Select the password and copy it.');
+    }
+  });
+
   root.querySelector('[data-cancel-password]')!.addEventListener('click', () => {
     setPasswordForm.hidden = true;
     setPasswordForm.reset();
@@ -717,6 +771,58 @@ const scoresHref = url('/captains/admin/minigame/');
 
   const onAccountAction = async (event: Event) => {
     const target = event.target as HTMLElement;
+    const openRoles = target.closest<HTMLButtonElement>('[data-open-roles]');
+    if (openRoles?.dataset.openRoles) {
+      const card = memberCards.find((item) => item.key === openRoles.dataset.openRoles);
+      if (!card) return;
+      if (!card.profileId) {
+        rolePicker.hidden = true;
+        setStatus(`Set a password for ${card.name} before adding roles.`);
+        return;
+      }
+      selectedRoleKey = card.key;
+      paintRolePicker(card);
+      rolePicker.hidden = false;
+      rolePicker.scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    const resetPassword = target.closest<HTMLButtonElement>('[data-reset-password]');
+    if (resetPassword?.dataset.resetPassword) {
+      const card = memberCards.find((item) => item.key === resetPassword.dataset.resetPassword);
+      if (!card || !viewerIsAdmin || card.protectedAccount) return;
+      const email = card.email.trim().toLowerCase();
+      if (!email) {
+        setStatus(`Add an email for ${card.name} before setting a password.`);
+        return;
+      }
+      const password = suggestPassword();
+      const issue = passwordIssue(password, email);
+      if (issue) {
+        setStatus(issue);
+        return;
+      }
+      setStatus(card.profileId ? 'Setting a password…' : 'Creating the login…');
+      const message = card.profileId
+        ? await callManageAccounts(supabase, { action: 'set-password', user_id: card.profileId, password })
+        : await callManageAccounts(supabase, { action: 'create', display_name: card.name, email, password });
+      if (message) {
+        setStatus(message);
+        return;
+      }
+      if (!card.profileId) {
+        await supabase.rpc('sync_website_player_emails');
+        await supabase.rpc('apply_lm_roles');
+      }
+      resetWho.textContent = card.name;
+      resetValue.value = password;
+      resetPasswordPanel.hidden = false;
+      resetPasswordPanel.scrollIntoView({ block: 'nearest' });
+      resetValue.focus();
+      resetValue.select();
+      setStatus(`Password set for ${card.name}. Copy it and tell them. Nothing was emailed.`);
+      await showSession();
+      return;
+    }
     const openPassword = target.closest<HTMLButtonElement>('[data-open-password]');
     if (openPassword) {
       const userId = openPassword.dataset.openPassword!;
@@ -816,12 +922,15 @@ const scoresHref = url('/captains/admin/minigame/');
   };
   membersHost.addEventListener('click', (event) => {
     const target = event.target as HTMLElement;
+    if (target.closest('[data-open-roles], [data-set-active], [data-delete-person], [data-reset-password]')) {
+      void onAccountAction(event);
+      return;
+    }
     if (target.closest('input, button, a, textarea, select')) return;
     const row = target.closest<HTMLElement>('[data-member-key]');
     if (!row?.dataset.memberKey) return;
     selectedMemberKey = row.dataset.memberKey;
     paintMembers();
-    memberForm.scrollIntoView({ block: 'nearest' });
   });
   membersHost.addEventListener('focusout', (event) => {
     const input = event.target as HTMLInputElement;
@@ -838,7 +947,6 @@ const scoresHref = url('/captains/admin/minigame/');
     if (email === card.email.trim().toLowerCase() && es === card.es && phone === card.phone) return;
     void saveMemberDetails(card, email, es, phone, false);
   });
-  memberActions.addEventListener('click', onAccountAction);
 
   root.querySelector('[data-sign-out]')!.addEventListener('click', async () => {
     await supabase.auth.signOut();
@@ -958,7 +1066,7 @@ const scoresHref = url('/captains/admin/minigame/');
     selectedMemberKey = button.dataset.openPerson;
     showTab('members');
     paintMembers();
-    memberForm.scrollIntoView({ block: 'nearest' });
+    membersHost.querySelector(`[data-member-key="${CSS.escape(selectedMemberKey)}"]`)?.scrollIntoView({ block: 'nearest' });
   });
   const juniorsHost = root.querySelector<HTMLElement>('[data-juniors-people]')!;
   type JuniorEntry = {
@@ -993,67 +1101,59 @@ const scoresHref = url('/captains/admin/minigame/');
   function paintMembers() {
     const query = memberSearch.value.trim().toLowerCase();
     groupNote.textContent = 'Filled from League Master. Each person has the LM Player role.';
-    const players = memberCards.filter((card) => card.groupSlugs.includes('lm_players'));
+    const players = memberCards.filter((card) => card.groupSlugs.includes('lm_players') || card.key === selectedMemberKey);
     const shown = players.filter((card) => {
       if (!query) return true;
-      return [card.name, card.profileName, card.place, card.email, card.groupNames, card.roleNames].some((value) => value.toLowerCase().includes(query));
+      return [card.name, card.profileName, card.teams, card.place, card.email, card.groupNames, card.roleNames].some((value) => value.toLowerCase().includes(query));
     });
     memberCount.textContent = query ? `${shown.length} of ${players.length} players` : `${players.length} players`;
     const contactCell = (card: MemberCard, field: 'email' | 'es' | 'phone', value: string, label: string, type: string, placeholder: string) => {
       if (!viewerIsAdmin || card.protectedAccount) return escapeHtml(field === 'email' && card.protectedAccount ? 'BSCA' : value || '—');
       return `<input data-row-field="${field}" data-row-key="${escapeHtml(card.key)}" aria-label="${label} for ${escapeHtml(card.name)}" type="${type}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" autocomplete="off" />`;
     };
+    const actionButton = (label: string, attrs: string) => `<button class="btn btn--ghost btn--sm" type="button" ${attrs}>${label}</button>`;
     membersHost.innerHTML = shown.length
       ? shown
           .map((card) => {
             const selected = card.key === selectedMemberKey ? ' class="is-selected"' : '';
             const email = contactCell(card, 'email', card.protectedAccount ? '' : card.email, 'Email', 'email', 'Add an email');
             const es = contactCell(card, 'es', card.es, 'ES number', 'text', 'Add an ES number');
-            const phone = contactCell(card, 'phone', card.phone, 'Phone', 'tel', 'Add a phone number');
-            return `<tr${selected} data-member-key="${escapeHtml(card.key)}"><td>${escapeHtml(card.label)}</td><td>${escapeHtml(card.place || '—')}</td><td>${escapeHtml(card.groupNames || 'None')}</td><td>${escapeHtml(card.roleNames || 'No role yet')}</td><td>${email}</td><td>${es}</td><td>${phone}</td><td>${card.statusHtml}</td><td>${escapeHtml(card.lastLogin)}</td></tr>`;
+            const mobile = contactCell(card, 'phone', card.phone, 'Mobile', 'tel', 'Add a mobile number');
+            const roles = actionButton('Roles', `data-open-roles="${escapeHtml(card.key)}" aria-label="Roles for ${escapeHtml(card.name)}"`);
+            const active =
+              viewerIsAdmin && card.profileId && !card.protectedAccount && card.profileId !== viewerId
+                ? actionButton(
+                    card.active ? 'Make inactive' : 'Make active',
+                    `data-set-active="${card.profileId}" data-active-next="${card.active ? 'false' : 'true'}" data-person-name="${escapeHtml(card.name)}" aria-label="${card.active ? 'Make inactive' : 'Make active'} ${escapeHtml(card.name)}"`,
+                  )
+                : '—';
+            const password = viewerIsAdmin && !card.protectedAccount ? actionButton('Password', `data-reset-password="${escapeHtml(card.key)}" aria-label="Password for ${escapeHtml(card.name)}"`) : '—';
+            const remove =
+              viewerIsAdmin && card.profileId && !card.protectedAccount
+                ? actionButton('Delete', `data-delete-person="${card.profileId}" data-person-name="${escapeHtml(card.name)}" aria-label="Delete ${escapeHtml(card.name)}"`)
+                : '—';
+            return `<tr${selected} data-member-key="${escapeHtml(card.key)}"><td>${escapeHtml(card.label)}</td><td>${escapeHtml(card.teams || '—')}</td><td>${email}</td><td>${es}</td><td>${mobile}</td><td class="row-action">${roles}</td><td class="row-action">${active}</td><td class="row-action">${password}</td><td class="row-action">${remove}</td><td>${escapeHtml(card.statusHtml)}</td><td>${escapeHtml(card.lastLogin)}</td></tr>`;
           })
           .join('')
-      : `<tr><td colspan="9">${players.length ? 'No players match that search.' : 'No League Master players yet.'}</td></tr>`;
-    paintMemberForm();
+      : `<tr><td colspan="11">${players.length ? 'No players match that search.' : 'No League Master players yet.'}</td></tr>`;
+    createAccountForm.hidden = true;
   }
-  function paintMemberForm() {
-    const card = memberCards.find((item) => item.key === selectedMemberKey);
-    if (!card) {
-      memberForm.hidden = true;
-      createAccountForm.hidden = true;
-      return;
-    }
-    memberForm.hidden = false;
-    memberWho.textContent = card.name;
-    memberMeta.textContent = `${card.groupNames || 'No group'} · ${card.roleNames || 'No role yet'} · ${card.place || 'No place'}`;
-    memberEmail.value = card.protectedAccount ? 'BSCA' : card.email;
-    memberEs.value = card.es;
-    memberPhone.value = card.phone;
-    const lockedContact = card.protectedAccount;
-    memberEmail.readOnly = lockedContact;
-    memberEs.readOnly = lockedContact;
-    memberPhone.readOnly = lockedContact;
-    memberEmail.disabled = lockedContact;
-    memberEs.disabled = lockedContact;
-    memberPhone.disabled = lockedContact;
-    for (const box of root.querySelectorAll<HTMLInputElement>('[data-user-group]')) {
-      const slug = box.dataset.userGroup ?? '';
-      box.checked = card.groupSlugs.includes(slug);
-      const lockedAdmin = slug === 'admins' && (card.protectedAccount || card.profileId === viewerId);
-      box.disabled = !viewerIsAdmin || !card.profileId || lockedAdmin;
-    }
-    const buttons: string[] = [];
-    if (viewerIsAdmin && card.profileId && !card.protectedAccount) {
-      buttons.push(
-        `<button class="btn btn--ghost btn--sm" type="button" data-open-password="${card.profileId}" data-password-name="${escapeHtml(card.name)}" data-password-email="${escapeHtml(card.email)}">Change password</button>`,
-        `<button class="btn btn--ghost btn--sm" type="button" data-set-active="${card.profileId}" data-active-next="${card.active ? 'false' : 'true'}" data-person-name="${escapeHtml(card.name)}">${card.active ? 'Make inactive' : 'Make active'}</button>`,
-        `<button class="btn btn--ghost btn--sm" type="button" data-delete-person="${card.profileId}" data-person-name="${escapeHtml(card.name)}">Delete</button>`,
-      );
-    }
-    memberActions.innerHTML = buttons.join(' ');
-    createName.value = card.name;
-    createEmail.value = card.protectedAccount ? '' : card.email;
-    createAccountForm.hidden = !viewerIsAdmin || Boolean(card.profileId);
+  function paintRolePicker(card: MemberCard) {
+    rolePickerWho.textContent = card.name;
+    const choices = groupCatalogLive
+      .filter((group) => group.slug === 'admins' || !group.managed)
+      .slice()
+      .sort((a, b) => a.position - b.position);
+    roleOptions.innerHTML = choices.length
+      ? choices
+          .map((group) => {
+            const role = roleCatalogLive.find((item) => item.slug === group.role_slug)?.name ?? group.name;
+            const checked = group.slug === 'admins' ? card.isAdmin || card.groupSlugs.includes('admins') : card.groupSlugs.includes(group.slug);
+            const locked = !card.profileId || (group.slug === 'admins' && (card.protectedAccount || card.profileId === viewerId));
+            return `<label><input type="checkbox" data-role-slug="${escapeHtml(group.slug)}" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''} /> ${escapeHtml(role)}</label>`;
+          })
+          .join('')
+      : '<p class="muted small">Roles are not on the database yet.</p>';
   }
   const looseKey = (value: string) =>
     value
@@ -1868,7 +1968,20 @@ const scoresHref = url('/captains/admin/minigame/');
       const state = profile ? stateById.get(profile.id) : undefined;
       const active = state ? state.active : true;
       const isDefault = (profile?.email || '').trim().toLowerCase() === 'county-admin@players.invalid';
-      const listed = directoryRows.find((row) => nameKey(row.name) === nameKey(display));
+      const listed = directoryRows.filter((row) => contactNames.has(nameKey(row.name)) && row.team);
+      const fromPlaces = groups.flatMap((group) =>
+        (group.place || '')
+          .split(';')
+          .map((part) => {
+            const bits = part
+              .split('/')
+              .map((bit) => bit.trim())
+              .filter(Boolean);
+            return bits.length > 1 ? bits.slice(1).join(' / ') : '';
+          })
+          .filter(Boolean),
+      );
+      const teams = [...new Set(listed.length ? listed.map((row) => row.team) : fromPlaces)];
       cards.set(key, {
         key,
         name: display,
@@ -1879,13 +1992,15 @@ const scoresHref = url('/captains/admin/minigame/');
         es: contacts.find((contact) => contact.es)?.es || '',
         phone: contacts.find((contact) => contact.phone)?.phone || '',
         place: placeFor(display, profile, groups),
+        teams: teams.join('; '),
         groupSlugs: slugs,
         groupNames: groups.map((group) => groupTitle.get(group.group_slug) ?? group.group_slug).filter((value, index, all) => all.indexOf(value) === index).join(', '),
         roleNames: roleNames.join(', '),
+        isAdmin: Boolean(profile?.is_admin),
         squadIds: contacts.map((contact) => contact.playerId).filter((id) => id > 0),
-        teamId: listed?.teamId ?? contacts.find((contact) => contact.teamId)?.teamId ?? null,
-        teamName: listed?.team || '',
-        statusHtml: !profile ? 'No login' : !state ? '—' : active ? 'Active' : '<span class="pill">Inactive</span>',
+        teamId: listed[0]?.teamId ?? contacts.find((contact) => contact.teamId)?.teamId ?? null,
+        teamName: listed[0]?.team || '',
+        statusHtml: !profile ? 'No login' : active ? 'Active' : 'Inactive',
         lastLogin: profile && state ? formatWhen(state.last_sign_in_at) : '—',
         protectedAccount: Boolean(isDefault),
         active,
@@ -2194,15 +2309,6 @@ const scoresHref = url('/captains/admin/minigame/');
     setStatus(`Details saved for ${card.name}. League Master replaces the name, email, and ES number on the next import. Phone stays on this website.`);
     await showSession();
   }
-  memberForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const card = memberCards.find((item) => item.key === selectedMemberKey);
-    if (!card) return;
-    const email = card.protectedAccount ? card.email.trim().toLowerCase() : memberEmail.value.trim().toLowerCase();
-    const es = memberEs.value.trim();
-    const phone = memberPhone.value.trim();
-    await saveMemberDetails(card, email, es, phone, true);
-  });
 
   showSession();
 </script>
@@ -2469,6 +2575,24 @@ const scoresHref = url('/captains/admin/minigame/');
   }
   #setup-app .overview td input::placeholder {
     color: #5c6d80;
+  }
+  #setup-app .role-choices {
+    display: grid;
+    gap: 0.4rem;
+  }
+  #setup-app .role-choices label {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+  #setup-app .role-choices input {
+    width: auto;
+  }
+  #setup-app .overview .row-action {
+    white-space: nowrap;
+  }
+  #setup-app [data-reset-value] {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
   #setup-app .overview th,
   #setup-app .overview td {
