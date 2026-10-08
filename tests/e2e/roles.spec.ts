@@ -614,7 +614,7 @@ test.describe('Club captain, team captain, and player', () => {
     await page.locator('[data-permission-groups] tr', { hasText: 'Admins' }).getByRole('button').click();
     await page.locator('[data-group-people]').getByRole('button', { name: 'Sam Morris' }).click();
     await expect(page.locator('[data-users] tr', { hasText: 'Sam Morris' }).getByRole('textbox', { name: 'Email for Sam Morris' })).toBeEnabled();
-    await expect(page.locator('[data-users] tr', { hasText: 'Sam Morris' }).getByRole('listbox', { name: 'Roles for Sam Morris' })).toBeVisible();
+    await expect(page.locator('[data-users] tr', { hasText: 'Sam Morris' }).getByRole('button', { name: 'Roles for Sam Morris' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Active for Sam Morris' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Delete' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Password for Sam Morris' })).toBeVisible();
@@ -641,7 +641,7 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(pat.getByRole('textbox', { name: 'Email for Pat Player' })).toBeEnabled();
     await expect(pat.getByRole('textbox', { name: 'ES number for Pat Player' })).toBeEnabled();
     await expect(pat.getByRole('textbox', { name: 'Mobile for Pat Player' })).toBeEnabled();
-    await expect(pat.getByRole('listbox', { name: 'Roles for Pat Player' })).toBeVisible();
+    await expect(pat.getByRole('button', { name: 'Roles for Pat Player' })).toBeVisible();
     await expect(pat.getByRole('button', { name: 'Password for Pat Player' })).toBeVisible();
     await expect(pat.getByRole('button', { name: 'Delete Pat Player' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Create login' })).toHaveCount(0);

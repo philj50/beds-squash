@@ -172,7 +172,11 @@ const scoresHref = url('/captains/admin/minigame/');
                 </div>
               </form>
             </dialog>
-            <div class="overview-box">
+            <div class="role-pop" data-role-pop hidden>
+              <p class="role-pop__who" data-role-pop-who></p>
+              <div class="role-pop__list" data-role-pop-options></div>
+            </div>
+            <div class="overview-box users-box">
               <table class="overview">
                 <thead>
                   <tr>
@@ -454,6 +458,9 @@ const scoresHref = url('/captains/admin/minigame/');
   const passwordDialogWho = root.querySelector<HTMLElement>('[data-password-dialog-who]')!;
   const passwordDialogError = root.querySelector<HTMLElement>('[data-password-dialog-error]')!;
   const passwordDialogValue = root.querySelector<HTMLInputElement>('[data-password-dialog-value]')!;
+  const rolePop = root.querySelector<HTMLElement>('[data-role-pop]')!;
+  const rolePopWho = root.querySelector<HTMLElement>('[data-role-pop-who]')!;
+  const rolePopOptions = root.querySelector<HTMLElement>('[data-role-pop-options]')!;
   const createName = root.querySelector<HTMLInputElement>('[data-create-name]')!;
   const createEmail = root.querySelector<HTMLInputElement>('[data-create-email]')!;
   let listedGroups: GroupMember[] = [];
@@ -486,6 +493,8 @@ const scoresHref = url('/captains/admin/minigame/');
   let memberCards: MemberCard[] = [];
   let selectedMemberKey = '';
   let passwordCardKey = '';
+  let openRoleKey = '';
+  let rolePopDirty = false;
   const activityChoice = new Map<string, boolean>();
   let groupCatalogLive: GroupCatalog[] = [];
   let roleCatalogLive: RoleCatalog[] = [];
@@ -779,14 +788,38 @@ const scoresHref = url('/captains/admin/minigame/');
 
   const onAccountAction = async (event: Event) => {
     const target = event.target as HTMLElement;
+    const openRoles = target.closest<HTMLButtonElement>('[data-open-role-pop]');
+    if (openRoles?.dataset.openRolePop) {
+      const card = memberCards.find((item) => item.key === openRoles.dataset.openRolePop);
+      if (!card) return;
+      if (openRoleKey === card.key && !rolePop.hidden) {
+        void closeRolePop();
+        return;
+      }
+      if (!rolePop.hidden) await closeRolePop();
+      openRoleKey = card.key;
+      rolePopDirty = false;
+      paintRolePop(card);
+      placeRolePop(openRoles);
+      return;
+    }
     const resetPassword = target.closest<HTMLButtonElement>('[data-reset-password]');
     if (resetPassword?.dataset.resetPassword) {
       const card = memberCards.find((item) => item.key === resetPassword.dataset.resetPassword);
       if (!card || !viewerIsAdmin || card.protectedAccount) return;
+      const email = card.email.trim();
+      if (!email) {
+        setStatus('Add an email address.');
+        return;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.toLowerCase())) {
+        setStatus('Enter a valid email address.');
+        return;
+      }
       passwordCardKey = card.key;
       passwordDialogWho.textContent = card.name;
       passwordDialogValue.value = '';
-      passwordDialogError.textContent = card.email.trim() ? '' : 'Add an email on the row before setting a password.';
+      passwordDialogError.textContent = '';
       passwordDialog.showModal();
       return;
     }
@@ -890,7 +923,7 @@ const scoresHref = url('/captains/admin/minigame/');
   };
   membersHost.addEventListener('click', (event) => {
     const target = event.target as HTMLElement;
-    if (target.closest('[data-set-active], [data-delete-person], [data-reset-password]')) {
+    if (target.closest('[data-open-role-pop], [data-set-active], [data-delete-person], [data-reset-password]')) {
       void onAccountAction(event);
       return;
     }
@@ -900,10 +933,15 @@ const scoresHref = url('/captains/admin/minigame/');
     selectedMemberKey = row.dataset.memberKey;
     paintMembers();
   });
-  membersHost.addEventListener('change', (event) => {
-    const select = (event.target as HTMLElement).closest<HTMLSelectElement>('[data-role-select]');
-    if (!select) return;
-    void saveRoleSelect(select);
+  rolePopOptions.addEventListener('change', () => {
+    rolePopDirty = true;
+  });
+  document.addEventListener('click', (event) => {
+    if (rolePop.hidden) return;
+    const target = event.target as Node;
+    if (rolePop.contains(target)) return;
+    if ((event.target as HTMLElement).closest?.('[data-open-role-pop]')) return;
+    void closeRolePop();
   });
   membersHost.addEventListener('focusout', (event) => {
     const input = event.target as HTMLInputElement;
@@ -915,6 +953,13 @@ const scoresHref = url('/captains/admin/minigame/');
     if (!card || !viewerIsAdmin || card.protectedAccount) return;
     const valueOf = (field: string) => row?.querySelector<HTMLInputElement>(`[data-row-field="${field}"]`)?.value ?? '';
     const email = valueOf('email').trim().toLowerCase();
+    const emailInput = row?.querySelector<HTMLInputElement>('[data-row-field="email"]');
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      emailInput?.setAttribute('aria-invalid', 'true');
+      setStatus('Enter a valid email address.');
+      return;
+    }
+    emailInput?.removeAttribute('aria-invalid');
     const es = valueOf('es').trim();
     const phone = valueOf('phone').trim();
     if (email === card.email.trim().toLowerCase() && es === card.es && phone === card.phone) return;
@@ -1085,20 +1130,15 @@ const scoresHref = url('/captains/admin/minigame/');
       return `<input data-row-field="${field}" data-row-key="${escapeHtml(card.key)}" aria-label="${label} for ${escapeHtml(card.name)}" type="${type}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" autocomplete="off" />`;
     };
     const actionButton = (label: string, attrs: string) => `<button class="btn btn--ghost btn--sm" type="button" ${attrs}>${label}</button>`;
-    const roleOptions = groupCatalogLive
+    const websiteRoles = groupCatalogLive
       .filter((group) => group.slug === 'admins' || !group.managed)
       .slice()
       .sort((a, b) => a.position - b.position);
-    const roleSelect = (card: MemberCard) => {
-      const options = roleOptions
-        .map((group) => {
-          const role = roleCatalogLive.find((item) => item.slug === group.role_slug)?.name ?? group.name;
-          const selected = group.slug === 'admins' ? card.isAdmin || card.groupSlugs.includes('admins') : card.groupSlugs.includes(group.slug);
-          const locked = group.slug === 'admins' && (!card.profileId || card.protectedAccount || card.profileId === viewerId);
-          return `<option value="${escapeHtml(group.slug)}" ${selected ? 'selected' : ''} ${locked ? 'disabled' : ''}>${escapeHtml(role)}</option>`;
-        })
-        .join('');
-      return `<select multiple data-role-select="${escapeHtml(card.key)}" aria-label="Roles for ${escapeHtml(card.name)}" size="${Math.max(roleOptions.length, 1)}">${options}</select>`;
+    const roleLabel = (card: MemberCard) => {
+      const names = websiteRoles
+        .filter((group) => (group.slug === 'admins' ? card.isAdmin || card.groupSlugs.includes('admins') : card.groupSlugs.includes(group.slug)))
+        .map((group) => roleCatalogLive.find((item) => item.slug === group.role_slug)?.name ?? group.name);
+      return names.length ? names.join(', ') : 'Roles';
     };
     membersHost.innerHTML = shown.length
       ? shown
@@ -1107,6 +1147,7 @@ const scoresHref = url('/captains/admin/minigame/');
             const email = contactCell(card, 'email', card.protectedAccount ? '' : card.email, 'Email', 'email', 'Add an email');
             const es = contactCell(card, 'es', card.es, 'ES number', 'text', 'Add an ES number');
             const mobile = contactCell(card, 'phone', card.phone, 'Mobile', 'tel', 'Add a mobile number');
+            const roles = `<button type="button" class="count-button" data-open-role-pop="${escapeHtml(card.key)}" aria-label="Roles for ${escapeHtml(card.name)}">${escapeHtml(roleLabel(card))}</button>`;
             const activeLabel = card.active ? 'Active' : 'Inactive';
             const active =
               viewerIsAdmin && card.profileId && !card.protectedAccount && card.profileId !== viewerId
@@ -1117,19 +1158,49 @@ const scoresHref = url('/captains/admin/minigame/');
               viewerIsAdmin && card.profileId && !card.protectedAccount
                 ? actionButton('Delete', `data-delete-person="${card.profileId}" data-person-name="${escapeHtml(card.name)}" aria-label="Delete ${escapeHtml(card.name)}" title="Deletes the login only. The League Master record stays."`)
                 : '—';
-            return `<tr${selected} data-member-key="${escapeHtml(card.key)}"><td>${escapeHtml(card.label)}</td><td>${escapeHtml(card.teams || '—')}</td><td>${email}</td><td>${es}</td><td>${mobile}</td><td class="row-action">${roleSelect(card)}</td><td class="row-action">${active}</td><td class="row-action">${password}</td><td class="row-action">${remove}</td><td>${escapeHtml(card.statusHtml)}</td><td>${escapeHtml(card.lastLogin)}</td></tr>`;
+            return `<tr${selected} data-member-key="${escapeHtml(card.key)}"><td>${escapeHtml(card.label)}</td><td>${escapeHtml(card.teams || '—')}</td><td>${email}</td><td>${es}</td><td>${mobile}</td><td class="row-action">${roles}</td><td class="row-action">${active}</td><td class="row-action">${password}</td><td class="row-action">${remove}</td><td>${escapeHtml(card.statusHtml)}</td><td>${escapeHtml(card.lastLogin)}</td></tr>`;
           })
           .join('')
       : `<tr><td colspan="11">${players.length ? 'No players match that search.' : 'No League Master players yet.'}</td></tr>`;
     createAccountForm.hidden = true;
   }
-  async function saveRoleSelect(select: HTMLSelectElement) {
-    const card = memberCards.find((item) => item.key === (select.dataset.roleSelect ?? ''));
+  function websiteRoleChoices() {
+    return groupCatalogLive.filter((group) => group.slug === 'admins' || !group.managed).slice().sort((a, b) => a.position - b.position);
+  }
+  function paintRolePop(card: MemberCard) {
+    rolePopWho.textContent = card.name;
+    rolePopOptions.innerHTML = websiteRoleChoices()
+      .map((group) => {
+        const role = roleCatalogLive.find((item) => item.slug === group.role_slug)?.name ?? group.name;
+        const checked = group.slug === 'admins' ? card.isAdmin || card.groupSlugs.includes('admins') : card.groupSlugs.includes(group.slug);
+        const locked = group.slug === 'admins' && (!card.profileId || card.protectedAccount || card.profileId === viewerId);
+        return `<label><input type="checkbox" data-role-slug="${escapeHtml(group.slug)}" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''} /> ${escapeHtml(role)}</label>`;
+      })
+      .join('');
+  }
+  function placeRolePop(anchor: HTMLElement) {
+    rolePop.hidden = false;
+    const rect = anchor.getBoundingClientRect();
+    const width = rolePop.offsetWidth || 220;
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
+    rolePop.style.top = `${rect.bottom + 6}px`;
+    rolePop.style.left = `${left}px`;
+  }
+  async function closeRolePop() {
+    if (rolePop.hidden) return;
+    const key = openRoleKey;
+    const wanted = new Set([...rolePopOptions.querySelectorAll<HTMLInputElement>('[data-role-slug]:checked')].map((box) => box.dataset.roleSlug ?? ''));
+    const dirty = rolePopDirty;
+    rolePop.hidden = true;
+    openRoleKey = '';
+    rolePopDirty = false;
+    if (dirty && key) await saveRoleChoice(key, wanted);
+  }
+  async function saveRoleChoice(key: string, wanted: Set<string>) {
+    const card = memberCards.find((item) => item.key === key);
     if (!card || !viewerIsAdmin) return;
-    const wanted = new Set([...select.selectedOptions].map((option) => option.value));
-    const choices = groupCatalogLive.filter((group) => group.slug === 'admins' || !group.managed);
     setStatus('Saving roles…');
-    for (const group of choices) {
+    for (const group of websiteRoleChoices()) {
       const slug = group.slug;
       const want = wanted.has(slug);
       if (slug === 'admins') {
@@ -1137,18 +1208,15 @@ const scoresHref = url('/captains/admin/minigame/');
         if (want === has) continue;
         if (!card.profileId) {
           setStatus(`Set a password for ${card.name} before adding Admin.`);
-          paintMembers();
           return;
         }
         if (!want && (card.protectedAccount || card.profileId === viewerId)) {
           setStatus('That admin access stays as it is.');
-          paintMembers();
           return;
         }
         const message = await callManageAccounts(supabase, { action: 'set-admin', user_id: card.profileId, is_admin: want });
         if (message) {
           setStatus(message);
-          paintMembers();
           return;
         }
         continue;
@@ -1162,7 +1230,6 @@ const scoresHref = url('/captains/admin/minigame/');
       );
       if (message) {
         setStatus(message);
-        paintMembers();
         return;
       }
     }
@@ -2242,7 +2309,7 @@ const scoresHref = url('/captains/admin/minigame/');
       return;
     }
     if (!card.protectedAccount && email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setStatus('Enter a valid email, or leave it blank.');
+      setStatus('Enter a valid email address.');
       return;
     }
     if (phone && !/\d/.test(phone)) {
@@ -2577,6 +2644,54 @@ const scoresHref = url('/captains/admin/minigame/');
     border-style: hidden;
     font-size: 0.82rem;
     line-height: 1.25;
+  }
+  #setup-app .users-box {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  #setup-app .users-box .overview {
+    width: max-content;
+    min-width: 100%;
+  }
+  #setup-app .users-box .overview th,
+  #setup-app .users-box .overview td {
+    white-space: nowrap;
+  }
+  #setup-app .users-box .overview td input {
+    width: 11rem;
+    min-width: 8rem;
+  }
+  #setup-app .overview td input[aria-invalid='true'] {
+    border-color: #b91c1c;
+    outline: 2px solid #b91c1c;
+  }
+  #setup-app .role-pop {
+    position: fixed;
+    z-index: 30;
+    min-width: 12rem;
+    background: #fff;
+    color: #0e2744;
+    border: 1px solid rgba(14, 39, 68, 0.2);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 10px 28px rgba(14, 39, 68, 0.18);
+    padding: 0.55rem 0.7rem;
+  }
+  #setup-app .role-pop__who {
+    margin: 0 0 0.35rem;
+    font-weight: 700;
+  }
+  #setup-app .role-pop__list {
+    display: grid;
+    gap: 0.3rem;
+  }
+  #setup-app .role-pop__list label {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-weight: 600;
+  }
+  #setup-app .role-pop__list input {
+    width: auto;
   }
   #setup-app .overview td select {
     width: 100%;
