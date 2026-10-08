@@ -1180,6 +1180,7 @@ const scoresHref = url('/captains/admin/minigame/');
     }
     const hasClubRole = account.isAdmin || mine.some((row) => row.role === 'club_captain');
     const hasTeamRole = mine.some((row) => row.role === 'team_captain');
+    const seesLeague = account.isAdmin || account.email.trim().toLowerCase() === 'county-admin@players.invalid';
     const rows: SiteRow[] = [];
     for (const squad of squads) {
       const team = squad.team_id != null ? teamById.get(squad.team_id) : undefined;
@@ -1243,14 +1244,14 @@ const scoresHref = url('/captains/admin/minigame/');
     }
     rows.sort((a, b) => a.club.localeCompare(b.club, 'en') || a.team.localeCompare(b.team, 'en') || a.name.localeCompare(b.name, 'en'));
     const visible = (row: SiteRow) => {
-      if (account.isAdmin) return true;
+      if (seesLeague) return true;
       const onTeam = row.teamId != null && teamIds.has(row.teamId);
       const onClub = clubSlugs.has(row.clubSlug);
       if (account.playerOnly) return isSelf(account, row.name, row.email) && (onTeam || homeClubSlugs.has(row.clubSlug));
       return onClub || onTeam;
     };
     const clubRowsScoped = rows.filter((row) => visible(row));
-    const teamRowsScoped = clubRowsScoped.filter((row) => account.isAdmin || hasClubRole || (row.teamId != null && teamIds.has(row.teamId)));
+    const teamRowsScoped = clubRowsScoped.filter((row) => seesLeague || hasClubRole || (row.teamId != null && teamIds.has(row.teamId)));
     const clubEditable = hasClubRole && !account.playerOnly;
     const readOnlyNote = ' This list is read only. It comes from League Master.';
     clubNote.textContent = 'Club captains from League Master.' + readOnlyNote;
@@ -1259,7 +1260,7 @@ const scoresHref = url('/captains/admin/minigame/');
       ? 'Your own row. This list is read only.'
       : 'Every player from League Master. This list is read only.') + ' SquashLevels names that are not an exact match come from Links, and are marked Linked.';
 
-    const clubsHere = clubList.filter((club) => (account.isAdmin ? true : hasClubRole ? clubSlugs.has(club.slug) : homeClubSlugs.has(club.slug)));
+    const clubsHere = clubList.filter((club) => (seesLeague ? true : hasClubRole ? clubSlugs.has(club.slug) : homeClubSlugs.has(club.slug)));
     const captainTable = (headers: string[], rows: string[][]) =>
       `<div class="overview-box"><table class="overview"><thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr></thead><tbody>${rows
         .map((cells) => `<tr>${cells.map((cell) => `<td>${escapeHtml(cell || '—')}</td>`).join('')}</tr>`)
@@ -1272,7 +1273,7 @@ const scoresHref = url('/captains/admin/minigame/');
         )
       : '<p class="muted small">No club captains from League Master yet.</p>';
 
-    const teamsHere = teamList.filter((team) => account.isAdmin || (hasClubRole ? clubsHere.some((club) => club.slug === team.club_slug) : teamIds.has(team.id)));
+    const teamsHere = teamList.filter((team) => seesLeague || (hasClubRole ? clubsHere.some((club) => club.slug === team.club_slug) : teamIds.has(team.id)));
     const clubNameOf = (slug: string) => clubList.find((club) => club.slug === slug)?.name ?? slug;
     const teamCaptains = teamsHere.filter((team) => team.captain_name);
     siteTeamHost.innerHTML = teamCaptains.length
@@ -1294,7 +1295,7 @@ const scoresHref = url('/captains/admin/minigame/');
       const contact = playerContacts.find((item) => addressOf(item.email) === address);
       return contact?.email?.trim() ?? '';
     };
-    const playerRows = (account.playerOnly || account.isAdmin || clubEditable ? clubRowsScoped : teamRowsScoped).map((row) => {
+    const playerRows = (account.playerOnly || seesLeague || clubEditable ? clubRowsScoped : teamRowsScoped).map((row) => {
       const fromLm = lmEmailFor(row);
       return fromLm ? { ...row, email: fromLm, emailLocked: true } : row;
     });
