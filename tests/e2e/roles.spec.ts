@@ -277,7 +277,12 @@ test.describe('Club captain, team captain, and player', () => {
 
     const playerLinks: { id: number; profile_id: string | null; squashlevels_player_id: number | null; lm_player_name: string | null }[] = [];
     let nextLinkId = 1;
-    const groupMembers: { profile_id: string; group_slug: string; role: string }[] = [];
+    const groupMembers: { profile_id: string; person_name: string; place: string | null; group_slug: string }[] = [
+      { profile_id: adminId, person_name: 'County Admin', place: null, group_slug: 'admins' },
+      { profile_id: '55555555-5555-4555-8555-555555555555', person_name: 'Gail', place: null, group_slug: 'admins' },
+      { profile_id: '66666666-6666-4666-8666-666666666666', person_name: 'Sam Morris', place: null, group_slug: 'admins' },
+      { profile_id: '66666666-6666-4666-8666-666666666666', person_name: 'Sam Morris', place: 'Test Club', group_slug: 'lm_club_captains' },
+    ];
     const scores = [
       { id: 9, player_name: 'Philip Jenkins', score: 40, created_at: '2026-10-04T11:00:00.000Z' },
       ...Array.from({ length: 15 }, (_, index) => ({
@@ -515,14 +520,30 @@ test.describe('Club captain, team captain, and player', () => {
         }
         return send(playerLinks);
       }
+      if (path.endsWith('/roles')) {
+        return send([
+          { slug: 'admin', name: 'Admin', position: 1 },
+          { slug: 'lm_club_captain', name: 'LM Club Captain', position: 2 },
+          { slug: 'lm_team_captain', name: 'LM Team Captain', position: 3 },
+          { slug: 'lm_player', name: 'LM Player', position: 4 },
+          { slug: 'sl_player', name: 'SL Player', position: 5 },
+          { slug: 'jc_player', name: 'JC Player', position: 6 },
+          { slug: 'junior_organiser', name: 'Junior Organiser', position: 7 },
+          { slug: 'bc_player', name: 'BC Player', position: 8 },
+          { slug: 'rb_player', name: 'RB Player', position: 9 },
+        ]);
+      }
       if (path.endsWith('/groups')) {
         return send([
-          { slug: 'admins', name: 'Admins', source: 'account', managed: true, position: 1 },
-          { slug: 'lm_clubs', name: 'LM Clubs', source: 'leaguemaster', managed: true, position: 2 },
-          { slug: 'lm_captains', name: 'LM Captains', source: 'leaguemaster', managed: true, position: 3 },
-          { slug: 'lm_players', name: 'LM Players', source: 'leaguemaster', managed: true, position: 4 },
-          { slug: 'bc_juniors', name: 'BC Juniors', source: 'website', managed: false, position: 5 },
-          { slug: 'beds_closed', name: 'Beds Closed', source: 'website', managed: false, position: 6 },
+          { slug: 'admins', name: 'Admins', role_slug: 'admin', source: 'account', managed: true, position: 1 },
+          { slug: 'lm_club_captains', name: 'LM Club Captains', role_slug: 'lm_club_captain', source: 'leaguemaster', managed: true, position: 2 },
+          { slug: 'lm_team_captains', name: 'LM Team Captains', role_slug: 'lm_team_captain', source: 'leaguemaster', managed: true, position: 3 },
+          { slug: 'lm_players', name: 'LM Players', role_slug: 'lm_player', source: 'leaguemaster', managed: true, position: 4 },
+          { slug: 'sl_players', name: 'SL Players', role_slug: 'sl_player', source: 'squashlevels', managed: true, position: 5 },
+          { slug: 'jc_players', name: 'JC Players', role_slug: 'jc_player', source: 'website', managed: false, position: 6 },
+          { slug: 'junior_organisers', name: 'Junior Organisers', role_slug: 'junior_organiser', source: 'website', managed: false, position: 7 },
+          { slug: 'bc_players', name: 'BC Players', role_slug: 'bc_player', source: 'website', managed: false, position: 8 },
+          { slug: 'rb_players', name: 'RB Players', role_slug: 'rb_player', source: 'website', managed: false, position: 9 },
         ]);
       }
       if (path.endsWith('/group_members')) {
@@ -585,14 +606,23 @@ test.describe('Club captain, team captain, and player', () => {
     await page.getByRole('button', { name: 'Roles' }).click();
     await expect(page.getByRole('heading', { name: 'Roles', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Admin', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Club captain' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'LM Club Captain', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'LM Team Captain', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'LM Player', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'SL Player', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'JC Player', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Junior Organiser', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'BC Player', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'RB Player', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Add an admin' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Remove admin' })).toHaveCount(0);
     const adminRole = page.locator('[data-roles] article', { has: page.getByRole('heading', { name: 'Admin', exact: true }) });
     await expect(adminRole).toContainText('County Admin');
-    await expect(adminRole.locator('tr', { hasText: 'County Admin' }).getByRole('button', { name: 'Remove admin' })).toHaveCount(0);
-    const clubCaptain = page.locator('[data-roles] article', { has: page.getByRole('heading', { name: 'Club captain' }) });
+    await expect(adminRole).toContainText('Comes from the Admins group.');
+    const clubCaptain = page.locator('[data-roles] article', { has: page.getByRole('heading', { name: 'LM Club Captain', exact: true }) });
     await expect(clubCaptain).toContainText('Sam Morris');
     await expect(clubCaptain).toContainText('Test Club');
-    await expect(clubCaptain).toContainText('Filled by the import');
+    await expect(clubCaptain).toContainText('Comes from the LM Club Captains group.');
 
     await page.getByRole('button', { name: 'Users' }).click();
     await expect(page.getByRole('heading', { name: 'Add a person' })).toBeVisible();
@@ -621,26 +651,23 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(samPeople).not.toContainText('All clubs');
 
     await page.getByRole('button', { name: 'Groups' }).click();
-    await expect(page.getByRole('heading', { name: 'LM Players' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'LM Captains' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'LM Clubs' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'BC Juniors' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Beds Closed' })).toBeVisible();
-    const leaguePlayers = page.locator('[data-groups] article', { has: page.getByRole('heading', { name: 'LM Players' }) });
-    await expect(leaguePlayers).toContainText('Filled by the import');
-    await expect(leaguePlayers.getByRole('button', { name: 'Add to LM Players' })).toHaveCount(0);
-    const juniors = page.locator('[data-groups] article', { has: page.getByRole('heading', { name: 'BC Juniors' }) });
-    await expect(juniors).toContainText('Website');
-    await expect(juniors).toContainText('Set here');
-    await juniors.getByRole('combobox', { name: 'Person for BC Juniors' }).selectOption({ label: 'County Admin' });
-    await juniors.getByRole('combobox', { name: 'Role for BC Juniors' }).selectOption('organiser');
-    await juniors.getByRole('button', { name: 'Add to BC Juniors' }).click();
-    await expect(page.getByText('County Admin is in BC Juniors.')).toBeVisible();
-    const juniorMember = juniors.locator('tr', { hasText: 'County Admin' });
-    await expect(juniorMember).toContainText('Organiser');
-    await juniorMember.getByRole('button', { name: 'Remove' }).click();
-    await expect(page.getByText('County Admin removed from BC Juniors.')).toBeVisible();
-    await expect(juniors.locator('tr', { hasText: 'County Admin' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'LM Club Captains', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'LM Team Captains', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'LM Players', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'SL Players', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'JC Players', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Junior Organisers', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'BC Players', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'RB Players', exact: true })).toBeVisible();
+    const leaguePlayers = page.locator('[data-groups] article', { has: page.getByRole('heading', { name: 'LM Players', exact: true }) });
+    await expect(leaguePlayers).toContainText('Filled from League Master');
+    await expect(leaguePlayers.getByRole('button', { name: /Add/ })).toHaveCount(0);
+    const juniors = page.locator('[data-groups] article', { has: page.getByRole('heading', { name: 'JC Players', exact: true }) });
+    await expect(juniors).toContainText('Not filled yet');
+    await expect(juniors.getByRole('button', { name: /Add/ })).toHaveCount(0);
+    const clubGroup = page.locator('[data-groups] article', { has: page.getByRole('heading', { name: 'LM Club Captains', exact: true }) });
+    await expect(clubGroup).toContainText('Sam Morris');
+    await expect(clubGroup).toContainText('Gives the LM Club Captain role.');
 
     await page.getByRole('button', { name: 'SL', exact: true }).click();
     const slZoe = page.locator('[data-site-sl] tr', { hasText: 'Zoe Player' });

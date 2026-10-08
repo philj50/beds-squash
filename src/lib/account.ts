@@ -43,19 +43,22 @@ function one<T>(value: T | T[] | null): T | null {
 export type AccountGroup = {
   slug: string;
   name: string;
-  role: 'member' | 'organiser';
+  role: string;
 };
 
 export const GROUP_NAME: Record<string, string> = {
   admins: 'Admins',
-  lm_clubs: 'LM Clubs',
-  lm_captains: 'LM Captains',
+  lm_club_captains: 'LM Club Captains',
+  lm_team_captains: 'LM Team Captains',
   lm_players: 'LM Players',
-  bc_juniors: 'BC Juniors',
-  beds_closed: 'Beds Closed',
+  sl_players: 'SL Players',
+  jc_players: 'JC Players',
+  junior_organisers: 'Junior Organisers',
+  bc_players: 'BC Players',
+  rb_players: 'RB Players',
 };
 
-const GROUP_ORDER = ['admins', 'lm_clubs', 'lm_captains', 'lm_players', 'bc_juniors', 'beds_closed'];
+const GROUP_ORDER = ['admins', 'lm_club_captains', 'lm_team_captains', 'lm_players', 'sl_players', 'jc_players', 'junior_organisers', 'bc_players', 'rb_players'];
 
 export type Account = {
   userId: string;
@@ -76,10 +79,9 @@ export async function organisesGroup(supabase: SupabaseClient, userId: string, s
   if (me?.is_admin) return true;
   const { data, error } = await supabase
     .from('group_members')
-    .select('role')
+    .select('group_slug')
     .eq('profile_id', userId)
     .eq('group_slug', slug)
-    .eq('role', 'organiser')
     .maybeSingle();
   return !error && Boolean(data);
 }
@@ -93,7 +95,7 @@ export async function loadAccount(supabase: SupabaseClient): Promise<Account | n
     supabase.from('profiles').select('display_name, is_admin').eq('id', session.user.id).maybeSingle(),
     supabase.from('memberships').select('role, club_slug, teams(name)').eq('profile_id', session.user.id),
     supabase.from('clubs').select('slug, name'),
-    supabase.from('group_members').select('role, group_slug').eq('profile_id', session.user.id),
+    supabase.from('group_members').select('group_slug, groups(name, position, roles(name))').eq('profile_id', session.user.id),
     supabase.from('groups').select('slug, name, position'),
   ]);
 
@@ -111,7 +113,10 @@ export async function loadAccount(supabase: SupabaseClient): Promise<Account | n
     places.push({ role: row.role, label: where ? `${title} · ${where}` : title });
   }
 
-  const groups = ((groupResult.error ? [] : groupResult.data) ?? []) as { role: 'member' | 'organiser'; group_slug: string }[];
+  const groups = ((groupResult.error ? [] : groupResult.data) ?? []) as {
+    group_slug: string;
+    groups: { name: string; position: number; roles: { name: string } | { name: string }[] | null } | { name: string; position: number; roles: { name: string } | { name: string }[] | null }[] | null;
+  }[];
   const catalog = ((catalogResult.error ? [] : catalogResult.data) ?? []) as { slug: string; name: string; position: number }[];
   const catalogBySlug = new Map(catalog.map((group) => [group.slug, group]));
   groups.sort((a, b) => {
@@ -128,11 +133,14 @@ export async function loadAccount(supabase: SupabaseClient): Promise<Account | n
     canManageSquad,
     playerOnly: !canManageSquad && rows.some((row) => row.role === 'team_player'),
     places,
-    groups: groups.map((group) => ({
-      slug: group.group_slug,
-      name: catalogBySlug.get(group.group_slug)?.name ?? GROUP_NAME[group.group_slug] ?? group.group_slug,
-      role: group.role,
-    })),
+    groups: groups.map((group) => {
+      const embedded = one(group.groups);
+      return {
+        slug: group.group_slug,
+        name: embedded?.name ?? catalogBySlug.get(group.group_slug)?.name ?? GROUP_NAME[group.group_slug] ?? group.group_slug,
+        role: one(embedded?.roles ?? null)?.name ?? '',
+      };
+    }),
   };
 }
 

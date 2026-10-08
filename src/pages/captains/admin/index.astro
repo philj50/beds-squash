@@ -24,7 +24,7 @@ const scoresHref = url('/captains/admin/minigame/');
         <strong>League Master</strong> is the source for clubs, captains, and player names, emails, and England Squash numbers. The next import replaces those copies. Phone stays on this website.
         <strong>SquashLevels</strong> shows each player’s level.
         <strong>This website</strong> is Club, Team and Player, plus Groups, Roles, and Users.
-        Groups and roles are read from the database. A managed group is filled by the import. The others are set on Groups.
+        A role is the permission a group gives. People are not added to a role directly. League Master fills the club, team, and player groups. Someone in those groups who is on SquashLevels also receives SL Player. Admin accounts are the Admins group.
         <strong>Links</strong> joins a League Master player to their SquashLevels name when the names differ.
         A club captain sees their club. A team captain sees their team. A player sees their own row. Nothing is emailed.
       </p>
@@ -179,8 +179,7 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="groups" data-lm-only hidden>
             <h2>Groups</h2>
             <p class="muted small">
-              This list is the groups table. A managed group is filled by the import. Add and remove people only on the groups that are set here.
-              A member sees their own part of that group. An organiser sees the whole group.
+              Each group gives one role. League Master fills LM Club Captains, LM Team Captains, and LM Players. A person in those groups who is on SquashLevels is also an SL Player. Admins are the accounts that already have admin access, and that group gives the Admin role.
             </p>
             <p class="muted small" data-groups-note hidden></p>
             <div class="group-stack" data-groups></div>
@@ -189,54 +188,16 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="roles" data-lm-only hidden>
             <h2>Roles</h2>
             <p class="muted small">
-              Admin is set here. The county admin cannot lose that access. Every other role is a membership already stored for that person, filled by the League Master import.
+              These are the permissions. Each one is given by its group. There is no separate way to add a person to a role.
             </p>
             <div class="group-stack" data-roles></div>
-            <form class="card" data-form="create-admin">
-              <div class="card__body stack">
-                <h3>Add an admin</h3>
-                <label>Name <input name="display_name" required minlength="2" maxlength="80" autocomplete="off" /></label>
-                <label>Email <input name="email" type="email" required autocomplete="off" /></label>
-                <label>
-                  First password
-                  <span class="pw-field">
-                    <input name="password" type="password" required minlength="12" maxlength="72" autocomplete="new-password" />
-                    <button class="btn btn--ghost btn--sm" type="button" data-toggle-password>Show</button>
-                  </span>
-                  <PasswordRules />
-                </label>
-                <label>
-                  Confirm password
-                  <span class="pw-field">
-                    <input name="confirm_password" type="password" required minlength="12" maxlength="72" autocomplete="new-password" />
-                    <button class="btn btn--ghost btn--sm" type="button" data-toggle-password>Show</button>
-                  </span>
-                </label>
-                <div class="actions">
-                  <button class="btn btn--ghost btn--sm" type="button" data-suggest-password>Suggest a password</button>
-                  <button class="btn btn--primary" type="submit">Create admin</button>
-                </div>
-              </div>
-            </form>
-            <form class="card" data-form="grant-admin">
-              <div class="card__body stack">
-                <h3>Make an existing person an admin</h3>
-                <label>
-                  Person
-                  <select name="user_id" required data-grant-admin>
-                    <option value="">Choose an account</option>
-                  </select>
-                </label>
-                <button class="btn btn--primary btn--sm" type="submit">Make admin</button>
-              </div>
-            </form>
           </section>
 
           <section class="admin-panel" data-tab="users" data-lm-only hidden>
             <h2>Users</h2>
             <p class="muted small">
               Create the login, set the first password, and tell them yourself. Nothing is emailed. They change it on their profile. An inactive account cannot sign in.
-              Groups and roles are changed on their own tabs. The county admin cannot be deleted or turned off.
+              The role and groups on each row come from the groups they are in. The county admin cannot be deleted or turned off.
             </p>
             <form class="card" data-form="create-account">
               <div class="card__body stack">
@@ -438,28 +399,19 @@ const scoresHref = url('/captains/admin/minigame/');
     profiles: { display_name: string; email: string | null } | { display_name: string; email: string | null }[] | null;
     teams: { name: string; division: string | null } | { name: string; division: string | null }[] | null;
   };
-  const roleLabel: Record<Membership['role'], string> = {
-    admin: 'Admin',
-    club_captain: 'Club captain',
-    team_captain: 'Team captain',
-    team_player: 'Player',
-  };
   const roleRank: Record<Membership['role'], number> = {
     admin: 0,
     club_captain: 1,
     team_captain: 2,
     team_player: 3,
   };
-  const titleFor = (role: string) => roleLabel[role as Membership['role']] ?? role.replaceAll('_', ' ');
   const rankFor = (role: string) => roleRank[role as Membership['role']] ?? 4;
-  const groupMemberRoles = [
-    { value: 'member', label: 'Member' },
-    { value: 'organiser', label: 'Organiser' },
-  ] as const;
-  type GroupCatalog = { slug: string; name: string; source: string; managed: boolean; position: number };
+  type RoleCatalog = { slug: string; name: string; position: number };
+  type GroupCatalog = { slug: string; name: string; role_slug: string; source: string; managed: boolean; position: number };
+  type GroupMember = { profile_id: string | null; person_name: string; place: string | null; group_slug: string };
   const groupTitle = new Map<string, string>();
   const sourceLabel = (source: string) =>
-    source === 'leaguemaster' ? 'League Master' : source === 'website' ? 'Website' : source === 'account' ? 'Account' : source;
+    source === 'leaguemaster' ? 'League Master' : source === 'squashlevels' ? 'SquashLevels' : source === 'website' ? 'Website' : source === 'account' ? 'Account' : source;
   type DirectoryRow = { club: string; team: string; teamId: number; name: string; email: string };
 
   const root = document.getElementById('setup-app');
@@ -481,7 +433,6 @@ const scoresHref = url('/captains/admin/minigame/');
   const usersHost = root.querySelector<HTMLElement>('[data-users]')!;
   const groupsHost = root.querySelector<HTMLElement>('[data-groups]')!;
   const rolesHost = root.querySelector<HTMLElement>('[data-roles]')!;
-  const grantAdmin = root.querySelector<HTMLSelectElement>('[data-grant-admin]')!;
   let protectedAdminId = '';
   const siteTabs = ['site-club', 'site-team', 'site-player', 'site-sl'] as const;
   const tabs = [...siteTabs, 'lm-clubs', 'lm-captains', 'lm-players', 'groups', 'roles', 'users', 'links', 'traffic'] as const;
@@ -607,7 +558,6 @@ const scoresHref = url('/captains/admin/minigame/');
   };
 
   const createAccountForm = root.querySelector<HTMLFormElement>('[data-form="create-account"]')!;
-  const createAdminForm = root.querySelector<HTMLFormElement>('[data-form="create-admin"]')!;
   const setPasswordForm = root.querySelector<HTMLFormElement>('[data-form="set-password"]')!;
   const passwordWho = root.querySelector<HTMLElement>('[data-password-who]')!;
   const passwordUser = root.querySelector<HTMLInputElement>('[data-password-user]')!;
@@ -653,48 +603,6 @@ const scoresHref = url('/captains/admin/minigame/');
     await supabase.rpc('apply_lm_roles');
     createAccountForm.reset();
     setStatus('Account created. Their role follows the email on the Player tab. Tell them the email and password. Nothing was emailed.');
-    await showSession();
-  });
-
-  createAdminForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const data = new FormData(createAdminForm);
-    const issue = passwordsMatch(createAdminForm);
-    if (issue) {
-      setStatus(issue);
-      return;
-    }
-    setStatus('Creating admin…');
-    const message = await callManageAccounts(supabase, {
-      action: 'create',
-      display_name: String(data.get('display_name') ?? '').trim(),
-      email: String(data.get('email') ?? '').trim(),
-      password: String(data.get('password') ?? ''),
-      role: 'admin',
-    });
-    if (message) {
-      setStatus(message);
-      return;
-    }
-    createAdminForm.reset();
-    setStatus('Admin created. Tell them the email and password. Nothing was emailed.');
-    await showSession();
-  });
-
-  root.querySelector<HTMLFormElement>('[data-form="grant-admin"]')!.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    if (!grantAdmin.value) return;
-    setStatus('Granting admin…');
-    const message = await callManageAccounts(supabase, {
-      action: 'set-admin',
-      user_id: grantAdmin.value,
-      is_admin: true,
-    });
-    if (message) {
-      setStatus(message);
-      return;
-    }
-    setStatus('Admin access granted.');
     await showSession();
   });
 
@@ -1573,6 +1481,7 @@ const scoresHref = url('/captains/admin/minigame/');
 
     await supabase.rpc('sync_website_player_emails');
     await supabase.rpc('apply_lm_roles');
+    await supabase.rpc('sync_permission_groups');
 
     const [
       { data: people, error: peopleError },
@@ -1584,6 +1493,7 @@ const scoresHref = url('/captains/admin/minigame/');
       { data: contactRows, error: contactError },
       { data: groupRows, error: groupError },
       { data: groupCatalogRows, error: groupCatalogError },
+      { data: permissionRows, error: permissionError },
     ] = await Promise.all([
       supabase.from('profiles').select('id, display_name, email, is_admin').order('display_name', { ascending: true }),
       fetchAccountStates(supabase),
@@ -1592,8 +1502,9 @@ const scoresHref = url('/captains/admin/minigame/');
       supabase.from('memberships').select('id, profile_id, role, club_slug, team_id, profiles(display_name, email), teams(name, division)').order('role', { ascending: true }),
       supabase.from('nominations').select('team_id, player_name, period, position, season').eq('season', SEASON),
       supabase.from('lm_player_contacts').select('id, team_id, player_name, email'),
-      supabase.from('group_members').select('profile_id, group_slug, role'),
-      supabase.from('groups').select('slug, name, source, managed, position').order('position'),
+      supabase.from('group_members').select('profile_id, person_name, place, group_slug'),
+      supabase.from('groups').select('slug, name, role_slug, source, managed, position').order('position'),
+      supabase.from('roles').select('slug, name, position').order('position'),
     ]);
     if (peopleError || clubError || orgError || roleError) {
       setStatus(peopleError?.message || clubError?.message || orgError?.message || roleError?.message || 'Could not load the lists.');
@@ -1606,11 +1517,12 @@ const scoresHref = url('/captains/admin/minigame/');
     const accounts = (people ?? []) as Person[];
     const stateById = new Map((accountStates ?? []).map((state) => [state.id, state]));
     const memberships = (roleRows ?? []) as Membership[];
-    const groupMembers = (groupError ? [] : groupRows ?? []) as { profile_id: string; group_slug: string; role: string }[];
+    const groupMembers = (groupError ? [] : groupRows ?? []) as GroupMember[];
     const groupCatalog = ((groupCatalogError ? [] : groupCatalogRows ?? []) as GroupCatalog[]).slice().sort((a, b) => a.position - b.position);
+    const roleCatalog = ((permissionError ? [] : permissionRows ?? []) as RoleCatalog[]).slice().sort((a, b) => a.position - b.position);
     groupTitle.clear();
     for (const group of groupCatalog) groupTitle.set(group.slug, group.name);
-    const groupsMissing = Boolean(groupError || groupCatalogError);
+    const groupsMissing = Boolean(groupError || groupCatalogError || permissionError);
     const groupsNote = root.querySelector<HTMLElement>('[data-groups-note]');
     if (groupsNote) {
       groupsNote.hidden = !groupsMissing;
@@ -1714,7 +1626,12 @@ const scoresHref = url('/captains/admin/minigame/');
       if (byRole) return byRole;
       return (a.display_name || a.email || '').localeCompare(b.display_name || b.email || '', 'en');
     });
-    const memberRoleLabel = (role: string) => groupMemberRoles.find((item) => item.value === role)?.label ?? role;
+    const permissionNames = (personId: string) => {
+      const slugs = new Set(groupsFor(personId).map((group) => group.group_slug));
+      return roleCatalog
+        .filter((role) => groupCatalog.some((group) => group.role_slug === role.slug && slugs.has(group.slug)))
+        .map((role) => role.name);
+    };
     usersHost.replaceChildren(
       ...(sortedAccounts.length
         ? sortedAccounts.map((person) => {
@@ -1722,10 +1639,7 @@ const scoresHref = url('/captains/admin/minigame/');
             const name = person.display_name || 'Unnamed';
             const roles = rolesFor(person.id);
             const isDefault = person.id === protectedAdminId;
-            const roleText = [
-              person.is_admin || isDefault ? 'Admin' : '',
-              ...roles.filter((membership) => membership.role !== 'admin').map((membership) => titleFor(membership.role)),
-            ].filter(Boolean);
+            const roleText = permissionNames(person.id);
             const placeText = person.is_admin || isDefault
               ? clubsFor(person.id) || '—'
               : roles.map((membership) => whereFor(membership)).filter((place) => place !== '—').join('; ') || '—';
@@ -1746,11 +1660,7 @@ const scoresHref = url('/captains/admin/minigame/');
                 ? 'Active'
                 : '<span class="pill">Inactive</span>';
             const groupLines = groupsFor(person.id)
-              .map((group) => {
-                const label = groupTitle.get(group.group_slug) ?? group.group_slug;
-                const text = group.role === 'organiser' ? `${label} · organiser` : label;
-                return escapeHtml(text);
-              })
+              .map((group) => escapeHtml(groupTitle.get(group.group_slug) ?? group.group_slug))
               .join(', ');
             row.innerHTML =
               `<td>${escapeHtml(name)}${person.id === selfId ? ' <span class="muted">(you)</span>' : ''}${isDefault ? ' <span class="pill">Default admin</span>' : ''}</td>` +
@@ -1766,105 +1676,69 @@ const scoresHref = url('/captains/admin/minigame/');
         : [Object.assign(document.createElement('tr'), { innerHTML: '<td colspan="8">No accounts yet.</td>' })]),
     );
 
-    const personById = new Map(accounts.map((person) => [person.id, person]));
-    const personOptions = sortedAccounts
-      .map((person) => `<option value="${escapeHtml(person.id)}">${escapeHtml(person.display_name || 'Unnamed')}</option>`)
-      .join('');
+    const roleName = (slug: string) => roleCatalog.find((role) => role.slug === slug)?.name ?? slug;
+    const filledNote = (group: GroupCatalog) => {
+      const granted = `Gives the ${roleName(group.role_slug)} role.`;
+      if (!group.managed) return `Not filled yet. ${granted}`;
+      if (group.source === 'squashlevels') return `Filled when that person is on SquashLevels. ${granted}`;
+      if (group.source === 'account') return `Filled from existing admin accounts. ${granted}`;
+      return `Filled from League Master. ${granted}`;
+    };
     groupsHost.innerHTML = groupCatalog.length
       ? groupCatalog
           .map((group) => {
             const members = groupMembers
               .filter((member) => member.group_slug === group.slug)
               .slice()
-              .sort((a, b) => {
-                const left = personById.get(a.profile_id)?.display_name || '';
-                const right = personById.get(b.profile_id)?.display_name || '';
-                return left.localeCompare(right, 'en');
-              });
+              .sort((a, b) => a.person_name.localeCompare(b.person_name, 'en') || (a.place || '').localeCompare(b.place || '', 'en'));
             const memberRows = members.length
               ? members
-                  .map((member) => {
-                    const person = personById.get(member.profile_id);
-                    const name = person?.display_name || 'Unnamed';
-                    const remove = group.managed
-                      ? ''
-                      : `<td class="col-action"><button class="btn btn--ghost btn--sm" type="button" data-group-remove="${member.profile_id}" data-group-slug="${escapeHtml(group.slug)}" data-person-name="${escapeHtml(name)}">Remove</button></td>`;
-                    return `<tr><td>${escapeHtml(name)}</td><td>${escapeHtml(memberRoleLabel(member.role))}</td>${remove}</tr>`;
-                  })
+                  .map(
+                    (member) =>
+                      `<tr><td>${escapeHtml(member.person_name)}</td><td>${escapeHtml(member.place || '—')}</td></tr>`,
+                  )
                   .join('')
-              : `<tr><td colspan="${group.managed ? 2 : 3}">No one in this group yet.</td></tr>`;
-            const addForm = group.managed
-              ? ''
-              : `<form class="group-add" data-group-form="${escapeHtml(group.slug)}">` +
-                `<label>Person for ${escapeHtml(group.name)} <select data-group-person required><option value="">Choose a person</option>${personOptions}</select></label>` +
-                `<label>Role for ${escapeHtml(group.name)} <select data-group-role>${groupMemberRoles.map((item) => `<option value="${item.value}">${item.label}</option>`).join('')}</select></label>` +
-                `<button class="btn btn--primary btn--sm" type="submit">Add to ${escapeHtml(group.name)}</button>` +
-                `</form>`;
+              : '<tr><td colspan="2">No one in this group yet.</td></tr>';
             return (
               `<article class="card"><div class="card__body stack">` +
               `<h3>${escapeHtml(group.name)}</h3>` +
-              `<p class="muted small">${escapeHtml(sourceLabel(group.source))}. ${group.managed ? 'Filled by the import.' : 'Set here.'}</p>` +
-              `<table class="overview"><thead><tr><th>Name</th><th>Role</th>${group.managed ? '' : '<th></th>'}</tr></thead><tbody>${memberRows}</tbody></table>` +
-              addForm +
+              `<p class="muted small">${escapeHtml(sourceLabel(group.source))}. ${escapeHtml(filledNote(group))}</p>` +
+              `<table class="overview"><thead><tr><th>Name</th><th>Club / team</th></tr></thead><tbody>${memberRows}</tbody></table>` +
               `</div></article>`
             );
           })
           .join('')
       : '<p class="muted">No groups are stored yet.</p>';
 
-    const adminRows = sortedAccounts.filter((person) => person.is_admin || person.id === protectedAdminId);
-    const adminTable = adminRows.length
-      ? adminRows
-          .map((person) => {
-            const name = person.display_name || 'Unnamed';
-            const locked = person.id === protectedAdminId;
-            const remove = locked
-              ? '<span class="muted">Kept</span>'
-              : `<button class="btn btn--ghost btn--sm" type="button" data-set-admin="${person.id}" data-admin-next="false" data-person-name="${escapeHtml(name)}">Remove admin</button>`;
-            return `<tr><td>${escapeHtml(name)}${locked ? ' <span class="pill">Default admin</span>' : ''}</td><td>${locked ? '—' : escapeHtml(person.email || '—')}</td><td class="col-action">${remove}</td></tr>`;
+    rolesHost.innerHTML = roleCatalog.length
+      ? roleCatalog
+          .map((role) => {
+            const group = groupCatalog.find((item) => item.role_slug === role.slug);
+            const members = group
+              ? groupMembers
+                  .filter((member) => member.group_slug === group.slug)
+                  .slice()
+                  .sort((a, b) => a.person_name.localeCompare(b.person_name, 'en') || (a.place || '').localeCompare(b.place || '', 'en'))
+              : [];
+            const body = members.length
+              ? members
+                  .map(
+                    (member) =>
+                      `<tr><td>${escapeHtml(member.person_name)}</td><td>${escapeHtml(member.place || '—')}</td></tr>`,
+                  )
+                  .join('')
+              : '<tr><td colspan="2">No one has this role yet.</td></tr>';
+            const from = group ? `Comes from the ${group.name} group.` : 'No group gives this role yet.';
+            return (
+              `<article class="card"><div class="card__body stack">` +
+              `<h3>${escapeHtml(role.name)}</h3>` +
+              `<p class="muted small">${escapeHtml(from)}</p>` +
+              `<table class="overview"><thead><tr><th>Name</th><th>Club / team</th></tr></thead><tbody>${body}</tbody></table>` +
+              `</div></article>`
+            );
           })
           .join('')
-      : '<tr><td colspan="3">No admins yet.</td></tr>';
-    const storedRoles = [...new Set(memberships.map((membership) => membership.role).filter((role) => role !== 'admin'))].sort(
-      (a, b) => rankFor(a) - rankFor(b) || a.localeCompare(b, 'en'),
-    );
-    const roleArticles = storedRoles
-      .map((role) => {
-        const rows = memberships
-          .filter((membership) => membership.role === role)
-          .slice()
-          .sort((a, b) => whereFor(a).localeCompare(whereFor(b), 'en') || (one(a.profiles)?.display_name || '').localeCompare(one(b.profiles)?.display_name || '', 'en'));
-        const body = rows.length
-          ? rows
-              .map((membership) => {
-                const name = one(membership.profiles)?.display_name || 'Unnamed';
-                return `<tr><td>${escapeHtml(name)}</td><td>${escapeHtml(whereFor(membership))}</td></tr>`;
-              })
-              .join('')
-          : '<tr><td colspan="2">No one has this role.</td></tr>';
-        return (
-          `<article class="card"><div class="card__body stack">` +
-          `<h3>${escapeHtml(titleFor(role))}</h3>` +
-          `<p class="muted small">Filled by the import.</p>` +
-          `<table class="overview"><thead><tr><th>Name</th><th>Club / team</th></tr></thead><tbody>${body}</tbody></table>` +
-          `</div></article>`
-        );
-      })
-      .join('');
-    rolesHost.innerHTML =
-      `<article class="card"><div class="card__body stack">` +
-      `<h3>Admin</h3>` +
-      `<p class="muted small">Set here. The county admin stays.</p>` +
-      `<table class="overview"><thead><tr><th>Name</th><th>Email</th><th></th></tr></thead><tbody>${adminTable}</tbody></table>` +
-      `</div></article>` +
-      roleArticles;
-    const grantCurrent = grantAdmin.value;
-    grantAdmin.replaceChildren(new Option('Choose an account', ''));
-    for (const person of accounts) {
-      if (person.is_admin || person.id === protectedAdminId) continue;
-      grantAdmin.append(new Option(person.display_name || person.email || 'Unnamed', person.id));
-    }
-    if ([...grantAdmin.options].some((option) => option.value === grantCurrent)) grantAdmin.value = grantCurrent;
+      : '<p class="muted">No roles are stored yet.</p>';
     await paintLinks();
   }
 

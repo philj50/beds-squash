@@ -151,7 +151,7 @@ import { url } from '@/lib/site';
       return null;
     };
     if (!teamIds.length) {
-      const competition = account.groups.filter((group) => group.slug === 'bc_juniors' || group.slug === 'beds_closed');
+      const competition = account.groups.filter((group) => group.slug === 'jc_players' || group.slug === 'bc_players' || group.slug === 'rb_players' || group.slug === 'junior_organisers');
       matchesEl.innerHTML = competition.length
         ? `<p class="muted">You are in ${competition.map((group) => group.name).join(' and ')}. League matches are not linked to this account. Your competition appears here when its draws are on the site.</p>`
         : '<p class="muted">No team is linked to this account yet. An admin sets that from Administration.</p>';
@@ -269,7 +269,7 @@ import { url } from '@/lib/site';
     whoEl.textContent = `Signed in as ${account.displayName || account.email}`;
     placesEl.textContent = account.places.length ? account.places.map((place) => place.label).join('. ') : 'No club or team on this account yet.';
     groupsEl.textContent = account.groups.length
-      ? `Groups: ${account.groups.map((group) => (group.role === 'organiser' && group.slug !== 'admins' ? `${group.name} organiser` : group.name)).join(', ')}`
+      ? `Groups: ${account.groups.map((group) => group.name).join(', ')}`
       : '';
     statusEl.textContent = '';
     const [{ squads, teamIds }, level, uploads] = await Promise.all([squadsFor(account), loadLevel(account), loadUploads(account)]);

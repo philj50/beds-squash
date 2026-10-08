@@ -53,7 +53,7 @@ import { url } from '@/lib/site';
     const { data } = await supabase.auth.getSession();
     const session = data.session;
     if (session) {
-      if (await organisesGroup(supabase, session.user.id, 'bc_juniors')) {
+      if (await organisesGroup(supabase, session.user.id, 'junior_organisers')) {
         for (const root of roots) root.hidden = false;
       }
     }
