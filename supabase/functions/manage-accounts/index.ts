@@ -78,6 +78,8 @@ Deno.serve(async (req) => {
     club_slug?: string;
     team_id?: number;
     active?: boolean;
+    group_slug?: string;
+    member?: boolean;
   };
   try {
     body = await req.json();
@@ -230,7 +232,10 @@ Deno.serve(async (req) => {
     if (keeper.error) return json({ error: keeper.error }, 500);
     if (!isAdmin && userId === keeper.id) return json({ error: 'The county admin cannot lose admin access.' }, 400);
     if (!isAdmin && userId === userData.user.id) return json({ error: 'You cannot remove your own admin access.' }, 400);
-
+    const { data: target } = await admin.from('profiles').select('email').eq('id', userId).maybeSingle();
+    if (String(target?.email ?? '').toLowerCase() === PERMANENT_ADMIN_EMAIL) {
+      return json({ error: 'The county admin stays as it is.' }, 400);
+    }
     const { error } = await admin.from('profiles').update({ is_admin: isAdmin }).eq('id', userId);
     if (error) return json({ error: error.message }, 400);
     if (isAdmin) {
@@ -252,6 +257,27 @@ Deno.serve(async (req) => {
     const { error: roleError } = await admin.from('memberships').delete().eq('profile_id', userId);
     if (roleError) return json({ error: roleError.message }, 400);
     const { error } = await admin.auth.admin.deleteUser(userId);
+    if (error) return json({ error: error.message }, 400);
+    return json({ ok: true });
+  }
+
+  if (body.action === 'set-group') {
+    const userId = String(body.user_id ?? '');
+    const slug = String(body.group_slug ?? '');
+    const member = Boolean(body.member);
+    const allowed = new Set(['junior_organisers', 'bc_players']);
+    if (!/^[0-9a-f-]{36}$/i.test(userId)) return json({ error: 'Choose an account.' }, 400);
+    if (!allowed.has(slug)) return json({ error: 'Choose Juniors or BC.' }, 400);
+    if (!member) {
+      const { error } = await admin.from('group_members').delete().eq('profile_id', userId).eq('group_slug', slug);
+      if (error) return json({ error: error.message }, 400);
+      return json({ ok: true });
+    }
+    const { data: person, error: personError } = await admin.from('profiles').select('display_name').eq('id', userId).maybeSingle();
+    if (personError) return json({ error: personError.message }, 400);
+    const name = String(person?.display_name ?? '').trim() || 'Unnamed';
+    await admin.from('group_members').delete().eq('profile_id', userId).eq('group_slug', slug);
+    const { error } = await admin.from('group_members').insert({ profile_id: userId, person_name: name, group_slug: slug });
     if (error) return json({ error: error.message }, 400);
     return json({ ok: true });
   }
