@@ -135,6 +135,10 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.getByRole('button', { name: 'Groups' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Roles' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Users' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Members' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Create login' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Make inactive' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Delete' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Activities' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Traffic' })).toHaveCount(0);
     await expect(page.locator('[data-junior-link]')).toBeHidden();

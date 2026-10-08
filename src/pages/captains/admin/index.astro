@@ -108,7 +108,7 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="members" data-lm-only hidden>
             <h2>Members</h2>
             <p class="muted small">
-              Everyone stored as a group member, plus any login that is not in a group yet. Choose a group to see only those people. League Master refills the club, team, and player groups when this page loads. Nothing is emailed.
+              Everyone stored as a group member, plus any login that is not in a group yet. Choose a group to see only those people. League Master refills the club, team, and player groups when this page loads. Only an admin can create a login, make one inactive, or delete it. Accounts are given out by hand. Nothing is emailed.
             </p>
             <p class="muted small" data-group-note></p>
             <div class="member-tools">
@@ -156,7 +156,7 @@ const scoresHref = url('/captains/admin/minigame/');
             <form class="card" data-form="create-account" hidden>
               <div class="card__body stack">
                 <h3>Create the login</h3>
-                <p class="muted small">Set the first password and tell them yourself. Nothing is emailed. They change it on their profile.</p>
+                <p class="muted small">Only an admin can create a login. Set the first password and tell them yourself. Nothing is emailed.</p>
                 <input type="hidden" name="display_name" data-create-name />
                 <input type="hidden" name="email" data-create-email />
                 <label>
@@ -562,6 +562,10 @@ const scoresHref = url('/captains/admin/minigame/');
 
   createAccountForm.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (!viewerIsAdmin) {
+      setStatus('Only an admin can create an account.');
+      return;
+    }
     createEmail.value = memberEmail.readOnly ? createEmail.value : memberEmail.value.trim();
     const data = new FormData(createAccountForm);
     const issue = passwordsMatch(createAccountForm);
@@ -633,6 +637,10 @@ const scoresHref = url('/captains/admin/minigame/');
     }
     const removePerson = target.closest<HTMLButtonElement>('[data-delete-person]');
     if (removePerson) {
+      if (!viewerIsAdmin) {
+        setStatus('Only an admin can delete an account.');
+        return;
+      }
       if (removePerson.dataset.deletePerson === protectedAdminId) {
         setStatus('The county admin cannot be deleted.');
         return;
@@ -654,6 +662,10 @@ const scoresHref = url('/captains/admin/minigame/');
     }
     const setActive = target.closest<HTMLButtonElement>('[data-set-active]');
     if (setActive) {
+      if (!viewerIsAdmin) {
+        setStatus('Only an admin can change whether an account is active.');
+        return;
+      }
       const who = setActive.dataset.personName || 'this person';
       const active = setActive.dataset.activeNext === 'true';
       if (!active && !window.confirm(`Make ${who} inactive? They cannot sign in until you turn the account back on.`)) return;
@@ -817,7 +829,7 @@ const scoresHref = url('/captains/admin/minigame/');
     createName.value = card.name;
     createEmail.value = card.protectedAccount ? '' : memberEmail.value;
     const buttons: string[] = [];
-    if (card.profileId && !card.protectedAccount) {
+    if (viewerIsAdmin && card.profileId && !card.protectedAccount) {
       buttons.push(
         `<button class="btn btn--ghost btn--sm" type="button" data-open-password="${card.profileId}" data-password-name="${escapeHtml(card.name)}" data-password-email="${escapeHtml(card.email)}">Change password</button>`,
         `<button class="btn btn--ghost btn--sm" type="button" data-set-active="${card.profileId}" data-active-next="${card.active ? 'false' : 'true'}" data-person-name="${escapeHtml(card.name)}">${card.active ? 'Make inactive' : 'Make active'}</button>`,
@@ -825,7 +837,7 @@ const scoresHref = url('/captains/admin/minigame/');
       );
     }
     memberActions.innerHTML = buttons.join(' ');
-    createAccountForm.hidden = Boolean(card.profileId);
+    createAccountForm.hidden = !viewerIsAdmin || Boolean(card.profileId);
   }
   const looseKey = (value: string) =>
     value
@@ -1200,7 +1212,7 @@ const scoresHref = url('/captains/admin/minigame/');
       .slice()
       .sort((a, b) => (clubBySlug.get(a.club_slug)?.name || '').localeCompare(clubBySlug.get(b.club_slug)?.name || '', 'en') || a.name.localeCompare(b.name, 'en'));
     const addPlayer = account.isAdmin
-      ? `<form class="card" data-form="add-player"><div class="card__body stack"><h3>Add a player</h3><p class="muted small">League Master is the list of players. Use this for someone who is not on it. Their email is stored on this website and their login role follows it.</p><label>Team <select name="team_id" required><option value="">Choose a team</option>${teamChoices
+      ? `<form class="card" data-form="add-player"><div class="card__body stack"><h3>Add a player</h3><p class="muted small">League Master is the list of players. Use this for someone who is not on it. This stores the name and email on the website. It does not create a login.</p><label>Team <select name="team_id" required><option value="">Choose a team</option>${teamChoices
           .map((team) => {
             const clubName = clubBySlug.get(team.club_slug)?.name || '';
             const label = [clubName, team.division ? `${team.name} · ${team.division}` : team.name].filter(Boolean).join(' — ');
