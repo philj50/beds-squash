@@ -95,7 +95,7 @@ test.describe('Club captain, team captain, and player', () => {
 
     await page.goto('captains/admin/', { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { level: 1, name: 'Administration' })).toBeVisible();
-    await expect(page.locator('.admin-tabs .tab-label').filter({ visible: true })).toHaveText(['SquashLevels', 'This website']);
+    await expect(page.locator('.admin-tabs .tab-label').filter({ visible: true })).toHaveText(['This website', 'SquashLevels']);
     await expect(page.getByRole('button', { name: 'Club', exact: true })).toBeVisible();
     await expect(page.locator('[data-site-club]')).toContainText('Pat Player');
     await expect(page.locator('[data-site-club]')).toContainText('Test Team 2');
@@ -277,11 +277,17 @@ test.describe('Club captain, team captain, and player', () => {
 
     const playerLinks: { id: number; profile_id: string | null; squashlevels_player_id: number | null; lm_player_name: string | null }[] = [];
     let nextLinkId = 1;
-    const groupMembers: { profile_id: string; person_name: string; place: string | null; group_slug: string }[] = [
+    const groupMembers: { profile_id: string | null; person_name: string; place: string | null; group_slug: string }[] = [
       { profile_id: adminId, person_name: 'County Admin', place: null, group_slug: 'admins' },
       { profile_id: '55555555-5555-4555-8555-555555555555', person_name: 'Gail', place: null, group_slug: 'admins' },
       { profile_id: '66666666-6666-4666-8666-666666666666', person_name: 'Sam Morris', place: null, group_slug: 'admins' },
       { profile_id: '66666666-6666-4666-8666-666666666666', person_name: 'Sam Morris', place: 'Test Club', group_slug: 'lm_club_captains' },
+      { profile_id: null, person_name: 'Pat Player', place: 'Test Club / Test Team 1', group_slug: 'lm_players' },
+      { profile_id: null, person_name: 'Zoe Player', place: 'Test Club / Test Team 1', group_slug: 'lm_players' },
+      { profile_id: null, person_name: 'Sam Squad', place: 'Test Club / Test Team 2', group_slug: 'lm_players' },
+      { profile_id: null, person_name: 'Alex Away', place: 'Other Club / Other Team', group_slug: 'lm_players' },
+      { profile_id: null, person_name: 'Chris Club', place: 'Test Club', group_slug: 'lm_club_captains' },
+      { profile_id: null, person_name: 'Taylor Team', place: 'Test Club / Test Team 1', group_slug: 'lm_team_captains' },
     ];
     const scores = [
       { id: 9, player_name: 'Philip Jenkins', score: 40, created_at: '2026-10-04T11:00:00.000Z' },
@@ -568,56 +574,65 @@ test.describe('Club captain, team captain, and player', () => {
     });
 
     await page.goto('captains/admin/#lm-players', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('heading', { name: 'LM Player' })).toBeVisible();
-    await expect(page.locator('.admin-tabs .tab-label')).toHaveText(['League Master', 'SquashLevels', 'This website', 'Links']);
+    await expect(page.getByRole('heading', { name: 'Members', exact: true })).toBeVisible();
+    await expect(page.locator('.admin-tabs .tab-label')).toHaveText(['This website', 'SquashLevels', 'Links']);
     await expect(page.locator('[data-junior-link]')).toBeVisible();
     await expect(page.locator('[data-share-link]')).toBeVisible();
     await expect(page.locator('[data-scores-link]')).toBeVisible();
-    const row = page.locator('[data-lm-players] tr', { hasText: 'Pat Player' });
+    const groupFilter = page.getByRole('combobox', { name: 'Group' });
+    await expect(groupFilter).toHaveValue('lm_players');
+    const row = page.locator('[data-users] tr', { hasText: 'Pat Player' });
     await expect(row).toContainText('Test Club');
     await expect(row).toContainText('Test Team 1');
-    await expect(row).toContainText('Player');
+    await expect(row).toContainText('LM Player');
     await expect(row).toContainText('pat.player@example.test');
     await expect(row).not.toContainText('old.contact@example.test');
     await expect(row.getByRole('textbox')).toHaveCount(0);
-    await expect(page.locator('[data-lm-players] tr', { hasText: 'Zoe Player' })).not.toContainText('Test Club');
-    await expect(page.locator('[data-lm-players] tr.team-start', { hasText: 'Sam Squad' })).toContainText('Test Team 2');
-    await expect(page.locator('[data-lm-players] tr.club-start', { hasText: 'Alex Away' })).toContainText('Other Club');
-    await expect(page.locator('[data-directory-count]')).toContainText('4 players');
-    await expect(page.locator('[data-directory-count]')).toContainText('3 with an email');
+    await expect(page.locator('[data-users] tr', { hasText: 'Sam Squad' })).toContainText('Test Team 2');
+    await expect(page.locator('[data-users] tr', { hasText: 'Alex Away' })).toContainText('Other Club');
+    await expect(page.locator('[data-member-count]')).toContainText('4 players');
+    await expect(page.locator('[data-member-count]')).toContainText('3 with an email');
 
     await page.getByRole('searchbox', { name: 'Search' }).fill('no-such-player');
-    await expect(page.getByText('No players match that search.')).toBeVisible();
+    await expect(page.getByText('No members match that search.')).toBeVisible();
     await page.getByRole('searchbox', { name: 'Search' }).fill('Pat');
     await expect(row).toBeVisible();
+    await row.click();
+    await expect(page.getByRole('heading', { name: 'Pat Player', exact: true })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'ES number' })).toHaveValue('123456');
+    await expect(page.getByRole('textbox', { name: 'Phone' })).toHaveValue('07000000000');
+    await expect(page.getByRole('button', { name: 'Create login' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save details' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Player', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Add a player' })).toBeVisible();
     await expect(page.locator('[data-site-player-list]').getByRole('textbox', { name: 'Email for Pat Player' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'LM Club' }).click();
-    await expect(page.locator('[data-lm-clubs]')).toContainText('club@example.test');
-    await expect(page.locator('[data-lm-clubs]')).toContainText('Chris Club');
+    await page.getByRole('button', { name: 'Members' }).click();
+    await page.getByRole('searchbox', { name: 'Search' }).fill('');
+    await groupFilter.selectOption('lm_club_captains');
+    await expect(page.locator('[data-users]')).toContainText('club@example.test');
+    await expect(page.locator('[data-users]')).toContainText('Chris Club');
+    await expect(page.locator('[data-group-note]')).toContainText('Gives the LM Club Captain role.');
 
-    await page.getByRole('button', { name: 'LM Captain' }).click();
-    await expect(page.locator('[data-lm-captains]')).toContainText('Taylor Team');
-    await expect(page.locator('[data-lm-captains]')).toContainText('taylor@example.test');
+    await groupFilter.selectOption('lm_team_captains');
+    await expect(page.locator('[data-users]')).toContainText('Taylor Team');
+    await expect(page.locator('[data-users]')).toContainText('taylor@example.test');
 
-    await page.getByRole('button', { name: 'Roles' }).click();
-    await expect(page.getByRole('heading', { name: 'Roles', exact: true })).toBeVisible();
-    const roleList = page.locator('[data-roles]');
     for (const roleName of ['Admin', 'LM Club Captain', 'LM Team Captain', 'LM Player', 'SL Player', 'JC Player', 'Junior Organiser', 'BC Player', 'RB Player']) {
-      await expect(roleList.getByRole('cell', { name: roleName, exact: true })).toBeVisible();
+      await expect(groupFilter.locator('option', { hasText: roleName })).toHaveCount(1);
     }
     await expect(page.getByRole('heading', { name: 'Add an admin' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Remove admin' })).toHaveCount(0);
-    await expect(roleList).not.toContainText('County Admin');
-    await expect(roleList).not.toContainText('Sam Morris');
-    await expect(roleList.getByRole('row', { name: 'Admin Admins' })).toBeVisible();
-    await expect(roleList.getByRole('row', { name: 'LM Club Captain LM Club Captains' })).toBeVisible();
+    await groupFilter.selectOption('lm_players');
+    await expect(page.locator('[data-group-note]')).toContainText('Filled from League Master');
+    await expect(page.locator('[data-group-note]')).toContainText('LM Player');
+    await groupFilter.selectOption('jc_players');
+    await expect(page.locator('[data-group-note]')).toContainText('Not filled yet');
+    await expect(groupFilter).not.toContainText('Sam Morris');
 
-    await page.getByRole('button', { name: 'Users' }).click();
-    await expect(page.getByRole('heading', { name: 'Add a person' })).toBeVisible();
+    await groupFilter.selectOption('all');
+    await page.getByRole('searchbox', { name: 'Search' }).fill('');
     await expect(page.getByRole('button', { name: 'People' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Admins' })).toHaveCount(0);
     await expect(page.getByRole('columnheader', { name: 'Last login' })).toBeVisible();
@@ -645,24 +660,8 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(samPeople).toContainText('LM Club Captains');
     await expect(samPeople).toContainText('LM Club Captain');
     await expect(samPeople).not.toContainText('All clubs');
-
-    await page.getByRole('button', { name: 'Groups' }).click();
-    const groupList = page.locator('[data-groups]');
-    for (const groupName of ['Admins', 'LM Club Captains', 'LM Team Captains', 'LM Players', 'SL Players', 'JC Players', 'Junior Organisers', 'BC Players', 'RB Players']) {
-      await expect(groupList.getByRole('cell', { name: groupName, exact: true })).toBeVisible();
-    }
-    const leaguePlayers = groupList.getByRole('row', { name: /LM Players/ });
-    await expect(leaguePlayers).toContainText('Filled from League Master');
-    await expect(leaguePlayers).toContainText('LM Player');
-    await expect(groupList.getByRole('button', { name: /Add/ })).toHaveCount(0);
-    const juniors = groupList.getByRole('row', { name: /JC Players/ });
-    await expect(juniors).toContainText('Not filled yet');
-    await expect(groupList).not.toContainText('Sam Morris');
     await expect(page.locator('[data-group-members]')).toContainText('Sam Morris');
-    await expect(page.locator('[data-group-members]')).toContainText('LM Club Captains');
     await expect(page.getByRole('columnheader', { name: 'Place' })).toBeVisible();
-    const clubGroup = groupList.getByRole('row', { name: /LM Club Captains/ });
-    await expect(clubGroup).toContainText('Gives the LM Club Captain role.');
 
     await page.getByRole('button', { name: 'SL', exact: true }).click();
     const slZoe = page.locator('[data-site-sl] tr', { hasText: 'Zoe Player' });
