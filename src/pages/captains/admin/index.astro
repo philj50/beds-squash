@@ -117,7 +117,7 @@ const scoresHref = url('/captains/admin/minigame/');
 
           <section class="admin-panel" data-tab="lm-clubs" data-lm-only hidden>
             <h2>LM Clubs</h2>
-            <p class="muted small">Club contacts are copied from League Master. Change them there. A matching login is put in the LM Clubs group.</p>
+            <p class="muted small">Club contacts are copied from League Master. Change them there. A matching login is put in the LM Club Captains group.</p>
             <div class="overview-box">
               <table class="overview">
                 <thead>
@@ -135,7 +135,7 @@ const scoresHref = url('/captains/admin/minigame/');
 
           <section class="admin-panel" data-tab="lm-captains" data-lm-only hidden>
             <h2>LM Captains</h2>
-            <p class="muted small">Team captains are copied from League Master. Change them there. A matching login is put in the LM Captains group.</p>
+            <p class="muted small">Team captains are copied from League Master. Change them there. A matching login is put in the LM Team Captains group.</p>
             <div class="overview-box">
               <table class="overview">
                 <thead>
@@ -192,6 +192,25 @@ const scoresHref = url('/captains/admin/minigame/');
                   </tr>
                 </thead>
                 <tbody data-groups></tbody>
+              </table>
+            </div>
+            <h3>Members</h3>
+            <p class="muted small">Every person stored in group members. League Master groups are filled again from the latest season when this page loads.</p>
+            <label class="directory-search">
+              Search
+              <input type="search" data-member-search placeholder="Group, person or place" autocomplete="off" />
+            </label>
+            <p class="muted small" data-member-count></p>
+            <div class="overview-box">
+              <table class="overview">
+                <thead>
+                  <tr>
+                    <th>Group</th>
+                    <th>Person</th>
+                    <th>Place</th>
+                  </tr>
+                </thead>
+                <tbody data-group-members></tbody>
               </table>
             </div>
           </section>
@@ -448,6 +467,10 @@ const scoresHref = url('/captains/admin/minigame/');
   const lmPlayersHost = root.querySelector<HTMLElement>('[data-lm-players]')!;
   const directoryCount = root.querySelector<HTMLElement>('[data-directory-count]')!;
   const playerSearch = root.querySelector<HTMLInputElement>('[data-player-search]')!;
+  const memberSearch = root.querySelector<HTMLInputElement>('[data-member-search]')!;
+  const memberCount = root.querySelector<HTMLElement>('[data-member-count]')!;
+  const membersHost = root.querySelector<HTMLElement>('[data-group-members]')!;
+  let listedGroups: GroupMember[] = [];
   let directoryRows: DirectoryRow[] = [];
   const usersHost = root.querySelector<HTMLElement>('[data-users]')!;
   const groupsHost = root.querySelector<HTMLElement>('[data-groups]')!;
@@ -817,6 +840,36 @@ const scoresHref = url('/captains/admin/minigame/');
 
   const levelText = (n: number | null) => (n == null ? '—' : n.toLocaleString('en-GB'));
   const nameKey = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
+  const groupLabel = (personName: string, slug: string) => {
+    const key = nameKey(personName);
+    if (!key) return '—';
+    const hit = listedGroups.some((group) => group.group_slug === slug && nameKey(group.person_name) === key);
+    return hit ? groupTitle.get(slug) ?? slug : '—';
+  };
+  function paintMembers() {
+    const query = memberSearch.value.trim().toLowerCase();
+    const shown = listedGroups
+      .slice()
+      .sort((a, b) => {
+        const byGroup = (groupTitle.get(a.group_slug) ?? a.group_slug).localeCompare(groupTitle.get(b.group_slug) ?? b.group_slug, 'en');
+        if (byGroup) return byGroup;
+        return a.person_name.localeCompare(b.person_name, 'en') || (a.place ?? '').localeCompare(b.place ?? '', 'en');
+      })
+      .filter((group) => {
+        if (!query) return true;
+        const label = groupTitle.get(group.group_slug) ?? group.group_slug;
+        return [label, group.person_name, group.place ?? ''].some((value) => value.toLowerCase().includes(query));
+      });
+    memberCount.textContent = query ? `${shown.length} of ${listedGroups.length} members` : `${listedGroups.length} members`;
+    membersHost.innerHTML = shown.length
+      ? shown
+          .map(
+            (group) =>
+              `<tr><td>${escapeHtml(groupTitle.get(group.group_slug) ?? group.group_slug)}</td><td>${escapeHtml(group.person_name)}</td><td>${escapeHtml(group.place || '—')}</td></tr>`,
+          )
+          .join('')
+      : `<tr><td colspan="3">${listedGroups.length ? 'No members match that search.' : 'No group members yet.'}</td></tr>`;
+  }
   const looseKey = (value: string) =>
     value
       .normalize('NFKD')
@@ -1541,6 +1594,7 @@ const scoresHref = url('/captains/admin/minigame/');
     const roleCatalog = ((permissionError ? [] : permissionRows ?? []) as RoleCatalog[]).slice().sort((a, b) => a.position - b.position);
     groupTitle.clear();
     for (const group of groupCatalog) groupTitle.set(group.slug, group.name);
+    listedGroups = groupMembers;
     const groupsMissing = Boolean(groupError || groupCatalogError || permissionError);
     const groupsNote = root.querySelector<HTMLElement>('[data-groups-note]');
     if (groupsNote) {
@@ -1555,7 +1609,7 @@ const scoresHref = url('/captains/admin/minigame/');
       ? leagueClubs
           .map(
             (club) =>
-              `<tr><td>${escapeHtml(club.name)}</td><td>${escapeHtml(club.contact_name || dash)}</td><td>${escapeHtml(club.contact_email || dash)}</td><td>LM Clubs</td></tr>`,
+              `<tr><td>${escapeHtml(club.name)}</td><td>${escapeHtml(club.contact_name || dash)}</td><td>${escapeHtml(club.contact_email || dash)}</td><td>${escapeHtml(groupLabel(club.contact_name || '', 'lm_club_captains'))}</td></tr>`,
           )
           .join('')
       : `<tr><td colspan="4">No clubs copied from League Master yet.</td></tr>`;
@@ -1566,7 +1620,7 @@ const scoresHref = url('/captains/admin/minigame/');
       ? captainRows
           .map(
             (team) =>
-              `<tr><td>${escapeHtml(clubNames.get(team.club_slug) || dash)}</td><td>${escapeHtml(team.division ? `${team.name} · ${team.division}` : team.name)}</td><td>${escapeHtml(team.captain_name || dash)}</td><td>${escapeHtml(team.captain_email || dash)}</td><td>LM Captains</td></tr>`,
+              `<tr><td>${escapeHtml(clubNames.get(team.club_slug) || dash)}</td><td>${escapeHtml(team.division ? `${team.name} · ${team.division}` : team.name)}</td><td>${escapeHtml(team.captain_name || dash)}</td><td>${escapeHtml(team.captain_email || dash)}</td><td>${escapeHtml(groupLabel(team.captain_name || '', 'lm_team_captains'))}</td></tr>`,
           )
           .join('')
       : `<tr><td colspan="5">No captains copied from League Master yet.</td></tr>`;
@@ -1599,7 +1653,7 @@ const scoresHref = url('/captains/admin/minigame/');
 
     const fetchedAdmin = await fetchProtectedAdmin(supabase);
     const onlyAdmin = accounts.filter((person) => person.is_admin);
-    const countyAdmin = accounts.find((person) => person.is_admin && (person.email || '').toLowerCase() === 'county-admin@players.invalid');
+    const countyAdmin = accounts.find((person) => (person.email || '').toLowerCase() === 'county-admin@players.invalid');
     protectedAdminId = countyAdmin?.id || fetchedAdmin || (onlyAdmin.length === 1 ? onlyAdmin[0].id : '');
     const selfId = account.userId;
     const one = (value: { display_name?: string; email?: string | null; name?: string; division?: string | null } | { display_name?: string; email?: string | null; name?: string; division?: string | null }[] | null) =>
@@ -1694,7 +1748,7 @@ const scoresHref = url('/captains/admin/minigame/');
               .join(', ');
             row.innerHTML =
               `<td>${escapeHtml(name)}${person.id === selfId ? ' <span class="muted">(you)</span>' : ''}${isDefault ? ' <span class="pill">Default admin</span>' : ''}</td>` +
-              `<td>${isDefault ? '—' : escapeHtml(person.email || '—')}</td>` +
+              `<td>${isDefault ? 'BSCA' : escapeHtml(person.email || '—')}</td>` +
               `<td>${escapeHtml(roleText.join(', ') || 'No role yet')}</td>` +
               `<td>${escapeHtml(placeText)}</td>` +
               `<td>${groupLines || '<span class="muted">None</span>'}</td>` +
@@ -1714,6 +1768,8 @@ const scoresHref = url('/captains/admin/minigame/');
       if (group.source === 'account') return `Filled from existing admin accounts. ${granted}`;
       return `Filled from League Master. ${granted}`;
     };
+    paintMembers();
+
     groupsHost.innerHTML = groupCatalog.length
       ? groupCatalog
           .map(
@@ -1762,7 +1818,7 @@ const scoresHref = url('/captains/admin/minigame/');
           html.push(
             `<tr${marker}>${clubCell}${teamCell}<td>${escapeHtml(row.name)}</td>` +
               `<td>${escapeHtml(row.email || '—')}</td>` +
-              `<td>LM Players</td></tr>`,
+              `<td>${escapeHtml(groupLabel(row.name, 'lm_players'))}</td></tr>`,
           );
         }
         teamIndex += teamCount;
@@ -1959,6 +2015,7 @@ const scoresHref = url('/captains/admin/minigame/');
   }
 
   playerSearch.addEventListener('input', () => paintDirectory());
+  memberSearch.addEventListener('input', () => paintMembers());
 
   showSession();
 </script>

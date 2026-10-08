@@ -630,6 +630,7 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(adminRow).toContainText('Active');
     await expect(adminRow).toContainText('4 Oct 2026');
     await expect(adminRow).not.toContainText('admin@example.test');
+    await expect(adminRow).toContainText('BSCA');
     await expect(adminRow.getByRole('button', { name: 'Set password' })).toHaveCount(0);
     await expect(adminRow.getByRole('button', { name: 'Delete' })).toHaveCount(0);
     await expect(adminRow.getByRole('button', { name: 'Make inactive' })).toHaveCount(0);
@@ -657,6 +658,9 @@ test.describe('Club captain, team captain, and player', () => {
     const juniors = groupList.getByRole('row', { name: /JC Players/ });
     await expect(juniors).toContainText('Not filled yet');
     await expect(groupList).not.toContainText('Sam Morris');
+    await expect(page.locator('[data-group-members]')).toContainText('Sam Morris');
+    await expect(page.locator('[data-group-members]')).toContainText('LM Club Captains');
+    await expect(page.getByRole('columnheader', { name: 'Place' })).toBeVisible();
     const clubGroup = groupList.getByRole('row', { name: /LM Club Captains/ });
     await expect(clubGroup).toContainText('Gives the LM Club Captain role.');
 
