@@ -179,25 +179,46 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="groups" data-lm-only hidden>
             <h2>Groups</h2>
             <p class="muted small">
-              Each group gives one role. League Master fills LM Club Captains, LM Team Captains, and LM Players. A person in those groups who is on SquashLevels is also an SL Player. Admins are the accounts that already have admin access, and that group gives the Admin role.
+              Each group gives one role. The people in a group are stored as group members and shown on that person’s user record.
             </p>
             <p class="muted small" data-groups-note hidden></p>
-            <div class="group-stack" data-groups></div>
+            <div class="overview-box">
+              <table class="overview">
+                <thead>
+                  <tr>
+                    <th>Group</th>
+                    <th>Role</th>
+                    <th>Filled from</th>
+                  </tr>
+                </thead>
+                <tbody data-groups></tbody>
+              </table>
+            </div>
           </section>
 
           <section class="admin-panel" data-tab="roles" data-lm-only hidden>
             <h2>Roles</h2>
             <p class="muted small">
-              These are the permissions. Each one is given by its group. There is no separate way to add a person to a role.
+              These are the permissions. Each one is given by its group. People are listed on their user record, not here.
             </p>
-            <div class="group-stack" data-roles></div>
+            <div class="overview-box">
+              <table class="overview">
+                <thead>
+                  <tr>
+                    <th>Role</th>
+                    <th>Given by</th>
+                  </tr>
+                </thead>
+                <tbody data-roles></tbody>
+              </table>
+            </div>
           </section>
 
           <section class="admin-panel" data-tab="users" data-lm-only hidden>
             <h2>Users</h2>
             <p class="muted small">
               Create the login, set the first password, and tell them yourself. Nothing is emailed. They change it on their profile. An inactive account cannot sign in.
-              The role and groups on each row come from the groups they are in. The county admin cannot be deleted or turned off.
+              Each row shows the groups that person belongs to, and the role those groups give. A role set on that person separately is shown as well. The county admin cannot be deleted or turned off.
             </p>
             <form class="card" data-form="create-account">
               <div class="card__body stack">
@@ -227,7 +248,7 @@ const scoresHref = url('/captains/admin/minigame/');
               </div>
             </form>
             <h3>Everyone</h3>
-            <p class="muted small">Sorted by role, then by name. Last login is the last time they signed in with a password. Groups and roles on this table are read from what is already stored.</p>
+            <p class="muted small">Sorted by role, then by name. Last login is the last time they signed in with a password. Groups come from the stored group members.</p>
             <div class="overview-box">
               <table class="overview">
                 <thead>
@@ -410,8 +431,6 @@ const scoresHref = url('/captains/admin/minigame/');
   type GroupCatalog = { slug: string; name: string; role_slug: string; source: string; managed: boolean; position: number };
   type GroupMember = { profile_id: string | null; person_name: string; place: string | null; group_slug: string };
   const groupTitle = new Map<string, string>();
-  const sourceLabel = (source: string) =>
-    source === 'leaguemaster' ? 'League Master' : source === 'squashlevels' ? 'SquashLevels' : source === 'website' ? 'Website' : source === 'account' ? 'Account' : source;
   type DirectoryRow = { club: string; team: string; teamId: number; name: string; email: string };
 
   const root = document.getElementById('setup-app');
@@ -1612,10 +1631,19 @@ const scoresHref = url('/captains/admin/minigame/');
         .filter((membership) => membership.profile_id === personId)
         .sort((a, b) => rankFor(a.role) - rankFor(b.role) || whereFor(a).localeCompare(whereFor(b), 'en'));
     const positionOf = (slug: string) => groupCatalog.find((group) => group.slug === slug)?.position ?? 99;
-    const groupsFor = (personId: string) =>
-      groupMembers
-        .filter((group) => group.profile_id === personId)
-        .sort((a, b) => positionOf(a.group_slug) - positionOf(b.group_slug) || a.group_slug.localeCompare(b.group_slug, 'en'));
+    const nameKey = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
+    const groupsFor = (person: Person) => {
+      const key = nameKey(person.display_name || '');
+      const seen = new Set<string>();
+      return groupMembers
+        .filter((group) => group.profile_id === person.id || (key !== '' && nameKey(group.person_name) === key))
+        .sort((a, b) => positionOf(a.group_slug) - positionOf(b.group_slug) || a.group_slug.localeCompare(b.group_slug, 'en'))
+        .filter((group) => {
+          if (seen.has(group.group_slug)) return false;
+          seen.add(group.group_slug);
+          return true;
+        });
+    };
     const personRank = (person: Person) => {
       if (person.is_admin || person.id === protectedAdminId) return 0;
       const roles = rolesFor(person.id);
@@ -1626,11 +1654,13 @@ const scoresHref = url('/captains/admin/minigame/');
       if (byRole) return byRole;
       return (a.display_name || a.email || '').localeCompare(b.display_name || b.email || '', 'en');
     });
-    const permissionNames = (personId: string) => {
-      const slugs = new Set(groupsFor(personId).map((group) => group.group_slug));
-      return roleCatalog
+    const permissionNames = (person: Person) => {
+      const slugs = new Set(groupsFor(person).map((group) => group.group_slug));
+      const names = roleCatalog
         .filter((role) => groupCatalog.some((group) => group.role_slug === role.slug && slugs.has(group.slug)))
         .map((role) => role.name);
+      if (person.is_admin && !names.includes('Admin')) names.unshift('Admin');
+      return names;
     };
     usersHost.replaceChildren(
       ...(sortedAccounts.length
@@ -1639,7 +1669,7 @@ const scoresHref = url('/captains/admin/minigame/');
             const name = person.display_name || 'Unnamed';
             const roles = rolesFor(person.id);
             const isDefault = person.id === protectedAdminId;
-            const roleText = permissionNames(person.id);
+            const roleText = permissionNames(person);
             const placeText = person.is_admin || isDefault
               ? clubsFor(person.id) || '—'
               : roles.map((membership) => whereFor(membership)).filter((place) => place !== '—').join('; ') || '—';
@@ -1659,7 +1689,7 @@ const scoresHref = url('/captains/admin/minigame/');
               : active
                 ? 'Active'
                 : '<span class="pill">Inactive</span>';
-            const groupLines = groupsFor(person.id)
+            const groupLines = groupsFor(person)
               .map((group) => escapeHtml(groupTitle.get(group.group_slug) ?? group.group_slug))
               .join(', ');
             row.innerHTML =
@@ -1686,59 +1716,22 @@ const scoresHref = url('/captains/admin/minigame/');
     };
     groupsHost.innerHTML = groupCatalog.length
       ? groupCatalog
-          .map((group) => {
-            const members = groupMembers
-              .filter((member) => member.group_slug === group.slug)
-              .slice()
-              .sort((a, b) => a.person_name.localeCompare(b.person_name, 'en') || (a.place || '').localeCompare(b.place || '', 'en'));
-            const memberRows = members.length
-              ? members
-                  .map(
-                    (member) =>
-                      `<tr><td>${escapeHtml(member.person_name)}</td><td>${escapeHtml(member.place || '—')}</td></tr>`,
-                  )
-                  .join('')
-              : '<tr><td colspan="2">No one in this group yet.</td></tr>';
-            return (
-              `<article class="card"><div class="card__body stack">` +
-              `<h3>${escapeHtml(group.name)}</h3>` +
-              `<p class="muted small">${escapeHtml(sourceLabel(group.source))}. ${escapeHtml(filledNote(group))}</p>` +
-              `<table class="overview"><thead><tr><th>Name</th><th>Club / team</th></tr></thead><tbody>${memberRows}</tbody></table>` +
-              `</div></article>`
-            );
-          })
+          .map(
+            (group) =>
+              `<tr><td>${escapeHtml(group.name)}</td><td>${escapeHtml(roleName(group.role_slug))}</td><td>${escapeHtml(filledNote(group))}</td></tr>`,
+          )
           .join('')
-      : '<p class="muted">No groups are stored yet.</p>';
+      : '<tr><td colspan="3">No groups are stored yet.</td></tr>';
 
     rolesHost.innerHTML = roleCatalog.length
       ? roleCatalog
           .map((role) => {
             const group = groupCatalog.find((item) => item.role_slug === role.slug);
-            const members = group
-              ? groupMembers
-                  .filter((member) => member.group_slug === group.slug)
-                  .slice()
-                  .sort((a, b) => a.person_name.localeCompare(b.person_name, 'en') || (a.place || '').localeCompare(b.place || '', 'en'))
-              : [];
-            const body = members.length
-              ? members
-                  .map(
-                    (member) =>
-                      `<tr><td>${escapeHtml(member.person_name)}</td><td>${escapeHtml(member.place || '—')}</td></tr>`,
-                  )
-                  .join('')
-              : '<tr><td colspan="2">No one has this role yet.</td></tr>';
-            const from = group ? `Comes from the ${group.name} group.` : 'No group gives this role yet.';
-            return (
-              `<article class="card"><div class="card__body stack">` +
-              `<h3>${escapeHtml(role.name)}</h3>` +
-              `<p class="muted small">${escapeHtml(from)}</p>` +
-              `<table class="overview"><thead><tr><th>Name</th><th>Club / team</th></tr></thead><tbody>${body}</tbody></table>` +
-              `</div></article>`
-            );
+            const from = group ? group.name : 'No group gives this role yet.';
+            return `<tr><td>${escapeHtml(role.name)}</td><td>${escapeHtml(from)}</td></tr>`;
           })
           .join('')
-      : '<p class="muted">No roles are stored yet.</p>';
+      : '<tr><td colspan="2">No roles are stored yet.</td></tr>';
     await paintLinks();
   }
 

@@ -605,24 +605,16 @@ test.describe('Club captain, team captain, and player', () => {
 
     await page.getByRole('button', { name: 'Roles' }).click();
     await expect(page.getByRole('heading', { name: 'Roles', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Admin', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'LM Club Captain', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'LM Team Captain', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'LM Player', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'SL Player', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'JC Player', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Junior Organiser', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'BC Player', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'RB Player', exact: true })).toBeVisible();
+    const roleList = page.locator('[data-roles]');
+    for (const roleName of ['Admin', 'LM Club Captain', 'LM Team Captain', 'LM Player', 'SL Player', 'JC Player', 'Junior Organiser', 'BC Player', 'RB Player']) {
+      await expect(roleList.getByRole('cell', { name: roleName, exact: true })).toBeVisible();
+    }
     await expect(page.getByRole('heading', { name: 'Add an admin' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Remove admin' })).toHaveCount(0);
-    const adminRole = page.locator('[data-roles] article', { has: page.getByRole('heading', { name: 'Admin', exact: true }) });
-    await expect(adminRole).toContainText('County Admin');
-    await expect(adminRole).toContainText('Comes from the Admins group.');
-    const clubCaptain = page.locator('[data-roles] article', { has: page.getByRole('heading', { name: 'LM Club Captain', exact: true }) });
-    await expect(clubCaptain).toContainText('Sam Morris');
-    await expect(clubCaptain).toContainText('Test Club');
-    await expect(clubCaptain).toContainText('Comes from the LM Club Captains group.');
+    await expect(roleList).not.toContainText('County Admin');
+    await expect(roleList).not.toContainText('Sam Morris');
+    await expect(roleList.getByRole('row', { name: 'Admin Admins' })).toBeVisible();
+    await expect(roleList.getByRole('row', { name: 'LM Club Captain LM Club Captains' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Users' }).click();
     await expect(page.getByRole('heading', { name: 'Add a person' })).toBeVisible();
@@ -648,25 +640,24 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(gail).not.toContainText('Test Club');
     const samPeople = page.locator('[data-users] tr', { hasText: 'Sam Morris' });
     await expect(samPeople).toContainText('Test Club');
+    await expect(samPeople).toContainText('Admins');
+    await expect(samPeople).toContainText('LM Club Captains');
+    await expect(samPeople).toContainText('LM Club Captain');
     await expect(samPeople).not.toContainText('All clubs');
 
     await page.getByRole('button', { name: 'Groups' }).click();
-    await expect(page.getByRole('heading', { name: 'LM Club Captains', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'LM Team Captains', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'LM Players', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'SL Players', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'JC Players', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Junior Organisers', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'BC Players', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'RB Players', exact: true })).toBeVisible();
-    const leaguePlayers = page.locator('[data-groups] article', { has: page.getByRole('heading', { name: 'LM Players', exact: true }) });
+    const groupList = page.locator('[data-groups]');
+    for (const groupName of ['Admins', 'LM Club Captains', 'LM Team Captains', 'LM Players', 'SL Players', 'JC Players', 'Junior Organisers', 'BC Players', 'RB Players']) {
+      await expect(groupList.getByRole('cell', { name: groupName, exact: true })).toBeVisible();
+    }
+    const leaguePlayers = groupList.getByRole('row', { name: /LM Players/ });
     await expect(leaguePlayers).toContainText('Filled from League Master');
-    await expect(leaguePlayers.getByRole('button', { name: /Add/ })).toHaveCount(0);
-    const juniors = page.locator('[data-groups] article', { has: page.getByRole('heading', { name: 'JC Players', exact: true }) });
+    await expect(leaguePlayers).toContainText('LM Player');
+    await expect(groupList.getByRole('button', { name: /Add/ })).toHaveCount(0);
+    const juniors = groupList.getByRole('row', { name: /JC Players/ });
     await expect(juniors).toContainText('Not filled yet');
-    await expect(juniors.getByRole('button', { name: /Add/ })).toHaveCount(0);
-    const clubGroup = page.locator('[data-groups] article', { has: page.getByRole('heading', { name: 'LM Club Captains', exact: true }) });
-    await expect(clubGroup).toContainText('Sam Morris');
+    await expect(groupList).not.toContainText('Sam Morris');
+    const clubGroup = groupList.getByRole('row', { name: /LM Club Captains/ });
     await expect(clubGroup).toContainText('Gives the LM Club Captain role.');
 
     await page.getByRole('button', { name: 'SL', exact: true }).click();
