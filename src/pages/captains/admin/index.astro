@@ -815,11 +815,28 @@ const scoresHref = url('/captains/admin/minigame/');
     await showSession();
   };
   membersHost.addEventListener('click', (event) => {
-    const row = (event.target as HTMLElement).closest<HTMLElement>('[data-member-key]');
+    const target = event.target as HTMLElement;
+    if (target.closest('input, button, a, textarea, select')) return;
+    const row = target.closest<HTMLElement>('[data-member-key]');
     if (!row?.dataset.memberKey) return;
     selectedMemberKey = row.dataset.memberKey;
     paintMembers();
     memberForm.scrollIntoView({ block: 'nearest' });
+  });
+  membersHost.addEventListener('focusout', (event) => {
+    const input = event.target as HTMLInputElement;
+    if (!input.matches?.('[data-row-field]')) return;
+    const row = input.closest('tr');
+    const next = event.relatedTarget;
+    if (row && next instanceof Node && row.contains(next)) return;
+    const card = memberCards.find((item) => item.key === (input.dataset.rowKey ?? ''));
+    if (!card || !viewerIsAdmin || card.protectedAccount) return;
+    const valueOf = (field: string) => row?.querySelector<HTMLInputElement>(`[data-row-field="${field}"]`)?.value ?? '';
+    const email = valueOf('email').trim().toLowerCase();
+    const es = valueOf('es').trim();
+    const phone = valueOf('phone').trim();
+    if (email === card.email.trim().toLowerCase() && es === card.es && phone === card.phone) return;
+    void saveMemberDetails(card, email, es, phone, false);
   });
   memberActions.addEventListener('click', onAccountAction);
 
@@ -982,12 +999,18 @@ const scoresHref = url('/captains/admin/minigame/');
       return [card.name, card.profileName, card.place, card.email, card.groupNames, card.roleNames].some((value) => value.toLowerCase().includes(query));
     });
     memberCount.textContent = query ? `${shown.length} of ${players.length} players` : `${players.length} players`;
+    const contactCell = (card: MemberCard, field: 'email' | 'es' | 'phone', value: string, label: string, type: string, placeholder: string) => {
+      if (!viewerIsAdmin || card.protectedAccount) return escapeHtml(field === 'email' && card.protectedAccount ? 'BSCA' : value || '—');
+      return `<input data-row-field="${field}" data-row-key="${escapeHtml(card.key)}" aria-label="${label} for ${escapeHtml(card.name)}" type="${type}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" autocomplete="off" />`;
+    };
     membersHost.innerHTML = shown.length
       ? shown
           .map((card) => {
             const selected = card.key === selectedMemberKey ? ' class="is-selected"' : '';
-            const email = card.protectedAccount ? 'BSCA' : card.email || '—';
-            return `<tr${selected} data-member-key="${escapeHtml(card.key)}"><td>${escapeHtml(card.label)}</td><td>${escapeHtml(card.place || '—')}</td><td>${escapeHtml(card.groupNames || 'None')}</td><td>${escapeHtml(card.roleNames || 'No role yet')}</td><td>${escapeHtml(email)}</td><td>${escapeHtml(card.es || '—')}</td><td>${escapeHtml(card.phone || '—')}</td><td>${card.statusHtml}</td><td>${escapeHtml(card.lastLogin)}</td></tr>`;
+            const email = contactCell(card, 'email', card.protectedAccount ? '' : card.email, 'Email', 'email', 'Add an email');
+            const es = contactCell(card, 'es', card.es, 'ES number', 'text', 'Add an ES number');
+            const phone = contactCell(card, 'phone', card.phone, 'Phone', 'tel', 'Add a phone number');
+            return `<tr${selected} data-member-key="${escapeHtml(card.key)}"><td>${escapeHtml(card.label)}</td><td>${escapeHtml(card.place || '—')}</td><td>${escapeHtml(card.groupNames || 'None')}</td><td>${escapeHtml(card.roleNames || 'No role yet')}</td><td>${email}</td><td>${es}</td><td>${phone}</td><td>${card.statusHtml}</td><td>${escapeHtml(card.lastLogin)}</td></tr>`;
           })
           .join('')
       : `<tr><td colspan="9">${players.length ? 'No players match that search.' : 'No League Master players yet.'}</td></tr>`;
@@ -1006,7 +1029,7 @@ const scoresHref = url('/captains/admin/minigame/');
     memberEmail.value = card.protectedAccount ? 'BSCA' : card.email;
     memberEs.value = card.es;
     memberPhone.value = card.phone;
-    const lockedContact = !viewerIsAdmin || card.protectedAccount;
+    const lockedContact = card.protectedAccount;
     memberEmail.readOnly = lockedContact;
     memberEs.readOnly = lockedContact;
     memberPhone.readOnly = lockedContact;
@@ -2081,17 +2104,11 @@ const scoresHref = url('/captains/admin/minigame/');
   }
 
   memberSearch.addEventListener('input', () => paintMembers());
-  memberForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
+  async function saveMemberDetails(card: MemberCard, email: string, es: string, phone: string, updateGroups: boolean) {
     if (!viewerIsAdmin) {
       setStatus('Only an admin can change a player.');
       return;
     }
-    const card = memberCards.find((item) => item.key === selectedMemberKey);
-    if (!card) return;
-    const email = card.protectedAccount ? card.email.trim().toLowerCase() : memberEmail.value.trim().toLowerCase();
-    const es = memberEs.value.trim();
-    const phone = memberPhone.value.trim();
     if (!card.protectedAccount && email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setStatus('Enter a valid email, or leave it blank.');
       return;
@@ -2144,7 +2161,7 @@ const scoresHref = url('/captains/admin/minigame/');
       await supabase.rpc('sync_website_player_emails');
       await supabase.rpc('apply_lm_roles');
     }
-    if (card.profileId) {
+    if (updateGroups && card.profileId) {
       const wanted = new Map(
         [...root.querySelectorAll<HTMLInputElement>('[data-user-group]')].map((box) => [box.dataset.userGroup ?? '', box.checked]),
       );
@@ -2176,6 +2193,15 @@ const scoresHref = url('/captains/admin/minigame/');
     }
     setStatus(`Details saved for ${card.name}. League Master replaces the name, email, and ES number on the next import. Phone stays on this website.`);
     await showSession();
+  }
+  memberForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const card = memberCards.find((item) => item.key === selectedMemberKey);
+    if (!card) return;
+    const email = card.protectedAccount ? card.email.trim().toLowerCase() : memberEmail.value.trim().toLowerCase();
+    const es = memberEs.value.trim();
+    const phone = memberPhone.value.trim();
+    await saveMemberDetails(card, email, es, phone, true);
   });
 
   showSession();
@@ -2428,6 +2454,21 @@ const scoresHref = url('/captains/admin/minigame/');
     border-style: hidden;
     font-size: 0.82rem;
     line-height: 1.25;
+  }
+  #setup-app .overview td input {
+    width: 100%;
+    min-width: 9rem;
+    background: #fff;
+    color: #0e2744;
+    color-scheme: light;
+    border: 1px solid rgba(14, 39, 68, 0.25);
+    border-radius: var(--radius-sm);
+    padding: 0.3rem 0.45rem;
+    font: inherit;
+    font-size: 0.82rem;
+  }
+  #setup-app .overview td input::placeholder {
+    color: #5c6d80;
   }
   #setup-app .overview th,
   #setup-app .overview td {

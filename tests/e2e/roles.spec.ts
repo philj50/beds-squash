@@ -637,7 +637,10 @@ test.describe('Club captain, team captain, and player', () => {
     const pat = page.locator('[data-users] tr', { hasText: 'Pat Player' });
     await expect(pat).toContainText('LM Player');
     await expect(pat).toContainText('No login');
-    await pat.click();
+    await expect(pat.getByRole('textbox', { name: 'Email for Pat Player' })).toBeEnabled();
+    await expect(pat.getByRole('textbox', { name: 'ES number for Pat Player' })).toBeEnabled();
+    await expect(pat.getByRole('textbox', { name: 'Phone for Pat Player' })).toBeEnabled();
+    await pat.locator('td').first().click();
     await expect(page.locator('[data-form="member"]').getByLabel('Email')).toHaveValue('pat.player@example.test');
     await expect(page.locator('[data-form="member"]').getByLabel('ES number')).toBeVisible();
     await expect(page.locator('[data-form="member"]').getByLabel('Phone')).toBeVisible();
