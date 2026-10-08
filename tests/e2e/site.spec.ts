@@ -391,6 +391,16 @@ test.describe('Public site', () => {
     await expect(page.locator('input[name="player_first_name"]')).toBeVisible();
   });
 
+  test('login accepts a name as well as an email', async ({ page }) => {
+    await open(page, 'login/');
+    await expect(page.getByRole('heading', { level: 1, name: 'Log in' })).toBeVisible();
+    const login = page.getByRole('textbox', { name: 'Email or login' });
+    await expect(login).toHaveAttribute('type', 'text');
+    await login.fill('BSCA');
+    await expect(login).toHaveValue('BSCA');
+    await expect(login).toBeFocused();
+  });
+
   test('contact page shows association email pattern', async ({ page }) => {
     await open(page, 'contact/');
     await expect(page.getByRole('heading', { level: 1 })).toContainText(/contact/i);
