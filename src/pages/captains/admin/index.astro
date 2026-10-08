@@ -146,29 +146,13 @@ const scoresHref = url('/captains/admin/minigame/');
               </label>
             </div>
             <p class="muted small" data-member-count></p>
-            <div class="overview-box">
-              <table class="overview">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Place</th>
-                    <th>Groups</th>
-                    <th>Role</th>
-                    <th>Email</th>
-                    <th>Status</th>
-                    <th>Last login</th>
-                  </tr>
-                </thead>
-                <tbody data-users data-group-members></tbody>
-              </table>
-            </div>
             <form class="card" data-form="member" hidden>
               <div class="card__body stack">
                 <h3 data-member-who></h3>
                 <p class="muted small" data-member-meta></p>
-                <label>Email <input name="email" type="email" data-member-email autocomplete="off" /></label>
-                <label>ES number <input name="es" data-member-es maxlength="32" autocomplete="off" /></label>
-                <label>Phone <input name="phone" type="tel" data-member-phone autocomplete="off" /></label>
+                <label>Email <input name="email" type="email" data-member-email autocomplete="off" placeholder="Add an email" /></label>
+                <label>ES number <input name="es" data-member-es maxlength="32" autocomplete="off" placeholder="Add an ES number" /></label>
+                <label>Phone <input name="phone" type="tel" data-member-phone autocomplete="off" placeholder="Add a phone number" /></label>
                 <fieldset class="stack">
                   <legend>Groups</legend>
                   <label><input type="checkbox" data-user-group="admins" /> Admins</label>
@@ -181,6 +165,24 @@ const scoresHref = url('/captains/admin/minigame/');
                 </div>
               </div>
             </form>
+            <div class="overview-box">
+              <table class="overview">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Place</th>
+                    <th>Groups</th>
+                    <th>Role</th>
+                    <th>Email</th>
+                    <th>ES number</th>
+                    <th>Phone</th>
+                    <th>Status</th>
+                    <th>Last login</th>
+                  </tr>
+                </thead>
+                <tbody data-users data-group-members></tbody>
+              </table>
+            </div>
             <form class="card" data-form="create-account" hidden>
               <div class="card__body stack">
                 <h3>Create the login</h3>
@@ -793,6 +795,7 @@ const scoresHref = url('/captains/admin/minigame/');
     if (!row?.dataset.memberKey) return;
     selectedMemberKey = row.dataset.memberKey;
     paintMembers();
+    memberForm.scrollIntoView({ block: 'nearest' });
   });
   memberActions.addEventListener('click', onAccountAction);
 
@@ -894,10 +897,10 @@ const scoresHref = url('/captains/admin/minigame/');
           .map((card) => {
             const selected = card.key === selectedMemberKey ? ' class="is-selected"' : '';
             const email = card.protectedAccount ? 'BSCA' : card.email || '—';
-            return `<tr${selected} data-member-key="${escapeHtml(card.key)}"><td>${escapeHtml(card.label)}</td><td>${escapeHtml(card.place || '—')}</td><td>${escapeHtml(card.groupNames || 'None')}</td><td>${escapeHtml(card.roleNames || 'No role yet')}</td><td>${escapeHtml(email)}</td><td>${card.statusHtml}</td><td>${escapeHtml(card.lastLogin)}</td></tr>`;
+            return `<tr${selected} data-member-key="${escapeHtml(card.key)}"><td>${escapeHtml(card.label)}</td><td>${escapeHtml(card.place || '—')}</td><td>${escapeHtml(card.groupNames || 'None')}</td><td>${escapeHtml(card.roleNames || 'No role yet')}</td><td>${escapeHtml(email)}</td><td>${escapeHtml(card.es || '—')}</td><td>${escapeHtml(card.phone || '—')}</td><td>${card.statusHtml}</td><td>${escapeHtml(card.lastLogin)}</td></tr>`;
           })
           .join('')
-      : `<tr><td colspan="7">${players.length ? 'No players match that search.' : 'No League Master players yet.'}</td></tr>`;
+      : `<tr><td colspan="9">${players.length ? 'No players match that search.' : 'No League Master players yet.'}</td></tr>`;
     paintMemberForm();
   }
   function paintMemberForm() {
@@ -911,11 +914,15 @@ const scoresHref = url('/captains/admin/minigame/');
     memberWho.textContent = card.name;
     memberMeta.textContent = `${card.groupNames || 'No group'} · ${card.roleNames || 'No role yet'} · ${card.place || 'No place'}`;
     memberEmail.value = card.protectedAccount ? 'BSCA' : card.email;
-    memberEmail.readOnly = card.protectedAccount;
     memberEs.value = card.es;
     memberPhone.value = card.phone;
-    memberEs.readOnly = card.protectedAccount;
-    memberPhone.readOnly = card.protectedAccount;
+    const lockedContact = !viewerIsAdmin || card.protectedAccount;
+    memberEmail.readOnly = lockedContact;
+    memberEs.readOnly = lockedContact;
+    memberPhone.readOnly = lockedContact;
+    memberEmail.disabled = lockedContact;
+    memberEs.disabled = lockedContact;
+    memberPhone.disabled = lockedContact;
     for (const box of root.querySelectorAll<HTMLInputElement>('[data-user-group]')) {
       const slug = box.dataset.userGroup ?? '';
       box.checked = card.groupSlugs.includes(slug);
@@ -1727,7 +1734,10 @@ const scoresHref = url('/captains/admin/minigame/');
       const key = profile ? `id:${profile.id}` : `name:${nameKey(name)}`;
       if (!name && !profile) return;
       const display = profile?.display_name || name || 'Unnamed';
-      const contacts = contactFor(display);
+      const contactNames = new Set(
+        [display, name, ...groups.map((group) => group.person_name)].map((value) => nameKey(value || '')).filter(Boolean),
+      );
+      const contacts = personContacts.filter((contact) => contactNames.has(nameKey(contact.name)));
       const slugs = [...new Set(groups.map((group) => group.group_slug))];
       const roleNames = roleCatalog
         .filter((role) => groupCatalog.some((group) => group.role_slug === role.slug && slugs.includes(group.slug)))
