@@ -443,6 +443,7 @@ const scoresHref = url('/captains/admin/minigame/');
   type MemberCard = {
     key: string;
     name: string;
+    profileName: string;
     label: string;
     profileId: string | null;
     email: string;
@@ -889,7 +890,7 @@ const scoresHref = url('/captains/admin/minigame/');
     const players = memberCards.filter((card) => card.groupSlugs.includes('lm_players'));
     const shown = players.filter((card) => {
       if (!query) return true;
-      return [card.name, card.place, card.email, card.groupNames, card.roleNames].some((value) => value.toLowerCase().includes(query));
+      return [card.name, card.profileName, card.place, card.email, card.groupNames, card.roleNames].some((value) => value.toLowerCase().includes(query));
     });
     memberCount.textContent = query ? `${shown.length} of ${players.length} players` : `${players.length} players`;
     membersHost.innerHTML = shown.length
@@ -1369,7 +1370,13 @@ const scoresHref = url('/captains/admin/minigame/');
     }
 
     const linkedLm = mineLink?.lm_player_name ? nameKey(mineLink.lm_player_name) : '';
-    const myNominations = nominations.filter((row) => isSelf(account, row.player_name, null) || (linkedLm && nameKey(row.player_name) === linkedLm));
+    const myNames = new Set(rows.filter((row) => isSelf(account, row.name, row.email)).map((row) => nameKey(row.name)));
+    const selfRow = rows.find((row) => myNames.has(nameKey(row.name)));
+    if (selfRow) {
+      ownName.textContent = selfRow.name;
+      whoEl.textContent = `Signed in as ${selfRow.name}`;
+    }
+    const myNominations = nominations.filter((row) => myNames.has(nameKey(row.player_name)) || isSelf(account, row.player_name, null) || (linkedLm && nameKey(row.player_name) === linkedLm));
     const lmHtml = myNominations.length
       ? `<ul>${myNominations
           .map((row) => {
@@ -1733,7 +1740,12 @@ const scoresHref = url('/captains/admin/minigame/');
     const addCard = (name: string, profile: Person | null, groups: GroupMember[]) => {
       const key = profile ? `id:${profile.id}` : `name:${nameKey(name)}`;
       if (!name && !profile) return;
-      const display = profile?.display_name || name || 'Unnamed';
+      const lmName =
+        groups.find((group) => group.group_slug === 'lm_players')?.person_name ||
+        groups.find((group) => group.group_slug === 'lm_team_captains' || group.group_slug === 'lm_club_captains')?.person_name ||
+        '';
+      const display = lmName || profile?.display_name || name || 'Unnamed';
+      const profileName = profile?.display_name || '';
       const contactNames = new Set(
         [display, name, ...groups.map((group) => group.person_name)].map((value) => nameKey(value || '')).filter(Boolean),
       );
@@ -1750,6 +1762,7 @@ const scoresHref = url('/captains/admin/minigame/');
       cards.set(key, {
         key,
         name: display,
+        profileName,
         label: `${display}${profile?.id === selfId ? ' (you)' : ''}${isDefault ? ' Default admin' : ''}`,
         profileId: profile?.id ?? null,
         email: emailFor(display, profile),
