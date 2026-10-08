@@ -172,8 +172,8 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
     overflow: hidden;
     border-bottom: 1px solid var(--border);
     background:
-      radial-gradient(900px 500px at 85% 20%, rgba(242, 183, 5, 0.12), transparent 60%),
-      repeating-linear-gradient(-55deg, transparent 0 38px, rgba(255, 255, 255, 0.02) 38px 40px);
+      radial-gradient(900px 500px at 85% 20%, rgba(241, 90, 34, 0.1), transparent 60%),
+      repeating-linear-gradient(-55deg, transparent 0 38px, rgba(14, 39, 68, 0.025) 38px 40px);
   }
   .hero__inner {
     display: grid;
@@ -190,7 +190,7 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
   }
   .lede {
     font-size: clamp(1.05rem, 1.6vw, 1.3rem);
-    color: var(--ink-200);
+    color: var(--text-muted);
     max-width: 58ch;
   }
   .hero__cta {
@@ -325,12 +325,12 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
     padding: 0.85rem 1rem;
     border-radius: var(--radius);
     background:
-      linear-gradient(135deg, rgba(242, 183, 5, 0.14), rgba(215, 38, 61, 0.1)),
-      var(--ink-800);
+      linear-gradient(135deg, rgba(241, 90, 34, 0.1), rgba(14, 39, 68, 0.04)),
+      #fff;
     border: 1px solid var(--border-strong);
   }
   .cta p {
-    color: var(--ink-200);
+    color: var(--text-muted);
     margin: 0;
   }
   .cta__actions {

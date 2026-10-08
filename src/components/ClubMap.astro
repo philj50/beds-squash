@@ -182,11 +182,11 @@ const payload = clubs.map((c) => ({ ...c, href: url(`/clubs/${c.id}/`) }));
   .club-map__hold p {
     margin: 0;
     max-width: 28rem;
-    color: var(--ink-200);
+    color: #e7eef6;
   }
-  /* Dark-mode treatment for standard OSM raster tiles */
+  /* Dark OSM tiles. Higher contrast keeps town names and roads readable on the navy land. */
   .club-map .osm-dark {
-    filter: invert(1) hue-rotate(190deg) brightness(0.8) contrast(0.95) saturate(0.55);
+    filter: invert(1) hue-rotate(200deg) brightness(1.05) contrast(1.45) saturate(0.35);
   }
   .club-map__legend {
     position: absolute;
@@ -200,7 +200,7 @@ const payload = clubs.map((c) => ({ ...c, href: url(`/clubs/${c.id}/`) }));
     border-radius: 999px;
     padding: 0.4rem 0.9rem;
     font-size: 0.8rem;
-    color: var(--ink-100);
+    color: #fff;
     backdrop-filter: blur(6px);
   }
   .club-map__legend span {
@@ -216,13 +216,13 @@ const payload = clubs.map((c) => ({ ...c, href: url(`/clubs/${c.id}/`) }));
   }
   .dot--league,
   .pin--league {
-    background: var(--gold-500);
-    box-shadow: 0 0 0 3px rgba(242, 183, 5, 0.3);
+    background: #f15a22;
+    box-shadow: 0 0 0 3px rgba(241, 90, 34, 0.55);
   }
   .dot--venue,
   .pin--venue {
-    background: var(--red-500);
-    box-shadow: 0 0 0 3px rgba(215, 38, 61, 0.3);
+    background: #e11d48;
+    box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.5);
   }
   .pin {
     display: block;
@@ -230,7 +230,7 @@ const payload = clubs.map((c) => ({ ...c, href: url(`/clubs/${c.id}/`) }));
     height: 18px;
     margin: 2px;
     border-radius: 50%;
-    border: 2px solid var(--ink-950);
+    border: 2px solid #fff;
     transition: transform 0.15s ease;
   }
   .leaflet-marker-icon:hover .pin {
@@ -242,7 +242,7 @@ const payload = clubs.map((c) => ({ ...c, href: url(`/clubs/${c.id}/`) }));
   .leaflet-popup-content-wrapper,
   .leaflet-popup-tip {
     background: var(--ink-800);
-    color: var(--text);
+    color: #fff;
     border: 1px solid var(--border-strong);
     box-shadow: var(--shadow);
   }
@@ -252,15 +252,15 @@ const payload = clubs.map((c) => ({ ...c, href: url(`/clubs/${c.id}/`) }));
     font-size: 0.9rem;
   }
   .leaflet-popup-content a {
-    color: var(--gold-400);
+    color: #fff;
     font-weight: 600;
   }
   .leaflet-container a.leaflet-popup-close-button {
-    color: var(--ink-300);
+    color: #fff;
   }
   .leaflet-bar a {
     background: var(--ink-800);
-    color: var(--text);
+    color: #fff;
     border-bottom-color: var(--border-strong);
   }
   .leaflet-bar a:hover {
@@ -268,10 +268,10 @@ const payload = clubs.map((c) => ({ ...c, href: url(`/clubs/${c.id}/`) }));
   }
   .leaflet-control-attribution {
     background: color-mix(in srgb, var(--ink-900) 75%, transparent) !important;
-    color: var(--ink-300) !important;
+    color: #e7eef6 !important;
     font-size: 10px;
   }
   .leaflet-control-attribution a {
-    color: var(--ink-200) !important;
+    color: #fff !important;
   }
 </style>

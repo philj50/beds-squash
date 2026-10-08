@@ -13,7 +13,7 @@ const profileHref = url('/captains/profile/');
 <header class="site-header" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} data-login={loginHref} data-profile={profileHref}>
   <div class="container bar">
     <a class="brand" href={url('/')} aria-label={`${SITE.name} home`}>
-      <img src={url('/brand/logo-navy.png')} alt="" width="154" height="91" />
+      <img src={url('/brand/logo-coral.png')} alt="" width="154" height="91" />
     </a>
 
     <div class="bar-end">
@@ -133,6 +133,12 @@ const profileHref = url('/captains/profile/');
     -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border);
   }
+  :global(html[data-theme='navy']) .site-header,
+  :global(html[data-theme='light']) .site-header {
+    background: #fff;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
   .bar {
     display: flex;
     align-items: center;
@@ -159,7 +165,6 @@ const profileHref = url('/captains/profile/');
     height: 52px;
     border-radius: 6px;
     flex-shrink: 0;
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
   }
 
   .nav ul {
@@ -206,6 +211,67 @@ const profileHref = url('/captains/profile/');
   .account-toggle[aria-expanded='true'] {
     color: #fff;
     background: rgba(255, 255, 255, 0.05);
+  }
+  :global(html[data-theme='navy']) .nav > ul > li > a,
+  :global(html[data-theme='navy']) .account-toggle,
+  :global(html[data-theme='light']) .nav > ul > li > a,
+  :global(html[data-theme='light']) .account-toggle {
+    color: var(--text);
+  }
+  :global(html[data-theme='navy']) .nav > ul > li > a:hover,
+  :global(html[data-theme='navy']) .account-toggle:hover,
+  :global(html[data-theme='navy']) .account-toggle[aria-expanded='true'],
+  :global(html[data-theme='light']) .nav > ul > li > a:hover,
+  :global(html[data-theme='light']) .account-toggle:hover,
+  :global(html[data-theme='light']) .account-toggle[aria-expanded='true'] {
+    color: var(--accent);
+    background: transparent;
+  }
+  :global(html[data-theme='navy']) .nav > ul > li > a[data-account-login],
+  :global(html[data-theme='light']) .nav > ul > li > a[data-account-login] {
+    background: var(--accent);
+    color: #fff;
+    border-radius: 999px;
+    padding: 0.4rem 0.95rem;
+  }
+  :global(html[data-theme='navy']) .nav > ul > li > a[data-account-login]:hover,
+  :global(html[data-theme='light']) .nav > ul > li > a[data-account-login]:hover {
+    background: var(--accent-hover);
+    color: #fff;
+  }
+  :global(html[data-theme='navy']) .account-menu,
+  :global(html[data-theme='light']) .account-menu {
+    background: #fff;
+  }
+  :global(html[data-theme='navy']) .nav.is-open,
+  :global(html[data-theme='light']) .nav.is-open {
+    background: #0e2744;
+  }
+  :global(html[data-theme='navy']) .nav.is-open > ul > li > a:not([data-account-login]),
+  :global(html[data-theme='navy']) .nav.is-open .account-toggle,
+  :global(html[data-theme='light']) .nav.is-open > ul > li > a:not([data-account-login]),
+  :global(html[data-theme='light']) .nav.is-open .account-toggle {
+    color: #fff;
+  }
+  :global(html[data-theme='navy']) .nav.is-open > ul > li > a:not([data-account-login]):hover,
+  :global(html[data-theme='navy']) .nav.is-open .account-toggle:hover,
+  :global(html[data-theme='light']) .nav.is-open > ul > li > a:not([data-account-login]):hover,
+  :global(html[data-theme='light']) .nav.is-open .account-toggle:hover {
+    color: #ffb088;
+    background: transparent;
+  }
+  :global(html[data-theme='navy']) .account-menu a,
+  :global(html[data-theme='navy']) .account-menu button,
+  :global(html[data-theme='light']) .account-menu a,
+  :global(html[data-theme='light']) .account-menu button {
+    color: var(--text);
+  }
+  :global(html[data-theme='navy']) .account-menu a:hover,
+  :global(html[data-theme='navy']) .account-menu button:hover,
+  :global(html[data-theme='light']) .account-menu a:hover,
+  :global(html[data-theme='light']) .account-menu button:hover {
+    color: var(--accent);
+    background: rgba(241, 90, 34, 0.08);
   }
   .nav > ul > li > a[aria-current='page'] {
     color: var(--accent);

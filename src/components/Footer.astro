@@ -67,6 +67,32 @@ const year = new Date().getFullYear();
     padding: 1.25rem 0 0.85rem;
     font-size: 0.95rem;
   }
+  :global(html[data-theme='navy']) .site-footer,
+  :global(html[data-theme='light']) .site-footer {
+    background: #0e2744;
+    color: #e7eef6;
+    border-top: 0;
+  }
+  :global(html[data-theme='navy']) .site-footer .muted,
+  :global(html[data-theme='navy']) .site-footer a,
+  :global(html[data-theme='navy']) .site-footer .bottom,
+  :global(html[data-theme='navy']) .site-footer .bottom button,
+  :global(html[data-theme='light']) .site-footer .muted,
+  :global(html[data-theme='light']) .site-footer a,
+  :global(html[data-theme='light']) .site-footer .bottom,
+  :global(html[data-theme='light']) .site-footer .bottom button {
+    color: #e7eef6;
+  }
+  :global(html[data-theme='navy']) .site-footer a:hover,
+  :global(html[data-theme='light']) .site-footer a:hover {
+    color: #fff;
+  }
+  :global(html[data-theme='navy']) .site-footer .legal,
+  :global(html[data-theme='navy']) .site-footer h4,
+  :global(html[data-theme='light']) .site-footer .legal,
+  :global(html[data-theme='light']) .site-footer h4 {
+    color: #fff;
+  }
   .grid {
     display: grid;
     grid-template-columns: 1.4fr 1fr 1fr;

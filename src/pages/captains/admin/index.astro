@@ -1977,7 +1977,7 @@ const scoresHref = url('/captains/admin/minigame/');
   }
   #setup-app .test-flag {
     border: 1px solid var(--gold-500);
-    color: var(--gold-400);
+    color: var(--gold-600);
     border-radius: var(--radius-sm);
     padding: 0.75rem 1rem;
     margin: 0 0 1.25rem;
@@ -1990,7 +1990,7 @@ const scoresHref = url('/captains/admin/minigame/');
   }
   #setup-app .status {
     margin: 1rem 0;
-    color: var(--gold-400);
+    color: var(--gold-600);
   }
   #setup-app .who {
     margin-bottom: 0.5rem;
@@ -2028,7 +2028,7 @@ const scoresHref = url('/captains/admin/minigame/');
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--gold-400);
+    color: #fff;
     background: var(--ink-800);
     border: 1px solid var(--gold-500);
     border-bottom: none;
@@ -2058,8 +2058,9 @@ const scoresHref = url('/captains/admin/minigame/');
   #setup-app .site-card input,
   #setup-app [data-form='own-name'] input {
     width: 100%;
-    background: var(--ink-950);
+    background: #fff;
     color: var(--text);
+    color-scheme: light;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     padding: 0.35rem 0.45rem;
@@ -2067,7 +2068,7 @@ const scoresHref = url('/captains/admin/minigame/');
   }
   #setup-app .admin-tabs button {
     background: transparent;
-    color: var(--ink-200);
+    color: var(--text-muted);
     border: 1px solid transparent;
     border-bottom: none;
     border-radius: var(--radius-sm) var(--radius-sm) 0 0;
@@ -2079,11 +2080,11 @@ const scoresHref = url('/captains/admin/minigame/');
     cursor: pointer;
   }
   #setup-app .admin-tabs button:hover {
-    color: var(--gold-400);
+    color: var(--gold-600);
   }
   #setup-app .admin-tabs button[aria-current='page'] {
     background: var(--ink-800);
-    color: var(--gold-400);
+    color: #fff;
     border-color: var(--gold-500);
     border-bottom: 2px solid var(--ink-800);
   }
@@ -2130,14 +2131,14 @@ const scoresHref = url('/captains/admin/minigame/');
   }
   #setup-app .traffic-kpis dt {
     font-size: 0.85rem;
-    color: var(--ink-300);
+    color: var(--text);
     margin: 0 0 0.25rem;
   }
   #setup-app .traffic-kpis dd {
     margin: 0;
     font-size: 1.75rem;
     font-weight: 700;
-    color: var(--gold-400);
+    color: var(--ink-950);
   }
   #setup-app .traffic-table code {
     font-size: 0.85rem;
@@ -2156,7 +2157,7 @@ const scoresHref = url('/captains/admin/minigame/');
   }
   #setup-app .club-menu button {
     background: var(--ink-800);
-    color: var(--paper);
+    color: #fff;
     border: 1px solid rgba(255, 255, 255, 0.25);
     border-radius: 999px;
     padding: 0.35rem 0.85rem;
@@ -2170,7 +2171,7 @@ const scoresHref = url('/captains/admin/minigame/');
   #setup-app .club-menu button[aria-current='true'] {
     background: var(--gold-500);
     border-color: var(--gold-500);
-    color: var(--ink-950);
+    color: #fff;
     font-weight: 600;
   }
 
@@ -2194,6 +2195,7 @@ const scoresHref = url('/captains/admin/minigame/');
     vertical-align: middle;
     padding: 0.18rem 0.4rem;
     border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #e7eef6;
   }
   #setup-app .overview .col-team,
   #setup-app .overview .col-division {
@@ -2201,7 +2203,7 @@ const scoresHref = url('/captains/admin/minigame/');
     width: 1%;
   }
   #setup-app .overview th {
-    color: var(--gold-400);
+    color: #fff;
     font-weight: 700;
     background: var(--ink-700);
     white-space: nowrap;
@@ -2221,7 +2223,7 @@ const scoresHref = url('/captains/admin/minigame/');
     font-weight: 700;
   }
   #setup-app .directory td.col-club {
-    color: var(--gold-400);
+    color: #fff;
   }
   #setup-app .directory tbody tr:nth-child(odd) td {
     background: transparent;
@@ -2233,7 +2235,7 @@ const scoresHref = url('/captains/admin/minigame/');
     background: none;
     border: none;
     padding: 0;
-    color: var(--gold-400);
+    color: #fff;
     font: inherit;
     font-weight: 600;
     text-align: left;
@@ -2255,8 +2257,9 @@ const scoresHref = url('/captains/admin/minigame/');
   #setup-app input,
   #setup-app select {
     width: 100%;
-    background: var(--ink-900);
+    background: #fff;
     color: var(--text);
+    color-scheme: light;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     padding: 0.65rem 0.75rem;
@@ -2304,10 +2307,10 @@ const scoresHref = url('/captains/admin/minigame/');
     font-size: 0.9rem;
   }
   #setup-app .matched {
-    color: var(--gold-400);
+    color: var(--gold-600);
   }
   #setup-app .waiting {
-    color: var(--ink-200);
+    color: var(--text-muted);
   }
   #setup-app .people {
     list-style: none;
@@ -2353,8 +2356,9 @@ const scoresHref = url('/captains/admin/minigame/');
   }
   #setup-app .pill {
     display: inline-block;
-    border: 1px solid var(--gold-500);
-    color: var(--gold-400);
+    background: #fff;
+    border: 1px solid transparent;
+    color: var(--gold-600);
     border-radius: 999px;
     padding: 0 0.45rem;
     font-size: 0.75rem;

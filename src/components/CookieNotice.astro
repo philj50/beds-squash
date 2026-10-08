@@ -107,7 +107,7 @@ const base = import.meta.env.BASE_URL || '/';
     transform: translate(-50%, -50%);
     width: min(32rem, calc(100% - 2rem));
     background: var(--ink-800);
-    color: var(--text);
+    color: #fff;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
@@ -115,6 +115,10 @@ const base = import.meta.env.BASE_URL || '/';
   }
   .cookie-notice__panel p {
     margin: 0 0 1rem;
+  }
+  .cookie-notice__panel .eyebrow,
+  .cookie-notice__panel a {
+    color: #fff;
   }
   .cookie-notice__actions {
     display: flex;
