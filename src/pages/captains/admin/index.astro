@@ -101,8 +101,6 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="site-player" hidden>
             <h2>Player</h2>
             <p class="muted small" data-site-player-note></p>
-            <p class="muted small">Signed in as <strong data-own-name></strong>. Email <strong data-own-email></strong>. Name and password are changed on your profile.</p>
-            <div class="site-facts" data-own-facts></div>
             <div data-site-player-list></div>
           </section>
 
@@ -1103,9 +1101,6 @@ const scoresHref = url('/captains/admin/minigame/');
   const playerNote = root.querySelector<HTMLElement>('[data-site-player-note]')!;
   const siteClubHost = root.querySelector<HTMLElement>('[data-site-club]')!;
   const siteTeamHost = root.querySelector<HTMLElement>('[data-site-team]')!;
-  const ownName = root.querySelector<HTMLElement>('[data-own-name]')!;
-  const ownEmail = root.querySelector<HTMLElement>('[data-own-email]')!;
-  const ownFacts = root.querySelector<HTMLElement>('[data-own-facts]')!;
   const playerListHost = root.querySelector<HTMLElement>('[data-site-player-list]')!;
   type WebsitePlayer = { teamId: number; name: string; email: string; playerId: number };
   let websitePlayers: WebsitePlayer[] = [];
@@ -1536,8 +1531,6 @@ const scoresHref = url('/captains/admin/minigame/');
   };
 
   async function loadWebsite(account: Account) {
-    ownName.textContent = account.displayName || '—';
-    ownEmail.textContent = account.email || '—';
     const [{ data: mineRows }, { data: clubRows }, { data: teamRows }, { data: squadRows }, { data: nomRows }, contactResult, { data: slRows }, linkResult, profileResult, roleMembershipResult, nameResult] = await Promise.all([
       supabase.from('memberships').select('role, club_slug, team_id').eq('profile_id', account.userId),
       supabase.from('clubs').select('slug, name, contact_name, contact_email').order('name', { ascending: true }),
@@ -1836,39 +1829,9 @@ const scoresHref = url('/captains/admin/minigame/');
       slHost.innerHTML = `<div class="overview-box"><table class="overview"><thead><tr><th>Club</th><th>Team</th><th>Player</th><th>Level</th><th>Updated</th></tr></thead><tbody>${body}</tbody></table></div>`;
     }
 
-    const linkedLm = mineLink?.lm_player_name ? nameKey(mineLink.lm_player_name) : '';
     const myNames = new Set(rows.filter((row) => isSelf(account, row.name, row.email)).map((row) => nameKey(row.name)));
     const selfRow = rows.find((row) => myNames.has(nameKey(row.name)));
-    if (selfRow) {
-      ownName.textContent = selfRow.name;
-      whoEl.textContent = `Signed in as ${selfRow.name}`;
-    }
-    const myNominations = nominations.filter((row) => myNames.has(nameKey(row.player_name)) || isSelf(account, row.player_name, null) || (linkedLm && nameKey(row.player_name) === linkedLm));
-    const lmHtml = myNominations.length
-      ? `<ul>${myNominations
-          .map((row) => {
-            const team = teamById.get(row.team_id);
-            const club = team ? clubBySlug.get(team.club_slug) : undefined;
-            return `<li>${escapeHtml(club?.name ?? 'Club')} · ${escapeHtml(team?.name ?? 'Team')} · ${escapeHtml(row.player_name)}</li>`;
-          })
-          .join('')}</ul>`
-      : '<p class="muted small">No League Master nomination matches your name.</p>';
-    const teamFacts = account.isAdmin
-      ? '<p class="muted small">Every team is on the Team tab.</p>'
-      : hasClubRole
-        ? '<p class="muted small">Every team at your club is on the Team tab.</p>'
-        : teamIds.size
-          ? teamList
-              .filter((team) => teamIds.has(team.id))
-              .map((team) => `<p>${escapeHtml(team.division ? `${team.name} · ${team.division}` : team.name)}${team.captain_name ? ` · Captain ${escapeHtml(team.captain_name)}` : ''}</p>`)
-              .join('')
-          : '<p class="muted small">No team on this account yet.</p>';
-    const clubFacts = account.isAdmin
-      ? '<p class="muted small">Every club is on the Club tab.</p>'
-      : (account.playerOnly ? clubList.filter((club) => homeClubSlugs.has(club.slug)) : hasClubRole ? clubList.filter((club) => clubSlugs.has(club.slug)) : clubList.filter((club) => homeClubSlugs.has(club.slug)))
-          .map((club) => `<p>${escapeHtml(club.name)}${club.contact_name ? ` · ${escapeHtml(club.contact_name)}` : ''}${club.contact_email ? ` · ${escapeHtml(club.contact_email)}` : ''}</p>`)
-          .join('') || '<p class="muted small">No club on this account yet.</p>';
-    ownFacts.innerHTML = `<h3>League Master</h3>${lmHtml}<h3>Team</h3>${teamFacts}<h3>Club</h3>${clubFacts}`;
+    if (selfRow) whoEl.textContent = `Signed in as ${selfRow.name}`;
   }
 
   const rememberWebsiteEmail = (teamId: number, name: string, email: string, playerId: number) => {
@@ -2894,14 +2857,9 @@ const scoresHref = url('/captains/admin/minigame/');
   #setup-app .site-card {
     margin: 0 0 1rem;
   }
-  #setup-app .site-card h3,
-  #setup-app .site-facts h3 {
+  #setup-app .site-card h3 {
     margin: 0.8rem 0 0.3rem;
     font-size: 1rem;
-  }
-  #setup-app .site-facts ul {
-    margin: 0.25rem 0 0;
-    padding-left: 1.2rem;
   }
   #setup-app .sl-chart svg {
     width: 100%;

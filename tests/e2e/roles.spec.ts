@@ -202,11 +202,7 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.locator('[data-squad-link]')).toHaveText('Your team');
 
     await page.goto('captains/admin/', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('[data-own-name]')).toHaveText('Pat Player');
-    await expect(page.locator('[data-own-email]')).toHaveText('pat.player@example.test');
-    await expect(page.locator('[data-own-facts]')).toContainText('Test Club');
-    await expect(page.locator('[data-own-facts]')).toContainText('Test Team 1');
-    await expect(page.locator('[data-own-facts]')).toContainText('Pat Player');
+    await expect(page.locator('[data-site-player-list]')).toContainText('Pat Player');
     await expect(page.locator('[data-tab="site-player"]')).not.toContainText('Sam Spare');
     await expect(page.locator('[data-site-player-list]').getByRole('textbox')).toHaveCount(0);
     await page.getByRole('button', { name: 'Team', exact: true }).click();
