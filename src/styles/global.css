@@ -470,6 +470,8 @@ html[data-theme='light'] .prose code {
 }
 .prose img {
   border-radius: var(--radius);
+  width: auto;
+  max-width: min(100%, 22rem);
 }
 .prose hr {
   border: 0;

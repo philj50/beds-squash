@@ -3,6 +3,7 @@ import Base from '@/layouts/Base.astro';
 import ContentPage from '@/components/ContentPage.astro';
 import EventCard from '@/components/EventCard.astro';
 import JuniorAdminMenu from '@/components/JuniorAdminMenu.astro';
+import JuniorClosedPoster from '@/components/JuniorClosedPoster.astro';
 import JuniorClosedQr from '@/components/JuniorClosedQr.astro';
 import { getClubs, getDocuments, getUpcomingEvents } from '@/lib/content';
 import { url } from '@/lib/site';
@@ -19,7 +20,8 @@ const safeguarding = (await getDocuments()).filter((d) => d.data.category === 's
     <div slot="aside" class="stack">
       <div class="card"><div class="card__body">
         <h3>Junior County Closed</h3>
-        <p>Sunday 8th November, 10am–5pm at Towers Health &amp; Racquets Club. Entries close on Wednesday 28th October.</p>
+        <JuniorClosedPoster linked />
+        <p>Sunday 8th November, 10am–5pm at Towers Health &amp; Racquets Club. Entry is free. Entries close on Wednesday 28th October.</p>
         <a class="btn btn--primary btn--sm" href={url('/juniors/closed/')}>Enter</a>
       </div></div>
       <div class="card"><div class="card__body">

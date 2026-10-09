@@ -155,7 +155,7 @@ export async function changeOwnPassword(
   if (nextPassword === currentPassword) return 'Choose a different password from the one you use now.';
   const { error: signError } = await supabase.auth.signInWithPassword({ email, password: currentPassword });
   if (signError) return 'Current password is not correct.';
-  const { error } = await supabase.auth.updateUser({ password: nextPassword });
+  const { error } = await supabase.auth.updateUser({ password: nextPassword, data: { must_change_password: false } });
   return error ? error.message : null;
 }
 

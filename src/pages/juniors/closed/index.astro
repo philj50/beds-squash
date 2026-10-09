@@ -1,6 +1,7 @@
 ---
 import Base from '@/layouts/Base.astro';
 import JuniorAdminMenu from '@/components/JuniorAdminMenu.astro';
+import JuniorClosedPoster from '@/components/JuniorClosedPoster.astro';
 import JuniorClosedQr from '@/components/JuniorClosedQr.astro';
 import { getClubs } from '@/lib/content';
 import { AGE_REFERENCE, ENTRY_CLOSES, TOURNAMENT_ON } from '@/lib/junior-age';
@@ -27,8 +28,9 @@ const clubs = (await getClubs()).map((club) => club.data.name);
           <JuniorAdminMenu />
           <JuniorClosedQr showEnter={false} />
           <p class="lede">
-            Sunday 8th November, 10am–5pm at Towers Health &amp; Racquets Club. Entries close on Wednesday 28th October. A parent or guardian enters the player here. The age group is worked out from the date of birth, using age on {AGE_REFERENCE}.
+            Sunday 8th November, 10am–5pm at Towers Health &amp; Racquets Club. Entry is free. Entries close on Wednesday 28th October. A parent or guardian enters the player here. The age group is worked out from the date of birth, using age on {AGE_REFERENCE}.
           </p>
+          <JuniorClosedPoster />
           <ul class="categories">
             <li>Mixed U9</li>
             <li>Girls U11</li>

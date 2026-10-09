@@ -80,6 +80,12 @@ test.describe('Public pages', () => {
   test('minutes are listed by date and the PDF opens', async ({ page }) => {
     await open(page, 'documents/');
     await expect(page.getByRole('heading', { level: 1, name: 'Documents & minutes' })).toBeVisible();
+    const poster = page.locator('li', { hasText: 'Junior County Closed 2026 poster' });
+    await expect(poster).toBeVisible();
+    const posterPdf = poster.getByRole('link', { name: 'PDF' });
+    const posterHref = await posterPdf.getAttribute('href');
+    expect(posterHref).toMatch(/beds-junior-county-closed-2026\.pdf$/);
+    expect((await page.request.get(posterHref!)).ok()).toBeTruthy();
     const minutes = page.locator('li', { hasText: 'AGM – 23 September 2026' });
     await expect(minutes).toBeVisible();
     await expect(minutes).toContainText('23 September 2026');
@@ -125,6 +131,7 @@ test.describe('Public pages', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'News' })).toBeVisible();
     const stories = [
       'Welcome to the new Bedfordshire Squash website',
+      'Entries open for the Junior County Closed',
       'David Gibson beat Luke Horner',
     ];
     for (const title of stories) {
@@ -140,6 +147,9 @@ test.describe('Public pages', () => {
     await open(page, 'juniors/');
     await expect(page.getByRole('heading', { level: 1, name: 'Juniors' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Enter', exact: true })).toHaveAttribute('href', /\/juniors\/closed\/$/);
+    await expect(page.getByRole('img', { name: /Bedfordshire County Closed junior squash tournament/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Download the poster' })).toHaveAttribute('href', /beds-junior-county-closed-2026\.pdf$/);
+    await expect(page.getByRole('heading', { name: 'Junior County Closed', level: 3 }).first().locator('xpath=..')).toContainText('Entry is free.');
     await expect(page.getByRole('link', { name: 'Code of Conduct for Juniors' })).toHaveAttribute('href', /code-of-conduct-juniors/);
     await expect(page.getByRole('link', { name: 'Code of Conduct for Parents' })).toHaveAttribute('href', /code-of-conduct-parents/);
     await expect(page.getByRole('link', { name: 'bsrajunior@gmail.com' })).toBeVisible();

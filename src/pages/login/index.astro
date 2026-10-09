@@ -75,19 +75,27 @@ const profileHref = url('/captains/profile/');
       statusEl.textContent = error.message;
       return;
     }
+    const { data: signedIn } = await supabase.auth.getSession();
     await supabase.rpc('record_my_sign_in');
+    const mustChange = signedIn.session?.user.user_metadata?.must_change_password === true;
+    const destination = mustChange ? `${profileHref}?change=1` : nextHref;
 
     // Chrome saves a password when a sign-in finishes like this:
     // the address changes, and the password form is gone.
     // https://www.chromium.org/developers/design-documents/create-amazing-password-forms/
-    history.pushState({}, '', nextHref);
+    history.pushState({}, '', destination);
     form.remove();
-    statusEl.textContent = 'Signed in. If Chrome asks to save the password, choose Save.';
+    statusEl.textContent = mustChange
+      ? 'Signed in. Change this password before you continue.'
+      : 'Signed in. If Chrome asks to save the password, choose Save.';
     window.setTimeout(() => location.reload(), 4000);
   });
 
   const { data } = await supabase.auth.getSession();
-  if (data.session) location.replace(nextHref);
+  if (data.session) {
+    const mustChange = data.session.user.user_metadata?.must_change_password === true;
+    location.replace(mustChange ? `${profileHref}?change=1` : nextHref);
+  }
 </script>
 
 <style>

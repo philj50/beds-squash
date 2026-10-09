@@ -9,16 +9,20 @@ const countyId = '77777777-7777-4777-8777-777777777777';
 
 type Hooks = {
   refuseActive: boolean;
+  requireClub: boolean;
   squadWrites: number;
   actions: string[];
+  bodies: Record<string, unknown>[];
 };
 
-const hooks: Hooks = { refuseActive: false, squadWrites: 0, actions: [] };
+const hooks: Hooks = { refuseActive: false, requireClub: false, squadWrites: 0, actions: [], bodies: [] };
 
 test.beforeEach(async ({ context, baseURL, page }) => {
   hooks.refuseActive = false;
+  hooks.requireClub = false;
   hooks.squadWrites = 0;
   hooks.actions = [];
+  hooks.bodies = [];
   await context.addCookies([{ name: 'beds_cookies', value: 'essential', url: baseURL! }]);
   await installAdmin(page);
 });
@@ -60,14 +64,35 @@ test.describe('Users', () => {
     await page.getByRole('button', { name: 'Password for Pat Player' }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toContainText('Pat Player');
+    await expect(dialog.locator('[data-password-dialog-login]')).toHaveText('pat.player@example.test');
+    await expect(dialog.locator('[data-password-must-change]')).toBeChecked();
     await dialog.getByRole('button', { name: 'Generate' }).click();
     const value = dialog.locator('[data-password-dialog-value]');
     await expect(value).toHaveValue(/\S{12,}/);
-    await dialog.getByRole('button', { name: 'Copy' }).click();
-    await expect(dialog.locator('[data-password-dialog-error]')).toHaveText(/Password copied\.|Select the password and copy it\./);
+    await dialog.getByRole('button', { name: 'Copy details' }).click();
+    await expect(dialog.locator('[data-password-dialog-error]')).toHaveText('Player, login and password copied. Paste them into an email.');
+    const copied = await page.evaluate(() => navigator.clipboard.readText());
+    expect(copied).toContain('Player: Pat Player');
+    expect(copied).toContain('Login: pat.player@example.test');
+    expect(copied).toContain(`Password: ${await value.inputValue()}`);
+    expect(copied).toContain('Please change this password the next time you sign in.');
     await dialog.getByRole('button', { name: 'Set password' }).click();
-    await expect(dialog.locator('[data-password-dialog-error]')).toHaveText('Password set. Copy it and tell them. Nothing was emailed.');
-    expect(hooks.actions).toContain('create');
+    await expect(dialog.locator('[data-password-dialog-error]')).toHaveText('Password set. Copy the player, login and password. Nothing was emailed.');
+    expect(hooks.bodies.find((body) => body.action === 'create')?.must_change_password).toBe(true);
+  });
+
+  test('a password for someone with no login retries when the account service asks for a club', async ({ page }) => {
+    hooks.requireClub = true;
+    await openUsers(page);
+    await page.getByRole('button', { name: 'Password for Pat Player' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: 'Generate' }).click();
+    await dialog.getByRole('button', { name: 'Set password' }).click();
+    await expect(dialog.locator('[data-password-dialog-error]')).toHaveText('Password set. Copy the player, login and password. Nothing was emailed.');
+    const creates = hooks.bodies.filter((body) => body.action === 'create');
+    expect(creates).toHaveLength(2);
+    expect(creates[1]?.role).toBe('team_player');
+    expect([5, 6]).toContain(creates[1]?.team_id);
   });
 
   test('roles open on every row and the choice is still there after it saves', async ({ page }) => {
@@ -119,6 +144,7 @@ test.describe('Users', () => {
     const active = page.getByRole('button', { name: 'Active for Sam Morris' });
     await active.click();
     await expect(page.locator('[data-status]')).toHaveText('That account stays active.');
+    await expect(page.locator('[data-users] tr', { hasText: 'Sam Morris' })).toContainText('That account stays active.');
     await expect(active).toHaveCSS('background-color', 'rgb(21, 128, 61)');
     await expect(page.getByRole('button', { name: 'Inactive for Sam Morris' })).toHaveCount(0);
   });
@@ -145,6 +171,20 @@ test.describe('Users', () => {
     const pat = page.locator('[data-users] tr', { hasText: 'Pat Player' });
     await expect(pat.locator('td').nth(1)).toHaveText('Test Team 1; Test Team 2');
     await expect(page.locator('[data-users-pager]')).toBeHidden();
+  });
+
+  test('Group and Place narrow the list, and a login outside League Master keeps its sign-in', async ({ page }) => {
+    await openUsers(page);
+    const ada = page.locator('[data-users] tr', { hasText: 'Ada Admin' });
+    await expect(ada).toContainText(/4 Oct 2026/);
+    await page.getByLabel('Group').selectOption({ label: 'Admin' });
+    await expect(ada).toBeVisible();
+    await expect(page.locator('[data-users] tr', { hasText: 'Pat Player' })).toHaveCount(0);
+    await page.getByLabel('Group').selectOption({ label: 'All groups' });
+    await page.getByLabel('Place').selectOption({ label: 'Other Team' });
+    await expect(page.locator('[data-users] tr', { hasText: 'Alex Away' })).toBeVisible();
+    await expect(page.locator('[data-users] tr', { hasText: 'Pat Player' })).toHaveCount(0);
+    await expect(ada).toHaveCount(0);
   });
 
   test('search finds a player by team and by email, and a miss says so', async ({ page }) => {
@@ -233,9 +273,22 @@ async function installAdmin(page: Page) {
       return;
     }
     if (path.endsWith('/functions/v1/manage-accounts')) {
-      const payload = route.request().postDataJSON() as { action?: string; user_id?: string; active?: boolean; member?: boolean; group_slug?: string; person_name?: string } | null;
+      const payload = route.request().postDataJSON() as {
+        action?: string;
+        user_id?: string;
+        active?: boolean;
+        member?: boolean;
+        group_slug?: string;
+        person_name?: string;
+        role?: string;
+      } | null;
       const action = payload?.action ?? '';
       hooks.actions.push(action);
+      hooks.bodies.push((payload ?? {}) as Record<string, unknown>);
+      if (action === 'create' && hooks.requireClub && !payload?.role) {
+        await respond({ error: 'Choose a club.' });
+        return;
+      }
       if (action === 'states') {
         if (statesDown) {
           await respond({ error: 'down' });

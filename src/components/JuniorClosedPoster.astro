@@ -1,0 +1,45 @@
+---
+import { url } from '@/lib/site';
+
+interface Props {
+  /** Link the picture to the entry form. Leave this off on the entry form itself. */
+  linked?: boolean;
+}
+
+const { linked = false } = Astro.props;
+const poster = url('/juniors/county-closed-2026.jpg');
+const pdf = url('/uploads/juniors/beds-junior-county-closed-2026.pdf');
+const alt =
+  'Poster for the Bedfordshire County Closed junior squash tournament on Sunday 8th November 2026, from 10am to 5pm at Towers Health and Racquets Club. Entry is free.';
+---
+
+<figure class="closed-poster">
+  {
+    linked ? (
+      <a href={url('/juniors/closed/')}>
+        <img src={poster} alt={alt} width="840" height="1189" />
+      </a>
+    ) : (
+      <img src={poster} alt={alt} width="840" height="1189" />
+    )
+  }
+  <figcaption><a href={pdf}>Download the poster</a></figcaption>
+</figure>
+
+<style>
+  .closed-poster {
+    margin: 0.75rem 0;
+  }
+  .closed-poster img {
+    display: block;
+    width: 100%;
+    max-width: 18rem;
+    height: auto;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+  }
+  .closed-poster figcaption {
+    margin-top: 0.35rem;
+    font-size: 0.85rem;
+  }
+</style>

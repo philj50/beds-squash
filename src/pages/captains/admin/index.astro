@@ -145,7 +145,7 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="members" data-lm-only hidden>
             <h2>Users</h2>
             <p class="muted small">
-              Every player from League Master. Update the email, ES number, and mobile in the row. LM Club Captain, LM Team Captain, LM Player and JC Player are ticked in Roles and stay as they are. Password opens a dialog to generate a password. Nothing is emailed.
+              League Master players are listed, and so is anyone with an admin or organiser login. Filter by group or place. LM Club Captain, LM Team Captain, LM Player and JC Player are ticked in Roles and stay as they are. Password opens the player’s login details so you can copy them. Nothing is emailed.
             </p>
             <p class="muted small" data-group-note>Filled from League Master. Each person has the LM Player role.</p>
             <div class="member-tools">
@@ -153,21 +153,38 @@ const scoresHref = url('/captains/admin/minigame/');
                 Search
                 <input type="search" data-member-search placeholder="Name, place or email" autocomplete="off" />
               </label>
+              <label>
+                Group
+                <select data-member-group>
+                  <option value="">All groups</option>
+                </select>
+              </label>
+              <label>
+                Place
+                <select data-member-place>
+                  <option value="">All places</option>
+                </select>
+              </label>
             </div>
             <p class="muted small" data-member-count></p>
             <p class="status" data-users-status role="status"></p>
             <dialog class="account-dialog" data-password-dialog>
               <form method="dialog">
-                <h3>Password for <span data-password-dialog-who></span></h3>
-                <p class="muted small">Generate a password, then set it on this record. Copy it and tell them. Nothing is emailed.</p>
-                <p class="muted small" data-password-dialog-error></p>
+                <p class="muted small">These are the details to send</p>
+                <h3 data-password-dialog-who></h3>
+                <p class="login-line">Login <strong data-password-dialog-login></strong></p>
                 <label>
                   Password
                   <input type="text" readonly data-password-dialog-value autocomplete="off" />
                 </label>
+                <label class="check-line">
+                  <input type="checkbox" data-password-must-change checked />
+                  Change this password the next time they sign in
+                </label>
+                <p class="muted small" data-password-dialog-error></p>
                 <div class="actions member-actions">
                   <button class="btn btn--ghost btn--sm" type="button" data-generate-password>Generate</button>
-                  <button class="btn btn--ghost btn--sm" type="button" data-copy-dialog-password>Copy</button>
+                  <button class="btn btn--ghost btn--sm" type="button" data-copy-dialog-password>Copy details</button>
                   <button class="btn btn--primary btn--sm" type="button" data-apply-password>Set password</button>
                   <button class="btn btn--ghost btn--sm" type="submit">Close</button>
                 </div>
@@ -470,13 +487,17 @@ const scoresHref = url('/captains/admin/minigame/');
   const scoresLink = root.querySelector<HTMLElement>('[data-scores-link]')!;
   const whoEl = root.querySelector<HTMLElement>('[data-who]')!;
   const memberSearch = root.querySelector<HTMLInputElement>('[data-member-search]')!;
+  const memberGroup = root.querySelector<HTMLSelectElement>('[data-member-group]')!;
+  const memberPlace = root.querySelector<HTMLSelectElement>('[data-member-place]')!;
   const memberCount = root.querySelector<HTMLElement>('[data-member-count]')!;
   const membersHost = root.querySelector<HTMLElement>('[data-group-members]')!;
   const groupNote = root.querySelector<HTMLElement>('[data-group-note]')!;
   const passwordDialog = root.querySelector<HTMLDialogElement>('[data-password-dialog]')!;
   const passwordDialogWho = root.querySelector<HTMLElement>('[data-password-dialog-who]')!;
+  const passwordDialogLogin = root.querySelector<HTMLElement>('[data-password-dialog-login]')!;
   const passwordDialogError = root.querySelector<HTMLElement>('[data-password-dialog-error]')!;
   const passwordDialogValue = root.querySelector<HTMLInputElement>('[data-password-dialog-value]')!;
+  const passwordMustChange = root.querySelector<HTMLInputElement>('[data-password-must-change]')!;
   const rolePop = root.querySelector<HTMLElement>('[data-role-pop]')!;
   const rolePopWho = root.querySelector<HTMLElement>('[data-role-pop-who]')!;
   const rolePopOptions = root.querySelector<HTMLElement>('[data-role-pop-options]')!;
@@ -511,6 +532,8 @@ const scoresHref = url('/captains/admin/minigame/');
   };
   let memberCards: MemberCard[] = [];
   let selectedMemberKey = '';
+  let signedInIds = new Set<string>();
+  let accountStatesReady = false;
   const USER_PAGE = 25;
   let memberPage = 0;
   let pinMember = false;
@@ -760,19 +783,26 @@ const scoresHref = url('/captains/admin/minigame/');
     passwordDialogValue.focus();
     passwordDialogValue.select();
   });
+  const passwordMessage = (card: MemberCard, password: string) => {
+    const lines = [`Player: ${card.name}`, `Login: ${card.email.trim()}`, `Password: ${password}`];
+    if (passwordMustChange.checked) lines.push('Please change this password the next time you sign in.');
+    return lines.join('\n');
+  };
   root.querySelector('[data-copy-dialog-password]')!.addEventListener('click', async () => {
+    const card = memberCards.find((item) => item.key === passwordCardKey);
     const password = passwordDialogValue.value;
-    if (!password) {
+    if (!card || !password) {
       passwordDialogError.textContent = 'Generate a password first.';
       return;
     }
+    const details = passwordMessage(card, password);
     try {
-      await navigator.clipboard.writeText(password);
-      passwordDialogError.textContent = 'Password copied.';
+      await navigator.clipboard.writeText(details);
+      passwordDialogError.textContent = 'Player, login and password copied. Paste them into an email.';
     } catch {
       passwordDialogValue.focus();
       passwordDialogValue.select();
-      passwordDialogError.textContent = 'Select the password and copy it.';
+      passwordDialogError.textContent = details;
     }
   });
   root.querySelector('[data-apply-password]')!.addEventListener('click', async () => {
@@ -793,10 +823,16 @@ const scoresHref = url('/captains/admin/minigame/');
       passwordDialogError.textContent = issue;
       return;
     }
+    const mustChange = passwordMustChange.checked;
     passwordDialogError.textContent = card.profileId ? 'Setting the password…' : 'Creating the login…';
     const message = card.profileId
-      ? await callManageAccounts(supabase, { action: 'set-password', user_id: card.profileId, password })
-      : await callManageAccounts(supabase, { action: 'create', display_name: card.name, email, password });
+      ? await callManageAccounts(supabase, {
+          action: 'set-password',
+          user_id: card.profileId,
+          password,
+          must_change_password: mustChange,
+        })
+      : await createLogin(card, email, password, mustChange);
     if (message) {
       passwordDialogError.textContent = message;
       return;
@@ -805,10 +841,18 @@ const scoresHref = url('/captains/admin/minigame/');
       await supabase.rpc('sync_website_player_emails');
       await supabase.rpc('apply_lm_roles');
     }
-    passwordDialogError.textContent = 'Password set. Copy it and tell them. Nothing was emailed.';
-    setStatus(`Password set for ${card.name}. Copy it and tell them. Nothing was emailed.`);
+    passwordDialogError.textContent = 'Password set. Copy the player, login and password. Nothing was emailed.';
+    setStatus(`Password set for ${card.name}. Copy the details and tell them. Nothing was emailed.`);
     await showSession();
   });
+
+  async function createLogin(card: MemberCard, email: string, password: string, mustChange: boolean) {
+    const body = { action: 'create', display_name: card.name, email, password, must_change_password: mustChange };
+    const message = await callManageAccounts(supabase, body);
+    if (message !== 'Choose a club.' && message !== 'Choose a role.') return message;
+    if (!card.teamId) return 'This player has no team, so the login could not be created.';
+    return callManageAccounts(supabase, { ...body, role: 'team_player', team_id: card.teamId });
+  }
 
   root.querySelector('[data-cancel-password]')!.addEventListener('click', () => {
     setPasswordForm.hidden = true;
@@ -847,8 +891,10 @@ const scoresHref = url('/captains/admin/minigame/');
       }
       passwordCardKey = card.key;
       passwordDialogWho.textContent = card.name;
+      passwordDialogLogin.textContent = card.email.trim();
       passwordDialogValue.value = '';
       passwordDialogError.textContent = '';
+      passwordMustChange.checked = true;
       passwordDialog.showModal();
       return;
     }
@@ -907,12 +953,20 @@ const scoresHref = url('/captains/admin/minigame/');
         user_id: userId,
         active,
       });
+      const card = memberCards.find((item) => item.profileId === userId);
       if (message) {
         setStatus(message);
         setActive.title = message;
+        if (card) card.statusHtml = message;
+        paintMembers();
         return;
       }
       if (userId) activityChoice.set(userId, active);
+      if (card) {
+        card.active = active;
+        card.statusHtml = active ? 'Active' : 'Inactive';
+      }
+      paintMembers();
       setStatus(active ? `${who} is active.` : `${who} is inactive.`);
       await showSession();
       return;
@@ -1148,15 +1202,56 @@ const scoresHref = url('/captains/admin/minigame/');
       : '<tr><td colspan="11">No junior entries yet.</td></tr>';
   }
   const LOCKED_ROLE_SLUGS = new Set(['lm_club_captains', 'lm_team_captains', 'lm_players', 'jc_players']);
+  function fillFilter(select: HTMLSelectElement, choices: { value: string; label: string }[], allLabel: string) {
+    const current = select.value;
+    const next = ['', ...choices.map((choice) => choice.value)];
+    const same =
+      select.options.length === next.length &&
+      next.every((value, index) => select.options[index]?.value === value) &&
+      choices.every((choice, index) => select.options[index + 1]?.textContent === choice.label);
+    if (same) return;
+    select.innerHTML = [`<option value="">${escapeHtml(allLabel)}</option>`, ...choices.map((choice) => `<option value="${escapeHtml(choice.value)}">${escapeHtml(choice.label)}</option>`)].join('');
+    select.value = next.includes(current) ? current : '';
+  }
   function paintMembers() {
     const query = memberSearch.value.trim().toLowerCase();
-    groupNote.textContent = 'Filled from League Master. Each person has the LM Player role.';
-    const players = memberCards.filter((card) => card.groupSlugs.includes('lm_players') || card.key === selectedMemberKey);
+    groupNote.textContent = 'Filled from League Master. Each LM Player is listed, and so is a sign-in for an admin or organiser.';
+    const players = memberCards.filter(
+      (card) =>
+        card.groupSlugs.includes('lm_players') ||
+        card.groupSlugs.includes('admins') ||
+        card.groupSlugs.includes('junior_organisers') ||
+        card.isAdmin ||
+        (card.profileId != null && signedInIds.has(card.profileId)) ||
+        card.key === selectedMemberKey,
+    );
+    const groupChoices = groupCatalogLive
+      .filter((group) => players.some((card) => (group.slug === 'admins' ? card.isAdmin || card.groupSlugs.includes('admins') : card.groupSlugs.includes(group.slug))))
+      .slice()
+      .sort((a, b) => a.position - b.position)
+      .map((group) => ({
+        value: group.slug,
+        label: roleCatalogLive.find((item) => item.slug === group.role_slug)?.name ?? group.name,
+      }));
+    const placeChoices = [...new Set(players.flatMap((card) => card.teams.split(';').map((part) => part.trim()).filter(Boolean)))].sort((a, b) =>
+      a.localeCompare(b, 'en'),
+    );
+    fillFilter(memberGroup, groupChoices, 'All groups');
+    fillFilter(
+      memberPlace,
+      placeChoices.map((place) => ({ value: place, label: place })),
+      'All places',
+    );
+    const groupFilter = memberGroup.value;
+    const placeFilter = memberPlace.value;
     const shown = players.filter((card) => {
+      if (groupFilter && !(groupFilter === 'admins' ? card.isAdmin || card.groupSlugs.includes('admins') : card.groupSlugs.includes(groupFilter))) return false;
+      if (placeFilter && !card.teams.split(';').map((part) => part.trim()).includes(placeFilter)) return false;
       if (!query) return true;
       return [card.name, card.profileName, card.teams, card.place, card.email, card.groupNames, card.roleNames].some((value) => value.toLowerCase().includes(query));
     });
-    memberCount.textContent = query ? `${shown.length} of ${players.length} players` : `${players.length} players`;
+    const narrowed = Boolean(query || groupFilter || placeFilter);
+    memberCount.textContent = narrowed ? `${shown.length} of ${players.length} players` : `${players.length} players`;
     const contactCell = (card: MemberCard, field: 'email' | 'es' | 'phone', value: string, label: string, type: string, placeholder: string) => {
       if (!viewerIsAdmin || card.protectedAccount) return escapeHtml(field === 'email' && card.protectedAccount ? 'BSCA' : value || '—');
       return `<input data-row-field="${field}" data-row-key="${escapeHtml(card.key)}" aria-label="${label} for ${escapeHtml(card.name)}" type="${type}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" autocomplete="off" />`;
@@ -1956,10 +2051,13 @@ const scoresHref = url('/captains/admin/minigame/');
     orgTeams = (orgRows ?? []) as OrgTeam[];
     const accounts = (people ?? []) as Person[];
     const stateById = new Map((accountStates ?? []).map((state) => [state.id, state]));
+    accountStatesReady = accountStates !== null;
+    signedInIds = new Set((accountStates ?? []).filter((state) => state.last_sign_in_at).map((state) => state.id));
     const latestSignIn = new Map<string, string>();
     for (const row of (signInRows ?? []) as { user_id: string; signed_in_at: string }[]) {
       if (row.user_id && row.signed_in_at && !latestSignIn.has(row.user_id)) latestSignIn.set(row.user_id, row.signed_in_at);
     }
+    for (const id of latestSignIn.keys()) signedInIds.add(id);
     const memberships = (roleRows ?? []) as Membership[];
     const groupMembers = (groupError ? [] : groupRows ?? []) as GroupMember[];
     const groupCatalog = ((groupCatalogError ? [] : groupCatalogRows ?? []) as GroupCatalog[]).slice().sort((a, b) => a.position - b.position);
@@ -2149,7 +2247,7 @@ const scoresHref = url('/captains/admin/minigame/');
         teamId: listed[0]?.teamId ?? contacts.find((contact) => contact.teamId)?.teamId ?? null,
         teamName: listed[0]?.team || '',
         statusHtml: !profile ? 'No login' : active ? 'Active' : 'Inactive',
-        lastLogin: profile && latest ? formatWhen(latest) : '—',
+        lastLogin: !profile ? '—' : latest ? formatWhen(latest) : accountStatesReady ? 'Not yet' : 'Unavailable',
         protectedAccount: Boolean(isDefault),
         active,
       });
@@ -2367,6 +2465,14 @@ const scoresHref = url('/captains/admin/minigame/');
   }
 
   memberSearch.addEventListener('input', () => {
+    memberPage = 0;
+    paintMembers();
+  });
+  memberGroup.addEventListener('change', () => {
+    memberPage = 0;
+    paintMembers();
+  });
+  memberPlace.addEventListener('change', () => {
     memberPage = 0;
     paintMembers();
   });
@@ -2845,7 +2951,28 @@ const scoresHref = url('/captains/admin/minigame/');
     background: #fff;
     color: #0e2744;
     padding: 1rem 1.1rem;
-    max-width: 28rem;
+    max-width: 32rem;
+  }
+  #setup-app .account-dialog::backdrop {
+    background: rgba(14, 39, 68, 0.45);
+  }
+  #setup-app .account-dialog h3 {
+    margin: 0 0 0.35rem;
+    font-size: 1.35rem;
+  }
+  #setup-app .account-dialog .login-line {
+    margin: 0 0 0.75rem;
+  }
+  #setup-app .account-dialog .check-line {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0.75rem 0;
+    font-weight: 600;
+  }
+  #setup-app .account-dialog .check-line input {
+    width: auto;
+    min-width: 0;
   }
   #setup-app .account-dialog::backdrop {
     background: rgba(14, 39, 68, 0.45);

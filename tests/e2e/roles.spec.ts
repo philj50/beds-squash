@@ -573,9 +573,10 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.locator('[data-junior-link]')).toBeVisible();
     await expect(page.locator('[data-share-link]')).toBeVisible();
     await expect(page.locator('[data-scores-link]')).toBeVisible();
-    await expect(page.locator('[data-member-count]')).toContainText('4 players');
+    await expect(page.locator('[data-member-count]')).toContainText('7 players');
     await expect(page.locator('[data-users]')).toContainText('Pat Player');
-    await expect(page.locator('[data-users]')).not.toContainText('County Admin');
+    await expect(page.locator('[data-users]')).toContainText('County Admin');
+    await expect(page.locator('[data-users] tr', { hasText: 'County Admin' })).toContainText(/4 Oct 2026/);
     await expect(page.getByRole('button', { name: 'Create login' })).toHaveCount(0);
 
     await page.getByRole('searchbox', { name: 'Search' }).fill('no-such-player');
@@ -616,7 +617,7 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.locator('[data-users] tr', { hasText: 'Sam Morris' }).getByRole('textbox', { name: 'Email for Sam Morris' })).toBeEnabled();
     await expect(page.locator('[data-users] tr', { hasText: 'Sam Morris' }).getByRole('button', { name: 'Roles for Sam Morris' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Active for Sam Morris' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Delete' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Delete Sam Morris' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Password for Sam Morris' })).toBeVisible();
     await page.getByRole('button', { name: 'Roles', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Roles', exact: true })).toBeVisible();

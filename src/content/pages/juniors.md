@@ -12,7 +12,7 @@ The junior programme has been rebuilt over the last 18 months. Sessions are orga
 
 ## Coming up
 
-- **Junior County Closed** — Sunday 8th November, 10am–5pm at Towers Health & Racquets Club. Entries close on Wednesday 28th October. Scan the code at the top of this page, or [enter a player](/juniors/closed/). Queries: [bsrajunior@gmail.com](mailto:bsrajunior@gmail.com).
+- **Junior County Closed** — Sunday 8th November, 10am–5pm at Towers Health & Racquets Club. Entry is free. Entries close on Wednesday 28th October. Scan the code at the top of this page, or [enter a player](/juniors/closed/). Queries: [bsrajunior@gmail.com](mailto:bsrajunior@gmail.com).
 - **Northants Grand Prix** — February
 - **Beds schools** — March / April
 

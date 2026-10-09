@@ -78,6 +78,7 @@ Deno.serve(async (req) => {
     club_slug?: string;
     team_id?: number;
     active?: boolean;
+    must_change_password?: boolean;
     group_slug?: string;
     member?: boolean;
   };
@@ -129,11 +130,12 @@ Deno.serve(async (req) => {
     if (role === 'club_captain' && !clubSlug) return json({ error: 'Choose a club.' }, 400);
     if ((role === 'team_captain' || role === 'team_player') && !Number.isInteger(teamId)) return json({ error: 'Choose a team.' }, 400);
 
+    const mustChange = body.must_change_password === true;
     const { data: created, error } = await admin.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
-      user_metadata: { display_name: displayName },
+      user_metadata: { display_name: displayName, must_change_password: mustChange },
     });
     if (error || !created.user) return json({ error: error?.message ?? 'Could not create the account.' }, 400);
 
@@ -219,7 +221,10 @@ Deno.serve(async (req) => {
     const { data: person } = await admin.from('profiles').select('email').eq('id', userId).maybeSingle();
     const issue = passwordIssue(password, person?.email ?? '');
     if (issue) return json({ error: issue }, 400);
-    const { error } = await admin.auth.admin.updateUserById(userId, { password });
+    const mustChange = body.must_change_password === true;
+    const { data: existing } = await admin.auth.admin.getUserById(userId);
+    const metadata = { ...(existing.user?.user_metadata ?? {}), must_change_password: mustChange };
+    const { error } = await admin.auth.admin.updateUserById(userId, { password, user_metadata: metadata });
     if (error) return json({ error: error.message }, 400);
     return json({ ok: true });
   }
