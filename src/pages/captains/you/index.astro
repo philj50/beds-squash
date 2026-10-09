@@ -111,18 +111,39 @@ import { url } from '@/lib/site';
     sendToLogin();
   });
 
+  const nameKey = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
+
+  type Seat = { person_name: string; place: string | null; group_slug: string };
+
+  function teamFromPlace(place: string) {
+    const parts = place.split('/').map((part) => part.trim()).filter(Boolean);
+    if (parts.length < 2) return null;
+    return { club: parts[0], team: parts[parts.length - 1] };
+  }
+
   async function squadsFor(account: Account) {
-    const [{ data: membershipRows }, squadResult] = await Promise.all([
+    const [{ data: membershipRows }, squadResult, seatResult, teamResult, clubResult] = await Promise.all([
       supabase.from('memberships').select('role, club_slug, team_id').eq('profile_id', account.userId),
       supabase.from('captain_squads').select('id, name, team_id').not('team_id', 'is', null).order('name'),
+      supabase.from('group_members').select('person_name, place, group_slug').eq('profile_id', account.userId),
+      supabase.from('teams').select('id, name, club_slug'),
+      supabase.from('clubs').select('slug, name'),
     ]);
     const memberships = (membershipRows ?? []) as Membership[];
     const teamIds = new Set(memberships.map((row) => row.team_id).filter((id): id is number => id != null));
     const clubSlugs = memberships.filter((row) => row.role === 'club_captain' && row.club_slug).map((row) => row.club_slug!);
-    if (clubSlugs.length) {
-      const { data: clubTeams } = await supabase.from('teams').select('id, club_slug').in('club_slug', clubSlugs);
-      for (const team of (clubTeams ?? []) as { id: number; club_slug: string }[]) {
-        if (clubSlugs.includes(team.club_slug)) teamIds.add(team.id);
+    const seats = (seatResult.error ? [] : seatResult.data ?? []) as Seat[];
+    const clubNames = new Map(((clubResult.data ?? []) as { slug: string; name: string }[]).map((club) => [club.slug, club.name]));
+    const wanted = seats.flatMap((seat) =>
+      (seat.place ?? '')
+        .split(';')
+        .map((part) => teamFromPlace(part.trim()))
+        .filter((part): part is { club: string; team: string } => part != null),
+    );
+    for (const team of (teamResult.data ?? []) as { id: number; name: string; club_slug: string }[]) {
+      const club = clubNames.get(team.club_slug) ?? '';
+      if (clubSlugs.includes(team.club_slug) || wanted.some((place) => nameKey(place.team) === nameKey(team.name) && nameKey(place.club) === nameKey(club))) {
+        teamIds.add(team.id);
       }
     }
     let squads = ((squadResult.data ?? []) as { id: number; name: string; team_id: number | null }[]).filter(
@@ -137,7 +158,13 @@ import { url } from '@/lib/site';
       }
     }
     const scoped = squads.filter((squad) => teamIds.has(squad.team_id));
-    return { squads: scoped, teamIds: [...teamIds] };
+    const names = [...new Set(seats.map((seat) => seat.person_name.trim()).filter(Boolean))];
+    const places = [
+      ...new Set(
+        wanted.map((place) => `${place.club} · ${place.team}`),
+      ),
+    ];
+    return { squads: scoped, teamIds: [...teamIds], names, places };
   }
 
   function drawMatches(squads: Squad[], teamIds: number[], fixtures: Fixture[], account: Account) {
@@ -196,7 +223,7 @@ import { url } from '@/lib/site';
       return;
     }
     const updated = level.updated_at ? ` Updated ${esc(day(level.updated_at))}.` : '';
-    levelEl.innerHTML = `<p class="level"><strong>${esc(level.current_level.toLocaleString('en-GB'))}</strong>${updated}</p>`;
+    levelEl.innerHTML = `<p class="level">${esc(level.display_name)} <strong>${esc(level.current_level.toLocaleString('en-GB'))}</strong>${updated}</p>`;
   }
 
   function drawUploads(rows: Upload[]) {
@@ -214,26 +241,39 @@ import { url } from '@/lib/site';
       .join('')}</ul>`;
   }
 
-  async function loadLevel(account: Account) {
-    const linked = await supabase.from('player_links').select('squashlevels_player_id').eq('profile_id', account.userId).maybeSingle();
-    const linkedId = !linked.error && linked.data?.squashlevels_player_id != null ? linked.data.squashlevels_player_id : null;
-    if (linkedId != null) {
-      const { data } = await supabase
-        .from('squashlevels_players')
-        .select('display_name, current_level, updated_at')
-        .eq('id', linkedId)
-        .maybeSingle();
-      if (data) return data as Level;
-    }
-    const name = account.displayName.trim();
-    if (!name) return null;
+  async function levelById(id: number) {
     const { data } = await supabase
       .from('squashlevels_players')
       .select('display_name, current_level, updated_at')
-      .ilike('display_name', name)
-      .limit(1)
+      .eq('id', id)
       .maybeSingle();
     return (data ?? null) as Level | null;
+  }
+
+  async function loadLevel(account: Account, names: string[]) {
+    const linked = await supabase.from('player_links').select('squashlevels_player_id').eq('profile_id', account.userId).maybeSingle();
+    const linkedId = !linked.error && linked.data?.squashlevels_player_id != null ? linked.data.squashlevels_player_id : null;
+    if (linkedId != null) {
+      const row = await levelById(linkedId);
+      if (row) return row;
+    }
+    const candidates = [...new Set([account.displayName, ...names].map((name) => name.trim()).filter(Boolean))];
+    for (const name of candidates) {
+      const named = await supabase.from('player_links').select('squashlevels_player_id').ilike('lm_player_name', name).maybeSingle();
+      const namedId = !named.error && named.data?.squashlevels_player_id != null ? named.data.squashlevels_player_id : null;
+      if (namedId != null) {
+        const row = await levelById(namedId);
+        if (row?.current_level != null) return row;
+      }
+      const { data } = await supabase
+        .from('squashlevels_players')
+        .select('display_name, current_level, updated_at')
+        .ilike('display_name', name)
+        .limit(1)
+        .maybeSingle();
+      if (data && (data as Level).current_level != null) return data as Level;
+    }
+    return null;
   }
 
   async function loadUploads(account: Account) {
@@ -267,12 +307,15 @@ import { url } from '@/lib/site';
       return;
     }
     whoEl.textContent = `Signed in as ${account.displayName || account.email}`;
-    placesEl.textContent = account.places.length ? account.places.map((place) => place.label).join('. ') : 'No club or team on this account yet.';
+    statusEl.textContent = '';
+    const found = await squadsFor(account);
+    const { squads, teamIds } = found;
+    const placeLabels = [...new Set([...account.places.map((place) => place.label), ...found.places])];
+    placesEl.textContent = placeLabels.length ? placeLabels.join('. ') : 'No club or team on this account yet.';
     groupsEl.textContent = account.groups.length
       ? `Groups: ${account.groups.map((group) => group.name).join(', ')}`
       : '';
-    statusEl.textContent = '';
-    const [{ squads, teamIds }, level, uploads] = await Promise.all([squadsFor(account), loadLevel(account), loadUploads(account)]);
+    const [level, uploads] = await Promise.all([loadLevel(account, found.names), loadUploads(account)]);
     let fixtures: Fixture[] = [];
     if (teamIds.length) {
       const { data: leagueTeams, error: teamError } = await supabase.from('league_teams').select('id, team_id').in('team_id', teamIds);

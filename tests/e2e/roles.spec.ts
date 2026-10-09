@@ -753,6 +753,102 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.getByText('Club night')).toBeVisible();
     await expect(page.getByText('Pending')).toBeVisible();
   });
+
+  test('a login whose name differs from League Master still sees that team and level', async ({ page }) => {
+    const id = '323bbbee-1111-4111-8111-111111111111';
+    const expiresAt = Math.floor(Date.now() / 1000) + 60 * 60;
+    const session = {
+      access_token: jwt({ sub: id, email: 'philip@example.test', role: 'authenticated', exp: expiresAt }),
+      refresh_token: 'simulated-refresh',
+      token_type: 'bearer',
+      expires_in: 3600,
+      expires_at: expiresAt,
+      user: {
+        id,
+        aud: 'authenticated',
+        role: 'authenticated',
+        email: 'philip@example.test',
+        app_metadata: { provider: 'email', providers: ['email'] },
+        user_metadata: { display_name: 'philip jenkins' },
+        identities: [],
+        created_at: '2026-10-02T00:00:00Z',
+        updated_at: '2026-10-02T00:00:00Z',
+      },
+    };
+    await page.addInitScript((stored) => {
+      localStorage.setItem('sb-klxyjmwiaivvqjbhxzak-auth-token', JSON.stringify(stored));
+    }, session);
+    await page.route(`${SUPABASE}/**`, async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      const path = url.pathname;
+      const single = (request.headers().accept ?? '').includes('application/vnd.pgrst.object+json');
+      const send = (payload: unknown) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload) });
+      if (path.startsWith('/auth/v1/')) return send(path.endsWith('/user') ? session.user : session);
+      if (path.endsWith('/profiles')) {
+        const row = { display_name: 'philip jenkins', is_admin: false };
+        return send(single ? row : [row]);
+      }
+      if (path.endsWith('/memberships')) return send([]);
+      if (path.endsWith('/clubs')) return send([{ slug: 'club-towers', name: 'Club Towers' }]);
+      if (path.endsWith('/groups') && !path.endsWith('/group_members')) {
+        return send([
+          { slug: 'lm_players', name: 'LM Players', position: 4 },
+          { slug: 'sl_players', name: 'SL Players', position: 5 },
+        ]);
+      }
+      if (path.endsWith('/group_members')) {
+        return send([
+          {
+            group_slug: 'lm_players',
+            person_name: 'Phil Jenkins',
+            place: 'Club Towers / Club Towers 1',
+            profile_id: id,
+            groups: { name: 'LM Players', position: 4, roles: { name: 'LM Player' } },
+          },
+          {
+            group_slug: 'sl_players',
+            person_name: 'Phil Jenkins',
+            place: 'Club Towers / Club Towers 1',
+            profile_id: id,
+            groups: { name: 'SL Players', position: 5, roles: { name: 'SL Player' } },
+          },
+        ]);
+      }
+      if (path.endsWith('/teams')) return send([{ id: 6, name: 'Club Towers 1', club_slug: 'club-towers' }]);
+      if (path.endsWith('/captain_squads')) return send([{ id: 16, name: 'Club Towers 1', team_id: 6 }]);
+      if (path.endsWith('/league_teams')) return send([{ id: 27, name: 'Club Towers 1', club_slug: 'club-towers', team_id: 6 }]);
+      if (path.endsWith('/fixtures')) {
+        return send([
+          {
+            id: 41,
+            starts_at: '2027-01-12T19:00:00.000Z',
+            status: 'scheduled',
+            home_points: null,
+            away_points: null,
+            divisions: { name: 'Division 1' },
+            home: { id: 27, name: 'Club Towers 1', club_slug: 'club-towers', team_id: 6 },
+            away: { id: 30, name: 'Flitwick 1', club_slug: 'flitwick', team_id: 4 },
+          },
+        ]);
+      }
+      if (path.endsWith('/player_links')) return send(single ? null : []);
+      if (path.endsWith('/squashlevels_players')) {
+        const name = (url.searchParams.get('display_name') ?? '').replace(/^ilike\./i, '');
+        const row = name.toLowerCase() === 'phil jenkins' ? { display_name: 'Phil Jenkins', current_level: 2317, updated_at: '2026-09-01' } : null;
+        return send(single ? row : row ? [row] : []);
+      }
+      if (path.endsWith('/contributions')) return send([]);
+      return send([]);
+    });
+    await page.goto('captains/you/', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByText('Signed in as philip jenkins')).toBeVisible();
+    await expect(page.locator('[data-places]')).toContainText('Club Towers · Club Towers 1');
+    await expect(page.locator('[data-groups]')).toContainText('LM Players');
+    await expect(page.getByRole('heading', { name: 'Club Towers 1 v Flitwick 1' })).toBeVisible();
+    await expect(page.locator('[data-level]')).toContainText('Phil Jenkins');
+    await expect(page.locator('[data-level]')).toContainText('2,317');
+  });
 });
 
 test.describe('Junior admin stays off the public juniors pages', () => {
