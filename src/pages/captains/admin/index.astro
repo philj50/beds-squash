@@ -1273,20 +1273,10 @@ const scoresHref = url('/captains/admin/minigame/');
     usersRange.textContent = shown.length ? `${start + 1}–${start + pageRows.length} of ${shown.length}` : '';
     usersPrev.disabled = memberPage <= 0;
     usersNext.disabled = memberPage >= pageCount - 1;
-    const websiteRoles = groupCatalogLive
-      .filter((group) => (group.slug === 'admins' || !group.managed) && !LOCKED_ROLE_SLUGS.has(group.slug))
-      .slice()
-      .sort((a, b) => a.position - b.position);
     const roleLabel = (card: MemberCard) => {
-      const names = websiteRoles
+      const names = roleMenuChoices()
         .filter((group) => (group.slug === 'admins' ? card.isAdmin || card.groupSlugs.includes('admins') : card.groupSlugs.includes(group.slug)))
         .map((group) => roleCatalogLive.find((item) => item.slug === group.role_slug)?.name ?? group.name);
-      for (const slug of ['jc_players', 'jc_parents']) {
-        if (!card.groupSlugs.includes(slug)) continue;
-        const roleSlug = groupCatalogLive.find((group) => group.slug === slug)?.role_slug;
-        const name = roleCatalogLive.find((item) => item.slug === roleSlug)?.name;
-        if (name && !names.includes(name)) names.push(name);
-      }
       return names.length ? names.join(', ') : 'Roles';
     };
     membersHost.innerHTML = pageRows.length
@@ -2166,11 +2156,15 @@ const scoresHref = url('/captains/admin/minigame/');
       if (key && !seenJuniors.has(key)) {
         seenJuniors.add(key);
         if (!groupMembers.some((member) => member.group_slug === 'jc_players' && nameKey(member.person_name) === key)) {
-          const profile = accounts.find((person) => nameKey(person.display_name || '') === key);
+          const sameName = groupMembers.filter((member) => nameKey(member.person_name) === key);
+          const known = sameName.find((member) => member.profile_id) ?? sameName[0];
+          const profile =
+            accounts.find((person) => nameKey(person.display_name || '') === key) ??
+            (known?.profile_id ? accounts.find((person) => person.id === known.profile_id) ?? null : null);
           groupMembers.push({
-            profile_id: profile?.id ?? null,
-            person_name: profile?.display_name || personName,
-            place: (entry.club ?? '').trim() || null,
+            profile_id: profile?.id ?? known?.profile_id ?? null,
+            person_name: profile?.display_name || known?.person_name || personName,
+            place: known?.place ? null : (entry.club ?? '').trim() || null,
             group_slug: 'jc_players',
           });
         }
@@ -2193,11 +2187,17 @@ const scoresHref = url('/captains/admin/minigame/');
     for (const parent of parents.values()) {
       const key = nameKey(parent.name);
       if (groupMembers.some((member) => member.group_slug === 'jc_parents' && nameKey(member.person_name) === key)) continue;
-      const profile = accounts.find((person) => nameKey(person.display_name || '') === key);
+      const sameName = groupMembers.filter((member) => nameKey(member.person_name) === key);
+      const known = sameName.find((member) => member.profile_id) ?? sameName[0];
+      const profile =
+        accounts.find((person) => nameKey(person.display_name || '') === key) ??
+        (known?.profile_id ? accounts.find((person) => person.id === known.profile_id) ?? null : null);
+      const place = known?.place || [...parent.places].join('; ') || null;
+      parent.name = profile?.display_name || known?.person_name || parent.name;
       groupMembers.push({
-        profile_id: profile?.id ?? null,
-        person_name: profile?.display_name || parent.name,
-        place: [...parent.places].join('; ') || null,
+        profile_id: profile?.id ?? known?.profile_id ?? null,
+        person_name: parent.name,
+        place,
         group_slug: 'jc_parents',
       });
     }
@@ -2344,7 +2344,25 @@ const scoresHref = url('/captains/admin/minigame/');
       if (!card.email.trim() && parent.email) card.email = parent.email;
       if (!card.phone.trim() && parent.phone) card.phone = parent.phone;
     }
-    memberCards = [...cards.values()].sort((a, b) => a.label.localeCompare(b.label, 'en'));
+    const merged = new Map<string, MemberCard>();
+    for (const card of cards.values()) {
+      const key = nameKey(card.name);
+      const previous = merged.get(key);
+      if (!previous) {
+        merged.set(key, card);
+        continue;
+      }
+      const keep = previous.profileId ? previous : card.profileId ? card : previous;
+      const other = keep === previous ? card : previous;
+      keep.groupSlugs = [...new Set([...keep.groupSlugs, ...other.groupSlugs])];
+      keep.teams = [...new Set(`${keep.teams}; ${other.teams}`.split(';').map((part) => part.trim()).filter(Boolean))].join('; ');
+      if (!keep.email.trim() && other.email.trim()) keep.email = other.email;
+      if (!keep.phone.trim() && other.phone.trim()) keep.phone = other.phone;
+      if (!keep.es.trim() && other.es.trim()) keep.es = other.es;
+      keep.roleNames = [...new Set(`${keep.roleNames}, ${other.roleNames}`.split(',').map((part) => part.trim()).filter(Boolean))].join(', ');
+      merged.set(key, keep);
+    }
+    memberCards = [...merged.values()].sort((a, b) => a.label.localeCompare(b.label, 'en'));
     openingGroup = '';
     if (selectedMemberKey && !memberCards.some((card) => card.key === selectedMemberKey)) {
       const named = memberCards.find((card) => nameKey(card.name) === nameKey(selectedMemberKey.replace(/^name:/, '')));

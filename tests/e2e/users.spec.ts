@@ -115,7 +115,7 @@ test.describe('Users', () => {
     await page.getByRole('heading', { name: 'Users', exact: true }).click();
     await expect(page.locator('[data-status]')).toHaveText('Roles saved for Pat Player.');
     const patRoles = page.getByRole('button', { name: 'Roles for Pat Player' });
-    await expect(patRoles).toHaveText('RB Player');
+    await expect(patRoles).toHaveText('LM Player, JC Player, RB Player');
     await patRoles.click();
     await expect(page.getByRole('checkbox', { name: 'RB Player' })).toBeChecked();
     await expect(page.getByRole('checkbox', { name: 'LM Player' })).toBeDisabled();
@@ -202,7 +202,11 @@ test.describe('Users', () => {
 
   test('a junior entry is a JC Player and the parent is a separate JC Parent', async ({ page }) => {
     await openUsers(page);
+    const pat = page.locator('[data-users] tr', { hasText: 'Pat Player' });
+    await expect(pat).toHaveCount(1);
+    await expect(pat.getByRole('button', { name: 'Roles for Pat Player' })).toHaveText('LM Player, JC Player');
     await page.getByLabel('Group').selectOption({ label: 'JC Player' });
+    await expect(pat).toHaveCount(1);
     const jamie = page.locator('[data-users] tr', { hasText: 'Jamie Junior' });
     const robin = page.locator('[data-users] tr', { hasText: 'Robin Junior' });
     await expect(jamie).toBeVisible();
@@ -212,7 +216,6 @@ test.describe('Users', () => {
     await expect(jamie.getByRole('textbox', { name: 'Mobile for Jamie Junior' })).toHaveValue('');
     await expect(jamie.getByRole('button', { name: 'Roles for Jamie Junior' })).toHaveText('JC Player');
     await expect(page.locator('[data-users] tr', { hasText: 'Pat Guardian' })).toHaveCount(0);
-    await expect(page.locator('[data-users] tr', { hasText: 'Pat Player' })).toHaveCount(0);
     await jamie.getByRole('button', { name: 'Roles for Jamie Junior' }).click();
     await expect(page.getByRole('checkbox', { name: 'JC Player' })).toBeChecked();
     await expect(page.getByRole('checkbox', { name: 'JC Player' })).toBeDisabled();
@@ -500,6 +503,20 @@ async function installAdmin(page: Page) {
           guardian_name: 'Pat Guardian',
           guardian_email: '',
           guardian_phone: '',
+          emergency_name: '',
+          emergency_phone: '',
+          notes: null,
+        },
+        {
+          player_first_name: 'Pat',
+          player_last_name: 'Player',
+          date_of_birth: '2012-01-01',
+          age_category: 'Under 15',
+          draw: 'Boys',
+          club: 'Test Club',
+          guardian_name: 'Pat Guardian',
+          guardian_email: 'guardian@example.test',
+          guardian_phone: '07000999999',
           emergency_name: '',
           emergency_phone: '',
           notes: null,
