@@ -966,11 +966,19 @@ const scoresHref = url('/captains/admin/minigame/');
       const active = setActive.dataset.activeNext === 'true';
       const userId = setActive.dataset.setActive ?? '';
       setStatus(active ? 'Turning the account on…' : 'Turning the account off…');
-      const message = await callManageAccounts(supabase, {
+      let message = await callManageAccounts(supabase, {
         action: 'set-active',
         user_id: userId,
         active,
       });
+      if (message === 'Unknown action.') {
+        const { error } = await supabase.rpc('set_account_active', { p_user_id: userId, p_active: active });
+        message = error
+          ? /set_account_active|schema cache/i.test(error.message)
+            ? 'Active changes are not on the database yet. Run the set_account_active SQL, then try again.'
+            : error.message
+          : null;
+      }
       const card = memberCards.find((item) => item.profileId === userId);
       if (message) {
         setStatus(message);
