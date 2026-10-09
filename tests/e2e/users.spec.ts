@@ -17,12 +17,81 @@ type Hooks = {
 
 const hooks: Hooks = { refuseActive: false, requireClub: false, squadWrites: 0, actions: [], bodies: [] };
 
+type DifferenceRow = {
+  id: number;
+  display_name: string;
+  email: string | null;
+  england_squash_id: string | null;
+  lm_email: string | null;
+  lm_england_squash_id: string | null;
+  lm_display_name: string | null;
+  lm_email_kept: string | null;
+  lm_es_kept: string | null;
+  lm_name_kept: string | null;
+};
+
+function freshDifferences(): DifferenceRow[] {
+  return [
+    {
+      id: 1,
+      display_name: 'Pat Player',
+      email: 'pat.player@example.test',
+      england_squash_id: '123456',
+      lm_email: 'league.pat@example.test',
+      lm_england_squash_id: '123456',
+      lm_display_name: 'Pat Player',
+      lm_email_kept: null,
+      lm_es_kept: null,
+      lm_name_kept: null,
+    },
+    {
+      id: 2,
+      display_name: 'Zoe Player',
+      email: 'not-an-email',
+      england_squash_id: '111',
+      lm_email: null,
+      lm_england_squash_id: '222',
+      lm_display_name: 'Zoe Renamed',
+      lm_email_kept: null,
+      lm_es_kept: null,
+      lm_name_kept: null,
+    },
+    {
+      id: 5,
+      display_name: 'Sam Morris',
+      email: 'sam.morris@example.test',
+      england_squash_id: null,
+      lm_email: 'sam.morris@example.test',
+      lm_england_squash_id: null,
+      lm_display_name: 'sam morris',
+      lm_email_kept: null,
+      lm_es_kept: null,
+      lm_name_kept: null,
+    },
+    {
+      id: 99,
+      display_name: 'Blank Email',
+      email: null,
+      england_squash_id: null,
+      lm_email: 'blank.lm@example.test',
+      lm_england_squash_id: null,
+      lm_display_name: 'Blank Email',
+      lm_email_kept: null,
+      lm_es_kept: null,
+      lm_name_kept: null,
+    },
+  ];
+}
+
+let differencePlayers = freshDifferences();
+
 test.beforeEach(async ({ context, baseURL, page }) => {
   hooks.refuseActive = false;
   hooks.requireClub = false;
   hooks.squadWrites = 0;
   hooks.actions = [];
   hooks.bodies = [];
+  differencePlayers = freshDifferences();
   await context.addCookies([{ name: 'beds_cookies', value: 'essential', url: baseURL! }]);
   await installAdmin(page);
 });
@@ -246,6 +315,27 @@ test.describe('Users', () => {
     await expect(county.getByRole('button', { name: 'Password for County Keeper' })).toHaveCount(0);
     await expect(county.getByRole('button', { name: 'Active for County Keeper' })).toHaveCount(0);
     await expect(county.getByRole('button', { name: 'Delete County Keeper' })).toHaveCount(0);
+  });
+
+  test('a League Master value that differs is listed, and a match is not', async ({ page }) => {
+    await openUsers(page);
+    const diff = page.locator('[data-differences]');
+    await expect(diff).toBeVisible();
+    await expect(diff).toContainText('Pat Player');
+    await expect(diff).toContainText('league.pat@example.test');
+    await expect(diff).not.toContainText('Sam Morris');
+    await expect(diff).not.toContainText('blank.lm@example.test');
+    await expect(diff.getByRole('row', { name: /Zoe Player/ })).toHaveCount(2);
+
+    await diff.getByRole('button', { name: 'Keep website Email for Pat Player' }).click();
+    await expect(diff).not.toContainText('league.pat@example.test');
+    await expect(page.getByRole('textbox', { name: 'Email for Pat Player' })).toHaveValue('pat.player@example.test');
+    await expect(page.locator('[data-users-status]')).toContainText('Website email kept for Pat Player.');
+
+    await diff.getByRole('button', { name: 'Use League Master ES number for Zoe Player' }).click();
+    await expect(diff.getByRole('row', { name: /Zoe Player/ })).toHaveCount(1);
+    await expect(page.getByRole('textbox', { name: 'ES number for Zoe Player' })).toHaveValue('222');
+    await expect(page.locator('[data-users-status]')).toContainText('League Master ES number saved for Zoe Player.');
   });
 });
 
@@ -524,8 +614,21 @@ async function installAdmin(page: Page) {
       ]);
       return;
     }
-    if (path.endsWith('/squad_players') && route.request().method() !== 'GET') {
-      hooks.squadWrites += 1;
+    if (path.endsWith('/squad_players')) {
+      const select = url.searchParams.get('select') ?? '';
+      if (route.request().method() === 'GET' && select.includes('lm_email')) {
+        await respond(differencePlayers);
+        return;
+      }
+      if (route.request().method() !== 'GET') {
+        hooks.squadWrites += 1;
+        if (route.request().method() === 'PATCH') {
+          const id = url.searchParams.get('id') ?? '';
+          const body = route.request().postDataJSON() as Record<string, string | null>;
+          const row = differencePlayers.find((item) => `eq.${item.id}` === id);
+          if (row) Object.assign(row, body);
+        }
+      }
     }
     await respond([]);
   });

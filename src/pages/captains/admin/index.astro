@@ -20,7 +20,7 @@ const scoresHref = url('/captains/admin/minigame/');
     <div class="container setup" id="setup-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
       <h1>Administration</h1>
       <p class="lede">
-        <strong>League Master</strong> lists club captains, team captains, and players. Those lists are read only. The next import replaces names, emails, and England Squash numbers. Phone stays on this website.
+        <strong>League Master</strong> lists club captains, team captains, and players. Those lists are read only. An email, name, or ES number saved on this website stays. A difference with League Master is listed under Differences. Phone stays on this website.
         <strong>Juniors</strong> lists the Junior County Closed entries submitted on this website. <strong>Beds Closed</strong> will be used later.
         <strong>SquashLevels</strong> shows each player’s level.
         <strong>Permissions</strong> is Users, Groups, and Roles, and only an admin sees it. Users is every League Master player. Update the email, ES number, and phone there, and change the password, turn the account off, or delete it when a login exists. A group gives one role. League Master fills the club, team, and player groups. Someone in those groups who is on SquashLevels also receives SL Player.
@@ -148,6 +148,24 @@ const scoresHref = url('/captains/admin/minigame/');
               League Master players are listed, and so is anyone with an admin or organiser login. A junior entry adds the player as a JC Player and the parent as a JC Parent. The entry email and phone stay on the parent. Filter by group or place. LM Club Captain, LM Team Captain, LM Player, JC Player and JC Parent are ticked in Roles and stay as they are. Password opens the login details so you can copy them. Nothing is emailed.
             </p>
             <p class="muted small" data-group-note>Filled from League Master. Each LM Player is listed. Junior entries add a JC Player and a JC Parent.</p>
+            <div data-differences hidden>
+              <h3>Differences</h3>
+              <p class="muted small">League Master has a different email, name, or ES number. The value on this website stays until you choose.</p>
+              <div class="overview-box">
+                <table class="overview">
+                  <thead>
+                    <tr>
+                      <th>Player</th>
+                      <th>Field</th>
+                      <th>This website</th>
+                      <th>League Master</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody data-difference-rows></tbody>
+                </table>
+              </div>
+            </div>
             <div class="member-tools">
               <label class="directory-search">
                 Search
@@ -1932,7 +1950,7 @@ const scoresHref = url('/captains/admin/minigame/');
         await supabase.rpc('sync_website_player_emails');
         await supabase.rpc('apply_lm_roles');
       }
-      setStatus(`Email saved for ${name}. League Master replaces the name, email, and ES number on the next import.`);
+      setStatus(`Email saved for ${name}. This website keeps it.`);
       return;
     }
     setStatus(`${label} saved for ${name}.`);
@@ -2369,6 +2387,7 @@ const scoresHref = url('/captains/admin/minigame/');
       selectedMemberKey = named?.key ?? '';
     }
     paintMembers();
+    await loadDifferences();
     await paintLinks();
   }
 
@@ -2667,9 +2686,114 @@ const scoresHref = url('/captains/admin/minigame/');
         }
       }
     }
-    setStatus(`Details saved for ${card.name}. League Master replaces the name, email, and ES number on the next import. Phone stays on this website.`);
+    setStatus(`Details saved for ${card.name}. This website keeps the email, ES number, and phone.`);
     await showSession();
   }
+
+  const differencesHost = root.querySelector<HTMLElement>('[data-differences]')!;
+  const differenceRows = root.querySelector<HTMLElement>('[data-difference-rows]')!;
+  type SnapshotPlayer = {
+    id: number;
+    display_name: string;
+    email: string | null;
+    england_squash_id: string | null;
+    lm_email: string | null;
+    lm_england_squash_id: string | null;
+    lm_display_name: string | null;
+    lm_email_kept: string | null;
+    lm_es_kept: string | null;
+    lm_name_kept: string | null;
+  };
+  let differencePlayers: SnapshotPlayer[] = [];
+  const filled = (value: string | null | undefined) => Boolean((value ?? '').trim());
+  const sameEmail = (left: string | null | undefined, right: string | null | undefined) => (left ?? '').trim().toLowerCase() === (right ?? '').trim().toLowerCase();
+  const sameEs = (left: string | null | undefined, right: string | null | undefined) => (left ?? '').trim() === (right ?? '').trim();
+  const differenceItems = (player: SnapshotPlayer) => {
+    const items: { field: 'email' | 'es' | 'name'; label: string; website: string; lm: string }[] = [];
+    if (filled(player.email) && filled(player.lm_email) && !sameEmail(player.email, player.lm_email) && !sameEmail(player.lm_email, player.lm_email_kept)) {
+      items.push({ field: 'email', label: 'Email', website: (player.email ?? '').trim(), lm: (player.lm_email ?? '').trim() });
+    }
+    if (filled(player.england_squash_id) && filled(player.lm_england_squash_id) && !sameEs(player.england_squash_id, player.lm_england_squash_id) && !sameEs(player.lm_england_squash_id, player.lm_es_kept)) {
+      items.push({ field: 'es', label: 'ES number', website: (player.england_squash_id ?? '').trim(), lm: (player.lm_england_squash_id ?? '').trim() });
+    }
+    if (filled(player.display_name) && filled(player.lm_display_name) && nameKey(player.display_name) !== nameKey(player.lm_display_name ?? '') && nameKey(player.lm_display_name ?? '') !== nameKey(player.lm_name_kept ?? '')) {
+      items.push({ field: 'name', label: 'Name', website: player.display_name.trim(), lm: (player.lm_display_name ?? '').trim() });
+    }
+    return items;
+  };
+  function paintDifferences() {
+    const rows = differencePlayers.flatMap((player) => differenceItems(player).map((item) => ({ player, item })));
+    differencesHost.hidden = rows.length === 0;
+    differenceRows.innerHTML = rows
+      .map(({ player, item }) => {
+        const keep = `Keep website ${item.label} for ${player.display_name}`;
+        const take = `Use League Master ${item.label} for ${player.display_name}`;
+        return `<tr><td>${escapeHtml(player.display_name)}</td><td>${escapeHtml(item.label)}</td><td>${escapeHtml(item.website)}</td><td>${escapeHtml(item.lm)}</td><td class="col-action col-action--wrap"><button class="btn btn--ghost btn--sm" type="button" data-keep-difference="${player.id}" data-difference-field="${item.field}">${escapeHtml(keep)}</button><button class="btn btn--primary btn--sm" type="button" data-take-difference="${player.id}" data-difference-field="${item.field}">${escapeHtml(take)}</button></td></tr>`;
+      })
+      .join('');
+  }
+  async function loadDifferences() {
+    const { data, error } = await supabase
+      .from('squad_players')
+      .select('id, display_name, email, england_squash_id, lm_email, lm_england_squash_id, lm_display_name, lm_email_kept, lm_es_kept, lm_name_kept');
+    if (error) {
+      differencesHost.hidden = true;
+      return;
+    }
+    differencePlayers = (data ?? []) as SnapshotPlayer[];
+    paintDifferences();
+  }
+  async function chooseDifference(playerId: number, field: 'email' | 'es' | 'name', takeLm: boolean) {
+    const player = differencePlayers.find((item) => item.id === playerId);
+    if (!player || !viewerIsAdmin) return;
+    const patch: Record<string, string | null> = {};
+    const lmEmail = (player.lm_email ?? '').trim().toLowerCase();
+    const lmEs = (player.lm_england_squash_id ?? '').trim();
+    const lmName = (player.lm_display_name ?? '').trim();
+    if (field === 'email') {
+      patch.lm_email_kept = player.lm_email;
+      if (takeLm) patch.email = lmEmail;
+    } else if (field === 'es') {
+      patch.lm_es_kept = player.lm_england_squash_id;
+      if (takeLm) patch.england_squash_id = lmEs;
+    } else {
+      patch.lm_name_kept = player.lm_display_name;
+      if (takeLm) patch.display_name = lmName;
+    }
+    const label = field === 'email' ? 'email' : field === 'es' ? 'ES number' : 'name';
+    setStatus(takeLm ? `Saving the League Master ${label}…` : `Keeping the website ${label}…`);
+    const { error } = await supabase.from('squad_players').update(patch).eq('id', playerId);
+    if (error) {
+      setStatus(error.message);
+      return;
+    }
+    Object.assign(player, patch);
+    if (takeLm) {
+      const contact = personContacts.find((item) => item.playerId === playerId);
+      for (const card of memberCards) {
+        if (!card.squadIds.includes(playerId)) continue;
+        if (field === 'email') card.email = lmEmail;
+        if (field === 'es') card.es = lmEs;
+        if (field === 'name') card.name = lmName;
+      }
+      if (contact) {
+        if (field === 'email') contact.email = lmEmail;
+        if (field === 'es') contact.es = lmEs;
+        if (field === 'name') contact.name = lmName;
+      }
+      paintMembers();
+    }
+    paintDifferences();
+    setStatus(takeLm ? `League Master ${label} saved for ${player.display_name}.` : `Website ${label} kept for ${player.display_name}.`);
+  }
+  differenceRows.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-keep-difference], [data-take-difference]');
+    if (!button) return;
+    const playerId = Number(button.dataset.keepDifference || button.dataset.takeDifference || 0);
+    const field = button.dataset.differenceField;
+    if (!playerId || (field !== 'email' && field !== 'es' && field !== 'name')) return;
+    void chooseDifference(playerId, field, Boolean(button.dataset.takeDifference));
+  });
 
   showSession();
 </script>
@@ -2976,6 +3100,9 @@ const scoresHref = url('/captains/admin/minigame/');
   #setup-app .users-box + .pager span {
     color: var(--ink-200);
     font-size: 0.8rem;
+  }
+  #setup-app [data-differences][hidden] {
+    display: none;
   }
   #setup-app [data-users-status]:empty {
     display: none;

@@ -470,7 +470,11 @@ async function refreshContacts() {
   console.error(`League Master contacts: ${clubCount} clubs, ${captainCount} captains updated`);
 }
 
-/** Replace squad name, England Squash number, and email from the League Master player list. */
+function blank(value) {
+  return !value || !String(value).trim();
+}
+
+/** Remember League Master details. A value already saved on the website stays. */
 async function refreshPlayerDetails(seasonId) {
   const username = process.env.LEAGUEMASTER_USERNAME;
   const password = process.env.LEAGUEMASTER_PASSWORD;
@@ -492,14 +496,32 @@ async function refreshPlayerDetails(seasonId) {
   const clubs = await rest('clubs?select=slug,leaguemaster_club_id&leaguemaster_club_id=not.is.null');
   const teams = await rest('teams?select=id,club_slug&limit=5000');
   const squads = await rest('captain_squads?select=id,team_id&limit=5000');
+  const snapshotColumns = 'lm_email,lm_england_squash_id,lm_display_name,lm_email_kept,lm_es_kept,lm_name_kept';
+  const baseColumns = 'id,squad_id,display_name,email,england_squash_id';
   let squadPlayers;
   let hasLmId = true;
+  let hasSnapshot = true;
+  const loadSquadPlayers = async (columns) => rest(`squad_players?select=${columns}&limit=5000`);
   try {
-    squadPlayers = await rest('squad_players?select=id,squad_id,display_name,email,england_squash_id,leaguemaster_player_id&limit=5000');
+    squadPlayers = await loadSquadPlayers(`${baseColumns},leaguemaster_player_id,${snapshotColumns}`);
   } catch (error) {
-    if (!String(error.message).includes('leaguemaster_player_id')) throw error;
-    hasLmId = false;
-    squadPlayers = await rest('squad_players?select=id,squad_id,display_name,email,england_squash_id&limit=5000');
+    const message = String(error.message);
+    const missingId = message.includes('leaguemaster_player_id');
+    const missingSnapshot = message.includes('lm_email');
+    if (!missingId && !missingSnapshot) throw error;
+    hasLmId = !missingId;
+    hasSnapshot = !missingSnapshot;
+    const columns = [baseColumns, hasLmId ? 'leaguemaster_player_id' : '', hasSnapshot ? snapshotColumns : ''].filter(Boolean).join(',');
+    try {
+      squadPlayers = await loadSquadPlayers(columns);
+    } catch (again) {
+      const againMessage = String(again.message);
+      if (againMessage.includes('leaguemaster_player_id')) hasLmId = false;
+      if (againMessage.includes('lm_email')) hasSnapshot = false;
+      if (!againMessage.includes('leaguemaster_player_id') && !againMessage.includes('lm_email')) throw again;
+      const fallback = [baseColumns, hasLmId ? 'leaguemaster_player_id' : '', hasSnapshot ? snapshotColumns : ''].filter(Boolean).join(',');
+      squadPlayers = await loadSquadPlayers(fallback);
+    }
   }
   const squadById = new Map((squads ?? []).map((squad) => [squad.id, squad]));
   const teamById = new Map((teams ?? []).map((team) => [team.id, team]));
@@ -526,19 +548,19 @@ async function refreshPlayerDetails(seasonId) {
       for (const player of targets) {
         const nextEmail = lm.email;
         const nextEs = lm.es;
-        const same =
-          sameName(player.display_name || '', lm.name) &&
-          (player.email || null) === nextEmail &&
-          (player.england_squash_id || null) === nextEs &&
-          (!hasLmId || player.leaguemaster_player_id === lm.id);
-        if (same) continue;
-        const body = { display_name: lm.name, email: nextEmail, england_squash_id: nextEs };
-        if (hasLmId) body.leaguemaster_player_id = lm.id;
+        const body = {};
+        if (hasLmId && player.leaguemaster_player_id !== lm.id) body.leaguemaster_player_id = lm.id;
+        if (hasSnapshot) {
+          if ((player.lm_email || null) !== nextEmail) body.lm_email = nextEmail;
+          if ((player.lm_england_squash_id || null) !== nextEs) body.lm_england_squash_id = nextEs;
+          if ((player.lm_display_name || null) !== lm.name) body.lm_display_name = lm.name;
+        }
+        if (blank(player.email) && (player.email || null) !== nextEmail) body.email = nextEmail;
+        if (blank(player.england_squash_id) && (player.england_squash_id || null) !== nextEs) body.england_squash_id = nextEs;
+        if (blank(player.display_name)) body.display_name = lm.name;
+        if (!Object.keys(body).length) continue;
         await rest(`squad_players?id=eq.${player.id}`, { method: 'PATCH', body: JSON.stringify(body) });
-        player.display_name = lm.name;
-        player.email = nextEmail;
-        player.england_squash_id = nextEs;
-        if (hasLmId) player.leaguemaster_player_id = lm.id;
+        Object.assign(player, body);
         updated += 1;
       }
     }
