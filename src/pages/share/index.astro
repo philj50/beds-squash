@@ -77,7 +77,7 @@ import { url } from '@/lib/site';
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { loadAccount, sendToLogin, type Account } from '@/lib/account';
+  import { loadAccount, noteActivity, privateStop, sendToLogin, stopMessage, type Account } from '@/lib/account';
   import {
     GALLERY_BODY_MAX,
     GALLERY_BODY_MIN,
@@ -133,6 +133,14 @@ import { url } from '@/lib/site';
   async function openForm() {
     const account = await loadAccount(supabase);
     if (!account) return;
+    const stop = await privateStop(supabase, account);
+    if (stop) {
+      gate.hidden = false;
+      gate.textContent = stopMessage(stop);
+      form.hidden = true;
+      return;
+    }
+    void noteActivity(supabase);
     if (!maySend(account)) {
       gate.textContent = 'This account cannot send content. It needs to be a player, a team captain, a club captain or an admin.';
       return;

@@ -57,7 +57,7 @@ import { url } from '@/lib/site';
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { sendToLogin } from '@/lib/account';
+  import { loadAccount, noteActivity, privateStop, sendToLogin, stopMessage } from '@/lib/account';
 
   type Article = {
     id: number;
@@ -113,6 +113,15 @@ import { url } from '@/lib/site';
       return;
     }
     whoEl.textContent = session.user.email ?? 'Signed in';
+    const account = await loadAccount(supabase);
+    if (account) {
+      const stop = await privateStop(supabase, account);
+      if (stop) {
+        denied.hidden = false;
+        denied.textContent = stopMessage(stop);
+        return;
+      }
+    }
     const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', session.user.id).maybeSingle();
     const { data: membership } = await supabase
       .from('memberships')
@@ -123,8 +132,10 @@ import { url } from '@/lib/site';
     const isAdmin = Boolean(profile?.is_admin) || Boolean(membership?.length);
     if (!isAdmin) {
       denied.hidden = false;
+      denied.textContent = 'This account cannot change articles.';
       return;
     }
+    void noteActivity(supabase);
     admin.hidden = false;
     const { data: settings, error: settingsError } = await supabase.from('article_settings').select('publication_mode').eq('id', 1).single();
     if (settingsError) statusEl.textContent = settingsError.message;

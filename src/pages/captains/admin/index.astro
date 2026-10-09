@@ -458,7 +458,7 @@ const scoresHref = url('/captains/admin/minigame/');
 <script>
   import { createClient } from '@supabase/supabase-js';
   import { bindPasswordRules, bindPasswordToggles, callManageAccounts, fetchAccountStates, fillSuggestedPassword, passwordIssue, suggestPassword } from '@/lib/passwords';
-  import { loadAccount, sendToLogin, type Account } from '@/lib/account';
+  import { loadAccount, noteActivity, privateStop, sendToLogin, stopMessage, type Account } from '@/lib/account';
 
   type Person = { id: string; display_name: string; email: string | null; is_admin: boolean };
   type Club = { slug: string; name: string; contact_name: string | null; contact_email: string | null; leaguemaster_club_id?: string | null };
@@ -2014,6 +2014,16 @@ const scoresHref = url('/captains/admin/minigame/');
     }
 
     whoEl.textContent = `Signed in as ${account.displayName || account.email}`;
+    const stop = await privateStop(supabase, account, { role: true });
+    if (stop) {
+      workspace.hidden = true;
+      juniorLink.hidden = true;
+      shareLink.hidden = true;
+      scoresLink.hidden = true;
+      setStatus(stopMessage(stop));
+      return;
+    }
+    void noteActivity(supabase);
     viewerIsAdmin = account.isAdmin;
     viewerId = account.userId;
     viewerSeesJuniors = account.isAdmin || account.groups.some((group) => group.slug === 'junior_organisers');

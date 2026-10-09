@@ -53,7 +53,7 @@ import { url } from '@/lib/site';
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { loadAccount, saveDisplayName, sendToLogin } from '@/lib/account';
+  import { accountIsActive, hasAccountEmail, loadAccount, noteActivity, saveDisplayName, sendToLogin, stopMessage } from '@/lib/account';
 
   const root = document.getElementById('profile-app');
   if (!root) throw new Error('profile app missing');
@@ -90,6 +90,17 @@ import { url } from '@/lib/site';
       return;
     }
     whoEl.textContent = `Signed in as ${account.displayName || account.email}`;
+    const inactive = !(await accountIsActive(supabase));
+    const nameForm = root.querySelector<HTMLElement>('[data-form="name"]')!;
+    const passwordSlot = root.querySelector<HTMLElement>('[data-change-password-slot]')!;
+    nameForm.hidden = inactive;
+    passwordSlot.hidden = inactive;
+    if (inactive) {
+      statusEl.textContent = stopMessage('inactive');
+      return;
+    }
+    void noteActivity(supabase);
+    if (!hasAccountEmail(account.email)) statusEl.textContent = stopMessage('email');
     nameInput.value = account.displayName;
     emailEl.textContent = account.email || '—';
     placesEl.textContent = account.places.length

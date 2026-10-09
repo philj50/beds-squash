@@ -28,7 +28,7 @@ import { url } from '@/lib/site';
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { organisesGroup, sendToLogin } from '@/lib/account';
+  import { loadAccount, noteActivity, organisesGroup, privateStop, sendToLogin, stopMessage } from '@/lib/account';
   import { ENTRY_GROUPS } from '@/lib/junior-age';
 
   type Entry = {
@@ -88,12 +88,24 @@ import { url } from '@/lib/site';
       return;
     }
     whoEl.textContent = `Signed in as ${session.user.email ?? 'organiser'}`;
+    const account = await loadAccount(supabase);
+    if (account) {
+      const stop = await privateStop(supabase, account);
+      if (stop) {
+        denied.hidden = false;
+        denied.textContent = stopMessage(stop);
+        list.hidden = true;
+        return;
+      }
+    }
     if (!(await organisesGroup(supabase, session.user.id, 'junior_organisers'))) {
       denied.hidden = false;
+      denied.textContent = 'This account cannot see entries.';
       list.hidden = true;
       return;
     }
     denied.hidden = true;
+    void noteActivity(supabase);
     const { data: rows, error } = await supabase
       .from('junior_entries')
       .select('id, player_first_name, player_last_name, date_of_birth, age_category, draw, club, guardian_name, guardian_email, guardian_phone, emergency_name, emergency_phone, notes, created_at')
