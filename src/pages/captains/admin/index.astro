@@ -169,7 +169,7 @@ const scoresHref = url('/captains/admin/minigame/');
             <div class="member-tools">
               <label class="directory-search">
                 Search
-                <input type="search" data-member-search placeholder="Name, place or email" autocomplete="off" />
+                <input type="search" data-member-search placeholder="Name, place, email, ES or mobile" autocomplete="off" />
               </label>
               <label>
                 Group
@@ -218,28 +218,22 @@ const scoresHref = url('/captains/admin/minigame/');
                   <col class="col-name" />
                   <col class="col-place" />
                   <col class="col-email" />
-                  <col class="col-es" />
-                  <col class="col-mobile" />
                   <col class="col-roles" />
                   <col class="col-active" />
                   <col class="col-password" />
                   <col class="col-delete" />
-                  <col class="col-status" />
-                  <col class="col-login" />
+                  <col class="col-more" />
                 </colgroup>
                 <thead>
                   <tr>
                     <th>Name</th>
                     <th>Place</th>
                     <th>Email</th>
-                    <th>ES number</th>
-                    <th>Mobile</th>
                     <th>Roles</th>
                     <th>Active</th>
                     <th>Password</th>
                     <th>Delete</th>
-                    <th>Status</th>
-                    <th>Last login</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody data-users data-group-members></tbody>
@@ -975,7 +969,10 @@ const scoresHref = url('/captains/admin/minigame/');
       if (message) {
         setStatus(message);
         setActive.title = message;
-        if (card) card.statusHtml = message;
+        if (card) {
+          card.statusHtml = message;
+          openMore.add(card.key);
+        }
         paintMembers();
         return;
       }
@@ -1023,8 +1020,21 @@ const scoresHref = url('/captains/admin/minigame/');
     setStatus(makingAdmin ? 'Admin access granted.' : 'Admin access removed.');
     await showSession();
   };
+  const openMore = new Set<string>();
   membersHost.addEventListener('click', (event) => {
     const target = event.target as HTMLElement;
+    const more = target.closest<HTMLButtonElement>('[data-toggle-more]');
+    if (more) {
+      const key = more.dataset.toggleMore ?? '';
+      const detail = [...membersHost.querySelectorAll<HTMLElement>('[data-member-detail]')].find((row) => row.dataset.memberDetail === key);
+      const open = Boolean(detail?.hidden);
+      if (detail) detail.hidden = !open;
+      more.setAttribute('aria-expanded', String(open));
+      more.textContent = open ? '−' : '+';
+      if (open) openMore.add(key);
+      else openMore.delete(key);
+      return;
+    }
     if (target.closest('[data-open-role-pop], [data-set-active], [data-delete-person], [data-reset-password]')) {
       void onAccountAction(event);
       return;
@@ -1048,14 +1058,16 @@ const scoresHref = url('/captains/admin/minigame/');
   membersHost.addEventListener('focusout', (event) => {
     const input = event.target as HTMLInputElement;
     if (!input.matches?.('[data-row-field]')) return;
-    const row = input.closest('tr');
+    const key = input.dataset.rowKey ?? '';
     const next = event.relatedTarget;
-    if (row && next instanceof Node && row.contains(next)) return;
-    const card = memberCards.find((item) => item.key === (input.dataset.rowKey ?? ''));
+    if (next instanceof HTMLElement && next.dataset.rowKey === key) return;
+    const card = memberCards.find((item) => item.key === key);
     if (!card || !viewerIsAdmin || card.protectedAccount) return;
-    const valueOf = (field: string) => row?.querySelector<HTMLInputElement>(`[data-row-field="${field}"]`)?.value ?? '';
+    const fieldInput = (field: string) =>
+      [...membersHost.querySelectorAll<HTMLInputElement>('[data-row-field]')].find((item) => item.dataset.rowField === field && item.dataset.rowKey === key);
+    const valueOf = (field: string) => fieldInput(field)?.value ?? '';
     const email = valueOf('email').trim().toLowerCase();
-    const emailInput = row?.querySelector<HTMLInputElement>('[data-row-field="email"]');
+    const emailInput = fieldInput('email');
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       emailInput?.setAttribute('aria-invalid', 'true');
       setStatus('Enter a valid email address.');
@@ -1268,7 +1280,9 @@ const scoresHref = url('/captains/admin/minigame/');
       if (groupFilter && !(groupFilter === 'admins' ? card.isAdmin || card.groupSlugs.includes('admins') : card.groupSlugs.includes(groupFilter))) return false;
       if (placeFilter && !card.teams.split(';').map((part) => part.trim()).includes(placeFilter)) return false;
       if (!query) return true;
-      return [card.name, card.profileName, card.teams, card.place, card.email, card.groupNames, card.roleNames].some((value) => value.toLowerCase().includes(query));
+      return [card.name, card.profileName, card.teams, card.place, card.email, card.es, card.phone, card.groupNames, card.roleNames].some((value) =>
+        value.toLowerCase().includes(query),
+      );
     });
     const narrowed = Boolean(query || groupFilter || placeFilter);
     memberCount.textContent = narrowed ? `${shown.length} of ${players.length} players` : `${players.length} players`;
@@ -1304,7 +1318,7 @@ const scoresHref = url('/captains/admin/minigame/');
             const email = contactCell(card, 'email', card.protectedAccount ? '' : card.email, 'Email', 'email', 'Add an email');
             const es = contactCell(card, 'es', card.es, 'ES number', 'text', 'Add an ES number');
             const mobile = contactCell(card, 'phone', card.phone, 'Mobile', 'tel', 'Add a mobile number');
-            const roles = `<button type="button" class="count-button" data-open-role-pop="${escapeHtml(card.key)}" aria-label="Roles for ${escapeHtml(card.name)}">${escapeHtml(roleLabel(card))}</button>`;
+            const roles = `<button type="button" class="count-button role-label" data-open-role-pop="${escapeHtml(card.key)}" aria-label="Roles for ${escapeHtml(card.name)}">${escapeHtml(roleLabel(card))}</button>`;
             const activeLabel = card.active ? 'Active' : 'Inactive';
             const active =
               viewerIsAdmin && card.profileId && !card.protectedAccount && card.profileId !== viewerId
@@ -1315,10 +1329,13 @@ const scoresHref = url('/captains/admin/minigame/');
               viewerIsAdmin && card.profileId && !card.protectedAccount
                 ? actionButton('Delete', `data-delete-person="${card.profileId}" data-person-name="${escapeHtml(card.name)}" aria-label="Delete ${escapeHtml(card.name)}" title="Deletes the login only. The League Master record stays."`)
                 : '—';
-            return `<tr${selected} data-member-key="${escapeHtml(card.key)}"><td>${escapeHtml(card.label)}</td><td>${escapeHtml(card.teams || '—')}</td><td>${email}</td><td>${es}</td><td>${mobile}</td><td class="row-action">${roles}</td><td class="row-action">${active}</td><td class="row-action">${password}</td><td class="row-action">${remove}</td><td>${escapeHtml(card.statusHtml)}</td><td>${escapeHtml(card.lastLogin)}</td></tr>`;
+            const expanded = openMore.has(card.key);
+            const more = `<button type="button" class="row-more" data-toggle-more="${escapeHtml(card.key)}" aria-expanded="${expanded ? 'true' : 'false'}" aria-label="More for ${escapeHtml(card.name)}">${expanded ? '−' : '+'}</button>`;
+            const detail = `<tr class="member-more" data-member-detail="${escapeHtml(card.key)}" ${expanded ? '' : 'hidden'}><td colspan="8"><div class="more-grid"><label>ES number ${es}</label><label>Mobile ${mobile}</label><p><span>Status</span> ${escapeHtml(card.statusHtml)}</p><p><span>Last active</span> ${escapeHtml(card.lastLogin)}</p></div></td></tr>`;
+            return `<tr${selected} data-member-key="${escapeHtml(card.key)}"><td>${escapeHtml(card.label)}</td><td>${escapeHtml(card.teams || '—')}</td><td>${email}</td><td class="row-action">${roles}</td><td class="row-action">${active}</td><td class="row-action">${password}</td><td class="row-action">${remove}</td><td class="row-action">${more}</td></tr>${detail}`;
           })
           .join('')
-      : `<tr><td colspan="11">${players.length ? 'No players match that search.' : 'No players yet.'}</td></tr>`;
+      : `<tr><td colspan="8">${players.length ? 'No players match that search.' : 'No players yet.'}</td></tr>`;
     createAccountForm.hidden = true;
   }
   function websiteRoleChoices() {
@@ -2832,11 +2849,29 @@ const scoresHref = url('/captains/admin/minigame/');
   }
 
   #setup-app .member-tools {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: minmax(12rem, 1.6fr) minmax(10rem, 1fr) minmax(10rem, 1fr);
     gap: 0.75rem 1rem;
     align-items: end;
-    margin: 0.5rem 0;
+    margin: 0.5rem 0 0.75rem;
+  }
+  #setup-app .member-tools label {
+    display: grid;
+    gap: 0.3rem;
+    margin: 0;
+    min-width: 0;
+    font-weight: 600;
+  }
+  #setup-app .member-tools .directory-search {
+    max-width: none;
+    margin: 0;
+  }
+  #setup-app .member-tools input,
+  #setup-app .member-tools select {
+    width: 100%;
+    min-height: 2.4rem;
+    margin: 0;
+    box-sizing: border-box;
   }
   #setup-app .member-tools select,
   #setup-app [data-form='member'] input,
@@ -3055,17 +3090,62 @@ const scoresHref = url('/captains/admin/minigame/');
     table-layout: fixed;
     font-size: 0.72rem;
   }
-  #setup-app .users-box .col-name { width: 12%; }
-  #setup-app .users-box .col-place { width: 11%; }
-  #setup-app .users-box .col-email { width: 16%; }
-  #setup-app .users-box .col-es { width: 8%; }
-  #setup-app .users-box .col-mobile { width: 9%; }
-  #setup-app .users-box .col-roles { width: 8%; }
-  #setup-app .users-box .col-active { width: 7%; }
-  #setup-app .users-box .col-password { width: 7%; }
+  #setup-app .users-box .col-name { width: 16%; }
+  #setup-app .users-box .col-place { width: 16%; }
+  #setup-app .users-box .col-email { width: 22%; }
+  #setup-app .users-box .col-roles { width: 20%; }
+  #setup-app .users-box .col-active { width: 8%; }
+  #setup-app .users-box .col-password { width: 8%; }
   #setup-app .users-box .col-delete { width: 6%; }
-  #setup-app .users-box .col-status { width: 7%; }
-  #setup-app .users-box .col-login { width: 9%; }
+  #setup-app .users-box .col-more { width: 4%; }
+  #setup-app .users-box .role-label {
+    font-size: 0.62rem;
+    line-height: 1.15;
+    white-space: normal;
+    color: #e7eef6;
+    text-underline-offset: 0.12em;
+  }
+  #setup-app .users-box .row-more {
+    width: 1.6rem;
+    height: 1.6rem;
+    padding: 0;
+    border: 1px solid var(--gold-500);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: #fff;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  #setup-app .users-box tr[hidden] {
+    display: none;
+  }
+  #setup-app .users-box .member-more td {
+    background: rgba(255, 255, 255, 0.04);
+  }
+  #setup-app .users-box .more-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.45rem 0.75rem;
+    padding: 0.35rem 0.15rem;
+  }
+  #setup-app .users-box .more-grid label,
+  #setup-app .users-box .more-grid p {
+    display: grid;
+    gap: 0.2rem;
+    margin: 0;
+    font-size: 0.68rem;
+    font-weight: 700;
+  }
+  #setup-app .users-box .more-grid p span {
+    color: var(--gold-400);
+  }
+  @media (max-width: 800px) {
+    #setup-app .member-tools,
+    #setup-app .users-box .more-grid {
+      grid-template-columns: 1fr;
+    }
+  }
   #setup-app .users-box .overview th,
   #setup-app .users-box .overview td {
     white-space: normal;
