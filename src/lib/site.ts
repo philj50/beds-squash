@@ -14,8 +14,11 @@ export const SITE = {
   englandSquashEvents: 'https://www.englandsquash.com/competitions/calendar',
 };
 
-export const NAV = [
+type NavItem = { label: string; href: string; signedIn?: boolean };
+
+export const NAV: NavItem[] = [
   { label: 'News', href: '/news/' },
+  { label: 'Your Squash', href: '/captains/you/', signedIn: true },
   { label: 'Events', href: '/events/' },
   { label: 'Clubs', href: '/clubs/' },
   { label: 'Leagues', href: '/leagues/' },

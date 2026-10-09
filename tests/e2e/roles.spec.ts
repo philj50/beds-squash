@@ -742,16 +742,47 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.getByText('No scores on the board.')).toBeVisible();
   });
 
-  test('a player sees their next match, last result, level and uploads', async ({ page }) => {
+  test('a player sees their next match, last result, level and uploads on Your Squash', async ({ page }) => {
     await signIn(page, 'team_player');
     await page.goto('captains/you/', { waitUntil: 'domcontentloaded' });
+    const nav = page.getByRole('navigation', { name: 'Primary' });
+    await expect(nav.getByRole('link', { name: 'Your Squash', exact: true })).toBeVisible();
+    const labels = (await nav.getByRole('link').allTextContents()).map((label) => label.trim());
+    expect(labels[labels.indexOf('News') + 1]).toBe('Your Squash');
+    expect(labels[labels.indexOf('Your Squash') + 1]).toBe('Events');
+    await expect(nav.getByRole('link', { name: 'Your Squash', exact: true })).toHaveAttribute('href', /\/captains\/you\/$/);
     await expect(page.getByRole('heading', { level: 1, name: 'Your squash' })).toBeVisible();
-    await expect(page.getByText('Signed in as Pat Player')).toBeVisible();
+    await expect(page.locator('[data-who]')).toHaveText('Signed in as Pat Player');
+    const summary = page.locator('[data-account-summary]');
+    await expect(summary).toContainText(`Signed in as ${PEOPLE.team_player.name}`);
+    await expect(summary).toContainText(PEOPLE.team_player.email);
+    await expect(summary).toContainText('Name and password are changed on your profile.');
+    await expect(summary.getByRole('link', { name: 'your profile' })).toHaveAttribute('href', /\/captains\/profile\/$/);
+    await expect(summary).toContainText('League Master — Test Club · Test Team 1 · Pat Player');
+    await expect(summary).toContainText('Team — Every team is on the Team tab.');
+    await expect(summary).toContainText('Club — Every club is on the Club tab.');
+    await expect(summary.getByRole('link', { name: 'Team tab' })).toHaveCount(0);
+    await expect(summary.getByRole('link', { name: 'Club tab' })).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Test Team 1 v Visitors' })).toBeVisible();
     await expect(page.getByText('Visitors 4–1 Test Team 1')).toBeVisible();
     await expect(page.getByText('4,321')).toBeVisible();
     await expect(page.getByText('Club night')).toBeVisible();
     await expect(page.getByText('Pending')).toBeVisible();
+  });
+
+  test('Your Squash links the Team and Club notes for a captain', async ({ page }) => {
+    await signIn(page, 'club_captain');
+    await page.goto('captains/you/', { waitUntil: 'domcontentloaded' });
+    const nav = page.getByRole('navigation', { name: 'Primary' });
+    await expect(nav.getByRole('link', { name: 'Your Squash', exact: true })).toBeVisible();
+    const summary = page.locator('[data-account-summary]');
+    await expect(summary).toContainText('Signed in as Chris Club');
+    await expect(summary).toContainText(PEOPLE.club_captain.email);
+    await expect(summary).toContainText('League Master — Test Club · Chris Club');
+    await expect(summary.getByRole('link', { name: 'Team tab' })).toHaveAttribute('href', /\/captains\/admin\/#site-team$/);
+    await expect(summary.getByRole('link', { name: 'Club tab' })).toHaveAttribute('href', /\/captains\/admin\/#site-club$/);
+    await expect(summary).toContainText('Team — Every team is on the Team tab.');
+    await expect(summary).toContainText('Club — Every club is on the Club tab.');
   });
 
   test('a login whose name differs from League Master still sees that team and level', async ({ page }) => {
@@ -842,7 +873,14 @@ test.describe('Club captain, team captain, and player', () => {
       return send([]);
     });
     await page.goto('captains/you/', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByText('Signed in as philip jenkins')).toBeVisible();
+    await expect(page.locator('[data-who]')).toHaveText('Signed in as philip jenkins');
+    const summary = page.locator('[data-account-summary]');
+    await expect(summary).toContainText('Signed in as philip jenkins');
+    await expect(summary).toContainText('philip@example.test');
+    await expect(summary).toContainText('League Master — Club Towers · Club Towers 1 · Phil Jenkins');
+    await expect(summary).toContainText('Team — Every team is on the Team tab.');
+    await expect(summary).toContainText('Club — Every club is on the Club tab.');
+    await expect(summary.getByRole('link', { name: 'Team tab' })).toHaveCount(0);
     await expect(page.locator('[data-places]')).toContainText('Club Towers · Club Towers 1');
     await expect(page.locator('[data-groups]')).toContainText('LM Players');
     await expect(page.getByRole('heading', { name: 'Club Towers 1 v Flitwick 1' })).toBeVisible();
