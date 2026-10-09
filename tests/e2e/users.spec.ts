@@ -200,6 +200,21 @@ test.describe('Users', () => {
     await expect(page.getByText('No players match that search.')).toBeVisible();
   });
 
+  test('a junior entry is listed as a JC Player', async ({ page }) => {
+    await openUsers(page);
+    await page.getByLabel('Group').selectOption({ label: 'JC Player' });
+    const jamie = page.locator('[data-users] tr', { hasText: 'Jamie Junior' });
+    await expect(jamie).toBeVisible();
+    await expect(jamie.locator('td').nth(1)).toHaveText('Test Club');
+    await expect(jamie.getByRole('textbox', { name: 'Email for Jamie Junior' })).toHaveValue('guardian@example.test');
+    await expect(jamie.getByRole('textbox', { name: 'Mobile for Jamie Junior' })).toHaveValue('07000999999');
+    await expect(page.locator('[data-users] tr', { hasText: 'Pat Player' })).toHaveCount(0);
+    await jamie.getByRole('button', { name: 'Roles for Jamie Junior' }).click();
+    await expect(page.getByRole('checkbox', { name: 'JC Player' })).toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'JC Player' })).toBeDisabled();
+    await expect(page.getByRole('checkbox', { name: 'LM Player' })).not.toBeChecked();
+  });
+
   test('the county row stays locked', async ({ page }) => {
     await openUsers(page);
     const county = page.locator('[data-users] tr', { hasText: 'County Keeper' });
@@ -433,6 +448,29 @@ async function installAdmin(page: Page) {
         { slug: 'junior_organisers', name: 'Junior Organisers', role_slug: 'junior_organiser', source: 'website', managed: false, position: 7 },
         { slug: 'bc_players', name: 'BC Players', role_slug: 'bc_player', source: 'website', managed: false, position: 8 },
         { slug: 'rb_players', name: 'RB Players', role_slug: 'rb_player', source: 'website', managed: false, position: 9 },
+      ]);
+      return;
+    }
+    if (path.endsWith('/rb_players')) {
+      await respond([]);
+      return;
+    }
+    if (path.endsWith('/junior_entries')) {
+      await respond([
+        {
+          player_first_name: 'Jamie',
+          player_last_name: 'Junior',
+          date_of_birth: '2015-04-02',
+          age_category: 'Under 11',
+          draw: 'Girls',
+          club: 'Test Club',
+          guardian_name: 'Pat Guardian',
+          guardian_email: 'guardian@example.test',
+          guardian_phone: '07000999999',
+          emergency_name: 'Sam Emergency',
+          emergency_phone: '07000000001',
+          notes: null,
+        },
       ]);
       return;
     }

@@ -573,10 +573,17 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.locator('[data-junior-link]')).toBeVisible();
     await expect(page.locator('[data-share-link]')).toBeVisible();
     await expect(page.locator('[data-scores-link]')).toBeVisible();
-    await expect(page.locator('[data-member-count]')).toContainText('7 players');
+    await expect(page.locator('[data-member-count]')).toContainText('8 players');
     await expect(page.locator('[data-users]')).toContainText('Pat Player');
+    await expect(page.locator('[data-users]')).toContainText('Jamie Junior');
     await expect(page.locator('[data-users]')).toContainText('County Admin');
     await expect(page.locator('[data-users] tr', { hasText: 'County Admin' })).toContainText(/4 Oct 2026/);
+    const jamie = page.locator('[data-users] tr', { hasText: 'Jamie Junior' });
+    await expect(jamie.locator('td').nth(1)).toHaveText('Test Club');
+    await jamie.getByRole('button', { name: 'Roles for Jamie Junior' }).click();
+    await expect(page.getByRole('checkbox', { name: 'JC Player' })).toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'JC Player' })).toBeDisabled();
+    await page.getByRole('heading', { name: 'Users', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Create login' })).toHaveCount(0);
 
     await page.getByRole('searchbox', { name: 'Search' }).fill('no-such-player');

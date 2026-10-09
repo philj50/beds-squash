@@ -145,9 +145,9 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="members" data-lm-only hidden>
             <h2>Users</h2>
             <p class="muted small">
-              League Master players are listed, and so is anyone with an admin or organiser login. Filter by group or place. LM Club Captain, LM Team Captain, LM Player and JC Player are ticked in Roles and stay as they are. Password opens the player’s login details so you can copy them. Nothing is emailed.
+              League Master players are listed, and so is anyone with an admin or organiser login. Junior County Closed entries are listed as JC Players. Filter by group or place. LM Club Captain, LM Team Captain, LM Player and JC Player are ticked in Roles and stay as they are. Password opens the player’s login details so you can copy them. Nothing is emailed.
             </p>
-            <p class="muted small" data-group-note>Filled from League Master. Each person has the LM Player role.</p>
+            <p class="muted small" data-group-note>Filled from League Master. Each LM Player is listed, and junior entries are listed as JC Players.</p>
             <div class="member-tools">
               <label class="directory-search">
                 Search
@@ -1215,10 +1215,11 @@ const scoresHref = url('/captains/admin/minigame/');
   }
   function paintMembers() {
     const query = memberSearch.value.trim().toLowerCase();
-    groupNote.textContent = 'Filled from League Master. Each LM Player is listed, and so is a sign-in for an admin or organiser.';
+    groupNote.textContent = 'Filled from League Master. Each LM Player is listed, and so is a sign-in for an admin or organiser. Junior entries are listed as JC Players.';
     const players = memberCards.filter(
       (card) =>
         card.groupSlugs.includes('lm_players') ||
+        card.groupSlugs.includes('jc_players') ||
         card.groupSlugs.includes('admins') ||
         card.groupSlugs.includes('junior_organisers') ||
         card.isAdmin ||
@@ -1302,7 +1303,7 @@ const scoresHref = url('/captains/admin/minigame/');
             return `<tr${selected} data-member-key="${escapeHtml(card.key)}"><td>${escapeHtml(card.label)}</td><td>${escapeHtml(card.teams || '—')}</td><td>${email}</td><td>${es}</td><td>${mobile}</td><td class="row-action">${roles}</td><td class="row-action">${active}</td><td class="row-action">${password}</td><td class="row-action">${remove}</td><td>${escapeHtml(card.statusHtml)}</td><td>${escapeHtml(card.lastLogin)}</td></tr>`;
           })
           .join('')
-      : `<tr><td colspan="11">${players.length ? 'No players match that search.' : 'No League Master players yet.'}</td></tr>`;
+      : `<tr><td colspan="11">${players.length ? 'No players match that search.' : 'No players yet.'}</td></tr>`;
     createAccountForm.hidden = true;
   }
   function websiteRoleChoices() {
@@ -1330,11 +1331,21 @@ const scoresHref = url('/captains/admin/minigame/');
   }
   function placeRolePop(anchor: HTMLElement) {
     rolePop.hidden = false;
+    rolePop.style.maxHeight = '';
+    rolePop.style.overflow = '';
     const rect = anchor.getBoundingClientRect();
     const width = rolePop.offsetWidth || 220;
+    const height = rolePop.offsetHeight;
     const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
-    rolePop.style.top = `${rect.bottom + 6}px`;
+    const fitsBelow = rect.bottom + 6 + height <= window.innerHeight - 8;
     rolePop.style.left = `${left}px`;
+    rolePop.style.top = fitsBelow ? `${rect.bottom + 6}px` : `${Math.max(8, rect.top - 6 - height)}px`;
+    const box = rolePop.getBoundingClientRect();
+    if (box.bottom > window.innerHeight - 8 || box.top < 8) {
+      rolePop.style.top = '8px';
+      rolePop.style.maxHeight = `${window.innerHeight - 16}px`;
+      rolePop.style.overflow = 'auto';
+    }
   }
   async function closeRolePop() {
     if (rolePop.hidden) return;
@@ -2068,7 +2079,8 @@ const scoresHref = url('/captains/admin/minigame/');
     groupCatalogLive = groupCatalog;
     roleCatalogLive = roleCatalog;
     paintPermissionCatalog(groupCatalog, roleCatalog, groupMembers);
-    paintJuniorEntries((juniorError ? [] : (juniorRows ?? [])) as JuniorEntry[], juniorError?.message ?? '');
+    const juniorEntries = (juniorError ? [] : (juniorRows ?? [])) as JuniorEntry[];
+    paintJuniorEntries(juniorEntries, juniorError?.message ?? '');
     if (groupError || groupCatalogError || permissionError) groupNote.textContent = 'Groups are not on the database yet. Apply the groups migration, then reload.';
     const clubNames = new Map(clubs.map((club) => [club.slug, club.name]));
     const dash = '—';
@@ -2130,6 +2142,22 @@ const scoresHref = url('/captains/admin/minigame/');
         .sort((a, b) => rankFor(a.role) - rankFor(b.role) || whereFor(a).localeCompare(whereFor(b), 'en'));
     const positionOf = (slug: string) => groupCatalog.find((group) => group.slug === slug)?.position ?? 99;
     const nameKey = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
+    const seenJuniors = new Set<string>();
+    for (const entry of juniorEntries) {
+      const personName = `${entry.player_first_name ?? ''} ${entry.player_last_name ?? ''}`.replace(/\s+/g, ' ').trim();
+      const key = nameKey(personName);
+      if (!key || seenJuniors.has(key)) continue;
+      seenJuniors.add(key);
+      if (groupMembers.some((member) => member.group_slug === 'jc_players' && nameKey(member.person_name) === key)) continue;
+      const profile = accounts.find((person) => nameKey(person.display_name || '') === key);
+      groupMembers.push({
+        profile_id: profile?.id ?? null,
+        person_name: profile?.display_name || personName,
+        place: (entry.club ?? '').trim() || null,
+        group_slug: 'jc_players',
+      });
+    }
+    paintPermissionCatalog(groupCatalog, roleCatalog, groupMembers);
     const groupsFor = (person: Person) => {
       const key = nameKey(person.display_name || '');
       const seen = new Set<string>();
@@ -2222,7 +2250,7 @@ const scoresHref = url('/captains/admin/minigame/');
               .split('/')
               .map((bit) => bit.trim())
               .filter(Boolean);
-            return bits.length > 1 ? bits.slice(1).join(' / ') : '';
+            return bits.length > 1 ? bits.slice(1).join(' / ') : bits[0] ?? '';
           })
           .filter(Boolean),
       );
@@ -2265,6 +2293,13 @@ const scoresHref = url('/captains/admin/minigame/');
     for (const person of sortedAccounts) {
       if (cards.has(`id:${person.id}`)) continue;
       addCard(person.display_name || 'Unnamed', person, groupsFor(person));
+    }
+    for (const entry of juniorEntries) {
+      const personName = `${entry.player_first_name ?? ''} ${entry.player_last_name ?? ''}`.replace(/\s+/g, ' ').trim();
+      const card = [...cards.values()].find((item) => nameKey(item.name) === nameKey(personName) || nameKey(item.profileName) === nameKey(personName));
+      if (!card) continue;
+      if (!card.email.trim() && (entry.guardian_email ?? '').trim()) card.email = entry.guardian_email.trim();
+      if (!card.phone.trim() && (entry.guardian_phone ?? '').trim()) card.phone = entry.guardian_phone.trim();
     }
     memberCards = [...cards.values()].sort((a, b) => a.label.localeCompare(b.label, 'en'));
     openingGroup = '';
