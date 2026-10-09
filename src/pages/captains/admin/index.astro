@@ -1170,7 +1170,7 @@ const scoresHref = url('/captains/admin/minigame/');
             nameKey(item.profileName) === nameKey(member.person_name),
         );
         const key = card?.key ?? '';
-        return `<tr><td><button type="button" class="count-button" data-open-person="${escapeHtml(key)}">${escapeHtml(member.person_name)}</button></td><td>${escapeHtml(member.place || '—')}</td></tr>`;
+        return `<tr><td><button type="button" class="count-button" data-open-person="${escapeHtml(key)}">${escapeHtml(member.person_name)}</button></td><td>${escapeHtml(groupPeoplePlace(member, card))}</td></tr>`;
       })
       .join('');
   }
@@ -1204,6 +1204,51 @@ const scoresHref = url('/captains/admin/minigame/');
     emergency_phone: string;
     notes: string | null;
   };
+  let juniorEntriesLive: JuniorEntry[] = [];
+  const placeParts = (value: string | null | undefined) =>
+    (value ?? '')
+      .split(';')
+      .map((part) => part.trim())
+      .filter(Boolean);
+  function groupPeoplePlace(member: GroupMember, card: MemberCard | undefined) {
+    if (member.group_slug !== 'jc_players' && member.group_slug !== 'jc_parents') return member.place || '—';
+    const names = new Set<string>();
+    const addName = (value: string | null | undefined) => {
+      const key = nameKey(value ?? '');
+      if (key) names.add(key);
+    };
+    addName(member.person_name);
+    addName(card?.name);
+    addName(card?.profileName);
+    for (const other of listedGroups) {
+      const otherKey = nameKey(other.person_name);
+      if (!otherKey) continue;
+      const sameProfile = Boolean(member.profile_id) && other.profile_id === member.profile_id;
+      if (sameProfile || names.has(otherKey)) addName(other.person_name);
+    }
+    const samePerson = (other: GroupMember) => {
+      const otherKey = nameKey(other.person_name);
+      return (Boolean(member.profile_id) && other.profile_id === member.profile_id) || (otherKey !== '' && names.has(otherKey));
+    };
+    const isLm = (slug: string) => slug.startsWith('lm_') || groupCatalogLive.some((item) => item.slug === slug && item.source === 'leaguemaster');
+    const lmParts = listedGroups.filter((other) => isLm(other.group_slug) && samePerson(other)).flatMap((other) => placeParts(other.place));
+    const clubs =
+      member.group_slug === 'jc_players'
+        ? juniorEntriesLive
+            .filter((entry) => names.has(nameKey(`${entry.player_first_name ?? ''} ${entry.player_last_name ?? ''}`)))
+            .map((entry) => (entry.club ?? '').trim())
+        : juniorEntriesLive.filter((entry) => names.has(nameKey(entry.guardian_name ?? ''))).map((entry) => (entry.club ?? '').trim());
+    const juniorParts = clubs.some(Boolean) ? clubs.filter(Boolean) : placeParts(member.place);
+    const seen = new Set<string>();
+    const combined: string[] = [];
+    for (const part of [...lmParts, ...juniorParts]) {
+      const token = part.toLowerCase();
+      if (seen.has(token)) continue;
+      seen.add(token);
+      combined.push(part);
+    }
+    return combined.join('; ') || '—';
+  }
   function paintJuniorEntries(entries: JuniorEntry[], problem = '') {
     if (problem) {
       juniorsHost.innerHTML = `<tr><td colspan="11">${escapeHtml(problem)}</td></tr>`;
@@ -2095,6 +2140,7 @@ const scoresHref = url('/captains/admin/minigame/');
     roleCatalogLive = roleCatalog;
     paintPermissionCatalog(groupCatalog, roleCatalog, groupMembers);
     const juniorEntries = (juniorError ? [] : (juniorRows ?? [])) as JuniorEntry[];
+    juniorEntriesLive = juniorEntries;
     paintJuniorEntries(juniorEntries, juniorError?.message ?? '');
     if (groupError || groupCatalogError || permissionError) groupNote.textContent = 'Groups are not on the database yet. Apply the groups migration, then reload.';
     const clubNames = new Map(clubs.map((club) => [club.slug, club.name]));

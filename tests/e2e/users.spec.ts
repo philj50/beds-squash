@@ -304,6 +304,19 @@ test.describe('Users', () => {
     await expect(page.getByRole('checkbox', { name: 'JC Parent' })).toBeChecked();
     await expect(page.getByRole('checkbox', { name: 'JC Parent' })).toBeDisabled();
     await expect(page.getByRole('checkbox', { name: 'JC Player' })).not.toBeChecked();
+    await page.getByRole('heading', { name: 'Users', exact: true }).click();
+
+    await page.getByRole('button', { name: 'Groups' }).click();
+    await page.locator('[data-permission-groups] tr', { hasText: 'JC Players' }).getByRole('button').click();
+    const jcPeople = page.locator('[data-group-people]');
+    await expect(jcPeople.locator('tr', { hasText: 'Pat Player' }).locator('td').nth(1)).toHaveText('Test Club / Test Team 1; Test Club');
+    await expect(jcPeople.locator('tr', { hasText: 'Jamie Junior' }).locator('td').nth(1)).toHaveText('Test Club');
+    await expect(jcPeople.locator('tr', { hasText: 'Robin Junior' }).locator('td').nth(1)).toHaveText('Other Club');
+    await page.locator('[data-permission-groups] tr', { hasText: 'LM Players' }).getByRole('button').click();
+    await expect(page.locator('[data-group-people] tr', { hasText: 'Pat Player' }).locator('td').nth(1)).toHaveText('Test Club / Test Team 1');
+    await expect(page.locator('[data-group-people] tr', { hasText: 'Zoe Player' }).locator('td').nth(1)).toHaveText('Test Club / Test Team 1');
+    await page.locator('[data-permission-groups] tr', { hasText: 'JC Parents' }).getByRole('button').click();
+    await expect(page.locator('[data-group-people] tr', { hasText: 'Pat Guardian' }).locator('td').nth(1)).toHaveText('Test Club; Other Club');
   });
 
   test('the county row stays locked', async ({ page }) => {
