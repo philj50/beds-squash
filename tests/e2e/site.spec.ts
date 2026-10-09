@@ -31,6 +31,9 @@ test.describe('Public site', () => {
     await expect(nav.getByRole('link', { name: 'Juniors', exact: true })).toBeVisible();
     const labels = (await nav.getByRole('link').allTextContents()).map((label) => label.trim());
     expect(labels.indexOf('Minigame mk2')).toBe(labels.indexOf('Contact') + 1);
+    expect(labels[labels.indexOf('News') + 1]).toBe('Events');
+    await expect(nav.locator('[data-your-squash]')).toBeHidden();
+    await expect(nav.getByRole('link', { name: 'Your Squash', exact: true })).toHaveCount(0);
   });
 
   test('news index and a league match article', async ({ page }) => {

@@ -14,14 +14,14 @@ import { url } from '@/lib/site';
       <p class="status" data-status role="status"></p>
       <div data-panel="signed-in" hidden>
         <p class="who" data-who></p>
-        <p class="places" data-places></p>
-        <p class="places" data-groups></p>
         <p class="actions">
           <a class="btn btn--ghost btn--sm" href={url('/captains/matches/')}>Matches</a>
           <a class="btn btn--ghost btn--sm" href={url('/share/')}>Send something in</a>
           <a class="btn btn--ghost btn--sm" href={url('/captains/profile/')}>Profile</a>
           <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
         </p>
+        <p class="places" data-places></p>
+        <p class="places" data-groups></p>
 
         <h2>Next matches</h2>
         <div data-matches></div>
@@ -31,6 +31,19 @@ import { url } from '@/lib/site';
 
         <h2>Sent to the site</h2>
         <div data-uploads></div>
+
+        <div
+          class="account-summary"
+          data-account-summary
+          data-team-tab={url('/captains/admin/#site-team')}
+          data-club-tab={url('/captains/admin/#site-club')}
+        >
+          <p class="muted">
+            Signed in as <strong data-summary-name></strong>. Email <strong data-summary-email></strong>. Name and password are changed on <a href={url('/captains/profile/')}>your profile</a>.
+          </p>
+          <div data-summary-league></div>
+          <div data-summary-tabs></div>
+        </div>
       </div>
     </div>
   </section>
@@ -75,6 +88,11 @@ import { url } from '@/lib/site';
   const matchesEl = root.querySelector<HTMLElement>('[data-matches]')!;
   const levelEl = root.querySelector<HTMLElement>('[data-level]')!;
   const uploadsEl = root.querySelector<HTMLElement>('[data-uploads]')!;
+  const summaryName = root.querySelector<HTMLElement>('[data-summary-name]')!;
+  const summaryEmail = root.querySelector<HTMLElement>('[data-summary-email]')!;
+  const summaryLeague = root.querySelector<HTMLElement>('[data-summary-league]')!;
+  const summaryTabs = root.querySelector<HTMLElement>('[data-summary-tabs]')!;
+  const summaryRoot = root.querySelector<HTMLElement>('[data-account-summary]')!;
 
   const esc = (value: string | null | undefined) =>
     String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
@@ -121,6 +139,79 @@ import { url } from '@/lib/site';
     return { club: parts[0], team: parts[parts.length - 1] };
   }
 
+  const LM_PLACE_GROUPS = new Set(['lm_club_captains', 'lm_team_captains', 'lm_players']);
+
+  function leagueLines(
+    account: Account,
+    seats: Seat[],
+    memberships: Membership[],
+    teams: { id: number; name: string; club_slug: string }[],
+    clubNames: Map<string, string>,
+  ) {
+    const lines: string[] = [];
+    const seen = new Set<string>();
+    const add = (club: string, team: string, person: string) => {
+      const where = club.trim();
+      const side = team.trim();
+      const who = person.trim();
+      if (!who || (!where && !side)) return;
+      const key = nameKey(side ? `${where}|${side}` : `club|${where}`);
+      if (seen.has(key)) return;
+      seen.add(key);
+      lines.push(side && where ? `${where} · ${side} · ${who}` : `${where || side} · ${who}`);
+    };
+    for (const seat of seats) {
+      if (!LM_PLACE_GROUPS.has(seat.group_slug)) continue;
+      const person = seat.person_name.trim() || account.displayName;
+      for (const part of (seat.place ?? '').split(';')) {
+        const trimmed = part.trim();
+        if (!trimmed) continue;
+        const parsed = teamFromPlace(trimmed);
+        if (parsed) add(parsed.club, parsed.team, person);
+        else add(trimmed, '', person);
+      }
+    }
+    const teamById = new Map(teams.map((team) => [team.id, team]));
+    for (const row of memberships) {
+      if (row.role === 'admin') continue;
+      const team = row.team_id != null ? teamById.get(row.team_id) : undefined;
+      const clubSlug = row.club_slug || team?.club_slug || '';
+      const club = clubSlug ? (clubNames.get(clubSlug) ?? '') : '';
+      const person = account.displayName || account.email;
+      if (team) add(club, team.name, person);
+      else if (club) add(club, '', person);
+      else {
+        const label = account.places.find((place) => place.role === row.role)?.label ?? '';
+        if (label) add(label, '', person);
+      }
+    }
+    return lines;
+  }
+
+  function opensAdminTabs(account: Account) {
+    if (account.isAdmin) return true;
+    if (account.places.some((place) => place.role === 'club_captain' || place.role === 'team_captain')) return true;
+    return account.groups.some((group) => group.slug === 'admins' || group.slug === 'lm_club_captains' || group.slug === 'lm_team_captains');
+  }
+
+  function linkedTab(sentence: string, tab: string, href: string) {
+    const at = sentence.indexOf(tab);
+    if (at < 0) return esc(sentence);
+    return `${esc(sentence.slice(0, at))}<a href="${esc(href)}">${esc(tab)}</a>${esc(sentence.slice(at + tab.length))}`;
+  }
+
+  function paintSummary(account: Account, league: string[]) {
+    summaryName.textContent = account.displayName || account.email;
+    summaryEmail.textContent = account.email;
+    summaryLeague.innerHTML = league.map((line) => `<p>League Master — ${esc(line)}</p>`).join('');
+    const linkTabs = opensAdminTabs(account);
+    const teamSentence = 'Every team is on the Team tab.';
+    const clubSentence = 'Every club is on the Club tab.';
+    const teamBody = linkTabs && summaryRoot.dataset.teamTab ? linkedTab(teamSentence, 'Team tab', summaryRoot.dataset.teamTab) : esc(teamSentence);
+    const clubBody = linkTabs && summaryRoot.dataset.clubTab ? linkedTab(clubSentence, 'Club tab', summaryRoot.dataset.clubTab) : esc(clubSentence);
+    summaryTabs.innerHTML = `<p>Team — ${teamBody}</p><p>Club — ${clubBody}</p>`;
+  }
+
   async function squadsFor(account: Account) {
     const [{ data: membershipRows }, squadResult, seatResult, teamResult, clubResult] = await Promise.all([
       supabase.from('memberships').select('role, club_slug, team_id').eq('profile_id', account.userId),
@@ -140,7 +231,8 @@ import { url } from '@/lib/site';
         .map((part) => teamFromPlace(part.trim()))
         .filter((part): part is { club: string; team: string } => part != null),
     );
-    for (const team of (teamResult.data ?? []) as { id: number; name: string; club_slug: string }[]) {
+    const teams = (teamResult.data ?? []) as { id: number; name: string; club_slug: string }[];
+    for (const team of teams) {
       const club = clubNames.get(team.club_slug) ?? '';
       if (clubSlugs.includes(team.club_slug) || wanted.some((place) => nameKey(place.team) === nameKey(team.name) && nameKey(place.club) === nameKey(club))) {
         teamIds.add(team.id);
@@ -164,7 +256,7 @@ import { url } from '@/lib/site';
         wanted.map((place) => `${place.club} · ${place.team}`),
       ),
     ];
-    return { squads: scoped, teamIds: [...teamIds], names, places };
+    return { squads: scoped, teamIds: [...teamIds], names, places, league: leagueLines(account, seats, memberships, teams, clubNames) };
   }
 
   function drawMatches(squads: Squad[], teamIds: number[], fixtures: Fixture[], account: Account) {
@@ -307,6 +399,7 @@ import { url } from '@/lib/site';
       return;
     }
     whoEl.textContent = `Signed in as ${account.displayName || account.email}`;
+    paintSummary(account, []);
     statusEl.textContent = '';
     const found = await squadsFor(account);
     const { squads, teamIds } = found;
@@ -337,6 +430,7 @@ import { url } from '@/lib/site';
     drawLevel(level);
     if (uploads.error) statusEl.textContent = uploads.error;
     drawUploads(uploads.rows);
+    paintSummary(account, found.league);
   }
 
   void showSession();
@@ -414,6 +508,15 @@ import { url } from '@/lib/site';
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
+  }
+  .account-summary {
+    margin-top: 2.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    color: var(--ink-200);
+  }
+  .account-summary p {
+    margin: 0.35rem 0;
   }
   @media (max-width: 640px) {
     .uploads li {

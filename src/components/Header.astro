@@ -20,13 +20,21 @@ const profileHref = url('/captains/profile/');
       <nav id="site-nav" class="nav" aria-label="Primary">
         <ul>
           {
-            NAV.map((item) => (
-              <li>
-                <a href={url(item.href)} aria-current={isActive(item.href) ? 'page' : undefined}>
-                  {item.label}
-                </a>
-              </li>
-            ))
+            NAV.map((item) =>
+              item.signedIn ? (
+                <li data-your-squash hidden>
+                  <a href={url(item.href)} aria-current={isActive(item.href) ? 'page' : undefined}>
+                    {item.label}
+                  </a>
+                </li>
+              ) : (
+                <li>
+                  <a href={url(item.href)} aria-current={isActive(item.href) ? 'page' : undefined}>
+                    {item.label}
+                  </a>
+                </li>
+              ),
+            )
           }
           <li class="account" data-account-item>
             <a data-account-login href={loginHref}>Log in</a>
@@ -71,6 +79,7 @@ const profileHref = url('/captains/profile/');
   const toggle = header?.querySelector<HTMLButtonElement>('[data-account-toggle]');
   const menu = header?.querySelector<HTMLElement>('[data-account-menu]');
   const logOut = header?.querySelector<HTMLButtonElement>('[data-log-out]');
+  const yourSquash = header?.querySelector<HTMLElement>('[data-your-squash]');
   if (header && accountItem && loginLink && signedIn && nameEl && toggle && menu && logOut && header.dataset.url && header.dataset.key) {
     const supabase = createClient(header.dataset.url, header.dataset.key);
 
@@ -106,10 +115,12 @@ const profileHref = url('/captains/profile/');
         setMenuOpen(false);
         loginLink!.hidden = false;
         signedIn!.hidden = true;
+        if (yourSquash) yourSquash.hidden = true;
         return;
       }
       loginLink!.hidden = true;
       signedIn!.hidden = false;
+      if (yourSquash) yourSquash.hidden = false;
       nameEl!.textContent = session.user.user_metadata?.display_name || session.user.email?.split('@')[0] || 'Profile';
       const { data: me } = await supabase.from('profiles').select('display_name').eq('id', session.user.id).maybeSingle();
       if (id !== paintId || !me?.display_name) return;
@@ -177,6 +188,7 @@ const profileHref = url('/captains/profile/');
     flex-wrap: nowrap;
     justify-content: flex-end;
   }
+  .nav > ul > li[hidden],
   .nav > ul > li > a[hidden] {
     display: none;
   }

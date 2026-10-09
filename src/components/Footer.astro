@@ -31,7 +31,11 @@ const year = new Date().getFullYear();
     <nav aria-label="Footer">
       <h4>Explore</h4>
       <ul>
-        {NAV.map((i) => <li><a href={url(i.href)}>{i.label}</a></li>)}
+        {NAV.filter((item) => !item.signedIn).map((item) => (
+          <li>
+            <a href={url(item.href)}>{item.label}</a>
+          </li>
+        ))}
       </ul>
     </nav>
 
