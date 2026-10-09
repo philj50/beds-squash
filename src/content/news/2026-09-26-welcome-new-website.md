@@ -6,7 +6,7 @@ category: county
 featured: true
 ---
 
-Welcome to the new home of squash and Squash 57 (racketball) in Bedfordshire.
+Welcome to the new home of squash and racketball in Bedfordshire.
 
 The site replaces the old Beds SRA website and brings everything together:
 

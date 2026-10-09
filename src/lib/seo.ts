@@ -19,7 +19,7 @@ export function organization(site: URL | undefined) {
     url: abs(site, '/'),
     logo: abs(site, '/brand/logo-512.png'),
     email: SITE.email,
-    sport: ['Squash', 'Squash 57'],
+    sport: ['Squash', 'Racketball'],
     areaServed: ['Bedfordshire', 'Luton', 'Milton Keynes'],
     sameAs: [SITE.facebook],
     memberOf: {

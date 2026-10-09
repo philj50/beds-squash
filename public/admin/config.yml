@@ -70,7 +70,7 @@ collections:
           - { label: Tournaments, value: tournaments }
           - { label: England Squash, value: england-squash }
           - { label: Clubs, value: clubs }
-          - { label: Squash 57 / Racketball, value: racketball }
+          - { label: Racketball, value: racketball }
       - { label: Image, name: image, widget: image, required: false, hint: 'Landscape photos work best (16:9). Keep under ~1MB.' }
       - { label: Image description, name: imageAlt, widget: string, required: false, hint: 'Describe the photo for screen readers.' }
       - { label: Featured on home page, name: featured, widget: boolean, default: false }
@@ -126,7 +126,7 @@ collections:
           - { label: Meeting / AGM, value: meeting }
           - { label: Coaching, value: coaching }
           - { label: Social, value: social }
-          - { label: Squash 57 / Racketball, value: racketball }
+          - { label: Racketball, value: racketball }
           - { label: Other, value: other }
       - { label: External link, name: link, widget: string, required: false, hint: 'e.g. the England Squash event page or club tournament page.' }
       - { label: Entry form (PDF), name: entryForm, widget: file, required: false, media_folder: /public/uploads/documents, public_folder: /uploads/documents }
@@ -169,7 +169,7 @@ collections:
         required: false
         options:
           - { label: Squash, value: squash }
-          - { label: Squash 57 / Racketball, value: racketball }
+          - { label: Racketball, value: racketball }
           - { label: Juniors, value: juniors }
           - { label: Coaching, value: coaching }
           - { label: Pay & play, value: pay-and-play }

@@ -1,6 +1,6 @@
 ---
 title: About Beds SRA
-intro: The Bedfordshire Squash & Racketball Association is the county body for squash and Squash 57 (racketball), working with clubs, coaches and England Squash to grow the game.
+intro: The Bedfordshire Squash & Racketball Association is the county body for squash and racketball, working with clubs, coaches and England Squash to grow the game.
 ---
 
 ## What we do

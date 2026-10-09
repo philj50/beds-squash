@@ -1,7 +1,7 @@
 {
   "name": "Bedfordshire Squash",
   "short_name": "Beds Squash",
-  "description": "Squash & Squash 57 in Bedfordshire — clubs, leagues, events and news.",
+  "description": "Squash & Racketball in Bedfordshire — clubs, leagues, events and news.",
   "icons": [
     { "src": "brand/logo-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "brand/logo-512.png", "sizes": "512x512", "type": "image/png" }

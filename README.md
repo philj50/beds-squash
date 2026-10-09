@@ -1,6 +1,6 @@
 # Bedfordshire Squash — county website
 
-The new home of squash and Squash 57 (racketball) in Bedfordshire, replacing the out-of-date
+The new home of squash and racketball in Bedfordshire, replacing the out-of-date
 [beds-sra.co.uk](http://www.beds-sra.co.uk/) Weebly site.
 
 **Live site:** https://philj50.github.io/beds-squash/ (until a custom domain is set up — see below)

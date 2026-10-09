@@ -21,7 +21,7 @@ const events = (await getUpcomingEvents()).filter((e) => e.data.club === club.id
 const directions = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${d.venue}, ${d.address}, ${d.postcode}`)}`;
 const TAG_LABEL: Record<string, string> = {
   squash: 'Squash',
-  racketball: 'Squash 57',
+  racketball: 'Racketball',
   juniors: 'Juniors',
   coaching: 'Coaching',
   'pay-and-play': 'Pay & play',
