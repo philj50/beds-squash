@@ -1,5 +1,35 @@
 import { test, expect } from '@playwright/test';
 
+const SUPABASE = 'https://klxyjmwiaivvqjbhxzak.supabase.co';
+
+function jwt(payload: Record<string, unknown>) {
+  const enc = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  return `${enc({ alg: 'HS256', typ: 'JWT' })}.${enc(payload)}.simulated`;
+}
+
+function sessionFor(id: string, email: string, name: string) {
+  const expiresAt = Math.floor(Date.now() / 1000) + 60 * 60;
+  return {
+    access_token: jwt({ sub: id, email, role: 'authenticated', exp: expiresAt }),
+    refresh_token: 'simulated-refresh',
+    token_type: 'bearer',
+    expires_in: 3600,
+    expires_at: expiresAt,
+    user: {
+      id,
+      aud: 'authenticated',
+      role: 'authenticated',
+      email,
+      app_metadata: { provider: 'email', providers: ['email'] },
+      user_metadata: { display_name: name },
+      identities: [],
+      created_at: '2026-10-02T00:00:00Z',
+      updated_at: '2026-10-02T00:00:00Z',
+    },
+  };
+}
+
+
 test.beforeEach(async ({ context, baseURL }) => {
   await context.addCookies([
     {
@@ -448,4 +478,62 @@ test.describe('Private areas', () => {
     await open(page, 'juniors/closed/entries/');
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/i);
   });
+});
+
+test('a public visit stays anonymous until that browser is signed in', async ({ page }) => {
+  const seen: { authorization: string; apikey: string; path: string }[] = [];
+  await page.route(`${SUPABASE}/**`, async (route) => {
+    const request = route.request();
+    if (request.url().includes('/rpc/record_site_page_view')) {
+      const body = request.postDataJSON() as { p_path?: string } | null;
+      seen.push({
+        authorization: request.headers()['authorization'] ?? '',
+        apikey: request.headers()['apikey'] ?? '',
+        path: body?.p_path ?? '',
+      });
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+  });
+  await page.goto('about/', { waitUntil: 'domcontentloaded' });
+  await expect.poll(() => seen.length).toBeGreaterThan(0);
+  expect(seen[0].authorization).toBe(`Bearer ${seen[0].apikey}`);
+
+  const session = sessionFor('33333333-3333-4333-8333-333333333333', 'pat.player@example.test', 'Pat Player');
+  await page.evaluate((stored) => {
+    localStorage.setItem('sb-klxyjmwiaivvqjbhxzak-auth-token', JSON.stringify(stored));
+  }, session);
+  await page.goto('clubs/', { waitUntil: 'domcontentloaded' });
+  await expect.poll(() => seen.some((row) => row.path.includes('/clubs'))).toBe(true);
+  const signed = seen.find((row) => row.path.includes('/clubs'));
+  expect(signed?.authorization).toBe(`Bearer ${session.access_token}`);
+  expect(signed?.authorization).not.toBe(`Bearer ${signed?.apikey}`);
+});
+
+test('a captain page is counted only when someone is signed in', async ({ page }) => {
+  let views = 0;
+  await page.route(`${SUPABASE}/**`, async (route) => {
+    const request = route.request();
+    if (request.url().includes('/rpc/record_site_page_view')) {
+      views += 1;
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+    if (request.url().includes('/auth/v1/')) {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+      return;
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+  });
+  await page.goto('captains/profile/', { waitUntil: 'domcontentloaded' });
+  await expect(page).toHaveURL(/\/login/);
+  expect(views).toBe(0);
+
+  const session = sessionFor('33333333-3333-4333-8333-333333333333', 'pat.player@example.test', 'Pat Player');
+  await page.evaluate((stored) => {
+    localStorage.setItem('sb-klxyjmwiaivvqjbhxzak-auth-token', JSON.stringify(stored));
+  }, session);
+  await page.goto('captains/you/', { waitUntil: 'domcontentloaded' });
+  await expect.poll(() => views).toBeGreaterThan(0);
 });

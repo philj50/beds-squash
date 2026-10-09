@@ -469,6 +469,9 @@ test.describe('Club captain, team captain, and player', () => {
           sign_ins_30d: 1,
           by_day: [],
           top_pages: [],
+          signed_in_views: [
+            { viewed_at: '2026-10-04T18:00:00.000Z', path: '/beds-squash/news/', display_name: 'Pat Player', email: 'pat.player@example.test' },
+          ],
           recent_sign_ins: [
             { signed_in_at: '2026-10-04T12:00:00.000Z', display_name: 'Pat Player', email: 'pat.player@example.test' },
           ],
@@ -711,9 +714,16 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.locator('[data-site-team]').getByRole('columnheader', { name: 'Role' })).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Traffic' }).click();
+    await expect(page.getByRole('heading', { name: 'Signed-in visits (30 days)' })).toBeVisible();
+    await expect(page.locator('[data-traffic-members]')).toContainText('Pat Player');
+    await expect(page.locator('[data-traffic-members]')).toContainText('/beds-squash/news/');
     await expect(page.getByRole('heading', { name: 'Sign-ins (30 days)' })).toBeVisible();
     await expect(page.locator('[data-traffic-sign-ins]')).toContainText('Pat Player');
     await expect(page.locator('[data-kpi="signins-7"]')).toHaveText('1');
+    await page.locator('[data-traffic-members]').getByRole('button', { name: 'Pat Player' }).click();
+    await expect(page.getByRole('searchbox', { name: 'Search' })).toHaveValue('Pat Player');
+    await expect(page.locator('[data-users]')).toContainText('Pat Player');
+    await expect(page.locator('[data-users]')).not.toContainText('Zoe Player');
 
     await page.goto('juniors/', { waitUntil: 'domcontentloaded' });
     const adminMenu = page.locator('[data-junior-admin]');

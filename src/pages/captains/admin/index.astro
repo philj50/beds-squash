@@ -379,7 +379,7 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="traffic" data-lm-only hidden>
             <h2>Site traffic</h2>
             <p class="muted small">
-              Page views are anonymous counts from public pages, including Minigame mk2. Sign-ins record who logged in, and when. Admin and captain tools, and switching these tabs, are not counted as page views.
+              Public page views stay anonymous unless that browser is signed in. A signed-in visit is stored against that person, including captain and admin pages. The name opens that person on Users.
             </p>
             <p class="muted small" data-traffic-status hidden role="status"></p>
             <div class="traffic-stats" data-traffic-stats hidden>
@@ -432,6 +432,20 @@ const scoresHref = url('/captains/admin/minigame/');
                     </tr>
                   </thead>
                   <tbody data-traffic-top></tbody>
+                </table>
+              </div>
+              <h3>Signed-in visits (30 days)</h3>
+              <div class="overview-box">
+                <table class="overview traffic-table">
+                  <thead>
+                    <tr>
+                      <th>When</th>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Path</th>
+                    </tr>
+                  </thead>
+                  <tbody data-traffic-members></tbody>
                 </table>
               </div>
               <h3>Sign-ins (30 days)</h3>
@@ -599,6 +613,17 @@ const scoresHref = url('/captains/admin/minigame/');
   const trafficTop = root.querySelector<HTMLElement>('[data-traffic-top]')!;
   const trafficSignIns = root.querySelector<HTMLElement>('[data-traffic-sign-ins]')!;
 
+  const trafficMembers = root.querySelector<HTMLElement>('[data-traffic-members]')!;
+  trafficMembers.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-open-traffic-user]');
+    const name = button?.dataset.openTrafficUser ?? '';
+    if (!name) return;
+    memberSearch.value = name;
+    memberPage = 0;
+    showTab('members');
+    paintMembers();
+  });
+
   const formatDay = (iso: string) => {
     const d = new Date(`${iso}T12:00:00`);
     return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -636,6 +661,7 @@ const scoresHref = url('/captains/admin/minigame/');
       sign_ins_30d?: number;
       by_day: { day: string; page_views: number; sessions: number }[];
       top_pages: { path: string; page_views: number }[];
+      signed_in_views?: { viewed_at: string; path: string; display_name: string; email: string }[];
       recent_sign_ins?: { signed_in_at: string; display_name: string; email: string }[];
     };
     root.querySelector('[data-kpi="views-7"]')!.textContent = String(stats.total_7d ?? 0);
@@ -661,10 +687,20 @@ const scoresHref = url('/captains/admin/minigame/');
         : top
             .map((row) => `<tr><td><code>${escapeHtml(row.path)}</code></td><td>${row.page_views}</td></tr>`)
             .join('');
+    const memberViews = stats.signed_in_views ?? [];
+    trafficMembers.innerHTML =
+      memberViews.length === 0
+        ? '<tr><td colspan="4">No signed-in visits yet. A row appears when someone who is logged in opens a page.</td></tr>'
+        : memberViews
+            .map(
+              (row) =>
+                `<tr><td>${escapeHtml(formatWhen(row.viewed_at))}</td><td><button type="button" class="count-button" data-open-traffic-user="${escapeHtml(row.display_name)}">${escapeHtml(row.display_name)}</button></td><td>${escapeHtml(row.email || '—')}</td><td><code>${escapeHtml(row.path)}</code></td></tr>`,
+            )
+            .join('');
     const signIns = stats.recent_sign_ins ?? [];
     trafficSignIns.innerHTML =
       signIns.length === 0
-        ? '<tr><td colspan="3">No sign-ins yet. A row appears when someone logs in.</td></tr>'
+        ? '<tr><td colspan="3">No activity yet. A row appears when someone uses a signed-in page.</td></tr>'
         : signIns
             .map(
               (row) =>
