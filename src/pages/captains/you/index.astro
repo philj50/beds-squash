@@ -14,14 +14,15 @@ import { url } from '@/lib/site';
       <p class="status" data-status role="status"></p>
       <div data-panel="signed-in" hidden>
         <p class="who" data-who></p>
-        <p class="places" data-places></p>
-        <p class="places" data-groups></p>
         <p class="actions">
           <a class="btn btn--ghost btn--sm" href={url('/captains/matches/')}>Matches</a>
           <a class="btn btn--ghost btn--sm" href={url('/share/')}>Send something in</a>
           <a class="btn btn--ghost btn--sm" href={url('/captains/profile/')}>Profile</a>
           <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
         </p>
+        <div data-private>
+        <p class="places" data-places></p>
+        <p class="places" data-groups></p>
 
         <h2>Next matches</h2>
         <div data-matches></div>
@@ -31,6 +32,7 @@ import { url } from '@/lib/site';
 
         <h2>Sent to the site</h2>
         <div data-uploads></div>
+        </div>
       </div>
     </div>
   </section>
@@ -38,7 +40,7 @@ import { url } from '@/lib/site';
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { loadAccount, sendToLogin, type Account } from '@/lib/account';
+  import { loadAccount, noteActivity, privateStop, sendToLogin, stopMessage, type Account } from '@/lib/account';
 
   type Membership = { role: string; club_slug: string | null; team_id: number | null };
   type Squad = { id: number; name: string; team_id: number };
@@ -307,6 +309,15 @@ import { url } from '@/lib/site';
       return;
     }
     whoEl.textContent = `Signed in as ${account.displayName || account.email}`;
+    const stop = await privateStop(supabase, account, { role: true });
+    const work = root.querySelector<HTMLElement>('[data-private]')!;
+    if (stop) {
+      statusEl.textContent = stopMessage(stop);
+      work.hidden = true;
+      return;
+    }
+    work.hidden = false;
+    void noteActivity(supabase);
     statusEl.textContent = '';
     const found = await squadsFor(account);
     const { squads, teamIds } = found;

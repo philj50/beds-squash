@@ -49,7 +49,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { loadAccount, sendToLogin } from '@/lib/account';
+  import { loadAccount, noteActivity, privateStop, sendToLogin, stopMessage } from '@/lib/account';
 
   type Season = { id: number; name: string; starts_on: string | null };
   type Squad = { id: number; name: string; team_id: number | null };
@@ -247,10 +247,20 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       return;
     }
     userId = account.userId;
+    root!.querySelector('[data-who]')!.textContent = `Signed in as ${account.displayName || account.email}`;
+    const stop = await privateStop(supabase, account, { role: true });
+    if (stop) {
+      setStatus(stopMessage(stop));
+      teamMenu.replaceChildren();
+      layout.hidden = true;
+      unassigned.hidden = true;
+      playerOnly = false;
+      return;
+    }
+    void noteActivity(supabase);
     playerOnly = account.playerOnly;
     canAddPlayers = account.isAdmin;
     accountEmail = account.email.toLowerCase();
-    root!.querySelector('[data-who]')!.textContent = `Signed in as ${account.displayName || account.email}`;
     root!.querySelector('[data-squad-link]')!.textContent = account.playerOnly ? 'Your team' : 'Squad';
     adminLink.hidden = !account.isAdmin;
 
@@ -621,6 +631,9 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   #match-app .pill--active {
     border-color: var(--gold-500);
     color: var(--gold-400);
+  }
+  #match-app [hidden] {
+    display: none !important;
   }
   #match-app .layout {
     display: grid;

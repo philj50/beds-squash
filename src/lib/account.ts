@@ -74,6 +74,57 @@ export type Account = {
   groups: AccountGroup[];
 };
 
+const GENERATED_LOGIN = /^p-[a-z0-9]+@players\.invalid$/i;
+
+/** A contact email. A generated login such as p-abc@players.invalid does not count. */
+export function hasAccountEmail(email: string) {
+  const value = email.trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && !GENERATED_LOGIN.test(value);
+}
+
+/** A login that may use the signed-in pages: an admin, the county login, a membership, or a group. */
+export function hasPrivateRole(account: Account) {
+  if (account.isAdmin) return true;
+  if (account.email.trim().toLowerCase() === 'county-admin@players.invalid') return true;
+  if (account.places.some((place) => place.role !== 'admin')) return true;
+  return account.groups.length > 0;
+}
+
+export type PrivateStop = 'inactive' | 'email' | 'role';
+
+export function stopMessage(stop: PrivateStop) {
+  if (stop === 'inactive') return 'This account is inactive. An admin can turn it back on from Users.';
+  if (stop === 'email') return 'This account needs an email address before it can do this. An admin adds that on Users.';
+  return 'This account does not have a role for this.';
+}
+
+/**
+ * Whether this login is still allowed to sign in.
+ * Until my_account_status exists, the ban flag cannot be read, so the account is treated as active.
+ */
+export async function accountIsActive(supabase: SupabaseClient) {
+  const { data, error } = await supabase.rpc('my_account_status');
+  if (error || !data || typeof data !== 'object' || Array.isArray(data) || !('active' in data)) return true;
+  return Boolean((data as { active?: unknown }).active);
+}
+
+/** Inactive, missing email, or, when asked, no role for the signed-in pages. */
+export async function privateStop(supabase: SupabaseClient, account: Account, options?: { role?: boolean }): Promise<PrivateStop | null> {
+  if (!(await accountIsActive(supabase))) return 'inactive';
+  if (!hasAccountEmail(account.email)) return 'email';
+  if (options?.role && !hasPrivateRole(account)) return 'role';
+  return null;
+}
+
+/** Remember that this person used a signed-in page. The database keeps one row every couple of minutes. */
+export async function noteActivity(supabase: SupabaseClient) {
+  try {
+    await supabase.rpc('record_my_sign_in');
+  } catch {
+    /* The sign-in table may not be on the database yet. */
+  }
+}
+
 /** True when this login organises a website group, or is an admin. */
 export async function organisesGroup(supabase: SupabaseClient, userId: string, slug: string) {
   const { data: me } = await supabase.from('profiles').select('is_admin').eq('id', userId).maybeSingle();

@@ -59,6 +59,14 @@ Deno.serve(async (req) => {
   const { data: userData, error: userError } = await admin.auth.getUser(jwt);
   if (userError || !userData.user) return json({ error: 'Sign in again.' }, 401);
 
+  const user = userData.user as { id: string; email?: string | null; banned_until?: string | null };
+  const bannedUntil = user.banned_until ? Date.parse(user.banned_until) : 0;
+  if (Number.isFinite(bannedUntil) && bannedUntil > Date.now()) return json({ error: 'This account is inactive.' }, 403);
+  const callerEmail = (user.email ?? '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(callerEmail) || /^p-[a-z0-9]+@players\.invalid$/.test(callerEmail)) {
+    return json({ error: 'This account needs an email address.' }, 403);
+  }
+
   const { data: me, error: meError } = await admin
     .from('profiles')
     .select('is_admin')

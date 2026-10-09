@@ -68,7 +68,7 @@ import { url } from '@/lib/site';
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { sendToLogin } from '@/lib/account';
+  import { loadAccount, noteActivity, privateStop, sendToLogin, stopMessage } from '@/lib/account';
 
   type Score = { id: number; player_name: string; score: number; created_at: string };
 
@@ -263,11 +263,22 @@ import { url } from '@/lib/site';
       return;
     }
     whoEl.textContent = session.user.email ?? 'Signed in';
+    const account = await loadAccount(supabase);
+    if (account) {
+      const stop = await privateStop(supabase, account);
+      if (stop) {
+        denied.hidden = false;
+        denied.textContent = stopMessage(stop);
+        return;
+      }
+    }
     const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', session.user.id).maybeSingle();
     if (!profile?.is_admin) {
       denied.hidden = false;
+      denied.textContent = 'This account cannot change the minigame board.';
       return;
     }
+    void noteActivity(supabase);
     admin.hidden = false;
     await Promise.all([loadScores(), loadBlocked()]);
   }

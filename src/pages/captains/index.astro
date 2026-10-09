@@ -53,7 +53,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { loadAccount, sendToLogin } from '@/lib/account';
+  import { loadAccount, noteActivity, privateStop, sendToLogin, stopMessage } from '@/lib/account';
 
   const root = document.getElementById('captain-app');
   if (!root) throw new Error('captain app missing');
@@ -141,6 +141,15 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     whoEl.textContent = `Signed in as ${account.displayName || account.email}`;
     viewerIsAdmin = account.isAdmin;
     adminLink.hidden = !account.isAdmin;
+    const stop = await privateStop(supabase, account, { role: true });
+    if (stop) {
+      setStatus(stopMessage(stop));
+      squadHost.replaceChildren();
+      unassigned.hidden = true;
+      playerOnlyPanel.hidden = true;
+      return;
+    }
+    void noteActivity(supabase);
     if (account.playerOnly) {
       squadHost.replaceChildren();
       unassigned.hidden = true;
