@@ -635,6 +635,12 @@ test.describe('Club captain, team captain, and player', () => {
       await expect(page.locator('[data-permission-roles]')).toContainText(roleName);
     }
     await expect(page.locator('[data-permission-roles]').getByRole('textbox')).toHaveCount(0);
+    await expect(page.getByRole('columnheader', { name: 'Can do' })).toBeVisible();
+    const adminFunctions = page.locator('[data-permission-roles] tr', { hasText: 'Admin' }).locator('td').nth(2);
+    const playerFunctions = page.locator('[data-permission-roles] tr', { hasText: 'LM Player' }).locator('td').nth(2);
+    await expect(adminFunctions).not.toHaveText('');
+    await expect(playerFunctions).not.toHaveText('');
+    expect(await adminFunctions.innerText()).not.toEqual(await playerFunctions.innerText());
     await page.getByRole('button', { name: 'Users' }).click();
     await expect(page.getByRole('button', { name: 'People' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Admins' })).toHaveCount(0);

@@ -190,6 +190,35 @@ test.describe('Users', () => {
     await expect(page.getByRole('checkbox', { name: 'LM Player' })).toBeDisabled();
   });
 
+  test('role names on a row use different colours', async ({ page }) => {
+    await openUsers(page);
+    const pat = page.getByRole('button', { name: 'Roles for Pat Player' });
+    await expect(pat).toHaveText('LM Player, JC Player');
+    await expect(pat).toHaveCSS('text-decoration-line', 'underline');
+    const lm = pat.locator('.role-name[data-role="lm_player"]');
+    const jc = pat.locator('.role-name[data-role="jc_player"]');
+    await expect(lm).toHaveText('LM Player');
+    await expect(jc).toHaveText('JC Player');
+    const lmColor = await lm.evaluate((node) => getComputedStyle(node).color);
+    const jcColor = await jc.evaluate((node) => getComputedStyle(node).color);
+    expect(lmColor).not.toBe(jcColor);
+    await expect(lm).toHaveCSS('color', 'rgb(110, 231, 168)');
+    await expect(jc).toHaveCSS('color', 'rgb(147, 197, 253)');
+
+    await pat.click();
+    const pop = page.locator('[data-role-pop]');
+    const popLm = pop.locator('.role-name[data-role="lm_player"]');
+    const popJc = pop.locator('.role-name[data-role="jc_player"]');
+    await expect(popLm).toHaveCSS('color', 'rgb(22, 101, 52)');
+    await expect(popJc).toHaveCSS('color', 'rgb(29, 78, 216)');
+
+    await page.getByRole('heading', { name: 'Users', exact: true }).click();
+    await page.getByRole('button', { name: 'Roles', exact: true }).click();
+    const catalog = page.locator('[data-permission-roles]');
+    await expect(catalog.locator('.role-name[data-role="lm_player"]')).toHaveCSS('color', 'rgb(110, 231, 168)');
+    await expect(catalog.locator('.role-name[data-role="admin"]')).toHaveCSS('color', 'rgb(255, 176, 136)');
+  });
+
   test('Active is green, turns red, and stays red if the next account check fails', async ({ page }) => {
     await openUsers(page);
     const active = page.getByRole('button', { name: 'Active for Sam Morris' });

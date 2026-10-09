@@ -350,6 +350,7 @@ const scoresHref = url('/captains/admin/minigame/');
                   <tr>
                     <th>Role</th>
                     <th>Given by</th>
+                    <th>Can do</th>
                   </tr>
                 </thead>
                 <tbody data-permission-roles></tbody>
@@ -1122,6 +1123,24 @@ const scoresHref = url('/captains/admin/minigame/');
   const groupPeopleTitle = root.querySelector<HTMLElement>('[data-group-people-title]')!;
   const groupPeopleRows = root.querySelector<HTMLElement>('[data-group-people-rows]')!;
   let openGroupSlug = '';
+  const roleCanDo = (slug: string) => {
+    const text: Record<string, string> = {
+      admin: 'Users, groups, roles, links, traffic, League Master lists, juniors, Beds Closed, publish content, match articles, minigame scores',
+      lm_club_captain: 'Their club on League Master, the squad, club matches',
+      lm_team_captain: 'Their team, the squad, the match sheet',
+      lm_player: 'Your squash, mark availability, send something in',
+      sl_player: 'Listed on SquashLevels',
+      jc_player: 'Listed from a junior entry',
+      jc_parent: 'Listed as the parent on a junior entry',
+      junior_organiser: 'Junior admin menu, County Closed entries',
+      bc_player: 'Beds Closed section',
+      rb_player: 'Racketball group',
+    };
+    return text[slug] ?? '';
+  };
+  function roleMark(slug: string, name: string) {
+    return `<span class="role-name" data-role="${escapeHtml(slug)}">${escapeHtml(name)}</span>`;
+  };
   const filledFrom = (group: GroupCatalog) => {
     if (!group.managed) return 'This website';
     if (group.source === 'squashlevels') return 'SquashLevels';
@@ -1134,7 +1153,7 @@ const scoresHref = url('/captains/admin/minigame/');
           .map((group) => {
             const role = roleCatalog.find((item) => item.slug === group.role_slug)?.name ?? group.role_slug;
             const people = members.filter((member) => member.group_slug === group.slug).length;
-            return `<tr><td>${escapeHtml(group.name)}</td><td>${escapeHtml(role)}</td><td>${escapeHtml(filledFrom(group))}</td><td><button type="button" class="count-button" data-open-group="${escapeHtml(group.slug)}">${people}</button></td></tr>`;
+            return `<tr><td>${escapeHtml(group.name)}</td><td>${roleMark(group.role_slug, role)}</td><td>${escapeHtml(filledFrom(group))}</td><td><button type="button" class="count-button" data-open-group="${escapeHtml(group.slug)}">${people}</button></td></tr>`;
           })
           .join('')
       : '<tr><td colspan="4">Groups are not on the database yet.</td></tr>';
@@ -1142,10 +1161,10 @@ const scoresHref = url('/captains/admin/minigame/');
       ? roleCatalog
           .map((role) => {
             const given = groupCatalog.filter((group) => group.role_slug === role.slug).map((group) => group.name);
-            return `<tr><td>${escapeHtml(role.name)}</td><td>${escapeHtml(given.join(', ') || 'No group')}</td></tr>`;
+            return `<tr><td>${roleMark(role.slug, role.name)}</td><td>${escapeHtml(given.join(', ') || 'No group')}</td><td class="can-do">${escapeHtml(roleCanDo(role.slug))}</td></tr>`;
           })
           .join('')
-      : '<tr><td colspan="2">Roles are not on the database yet.</td></tr>';
+      : '<tr><td colspan="3">Roles are not on the database yet.</td></tr>';
   }
   function paintGroupPeople() {
     const group = groupCatalogLive.find((item) => item.slug === openGroupSlug);
@@ -1294,7 +1313,10 @@ const scoresHref = url('/captains/admin/minigame/');
     const roleLabel = (card: MemberCard) => {
       const names = roleMenuChoices()
         .filter((group) => (group.slug === 'admins' ? card.isAdmin || card.groupSlugs.includes('admins') : card.groupSlugs.includes(group.slug)))
-        .map((group) => roleCatalogLive.find((item) => item.slug === group.role_slug)?.name ?? group.name);
+        .map((group) => {
+          const match = roleCatalogLive.find((item) => item.slug === group.role_slug);
+          return roleMark(match?.slug ?? group.role_slug, match?.name ?? group.name);
+        });
       return names.length ? names.join(', ') : 'Roles';
     };
     membersHost.innerHTML = pageRows.length
@@ -1304,7 +1326,7 @@ const scoresHref = url('/captains/admin/minigame/');
             const email = contactCell(card, 'email', card.protectedAccount ? '' : card.email, 'Email', 'email', 'Add an email');
             const es = contactCell(card, 'es', card.es, 'ES number', 'text', 'Add an ES number');
             const mobile = contactCell(card, 'phone', card.phone, 'Mobile', 'tel', 'Add a mobile number');
-            const roles = `<button type="button" class="count-button" data-open-role-pop="${escapeHtml(card.key)}" aria-label="Roles for ${escapeHtml(card.name)}">${escapeHtml(roleLabel(card))}</button>`;
+            const roles = `<button type="button" class="count-button" data-open-role-pop="${escapeHtml(card.key)}" aria-label="Roles for ${escapeHtml(card.name)}">${roleLabel(card)}</button>`;
             const activeLabel = card.active ? 'Active' : 'Inactive';
             const active =
               viewerIsAdmin && card.profileId && !card.protectedAccount && card.profileId !== viewerId
@@ -1340,7 +1362,7 @@ const scoresHref = url('/captains/admin/minigame/');
         const role = roleCatalogLive.find((item) => item.slug === group.role_slug)?.name ?? group.name;
         const checked = group.slug === 'admins' ? card.isAdmin || card.groupSlugs.includes('admins') : card.groupSlugs.includes(group.slug);
         const locked = LOCKED_ROLE_SLUGS.has(group.slug) || (group.slug === 'admins' && (!card.profileId || card.protectedAccount || card.profileId === viewerId));
-        return `<label class="${locked ? 'is-locked' : ''}"><input type="checkbox" data-role-slug="${escapeHtml(group.slug)}" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''} /> ${escapeHtml(role)}</label>`;
+        return `<label class="${locked ? 'is-locked' : ''}"><input type="checkbox" data-role-slug="${escapeHtml(group.slug)}" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''} /> ${roleMark(group.role_slug, role)}</label>`;
       })
       .join('');
   }
@@ -3066,6 +3088,36 @@ const scoresHref = url('/captains/admin/minigame/');
   #setup-app .users-box .col-delete { width: 6%; }
   #setup-app .users-box .col-status { width: 7%; }
   #setup-app .users-box .col-login { width: 9%; }
+  #setup-app {
+    --role-admin: #ffb088;
+    --role-lm-club-captain: #ffe14a;
+    --role-lm-team-captain: #c6e85a;
+    --role-lm-player: #6ee7a8;
+    --role-sl-player: #7dd3fc;
+    --role-jc-player: #93c5fd;
+    --role-jc-parent: #c4b5fd;
+    --role-junior-organiser: #f0abfc;
+    --role-bc-player: #5eead4;
+    --role-rb-player: #fda4af;
+  }
+  #setup-app .role-name {
+    color: #e7eef6;
+    font-weight: 700;
+  }
+  #setup-app .role-pop .role-name {
+    color: #0e2744;
+  }
+  #setup-app .role-name[data-role='admin'] { color: var(--role-admin); }
+  #setup-app .role-name[data-role='lm_club_captain'] { color: var(--role-lm-club-captain); }
+  #setup-app .role-name[data-role='lm_team_captain'] { color: var(--role-lm-team-captain); }
+  #setup-app .role-name[data-role='lm_player'] { color: var(--role-lm-player); }
+  #setup-app .role-name[data-role='sl_player'] { color: var(--role-sl-player); }
+  #setup-app .role-name[data-role='jc_player'] { color: var(--role-jc-player); }
+  #setup-app .role-name[data-role='jc_parent'] { color: var(--role-jc-parent); }
+  #setup-app .role-name[data-role='junior_organiser'] { color: var(--role-junior-organiser); }
+  #setup-app .role-name[data-role='bc_player'] { color: var(--role-bc-player); }
+  #setup-app .role-name[data-role='rb_player'] { color: var(--role-rb-player); }
+
   #setup-app .users-box .overview th,
   #setup-app .users-box .overview td {
     white-space: normal;
@@ -3121,6 +3173,16 @@ const scoresHref = url('/captains/admin/minigame/');
     border-radius: var(--radius-sm);
     box-shadow: 0 10px 28px rgba(14, 39, 68, 0.18);
     padding: 0.55rem 0.7rem;
+    --role-admin: #c2410c;
+    --role-lm-club-captain: #a16207;
+    --role-lm-team-captain: #4d7c0f;
+    --role-lm-player: #166534;
+    --role-sl-player: #0369a1;
+    --role-jc-player: #1d4ed8;
+    --role-jc-parent: #6d28d9;
+    --role-junior-organiser: #a21caf;
+    --role-bc-player: #0f766e;
+    --role-rb-player: #be123c;
   }
   #setup-app .role-pop__who {
     margin: 0 0 0.35rem;
@@ -3398,6 +3460,10 @@ const scoresHref = url('/captains/admin/minigame/');
   }
   #setup-app .overview .col-action--wrap .btn {
     margin: 0.15rem 0 0.15rem 0.35rem;
+  }
+  #setup-app [data-tab='permissions-roles'] .can-do {
+    white-space: normal;
+    max-width: 28rem;
   }
   #setup-app .pill {
     display: inline-block;
