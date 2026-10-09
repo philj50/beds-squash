@@ -7,6 +7,7 @@ const current = Astro.url.pathname.replace(base, '') || '/';
 const isActive = (href: string) => (href === '/' ? current === '/' : current.startsWith(href));
 const loginHref = url('/login/');
 const youHref = url('/captains/you/');
+const shareHref = url('/share/');
 const profileHref = url('/captains/profile/');
 ---
 
@@ -36,6 +37,7 @@ const profileHref = url('/captains/profile/');
               </button>
               <div id="account-menu" class="account-menu" data-account-menu hidden role="menu">
                 <a role="menuitem" href={youHref}>Your squash</a>
+                <a role="menuitem" href={shareHref}>Send something in</a>
                 <a role="menuitem" href={profileHref}>Profile</a>
                 <button role="menuitem" type="button" data-log-out>Log out</button>
               </div>
