@@ -241,20 +241,19 @@ test.describe('Public site', () => {
       await send([]);
     });
     await open(page, 'share/');
-    await expect(page.getByRole('heading', { level: 1, name: 'Share' })).toBeVisible();
-    await expect(page.getByText('Pat Player')).toBeVisible();
-    await expect(page.getByText('2 photos · 1 video · 1 article')).toBeVisible();
-    await expect(page.locator('[data-form]')).toBeHidden();
-    await expect(page.getByText('Sign in as a player, team captain, club captain or admin')).toBeVisible();
+    await expect(page).toHaveURL(/\/login\/\?next=/);
 
     await page.evaluate((stored) => {
       localStorage.setItem('sb-klxyjmwiaivvqjbhxzak-auth-token', JSON.stringify(stored));
     }, session);
-    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.goto('share/', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { level: 1, name: 'Share' })).toBeVisible();
+    await expect(page.locator('[data-sender]')).toHaveText('Pat Player');
+    await expect(page.getByText('2 photos · 1 video · 1 article')).toBeVisible();
     await expect(page.locator('[data-form]')).toBeVisible();
+    await expect(page.getByLabel('Your name')).toHaveCount(0);
     await page.getByRole('radio', { name: 'Video' }).check();
     await expect(page.getByText('up to 10 MB')).toBeVisible();
-    await page.getByLabel('Your name').fill('Pat Player');
     await page.getByLabel('Caption').fill('A short rally');
     await page.locator('input[name="video"]').setInputFiles({
       name: 'too-big.mp4',

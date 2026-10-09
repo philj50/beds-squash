@@ -10,7 +10,7 @@ const galleries = await getGalleries();
 
 <Base title="Bedfordshire squash photos" description="Photos from Bedfordshire squash events — County Closed finals, county weekends, junior events and more." crumbs={[{ name: 'Gallery', path: '/gallery/' }]}>
   <PageHero eyebrow="Photos" title="Gallery" lede="Pictures from county tournaments, county weekends and junior events.">
-    <p class="send-in"><a href={url('/share/')}>Send a photo or a short video</a></p>
+    <p class="send-in"><a href={url('/share/')}>Sign in to send a photo or a short video</a></p>
   </PageHero>
   <section class="section">
     <div class="container">
@@ -53,7 +53,7 @@ const galleries = await getGalleries();
     <div class="container">
       <div class="section-head">
         <h2>Sent in</h2>
-        <a href={url('/share/')}>Send something in →</a>
+        <a href={url('/share/')}>Sign in to send something in →</a>
       </div>
       <div class="grid grid--3" data-shared></div>
     </div>
