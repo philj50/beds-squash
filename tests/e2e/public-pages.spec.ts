@@ -143,16 +143,21 @@ test.describe('Public pages', () => {
     await expect(page.getByText('County', { exact: true })).toBeVisible();
   });
 
-  test('the juniors page links to the entry form and the codes of conduct', async ({ page }) => {
+  test('the juniors page links to the entry form and not the missing codes of conduct', async ({ page }) => {
     await open(page, 'juniors/');
     await expect(page.getByRole('heading', { level: 1, name: 'Juniors' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Enter', exact: true })).toHaveAttribute('href', /\/juniors\/closed\/$/);
     await expect(page.getByRole('img', { name: /Bedfordshire County Closed junior squash tournament/i })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Download the poster' })).toHaveAttribute('href', /beds-junior-county-closed-2026\.pdf$/);
     await expect(page.getByRole('heading', { name: 'Junior County Closed', level: 3 }).first().locator('xpath=..')).toContainText('Entry is free.');
-    await expect(page.getByRole('link', { name: 'Code of Conduct for Juniors' })).toHaveAttribute('href', /code-of-conduct-juniors/);
-    await expect(page.getByRole('link', { name: 'Code of Conduct for Parents' })).toHaveAttribute('href', /code-of-conduct-parents/);
+    await expect(page.getByRole('link', { name: 'Code of Conduct for Juniors' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Code of Conduct for Parents' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Child Protection Policy Statement' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'bsrajunior@gmail.com' })).toBeVisible();
+
+    await open(page, 'documents/');
+    await expect(page.getByRole('heading', { name: 'Codes of Conduct' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Code of Conduct for Juniors' })).toHaveCount(0);
   });
 
   test('a missing page explains itself and links home', async ({ page }) => {

@@ -5,7 +5,6 @@ import JuniorClosedPoster from '@/components/JuniorClosedPoster.astro';
 import JuniorClosedQr from '@/components/JuniorClosedQr.astro';
 import { getClubs } from '@/lib/content';
 import { AGE_REFERENCE, ENTRY_CLOSES, TOURNAMENT_ON } from '@/lib/junior-age';
-import { url } from '@/lib/site';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 const clubs = (await getClubs()).map((club) => club.data.name);
@@ -89,7 +88,7 @@ const clubs = (await getClubs()).map((club) => club.data.name);
               <label>Anything the organiser should know <textarea name="notes" maxlength="500" rows="3"></textarea></label>
               <label class="check">
                 <input name="guardian_confirmed" type="checkbox" required />
-                <span>I am the parent or guardian of this player, and I agree to the <a href={url('/documents/code-of-conduct-juniors/')}>junior code of conduct</a> and the <a href={url('/documents/code-of-conduct-parents/')}>parents’ code of conduct</a>.</span>
+                <span>I am the parent or guardian of this player.</span>
               </label>
               <label class="trap" aria-hidden="true">Company <input name="company" tabindex="-1" autocomplete="off" /></label>
               <button class="btn btn--primary" type="submit">Enter</button>

@@ -22,4 +22,4 @@ Most clubs run junior coaching — see [Club Towers](/clubs/club-towers/), [Bedf
 
 ## Safeguarding
 
-**Carly Martiello** is Child Welfare Officer. All county junior activity follows our [Child Protection Policy](/documents/) and the Beds SRA codes of conduct for coaches, juniors and parents.
+**Carly Martiello** is Child Welfare Officer. All county junior activity follows our [Child Protection Policy](/documents/child-protection-policy/).

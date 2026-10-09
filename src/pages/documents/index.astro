@@ -8,12 +8,12 @@ const docs = await getDocuments();
 const minutes = await getMinutes();
 const byCategory = new Map<string, typeof docs>();
 for (const d of docs) byCategory.set(d.data.category, [...(byCategory.get(d.data.category) ?? []), d]);
-const order = ['constitution', 'league-rules', 'accounts', 'safeguarding', 'code-of-conduct', 'forms', 'other'];
+const order = ['constitution', 'league-rules', 'accounts', 'safeguarding', 'forms', 'other'];
 const TYPE_LABEL: Record<string, string> = { agm: 'AGM', committee: 'Committee', egm: 'EGM', other: 'Meeting' };
 ---
 
-<Base title="Beds SRA minutes and policies" description="Bedfordshire Squash AGM minutes, committee minutes, league rules, accounts, safeguarding policies and codes of conduct." crumbs={[{ name: 'Documents', path: '/documents/' }]}>
-  <PageHero eyebrow="Governance" title="Documents & minutes" lede="Meeting minutes, accounts, the county constitution, league rules, safeguarding policies, codes of conduct and forms." />
+<Base title="Beds SRA minutes and policies" description="Bedfordshire Squash AGM minutes, committee minutes, league rules, accounts, safeguarding policies and forms." crumbs={[{ name: 'Documents', path: '/documents/' }]}>
+  <PageHero eyebrow="Governance" title="Documents & minutes" lede="Meeting minutes, accounts, the county constitution, league rules, safeguarding policies and forms." />
 
   <section class="section">
     <div class="container layout">

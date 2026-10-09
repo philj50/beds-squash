@@ -10,7 +10,7 @@ import { url } from '@/lib/site';
 
 const events = (await getUpcomingEvents()).filter((e) => e.data.category === 'juniors').slice(0, 4);
 const juniorClubs = (await getClubs()).filter((c) => c.data.tags.includes('juniors'));
-const safeguarding = (await getDocuments()).filter((d) => d.data.category === 'safeguarding' || d.data.category === 'code-of-conduct');
+const safeguarding = (await getDocuments()).filter((d) => d.data.category === 'safeguarding');
 ---
 
 <Base title="Junior squash in Bedfordshire" description="Junior squash in Bedfordshire: county squads, age groups, the Junior County Closed, coaching venues and safeguarding." crumbs={[{ name: 'Juniors', path: '/juniors/' }]}>
