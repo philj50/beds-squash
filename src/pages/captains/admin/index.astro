@@ -145,9 +145,9 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="members" data-lm-only hidden>
             <h2>Users</h2>
             <p class="muted small">
-              League Master players are listed, and so is anyone with an admin or organiser login. Junior County Closed entries are listed as JC Players. Filter by group or place. LM Club Captain, LM Team Captain, LM Player and JC Player are ticked in Roles and stay as they are. Password opens the player’s login details so you can copy them. Nothing is emailed.
+              League Master players are listed, and so is anyone with an admin or organiser login. A junior entry adds the player as a JC Player and the parent as a JC Parent. The entry email and phone stay on the parent. Filter by group or place. LM Club Captain, LM Team Captain, LM Player, JC Player and JC Parent are ticked in Roles and stay as they are. Password opens the login details so you can copy them. Nothing is emailed.
             </p>
-            <p class="muted small" data-group-note>Filled from League Master. Each LM Player is listed, and junior entries are listed as JC Players.</p>
+            <p class="muted small" data-group-note>Filled from League Master. Each LM Player is listed. Junior entries add a JC Player and a JC Parent.</p>
             <div class="member-tools">
               <label class="directory-search">
                 Search
@@ -1201,7 +1201,7 @@ const scoresHref = url('/captains/admin/minigame/');
           .join('')
       : '<tr><td colspan="11">No junior entries yet.</td></tr>';
   }
-  const LOCKED_ROLE_SLUGS = new Set(['lm_club_captains', 'lm_team_captains', 'lm_players', 'jc_players']);
+  const LOCKED_ROLE_SLUGS = new Set(['lm_club_captains', 'lm_team_captains', 'lm_players', 'jc_players', 'jc_parents']);
   function fillFilter(select: HTMLSelectElement, choices: { value: string; label: string }[], allLabel: string) {
     const current = select.value;
     const next = ['', ...choices.map((choice) => choice.value)];
@@ -1215,11 +1215,12 @@ const scoresHref = url('/captains/admin/minigame/');
   }
   function paintMembers() {
     const query = memberSearch.value.trim().toLowerCase();
-    groupNote.textContent = 'Filled from League Master. Each LM Player is listed, and so is a sign-in for an admin or organiser. Junior entries are listed as JC Players.';
+    groupNote.textContent = 'Filled from League Master. Each LM Player is listed, and so is a sign-in for an admin or organiser. Junior entries add a JC Player and a JC Parent.';
     const players = memberCards.filter(
       (card) =>
         card.groupSlugs.includes('lm_players') ||
         card.groupSlugs.includes('jc_players') ||
+        card.groupSlugs.includes('jc_parents') ||
         card.groupSlugs.includes('admins') ||
         card.groupSlugs.includes('junior_organisers') ||
         card.isAdmin ||
@@ -1280,6 +1281,12 @@ const scoresHref = url('/captains/admin/minigame/');
       const names = websiteRoles
         .filter((group) => (group.slug === 'admins' ? card.isAdmin || card.groupSlugs.includes('admins') : card.groupSlugs.includes(group.slug)))
         .map((group) => roleCatalogLive.find((item) => item.slug === group.role_slug)?.name ?? group.name);
+      for (const slug of ['jc_players', 'jc_parents']) {
+        if (!card.groupSlugs.includes(slug)) continue;
+        const roleSlug = groupCatalogLive.find((group) => group.slug === slug)?.role_slug;
+        const name = roleCatalogLive.find((item) => item.slug === roleSlug)?.name;
+        if (name && !names.includes(name)) names.push(name);
+      }
       return names.length ? names.join(', ') : 'Roles';
     };
     membersHost.innerHTML = pageRows.length
@@ -2142,19 +2149,56 @@ const scoresHref = url('/captains/admin/minigame/');
         .sort((a, b) => rankFor(a.role) - rankFor(b.role) || whereFor(a).localeCompare(whereFor(b), 'en'));
     const positionOf = (slug: string) => groupCatalog.find((group) => group.slug === slug)?.position ?? 99;
     const nameKey = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
+    if (!roleCatalog.some((role) => role.slug === 'jc_parent')) {
+      roleCatalog.push({ slug: 'jc_parent', name: 'JC Parent', position: 7 });
+      roleCatalog.sort((a, b) => a.position - b.position);
+    }
+    if (!groupCatalog.some((group) => group.slug === 'jc_parents')) {
+      groupCatalog.push({ slug: 'jc_parents', name: 'JC Parents', role_slug: 'jc_parent', source: 'website', managed: false, position: 7 });
+      groupCatalog.sort((a, b) => a.position - b.position);
+    }
+    groupTitle.set('jc_parents', groupCatalog.find((group) => group.slug === 'jc_parents')?.name ?? 'JC Parents');
     const seenJuniors = new Set<string>();
+    const parents = new Map<string, { name: string; email: string; phone: string; places: Set<string> }>();
     for (const entry of juniorEntries) {
       const personName = `${entry.player_first_name ?? ''} ${entry.player_last_name ?? ''}`.replace(/\s+/g, ' ').trim();
       const key = nameKey(personName);
-      if (!key || seenJuniors.has(key)) continue;
-      seenJuniors.add(key);
-      if (groupMembers.some((member) => member.group_slug === 'jc_players' && nameKey(member.person_name) === key)) continue;
+      if (key && !seenJuniors.has(key)) {
+        seenJuniors.add(key);
+        if (!groupMembers.some((member) => member.group_slug === 'jc_players' && nameKey(member.person_name) === key)) {
+          const profile = accounts.find((person) => nameKey(person.display_name || '') === key);
+          groupMembers.push({
+            profile_id: profile?.id ?? null,
+            person_name: profile?.display_name || personName,
+            place: (entry.club ?? '').trim() || null,
+            group_slug: 'jc_players',
+          });
+        }
+      }
+      const parentName = (entry.guardian_name ?? '').replace(/\s+/g, ' ').trim() || (personName ? `Parent of ${personName}` : '');
+      const parentKey = nameKey(parentName);
+      if (!parentKey) continue;
+      const club = (entry.club ?? '').trim();
+      const email = (entry.guardian_email ?? '').trim();
+      const phone = (entry.guardian_phone ?? '').trim();
+      const parent = parents.get(parentKey);
+      if (!parent) {
+        parents.set(parentKey, { name: parentName, email, phone, places: new Set(club ? [club] : []) });
+      } else {
+        if (!parent.email && email) parent.email = email;
+        if (!parent.phone && phone) parent.phone = phone;
+        if (club) parent.places.add(club);
+      }
+    }
+    for (const parent of parents.values()) {
+      const key = nameKey(parent.name);
+      if (groupMembers.some((member) => member.group_slug === 'jc_parents' && nameKey(member.person_name) === key)) continue;
       const profile = accounts.find((person) => nameKey(person.display_name || '') === key);
       groupMembers.push({
         profile_id: profile?.id ?? null,
-        person_name: profile?.display_name || personName,
-        place: (entry.club ?? '').trim() || null,
-        group_slug: 'jc_players',
+        person_name: profile?.display_name || parent.name,
+        place: [...parent.places].join('; ') || null,
+        group_slug: 'jc_parents',
       });
     }
     paintPermissionCatalog(groupCatalog, roleCatalog, groupMembers);
@@ -2294,12 +2338,11 @@ const scoresHref = url('/captains/admin/minigame/');
       if (cards.has(`id:${person.id}`)) continue;
       addCard(person.display_name || 'Unnamed', person, groupsFor(person));
     }
-    for (const entry of juniorEntries) {
-      const personName = `${entry.player_first_name ?? ''} ${entry.player_last_name ?? ''}`.replace(/\s+/g, ' ').trim();
-      const card = [...cards.values()].find((item) => nameKey(item.name) === nameKey(personName) || nameKey(item.profileName) === nameKey(personName));
+    for (const parent of parents.values()) {
+      const card = [...cards.values()].find((item) => nameKey(item.name) === nameKey(parent.name) || nameKey(item.profileName) === nameKey(parent.name));
       if (!card) continue;
-      if (!card.email.trim() && (entry.guardian_email ?? '').trim()) card.email = entry.guardian_email.trim();
-      if (!card.phone.trim() && (entry.guardian_phone ?? '').trim()) card.phone = entry.guardian_phone.trim();
+      if (!card.email.trim() && parent.email) card.email = parent.email;
+      if (!card.phone.trim() && parent.phone) card.phone = parent.phone;
     }
     memberCards = [...cards.values()].sort((a, b) => a.label.localeCompare(b.label, 'en'));
     openingGroup = '';

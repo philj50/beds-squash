@@ -573,9 +573,10 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.locator('[data-junior-link]')).toBeVisible();
     await expect(page.locator('[data-share-link]')).toBeVisible();
     await expect(page.locator('[data-scores-link]')).toBeVisible();
-    await expect(page.locator('[data-member-count]')).toContainText('8 players');
+    await expect(page.locator('[data-member-count]')).toContainText('9 players');
     await expect(page.locator('[data-users]')).toContainText('Pat Player');
     await expect(page.locator('[data-users]')).toContainText('Jamie Junior');
+    await expect(page.locator('[data-users]')).toContainText('Pat Guardian');
     await expect(page.locator('[data-users]')).toContainText('County Admin');
     await expect(page.locator('[data-users] tr', { hasText: 'County Admin' })).toContainText(/4 Oct 2026/);
     const jamie = page.locator('[data-users] tr', { hasText: 'Jamie Junior' });
@@ -630,7 +631,7 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.getByRole('heading', { name: 'Roles', exact: true })).toBeVisible();
     await expect(page.locator('[data-permission-roles] tr', { hasText: 'LM Player' })).toContainText('LM Players');
     await expect(page.locator('[data-permission-roles] tr', { hasText: 'Junior Organiser' })).toContainText('Junior Organisers');
-    for (const roleName of ['Admin', 'LM Club Captain', 'LM Team Captain', 'LM Player', 'SL Player', 'JC Player', 'Junior Organiser', 'BC Player', 'RB Player']) {
+    for (const roleName of ['Admin', 'LM Club Captain', 'LM Team Captain', 'LM Player', 'SL Player', 'JC Player', 'JC Parent', 'Junior Organiser', 'BC Player', 'RB Player']) {
       await expect(page.locator('[data-permission-roles]')).toContainText(roleName);
     }
     await expect(page.locator('[data-permission-roles]').getByRole('textbox')).toHaveCount(0);

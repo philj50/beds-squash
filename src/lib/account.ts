@@ -53,12 +53,13 @@ export const GROUP_NAME: Record<string, string> = {
   lm_players: 'LM Players',
   sl_players: 'SL Players',
   jc_players: 'JC Players',
+  jc_parents: 'JC Parents',
   junior_organisers: 'Junior Organisers',
   bc_players: 'BC Players',
   rb_players: 'RB Players',
 };
 
-const GROUP_ORDER = ['admins', 'lm_club_captains', 'lm_team_captains', 'lm_players', 'sl_players', 'jc_players', 'junior_organisers', 'bc_players', 'rb_players'];
+const GROUP_ORDER = ['admins', 'lm_club_captains', 'lm_team_captains', 'lm_players', 'sl_players', 'jc_players', 'jc_parents', 'junior_organisers', 'bc_players', 'rb_players'];
 
 export type Account = {
   userId: string;

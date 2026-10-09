@@ -200,19 +200,38 @@ test.describe('Users', () => {
     await expect(page.getByText('No players match that search.')).toBeVisible();
   });
 
-  test('a junior entry is listed as a JC Player', async ({ page }) => {
+  test('a junior entry is a JC Player and the parent is a separate JC Parent', async ({ page }) => {
     await openUsers(page);
     await page.getByLabel('Group').selectOption({ label: 'JC Player' });
     const jamie = page.locator('[data-users] tr', { hasText: 'Jamie Junior' });
+    const robin = page.locator('[data-users] tr', { hasText: 'Robin Junior' });
     await expect(jamie).toBeVisible();
+    await expect(robin).toBeVisible();
     await expect(jamie.locator('td').nth(1)).toHaveText('Test Club');
-    await expect(jamie.getByRole('textbox', { name: 'Email for Jamie Junior' })).toHaveValue('guardian@example.test');
-    await expect(jamie.getByRole('textbox', { name: 'Mobile for Jamie Junior' })).toHaveValue('07000999999');
+    await expect(jamie.getByRole('textbox', { name: 'Email for Jamie Junior' })).toHaveValue('');
+    await expect(jamie.getByRole('textbox', { name: 'Mobile for Jamie Junior' })).toHaveValue('');
+    await expect(jamie.getByRole('button', { name: 'Roles for Jamie Junior' })).toHaveText('JC Player');
+    await expect(page.locator('[data-users] tr', { hasText: 'Pat Guardian' })).toHaveCount(0);
     await expect(page.locator('[data-users] tr', { hasText: 'Pat Player' })).toHaveCount(0);
     await jamie.getByRole('button', { name: 'Roles for Jamie Junior' }).click();
     await expect(page.getByRole('checkbox', { name: 'JC Player' })).toBeChecked();
     await expect(page.getByRole('checkbox', { name: 'JC Player' })).toBeDisabled();
-    await expect(page.getByRole('checkbox', { name: 'LM Player' })).not.toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'JC Parent' })).toBeDisabled();
+    await expect(page.getByRole('checkbox', { name: 'JC Parent' })).not.toBeChecked();
+    await page.getByRole('heading', { name: 'Users', exact: true }).click();
+
+    await page.getByLabel('Group').selectOption({ label: 'JC Parent' });
+    const parent = page.locator('[data-users] tr', { hasText: 'Pat Guardian' });
+    await expect(parent).toBeVisible();
+    await expect(page.locator('[data-users] tr', { hasText: 'Jamie Junior' })).toHaveCount(0);
+    await expect(parent.locator('td').nth(1)).toHaveText('Test Club; Other Club');
+    await expect(parent.getByRole('textbox', { name: 'Email for Pat Guardian' })).toHaveValue('guardian@example.test');
+    await expect(parent.getByRole('textbox', { name: 'Mobile for Pat Guardian' })).toHaveValue('07000999999');
+    await expect(parent.getByRole('button', { name: 'Roles for Pat Guardian' })).toHaveText('JC Parent');
+    await parent.getByRole('button', { name: 'Roles for Pat Guardian' }).click();
+    await expect(page.getByRole('checkbox', { name: 'JC Parent' })).toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'JC Parent' })).toBeDisabled();
+    await expect(page.getByRole('checkbox', { name: 'JC Player' })).not.toBeChecked();
   });
 
   test('the county row stays locked', async ({ page }) => {
@@ -469,6 +488,20 @@ async function installAdmin(page: Page) {
           guardian_phone: '07000999999',
           emergency_name: 'Sam Emergency',
           emergency_phone: '07000000001',
+          notes: null,
+        },
+        {
+          player_first_name: 'Robin',
+          player_last_name: 'Junior',
+          date_of_birth: '2014-06-01',
+          age_category: 'Under 13',
+          draw: 'Boys',
+          club: 'Other Club',
+          guardian_name: 'Pat Guardian',
+          guardian_email: '',
+          guardian_phone: '',
+          emergency_name: '',
+          emergency_phone: '',
           notes: null,
         },
       ]);
