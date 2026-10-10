@@ -1,39 +1,62 @@
 ---
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
+interface Props {
+  /** Captain and admin pages are only counted when someone is signed in. */
+  signedInOnly?: boolean;
+}
+
+const { signedInOnly = false } = Astro.props;
 const path = Astro.url.pathname;
 ---
 
-<script is:inline define:vars={{ SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, path }}>
+<script is:inline define:vars={{ SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, path, signedInOnly }}>
   (function () {
     const SESSION_KEY = 'beds_traffic_session';
     const SENT_KEY = 'beds_traffic_sent';
+    function accessToken() {
+      try {
+        const ref = new URL(SUPABASE_URL).hostname.split('.')[0];
+        const raw = localStorage.getItem('sb-' + ref + '-auth-token');
+        if (!raw) return '';
+        const stored = JSON.parse(raw);
+        const session = stored && stored.access_token ? stored : stored && stored.currentSession;
+        if (!session || typeof session.access_token !== 'string' || !session.access_token) return '';
+        if (session.expires_at && session.expires_at * 1000 < Date.now() + 5000) return '';
+        return session.access_token;
+      } catch (e) {
+        return '';
+      }
+    }
     try {
+      const token = accessToken();
+      if (signedInOnly && !token) return;
       let sessionId = sessionStorage.getItem(SESSION_KEY);
       if (!sessionId) {
         sessionId = crypto.randomUUID();
         sessionStorage.setItem(SESSION_KEY, sessionId);
       }
       const sent = JSON.parse(sessionStorage.getItem(SENT_KEY) || '[]');
-      if (Array.isArray(sent) && sent.includes(path)) return;
+      const mark = path + '|' + (token ? 'user' : 'anon');
+      if (Array.isArray(sent) && sent.includes(mark)) return;
 
       fetch(`${SUPABASE_URL}/rest/v1/rpc/record_site_page_view`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           apikey: SUPABASE_PUBLISHABLE_KEY,
-          Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: 'Bearer ' + (token || SUPABASE_PUBLISHABLE_KEY),
         },
         body: JSON.stringify({ p_path: path, p_session_id: sessionId }),
         keepalive: true,
       })
         .then((res) => {
           if (!res.ok) return;
-          const next = Array.isArray(sent) ? [...sent, path] : [path];
+          const next = Array.isArray(sent) ? [...sent, mark] : [mark];
           sessionStorage.setItem(SENT_KEY, JSON.stringify(next));
         })
         .catch(() => {});
-    } catch {
+    } catch (e) {
       /* ignore */
     }
   })();

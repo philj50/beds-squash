@@ -90,7 +90,7 @@ const structured = graph(
     </main>
     <Footer />
     <CookieNotice />
-    {!noindex && <SiteTrafficBeacon />}
+    <SiteTrafficBeacon signedInOnly={noindex} />
   </body>
 </html>
 

@@ -4,12 +4,12 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 import { url } from '@/lib/site';
 ---
 
-<Base title="Minigame mk2 scores" description="Remove a name from the Minigame mk2 high-score board." noindex>
+<Base title="Minigame mk3 scores" description="Remove a name from the Minigame mk3 high-score board." noindex>
   <section class="section">
     <div class="container scores-admin" id="minigame-admin" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
-      <h1>Minigame mk2 scores</h1>
+      <h1>Minigame mk3 scores</h1>
       <p class="lede">
-        These names are on the <a href={url('/minigame/')}>Minigame mk2</a> high-score board.
+        These names are on the <a href={url('/minigame/')}>Minigame mk3</a> high-score board.
         Remove a row to take that name and score off the board.
       </p>
       <p class="status" data-status role="status"></p>
@@ -17,7 +17,7 @@ import { url } from '@/lib/site';
         <p class="who" data-who></p>
         <p class="actions">
           <a class="btn btn--ghost btn--sm" href={url('/captains/admin/')}>Admin</a>
-          <a class="btn btn--ghost btn--sm" href={url('/minigame/')}>Minigame mk2</a>
+          <a class="btn btn--ghost btn--sm" href={url('/minigame/')}>Minigame mk3</a>
           <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
         </p>
         <p data-denied hidden>This account cannot change the minigame board.</p>
@@ -68,7 +68,7 @@ import { url } from '@/lib/site';
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { sendToLogin } from '@/lib/account';
+  import { loadAccount, noteActivity, privateStop, sendToLogin, stopMessage } from '@/lib/account';
 
   type Score = { id: number; player_name: string; score: number; created_at: string };
 
@@ -263,11 +263,22 @@ import { url } from '@/lib/site';
       return;
     }
     whoEl.textContent = session.user.email ?? 'Signed in';
+    const account = await loadAccount(supabase);
+    if (account) {
+      const stop = await privateStop(supabase, account);
+      if (stop) {
+        denied.hidden = false;
+        denied.textContent = stopMessage(stop);
+        return;
+      }
+    }
     const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', session.user.id).maybeSingle();
     if (!profile?.is_admin) {
       denied.hidden = false;
+      denied.textContent = 'This account cannot change the minigame board.';
       return;
     }
+    void noteActivity(supabase);
     admin.hidden = false;
     await Promise.all([loadScores(), loadBlocked()]);
   }

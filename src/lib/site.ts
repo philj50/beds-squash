@@ -14,8 +14,11 @@ export const SITE = {
   englandSquashEvents: 'https://www.englandsquash.com/competitions/calendar',
 };
 
-export const NAV = [
+type NavItem = { label: string; href: string; signedIn?: boolean };
+
+export const NAV: NavItem[] = [
   { label: 'News', href: '/news/' },
+  { label: 'My Squash', href: '/captains/you/', signedIn: true },
   { label: 'Events', href: '/events/' },
   { label: 'Clubs', href: '/clubs/' },
   { label: 'Leagues', href: '/leagues/' },
@@ -23,11 +26,10 @@ export const NAV = [
   { label: 'Juniors', href: '/juniors/' },
   { label: 'County Teams', href: '/county-teams/' },
   { label: 'Gallery', href: '/gallery/' },
-  { label: 'Share', href: '/share/' },
   { label: 'Documents', href: '/documents/' },
   { label: 'About', href: '/about/' },
   { label: 'Contact', href: '/contact/' },
-  { label: 'Minigame mk2', href: '/minigame/' },
+  { label: 'Minigame mk3', href: '/minigame/' },
   { label: 'Administration', href: '/captains/admin/' },
 ];
 

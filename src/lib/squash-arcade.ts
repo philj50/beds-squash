@@ -1,4 +1,5 @@
-/** Top-down squash. The ball travels from the front wall down to the bat.
+/** Top-down squash. The ball leaves the front wall at an angle and the player
+ * has to play it before the second bounce, including boasts off the side wall.
  *
  * Singles court, World Squash: 9.75 m long and 6.40 m wide.
  * The short line is 5.49 m from the front wall.
@@ -18,11 +19,11 @@ const RACKET_Y = BACK - 16;
 const SERVICE_Y = FRONT + (BACK - FRONT) * (5.49 / 9.75);
 /** The racket head is drawn this far in front of the hit line. */
 const RACKET_HEAD = 22;
-const BALL = 6;
+const BALL = 7;
 const LIVES = 3;
-const BONUS_POINTS = 5;
-const BONUS_R = 15;
-const BONUS_MAX = 5;
+const GRAVITY = 620;
+const HIT_HEIGHT = 86;
+const BALL_COLORS = ['#ff6a00', '#c026d3', '#39d353', '#38bdf8', '#fb7185', '#facc15'];
 
 export const PLAY = { left: LEFT, right: RIGHT, front: FRONT, back: BACK };
 
@@ -34,15 +35,31 @@ export const SERVE_SPOT = {
 
 export type Phase = 'idle' | 'serve' | 'rally' | 'point' | 'over';
 export type TickEvent = 'hit' | 'score' | 'miss' | 'over' | 'bonus';
+export type BonusKind = 'pumpkin' | 'skull' | 'bat';
 
 type Ball = {
   x: number;
   y: number;
   vx: number;
   vy: number;
+  z: number;
+  vz: number;
+  /** Floor bounces since the front wall or the racket last played it. */
+  bounces: number;
   returned: boolean;
   /** Stays at the front until the other ball is on its way back. */
   wait: boolean;
+  color: number;
+};
+
+export type BonusDrop = {
+  x: number;
+  y: number;
+  until: number;
+  born: number;
+  points: 10 | 20 | 30;
+  kind: BonusKind;
+  r: number;
 };
 
 export type Arcade = {
@@ -56,16 +73,19 @@ export type Arcade = {
   twin: boolean;
   wait: number;
   age: number;
-  bonusesSpawned: number;
   nextBonus: number;
-  bonus: { x: number; y: number; until: number } | null;
+  bonus: BonusDrop | null;
+  lastBonusPoints: number;
 };
+
+function stillBall(x: number): Ball {
+  return { x, y: FRONT + 28, vx: 0, vy: 0, z: 18, vz: 0, bounces: 0, returned: false, wait: false, color: 0 };
+}
 
 function parked(count: number): Ball[] {
   const mid = (LEFT + RIGHT) / 2;
-  const still = (x: number): Ball => ({ x, y: FRONT + 28, vx: 0, vy: 0, returned: false, wait: false });
-  if (count < 2) return [still(mid)];
-  return [still(mid - 28), still(mid + 28)];
+  if (count < 2) return [stillBall(mid)];
+  return [stillBall(mid - 28), stillBall(mid + 28)];
 }
 
 export function createArcade(): Arcade {
@@ -79,9 +99,9 @@ export function createArcade(): Arcade {
     twin: false,
     wait: 0,
     age: 0,
-    bonusesSpawned: 0,
-    nextBonus: 5 + Math.random() * 6,
+    nextBonus: 2 + Math.random() * 1.5,
     bonus: null,
+    lastBonusPoints: 0,
   };
 }
 
@@ -108,7 +128,7 @@ export function setRacket(game: Arcade, fractionX: number, fractionY?: number) {
 
 function pace(game: Arcade) {
   const heat = Math.max(0, game.age - 52);
-  return Math.min(1500, 195 + game.age * 4.6 + heat * heat * 0.22 + game.score * 1.2);
+  return Math.min(460, 280 + game.age * 1.6 + heat * heat * 0.05 + game.score * 0.45);
 }
 
 export function tick(game: Arcade, dt: number): TickEvent[] {
@@ -126,7 +146,7 @@ export function tick(game: Arcade, dt: number): TickEvent[] {
   releaseWaiting(game);
   maybeSpawn(game);
   const speed = pace(game);
-  const slices = Math.max(5, Math.ceil((speed * step) / 10));
+  const slices = Math.max(6, Math.ceil((speed * step) / 8));
   let missed = false;
   for (let i = 0; i < slices && !missed; i += 1) {
     const piece = step / slices;
@@ -135,9 +155,19 @@ export function tick(game: Arcade, dt: number): TickEvent[] {
         ball.y = FRONT + 28;
         ball.vx = 0;
         ball.vy = 0;
+        ball.z = 18;
+        ball.vz = 0;
         continue;
       }
       const prevY = ball.y;
+      ball.vz -= GRAVITY * piece;
+      ball.z += ball.vz * piece;
+      if (ball.z <= 0) {
+        ball.z = 0;
+        ball.vz = Math.abs(ball.vz) * 0.56;
+        if (ball.vz < 50) ball.vz = 0;
+        ball.bounces += 1;
+      }
       ball.x += ball.vx * piece;
       ball.y += ball.vy * piece;
 
@@ -162,7 +192,6 @@ export function tick(game: Arcade, dt: number): TickEvent[] {
         ball.y = FRONT + BALL;
         if (ball.returned) {
           game.score += 1;
-          ball.returned = false;
           events.push('score');
         }
         const otherComing = game.balls.some((other) => other !== ball && !other.wait && other.vy > 0);
@@ -170,28 +199,32 @@ export function tick(game: Arcade, dt: number): TickEvent[] {
           ball.wait = true;
           ball.vx = 0;
           ball.vy = 0;
+          ball.vz = 0;
         } else {
-          ball.vy = Math.abs(speed);
-          ball.vx += wander(game, speed);
-          ball.vx = clamp(ball.vx, -speed * 0.8, speed * 0.8);
+          reboundFromFront(ball, speed);
         }
       }
 
       const racketY = game.racketY;
-      if (ball.vy > 0 && prevY <= racketY + 18 && ball.y >= racketY - BALL) {
+      if (ball.vy > 0 && ball.z < HIT_HEIGHT && prevY <= racketY + 18 && ball.y >= racketY - BALL) {
         const half = RACKET_W / 2;
         if (ball.x >= game.racketX - half && ball.x <= game.racketX + half) {
           const along = (ball.x - game.racketX) / half;
           ball.y = racketY - BALL;
           ball.vy = -speed;
-          ball.vx = along * speed * 0.42 + wander(game, speed) * 0.35;
-          ball.vx = clamp(ball.vx, -speed * 0.85, speed * 0.85);
+          const boast = Math.abs(along) > 0.42;
+          ball.vx = boast ? Math.sign(along || 1) * speed * (0.72 + Math.abs(along) * 0.28) : along * speed * 0.95;
+          ball.vx = clamp(ball.vx, -speed * 0.98, speed * 0.98);
+          ball.z = Math.max(ball.z, 40);
+          ball.vz = 360;
+          ball.bounces = 0;
           ball.returned = true;
+          ball.color = (ball.color + 1) % BALL_COLORS.length;
           events.push('hit');
         }
       }
 
-      if (ball.y > BACK + 10) {
+      if (ball.bounces >= 2 || ball.y > BACK + 8) {
         events.push(loseLife(game));
         missed = true;
         break;
@@ -201,10 +234,22 @@ export function tick(game: Arcade, dt: number): TickEvent[] {
   return events;
 }
 
-function wander(game: Arcade, speed: number) {
-  const heat = Math.max(0, game.age - 48);
-  const spread = Math.min(speed * 0.62, 18 + game.age * 3.6 + heat * 6.5);
-  return (Math.random() - 0.5) * spread;
+/** The front wall sends the ball back at an angle, often toward a side wall. */
+function reboundFromFront(ball: Ball, speed: number) {
+  const paceNow = Math.max(Math.abs(ball.vy), speed * 0.9);
+  ball.vy = paceNow;
+  if (Math.abs(ball.vx) < paceNow * 0.32) {
+    const dir = ball.x < (LEFT + RIGHT) / 2 ? -1 : 1;
+    ball.vx = dir * paceNow * (0.42 + Math.random() * 0.38);
+  } else {
+    ball.vx *= 1.12;
+  }
+  ball.vx = clamp(ball.vx, -paceNow * 0.95, paceNow * 0.95);
+  ball.returned = false;
+  ball.bounces = 0;
+  ball.z = Math.max(ball.z, 64);
+  ball.vz = 440;
+  ball.color = (ball.color + 1) % BALL_COLORS.length;
 }
 
 function maybeTwin(game: Arcade) {
@@ -217,38 +262,46 @@ function maybeTwin(game: Arcade) {
     y: FRONT + 28,
     vx: 0,
     vy: 0,
+    z: 18,
+    vz: 0,
+    bounces: 0,
     returned: false,
     wait: true,
+    color: 2,
   });
 }
 
-/** One ball comes down. The other stays at the front until that one is hit back. */
+/** One ball comes off the front wall. The other stays there until that one is hit back. */
 function releaseWaiting(game: Arcade) {
   if (game.balls.some((ball) => !ball.wait && ball.vy > 0)) return;
   const waiting = game.balls.find((ball) => ball.wait);
   if (!waiting) return;
-  const speed = pace(game);
   waiting.wait = false;
-  waiting.y = FRONT + 24;
-  waiting.returned = false;
-  waiting.vy = speed;
-  waiting.vx = (Math.random() - 0.5) * Math.min(160, 50 + game.age * 4);
+  waiting.y = FRONT + 16;
+  reboundFromFront(waiting, pace(game));
 }
 
 function bonusGap() {
-  return 6 + Math.random() * 8;
+  return 2.1 + Math.random() * 2.4;
 }
 
 function maybeSpawn(game: Arcade) {
-  if (game.bonus || game.bonusesSpawned >= BONUS_MAX || game.age < game.nextBonus) return;
-  const midX = (LEFT + RIGHT) / 2;
-  const midY = (FRONT + BACK) / 2;
-  game.bonus = {
-    x: midX + (Math.random() - 0.5) * (RIGHT - LEFT) * 0.28,
-    y: midY + (Math.random() - 0.5) * (BACK - FRONT) * 0.16,
-    until: game.age + 4.2,
-  };
-  game.bonusesSpawned += 1;
+  if (game.bonus || game.age < game.nextBonus) return;
+  const roll = Math.random();
+  const kind: BonusKind = roll < 0.46 ? 'pumpkin' : roll < 0.78 ? 'skull' : 'bat';
+  const points: 10 | 20 | 30 = kind === 'pumpkin' ? 10 : kind === 'skull' ? 20 : 30;
+  const r = kind === 'pumpkin' ? 16 : kind === 'skull' ? 13 : 10;
+  const life = kind === 'pumpkin' ? 5.4 : kind === 'skull' ? 3.5 : 2.2;
+  const spanX = RIGHT - LEFT - 36;
+  const spanY = (BACK - FRONT) * 0.78;
+  let x = LEFT + 18 + Math.random() * spanX;
+  let y = FRONT + 36 + Math.random() * spanY;
+  if (kind === 'bat') {
+    const side = Math.random() < 0.5;
+    x = side ? LEFT + 16 + Math.random() * 42 : RIGHT - 16 - Math.random() * 42;
+    if (Math.random() < 0.45) y = FRONT + 28 + Math.random() * 90;
+  }
+  game.bonus = { x, y, until: game.age + life, born: game.age, points, kind, r };
 }
 
 function collectBonus(game: Arcade, ball: Ball, events: TickEvent[]) {
@@ -256,8 +309,9 @@ function collectBonus(game: Arcade, ball: Ball, events: TickEvent[]) {
   if (!bonus) return false;
   const dx = ball.x - bonus.x;
   const dy = ball.y - bonus.y;
-  if (dx * dx + dy * dy > (BONUS_R + BALL) * (BONUS_R + BALL)) return false;
-  game.score += BONUS_POINTS;
+  if (dx * dx + dy * dy > (bonus.r + BALL) * (bonus.r + BALL)) return false;
+  game.score += bonus.points;
+  game.lastBonusPoints = bonus.points;
   game.bonus = null;
   game.nextBonus = game.age + bonusGap();
   events.push('bonus');
@@ -266,16 +320,20 @@ function collectBonus(game: Arcade, ball: Ball, events: TickEvent[]) {
 
 function flying(game: Arcade, slot: number): Ball {
   const speed = pace(game);
-  const span = RIGHT - LEFT - 80;
-  const along = slot === 0 ? Math.random() : 0.62 + Math.random() * 0.2;
   const lead = slot === 0;
+  const dir = Math.random() < 0.5 ? -1 : 1;
+  const mid = (LEFT + RIGHT) / 2;
   return {
-    x: LEFT + 40 + along * span,
-    y: FRONT + 24,
-    vx: lead ? (Math.random() - 0.5) * Math.min(160, 50 + game.age * 4) : 0,
-    vy: lead ? speed : 0,
+    x: lead ? mid + dir * (30 + Math.random() * 70) : mid - dir * 50,
+    y: FRONT + 16,
+    vx: lead ? dir * speed * (0.4 + Math.random() * 0.35) : 0,
+    vy: lead ? speed * 0.92 : 0,
+    z: lead ? 64 : 18,
+    vz: lead ? 440 : 0,
+    bounces: 0,
     returned: false,
     wait: !lead,
+    color: Math.floor(Math.random() * BALL_COLORS.length),
   };
 }
 
@@ -294,6 +352,7 @@ function loseLife(game: Arcade): 'miss' | 'over' {
     for (const ball of game.balls) {
       ball.vx = 0;
       ball.vy = 0;
+      ball.vz = 0;
     }
     return 'over';
   }
@@ -310,19 +369,19 @@ function clamp(value: number, min: number, max: number) {
 export function drawCourt(ctx: CanvasRenderingContext2D, game: Arcade) {
   const { width, height } = COURT;
   ctx.clearRect(0, 0, width, height);
-  ctx.fillStyle = '#07182c';
+  ctx.fillStyle = '#140810';
   ctx.fillRect(0, 0, width, height);
 
   const floorW = RIGHT - LEFT;
   const floorH = BACK - FRONT;
-  ctx.fillStyle = '#123056';
+  ctx.fillStyle = '#2a1233';
   ctx.fillRect(LEFT, FRONT, floorW, floorH);
 
   const shortY = SERVICE_Y;
   const boxDepth = floorH * (1.6 / 9.75);
   const boxWidth = floorW * (1.6 / 6.4);
 
-  ctx.strokeStyle = '#e23b3b';
+  ctx.strokeStyle = '#fb923c';
   ctx.lineWidth = 2;
   ctx.strokeRect(LEFT, FRONT, floorW, floorH);
   ctx.beginPath();
@@ -334,59 +393,147 @@ export function drawCourt(ctx: CanvasRenderingContext2D, game: Arcade) {
   ctx.strokeRect(LEFT, shortY, boxWidth, boxDepth);
   ctx.strokeRect(RIGHT - boxWidth, shortY, boxWidth, boxDepth);
 
-  ctx.lineWidth = 4;
+  ctx.strokeStyle = '#f97316';
+  ctx.lineWidth = 6;
   ctx.beginPath();
   ctx.moveTo(LEFT, FRONT);
   ctx.lineTo(RIGHT, FRONT);
   ctx.stroke();
 
+  drawCobweb(ctx, 8, 8, 54, false);
+  drawCobweb(ctx, width - 8, 8, 54, true);
+  drawLantern(ctx, 78, 24, 11);
+  drawLantern(ctx, width - 78, 24, 11);
+
   if (game.bonus) {
-    ctx.strokeStyle = '#ffc933';
-    ctx.lineWidth = 2;
-    drawStar(ctx, game.bonus.x, game.bonus.y, BONUS_R);
+    const age = game.age - game.bonus.born;
+    const pop = Math.min(1, age / 0.16);
+    drawBonus(ctx, game.bonus, pop);
   }
 
   const showBall = game.phase === 'serve' || game.phase === 'rally' || game.phase === 'point' || game.phase === 'over';
   if (showBall) {
-    ctx.strokeStyle = '#ffc933';
-    ctx.lineWidth = 2;
     for (const ball of game.balls) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
       ctx.beginPath();
-      ctx.arc(ball.x, ball.y, BALL, 0, Math.PI * 2);
+      ctx.ellipse(ball.x, ball.y + 2, BALL * 0.85, BALL * 0.45, 0, 0, Math.PI * 2);
+      ctx.fill();
+      const lift = ball.z * 0.12;
+      ctx.fillStyle = BALL_COLORS[ball.color % BALL_COLORS.length]!;
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y - lift, BALL, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.lineWidth = 1;
       ctx.stroke();
     }
   }
 
-  ctx.strokeStyle = '#9fd0ff';
-  ctx.lineWidth = 3;
   const racketY = game.racketY;
+  ctx.strokeStyle = '#c084fc';
+  ctx.fillStyle = '#c084fc';
+  ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.moveTo(game.racketX - RACKET_W / 2, racketY);
   ctx.lineTo(game.racketX + RACKET_W / 2, racketY);
   ctx.stroke();
-  ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.ellipse(game.racketX, racketY - 10, 16, 12, 0, 0, Math.PI * 2);
-  ctx.stroke();
+  ctx.fill();
 
-  ctx.fillStyle = '#e7eaef';
+  ctx.fillStyle = '#fde68a';
   ctx.font = '700 26px Barlow Condensed, Arial Narrow, sans-serif';
   ctx.fillText(String(game.score).padStart(4, '0'), 16, 32);
-  ctx.strokeStyle = '#f2b705';
-  ctx.lineWidth = 2;
-  for (let i = 0; i < game.lives; i += 1) ctx.strokeRect(108 + i * 18, 16, 12, 12);
+  for (let i = 0; i < game.lives; i += 1) drawLantern(ctx, 118 + i * 22, 22, 8);
 }
 
-function drawStar(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number) {
-  ctx.beginPath();
-  for (let i = 0; i < 8; i += 1) {
-    const arm = i % 2 === 0 ? radius : radius * 0.42;
-    const angle = (i / 8) * Math.PI * 2 - Math.PI / 2;
-    const px = x + Math.cos(angle) * arm;
-    const py = y + Math.sin(angle) * arm;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
+function drawCobweb(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, flip: boolean) {
+  ctx.save();
+  ctx.translate(x, y);
+  if (flip) ctx.scale(-1, 1);
+  ctx.strokeStyle = 'rgba(244, 236, 220, 0.55)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 5; i += 1) {
+    const angle = (i / 4) * (Math.PI / 2);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(angle) * size, Math.sin(angle) * size);
+    ctx.stroke();
   }
-  ctx.closePath();
-  ctx.stroke();
+  for (let ring = 1; ring <= 3; ring += 1) {
+    const radius = (size * ring) / 3;
+    ctx.beginPath();
+    for (let i = 0; i <= 4; i += 1) {
+      const angle = (i / 4) * (Math.PI / 2);
+      const px = Math.cos(angle) * radius;
+      const py = Math.sin(angle) * radius;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawLantern(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
+  ctx.fillStyle = '#f97316';
+  ctx.beginPath();
+  ctx.ellipse(x, y, r, r * 0.82, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#166534';
+  ctx.fillRect(x - 1.5, y - r - 3, 3, 4);
+  ctx.fillStyle = '#fde68a';
+  ctx.fillRect(x - 2, y - 2, 4, 3);
+}
+
+function drawBonus(ctx: CanvasRenderingContext2D, bonus: BonusDrop, pop: number) {
+  ctx.save();
+  ctx.translate(bonus.x, bonus.y);
+  ctx.scale(pop, pop);
+  if (bonus.kind === 'pumpkin') {
+    ctx.fillStyle = '#f97316';
+    ctx.beginPath();
+    ctx.arc(0, 0, bonus.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#7c2d12';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, -bonus.r + 3);
+    ctx.lineTo(0, bonus.r - 3);
+    ctx.moveTo(-5, -bonus.r + 4);
+    ctx.lineTo(-4, bonus.r - 4);
+    ctx.moveTo(5, -bonus.r + 4);
+    ctx.lineTo(4, bonus.r - 4);
+    ctx.stroke();
+    ctx.fillStyle = '#166534';
+    ctx.fillRect(-2, -bonus.r - 4, 4, 6);
+    ctx.fillStyle = '#111';
+    ctx.fillRect(-6, -2, 3, 3);
+    ctx.fillRect(3, -2, 3, 3);
+  } else if (bonus.kind === 'skull') {
+    ctx.fillStyle = '#f5f0e6';
+    ctx.beginPath();
+    ctx.arc(0, -1, bonus.r * 0.86, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#1c1024';
+    ctx.beginPath();
+    ctx.arc(-4, -2, 2.4, 0, Math.PI * 2);
+    ctx.arc(4, -2, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(-1.2, 3, 2.4, 4);
+  } else {
+    ctx.fillStyle = '#4c1d95';
+    ctx.beginPath();
+    ctx.moveTo(-bonus.r, 2);
+    ctx.quadraticCurveTo(-bonus.r * 0.2, -bonus.r, 0, -2);
+    ctx.quadraticCurveTo(bonus.r * 0.2, -bonus.r, bonus.r, 2);
+    ctx.quadraticCurveTo(0, 4, -bonus.r, 2);
+    ctx.fill();
+    ctx.fillStyle = '#111';
+    ctx.beginPath();
+    ctx.arc(-3, 0, 1.4, 0, Math.PI * 2);
+    ctx.arc(3, 0, 1.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
 }

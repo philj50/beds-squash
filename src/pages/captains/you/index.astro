@@ -1,36 +1,64 @@
 ---
 import Base from '@/layouts/Base.astro';
+import { getClubs } from '@/lib/content';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 import { url } from '@/lib/site';
+
+const venues = (await getClubs()).map((club) => ({
+  id: club.id,
+  name: club.data.name,
+  venue: club.data.venue,
+  address: club.data.address,
+  town: club.data.town ?? '',
+  postcode: club.data.postcode,
+}));
 ---
 
-<Base title="Your squash" description="Your next matches, last results, SquashLevels level and uploads." noindex>
+<Base title="My squash" description="Your next match, where to be, recent scores, SquashLevels graph and articles." noindex>
   <section class="section">
-    <div class="container you" id="you-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
-      <h1>Your squash</h1>
+    <div class="container you" id="you-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} data-venues={JSON.stringify(venues)}>
+      <h1>My squash</h1>
       <p class="lede">
-        This page is only for the person signed in. It shows your groups, your next team matches, the last time you played that opposition, your SquashLevels level, and what you have sent to the site.
+        This page is only for the person signed in. It shows your next match and where to be, recent scores, your SquashLevels graph, and the articles you have sent in.
       </p>
       <p class="status" data-status role="status"></p>
       <div data-panel="signed-in" hidden>
         <p class="who" data-who></p>
-        <p class="places" data-places></p>
-        <p class="places" data-groups></p>
         <p class="actions">
           <a class="btn btn--ghost btn--sm" href={url('/captains/matches/')}>Matches</a>
           <a class="btn btn--ghost btn--sm" href={url('/share/')}>Send something in</a>
           <a class="btn btn--ghost btn--sm" href={url('/captains/profile/')}>Profile</a>
           <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
         </p>
+        <div data-private>
+        <p class="places" data-places></p>
+        <p class="places" data-groups></p>
 
-        <h2>Next matches</h2>
-        <div data-matches></div>
+        <h2>Next match</h2>
+        <div data-next></div>
+
+        <h2>Recent matches</h2>
+        <div data-recent></div>
 
         <h2>SquashLevels</h2>
         <div data-level></div>
 
-        <h2>Sent to the site</h2>
-        <div data-uploads></div>
+        <h2>Articles</h2>
+        <div data-articles></div>
+
+        <div
+          class="account-summary"
+          data-account-summary
+          data-team-tab={url('/captains/admin/#site-team')}
+          data-club-tab={url('/captains/admin/#site-club')}
+        >
+          <p class="muted">
+            Signed in as <strong data-summary-name></strong>. Email <strong data-summary-email></strong>. Name and password are changed on <a href={url('/captains/profile/')}>your profile</a>.
+          </p>
+          <div data-summary-league></div>
+          <div data-summary-tabs></div>
+        </div>
+        </div>
       </div>
     </div>
   </section>
@@ -38,7 +66,7 @@ import { url } from '@/lib/site';
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { loadAccount, sendToLogin, type Account } from '@/lib/account';
+  import { loadAccount, noteActivity, privateStop, sendToLogin, stopMessage, type Account } from '@/lib/account';
 
   type Membership = { role: string; club_slug: string | null; team_id: number | null };
   type Squad = { id: number; name: string; team_id: number };
@@ -53,7 +81,7 @@ import { url } from '@/lib/site';
     away: Side;
     divisions: { name: string } | null;
   };
-  type Level = { display_name: string; current_level: number | null; updated_at: string | null };
+  type Level = { id?: number; display_name: string; current_level: number | null; updated_at: string | null };
   type Upload = {
     id: string;
     kind: string;
@@ -62,19 +90,39 @@ import { url } from '@/lib/site';
     status: string;
     created_at: string;
     credit: string;
+    credit_key?: string | null;
   };
+  type Rubber = {
+    fixture_id: number;
+    position: number;
+    home_player: string | null;
+    away_player: string | null;
+    score: string | null;
+    winner: string | null;
+  };
+  type SquadPlayer = { id: number; squad_id: number; display_name: string };
+  type AvailRow = { squad_player_id: number; status: string; fixture_id: number };
+  type Rating = { player_id: number; recorded_on: string; level: number; kind: string | null };
+  type Venue = { id: string; name: string; venue: string; address: string; town: string; postcode: string };
+  type KnownLevel = { id: number; display_name: string; current_level: number | null };
 
   const root = document.getElementById('you-app');
-  if (!root) throw new Error('your squash missing');
+  if (!root) throw new Error('my squash missing');
   const supabase = createClient(root.dataset.url!, root.dataset.key!);
   const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
   const signedIn = root.querySelector<HTMLElement>('[data-panel="signed-in"]')!;
   const whoEl = root.querySelector<HTMLElement>('[data-who]')!;
   const placesEl = root.querySelector<HTMLElement>('[data-places]')!;
   const groupsEl = root.querySelector<HTMLElement>('[data-groups]')!;
-  const matchesEl = root.querySelector<HTMLElement>('[data-matches]')!;
+  const nextEl = root.querySelector<HTMLElement>('[data-next]')!;
+  const recentEl = root.querySelector<HTMLElement>('[data-recent]')!;
   const levelEl = root.querySelector<HTMLElement>('[data-level]')!;
-  const uploadsEl = root.querySelector<HTMLElement>('[data-uploads]')!;
+  const articlesEl = root.querySelector<HTMLElement>('[data-articles]')!;
+  const summaryName = root.querySelector<HTMLElement>('[data-summary-name]')!;
+  const summaryEmail = root.querySelector<HTMLElement>('[data-summary-email]')!;
+  const summaryLeague = root.querySelector<HTMLElement>('[data-summary-league]')!;
+  const summaryTabs = root.querySelector<HTMLElement>('[data-summary-tabs]')!;
+  const summaryRoot = root.querySelector<HTMLElement>('[data-account-summary]')!;
 
   const esc = (value: string | null | undefined) =>
     String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
@@ -101,11 +149,6 @@ import { url } from '@/lib/site';
     return { ...row, home: one(row.home)!, away: one(row.away)!, divisions: one(row.divisions) };
   }
 
-  function pairKey(fixture: Fixture) {
-    const ids = [fixture.home.team_id, fixture.away.team_id].filter((id): id is number => id != null).sort((a, b) => a - b);
-    return ids.join(':');
-  }
-
   root.querySelector('[data-sign-out]')!.addEventListener('click', async () => {
     await supabase.auth.signOut();
     sendToLogin();
@@ -119,6 +162,79 @@ import { url } from '@/lib/site';
     const parts = place.split('/').map((part) => part.trim()).filter(Boolean);
     if (parts.length < 2) return null;
     return { club: parts[0], team: parts[parts.length - 1] };
+  }
+
+  const LM_PLACE_GROUPS = new Set(['lm_club_captains', 'lm_team_captains', 'lm_players']);
+
+  function leagueLines(
+    account: Account,
+    seats: Seat[],
+    memberships: Membership[],
+    teams: { id: number; name: string; club_slug: string }[],
+    clubNames: Map<string, string>,
+  ) {
+    const lines: string[] = [];
+    const seen = new Set<string>();
+    const add = (club: string, team: string, person: string) => {
+      const where = club.trim();
+      const side = team.trim();
+      const who = person.trim();
+      if (!who || (!where && !side)) return;
+      const key = nameKey(side ? `${where}|${side}` : `club|${where}`);
+      if (seen.has(key)) return;
+      seen.add(key);
+      lines.push(side && where ? `${where} · ${side} · ${who}` : `${where || side} · ${who}`);
+    };
+    for (const seat of seats) {
+      if (!LM_PLACE_GROUPS.has(seat.group_slug)) continue;
+      const person = seat.person_name.trim() || account.displayName;
+      for (const part of (seat.place ?? '').split(';')) {
+        const trimmed = part.trim();
+        if (!trimmed) continue;
+        const parsed = teamFromPlace(trimmed);
+        if (parsed) add(parsed.club, parsed.team, person);
+        else add(trimmed, '', person);
+      }
+    }
+    const teamById = new Map(teams.map((team) => [team.id, team]));
+    for (const row of memberships) {
+      if (row.role === 'admin') continue;
+      const team = row.team_id != null ? teamById.get(row.team_id) : undefined;
+      const clubSlug = row.club_slug || team?.club_slug || '';
+      const club = clubSlug ? (clubNames.get(clubSlug) ?? '') : '';
+      const person = account.displayName || account.email;
+      if (team) add(club, team.name, person);
+      else if (club) add(club, '', person);
+      else {
+        const label = account.places.find((place) => place.role === row.role)?.label ?? '';
+        if (label) add(label, '', person);
+      }
+    }
+    return lines;
+  }
+
+  function opensAdminTabs(account: Account) {
+    if (account.isAdmin) return true;
+    if (account.places.some((place) => place.role === 'club_captain' || place.role === 'team_captain')) return true;
+    return account.groups.some((group) => group.slug === 'admins' || group.slug === 'lm_club_captains' || group.slug === 'lm_team_captains');
+  }
+
+  function linkedTab(sentence: string, tab: string, href: string) {
+    const at = sentence.indexOf(tab);
+    if (at < 0) return esc(sentence);
+    return `${esc(sentence.slice(0, at))}<a href="${esc(href)}">${esc(tab)}</a>${esc(sentence.slice(at + tab.length))}`;
+  }
+
+  function paintSummary(account: Account, league: string[]) {
+    summaryName.textContent = account.displayName || account.email;
+    summaryEmail.textContent = account.email;
+    summaryLeague.innerHTML = league.map((line) => `<p>League Master — ${esc(line)}</p>`).join('');
+    const linkTabs = opensAdminTabs(account);
+    const teamSentence = 'Every team is on the Team tab.';
+    const clubSentence = 'Every club is on the Club tab.';
+    const teamBody = linkTabs && summaryRoot.dataset.teamTab ? linkedTab(teamSentence, 'Team tab', summaryRoot.dataset.teamTab) : esc(teamSentence);
+    const clubBody = linkTabs && summaryRoot.dataset.clubTab ? linkedTab(clubSentence, 'Club tab', summaryRoot.dataset.clubTab) : esc(clubSentence);
+    summaryTabs.innerHTML = `<p>Team — ${teamBody}</p><p>Club — ${clubBody}</p>`;
   }
 
   async function squadsFor(account: Account) {
@@ -140,7 +256,8 @@ import { url } from '@/lib/site';
         .map((part) => teamFromPlace(part.trim()))
         .filter((part): part is { club: string; team: string } => part != null),
     );
-    for (const team of (teamResult.data ?? []) as { id: number; name: string; club_slug: string }[]) {
+    const teams = (teamResult.data ?? []) as { id: number; name: string; club_slug: string }[];
+    for (const team of teams) {
       const club = clubNames.get(team.club_slug) ?? '';
       if (clubSlugs.includes(team.club_slug) || wanted.some((place) => nameKey(place.team) === nameKey(team.name) && nameKey(place.club) === nameKey(club))) {
         teamIds.add(team.id);
@@ -164,87 +281,372 @@ import { url } from '@/lib/site';
         wanted.map((place) => `${place.club} · ${place.team}`),
       ),
     ];
-    return { squads: scoped, teamIds: [...teamIds], names, places };
+    return { squads: scoped, teamIds: [...teamIds], names, places, clubNames, league: leagueLines(account, seats, memberships, teams, clubNames) };
   }
 
-  function drawMatches(squads: Squad[], teamIds: number[], fixtures: Fixture[], account: Account) {
+  function isCaptain(account: Account) {
+    if (account.places.some((place) => place.role === 'club_captain' || place.role === 'team_captain')) return true;
+    return account.groups.some((group) => group.slug === 'lm_club_captains' || group.slug === 'lm_team_captains');
+  }
+
+  function isPlayer(account: Account) {
+    if (account.places.some((place) => place.role === 'team_player')) return true;
+    return account.groups.some((group) => group.slug === 'lm_players');
+  }
+
+  function sideOf(fixture: Fixture, teamIds: number[]) {
     const ids = new Set(teamIds);
-    const squadByTeam = new Map(squads.map((squad) => [squad.team_id, squad]));
-    const sideOf = (fixture: Fixture) => {
-      const home = fixture.home.team_id != null && ids.has(fixture.home.team_id);
-      const away = fixture.away.team_id != null && ids.has(fixture.away.team_id);
-      if (home) return 'home' as const;
-      if (away) return 'away' as const;
-      return null;
-    };
-    if (!teamIds.length) {
-      const competition = account.groups.filter((group) => group.slug === 'jc_players' || group.slug === 'bc_players' || group.slug === 'rb_players' || group.slug === 'junior_organisers');
-      matchesEl.innerHTML = competition.length
-        ? `<p class="muted">You are in ${competition.map((group) => group.name).join(' and ')}. League matches are not linked to this account. Your competition appears here when its draws are on the site.</p>`
-        : '<p class="muted">No team is linked to this account yet. An admin sets that from Administration.</p>';
-      return;
-    }
-    const upcoming = fixtures
-      .filter((fixture) => sideOf(fixture) && fixture.status !== 'played' && new Date(fixture.starts_at).getTime() > Date.now() - 6 * 3600_000)
-      .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
-      .slice(0, 3);
-    if (!upcoming.length) {
-      matchesEl.innerHTML = '<p class="muted">No upcoming matches for your team.</p>';
-      return;
-    }
-    const played = fixtures
-      .filter((fixture) => sideOf(fixture) && fixture.status === 'played' && fixture.home_points != null && fixture.away_points != null)
-      .sort((a, b) => b.starts_at.localeCompare(a.starts_at));
-    matchesEl.innerHTML = upcoming
-      .map((fixture) => {
-        const side = sideOf(fixture)!;
-        const teamId = side === 'home' ? fixture.home.team_id : fixture.away.team_id;
-        const squad = teamId != null ? squadByTeam.get(teamId) : undefined;
-        const us = side === 'home' ? fixture.home : fixture.away;
-        const opponent = side === 'home' ? fixture.away : fixture.home;
-        const previous = played.find((past) => past.starts_at < fixture.starts_at && pairKey(past) === pairKey(fixture) && pairKey(fixture).includes(':'));
-        const last = previous
-          ? `Last time: ${esc(previous.home.name)} ${previous.home_points}–${previous.away_points} ${esc(previous.away.name)}, ${esc(day(previous.starts_at))}.`
-          : 'No earlier match against them.';
-        const team = teamIds.length > 1 ? `${esc(squad?.name ?? us.name)} · ` : '';
-        return `<article class="card"><div class="card__body">
-          <p class="eyebrow">${team}${esc(fixture.divisions?.name ?? 'League match')}</p>
-          <h3>${esc(us.name)} ${side === 'home' ? 'v' : 'at'} ${esc(opponent.name)}</h3>
-          <p class="meta">${esc(when(fixture.starts_at))} · ${side === 'home' ? 'Home' : 'Away'}</p>
-          <p class="last">${last}</p>
-        </div></article>`;
-      })
-      .join('');
+    if (fixture.home.team_id != null && ids.has(fixture.home.team_id)) return 'home' as const;
+    if (fixture.away.team_id != null && ids.has(fixture.away.team_id)) return 'away' as const;
+    return null;
   }
 
-  function drawLevel(level: Level | null) {
+  function scoreLine(fixture: Fixture) {
+    return `${fixture.home.name} ${fixture.home_points}–${fixture.away_points} ${fixture.away.name}`;
+  }
+
+  function beAt(slug: string | null, clubNames: Map<string, string>, fallback: string) {
+    const clubName = (slug && clubNames.get(slug)) || fallback;
+    let venues: Venue[] = [];
+    try {
+      venues = JSON.parse(root.dataset.venues || '[]') as Venue[];
+    } catch {
+      venues = [];
+    }
+    const place =
+      venues.find((venue) => slug && venue.id === slug) ??
+      venues.find((venue) => nameKey(venue.name) === nameKey(clubName) || nameKey(venue.venue) === nameKey(clubName));
+    if (!place) return `Be at ${clubName}.`;
+    const townLine = [place.town, place.postcode].filter(Boolean).join(' ');
+    const parts = [place.venue, place.address, townLine].filter((part, index, all) => part && all.indexOf(part) === index);
+    return `Be at ${parts.join(', ')}.`;
+  }
+
+  function levelOn(ratings: Rating[], on: string) {
+    const dayStamp = on.slice(0, 10);
+    const prior = ratings.filter((row) => (row.kind == null || row.kind === 'after') && row.recorded_on.slice(0, 10) <= dayStamp);
+    return prior.length ? prior[prior.length - 1].level : null;
+  }
+
+  function average(values: number[]) {
+    if (!values.length) return null;
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+  }
+
+  const levelText = (value: number) => value.toLocaleString('en-GB');
+
+  function drawChart(points: Rating[]) {
+    if (points.length < 2) return '';
+    const width = 640;
+    const height = 220;
+    const pad = { l: 56, r: 16, t: 16, b: 36 };
+    const levels = points.map((point) => point.level);
+    let min = Math.min(...levels);
+    let max = Math.max(...levels);
+    if (min === max) {
+      min -= 50;
+      max += 50;
+    }
+    const padY = (max - min) * 0.08;
+    min -= padY;
+    max += padY;
+    const innerW = width - pad.l - pad.r;
+    const innerH = height - pad.t - pad.b;
+    const xAt = (index: number) => pad.l + (index / (points.length - 1)) * innerW;
+    const yAt = (level: number) => pad.t + ((max - level) / (max - min)) * innerH;
+    const line = points.map((point, index) => `${index === 0 ? 'M' : 'L'}${xAt(index).toFixed(1)},${yAt(point.level).toFixed(1)}`).join(' ');
+    const yTicks = [max, (max + min) / 2, min];
+    const xTicks = [0, Math.floor((points.length - 1) / 2), points.length - 1];
+    const dateLabel = (iso: string) => day(`${iso}T12:00:00`);
+    const anchor = (index: number) => (index === 0 ? 'start' : index === points.length - 1 ? 'end' : 'middle');
+    return `<div class="chart"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="SquashLevels level after each match">
+      ${yTicks
+        .map((tick) => {
+          const y = yAt(tick);
+          return `<line class="grid" x1="${pad.l}" y1="${y.toFixed(1)}" x2="${width - pad.r}" y2="${y.toFixed(1)}" /><text x="${pad.l - 8}" y="${(y + 4).toFixed(1)}" text-anchor="end">${levelText(Math.round(tick))}</text>`;
+        })
+        .join('')}
+      <path class="line" d="${line}" />
+      ${xTicks.map((index) => `<text x="${xAt(index).toFixed(1)}" y="${height - 10}" text-anchor="${anchor(index)}">${dateLabel(points[index].recorded_on)}</text>`).join('')}
+    </svg><p class="muted">Level after each match.</p></div>`;
+  }
+
+  function drawLevel(level: Level | null, ratings: Rating[]) {
     if (!level || level.current_level == null) {
       levelEl.innerHTML = '<p class="muted">No SquashLevels record matches your name.</p>';
       return;
     }
     const updated = level.updated_at ? ` Updated ${esc(day(level.updated_at))}.` : '';
-    levelEl.innerHTML = `<p class="level">${esc(level.display_name)} <strong>${esc(level.current_level.toLocaleString('en-GB'))}</strong>${updated}</p>`;
+    const points = ratings
+      .filter((row) => row.kind == null || row.kind === 'after')
+      .slice()
+      .sort((a, b) => a.recorded_on.localeCompare(b.recorded_on));
+    levelEl.innerHTML = `<p class="level">${esc(level.display_name)} <strong>${esc(level.current_level.toLocaleString('en-GB'))}</strong>${updated}</p>${drawChart(points)}`;
   }
 
-  function drawUploads(rows: Upload[]) {
-    if (!rows.length) {
-      uploadsEl.innerHTML = '<p class="muted">Nothing sent in under this login yet.</p>';
+  function articleRank(published: Upload[], keys: string[]) {
+    const counts = new Map<string, number>();
+    for (const row of published) {
+      const key = nameKey(row.credit_key || row.credit || '');
+      if (!key) continue;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    const ordered = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    const ranks = new Map<string, number>();
+    let rank = 0;
+    let previous = -1;
+    ordered.forEach(([key, count], index) => {
+      if (count !== previous) rank = index + 1;
+      previous = count;
+      ranks.set(key, rank);
+    });
+    const mine = keys.map((key) => ranks.get(nameKey(key))).filter((value): value is number => value != null && value <= 3);
+    return mine.length ? Math.min(...mine) : null;
+  }
+
+  function drawArticles(rows: Upload[], rank: number | null) {
+    const articles = rows.filter((row) => row.kind === 'article');
+    const stars = rank === 1 ? '★★★' : rank === 2 ? '★★' : rank === 3 ? '★' : '';
+    const place = rank === 1 ? 'First' : rank === 2 ? 'Second' : rank === 3 ? 'Third' : '';
+    const badge = stars
+      ? `<p class="stars" aria-label="${place} among people who have sent articles">${stars} ${place} among people who have sent articles.</p>`
+      : '';
+    if (!articles.length) {
+      articlesEl.innerHTML = `${badge}<p class="muted">No articles sent in under this login yet.</p>`;
       return;
     }
-    const kindLabel: Record<string, string> = { photo: 'Photo', video: 'Video', link: 'Link', article: 'Article' };
-    uploadsEl.innerHTML = `<ul class="uploads">${rows
+    articlesEl.innerHTML = `${badge}<ul class="uploads">${articles
       .map((row) => {
-        const label = row.title || row.caption || kindLabel[row.kind] || 'Upload';
+        const label = row.title || row.caption || 'Article';
         const state = row.status === 'published' ? 'On the site' : 'Pending';
-        return `<li><span>${esc(kindLabel[row.kind] ?? row.kind)}</span><span>${esc(label)}</span><span>${esc(state)}</span><span>${esc(day(row.created_at))}</span></li>`;
+        return `<li><span>Article</span><span>${esc(label)}</span><span>${esc(state)}</span><span>${esc(day(row.created_at))}</span></li>`;
       })
       .join('')}</ul>`;
+  }
+
+  async function knownLevels(names: string[]) {
+    const found = new Map<string, KnownLevel>();
+    const unique = [...new Set(names.map((name) => name.trim()).filter(Boolean))];
+    await Promise.all(
+      unique.map(async (name) => {
+        const { data } = await supabase
+          .from('squashlevels_players')
+          .select('id, display_name, current_level')
+          .ilike('display_name', name)
+          .limit(1)
+          .maybeSingle();
+        if (data?.id != null) found.set(nameKey(data.display_name || name), data as KnownLevel);
+      }),
+    );
+    return found;
+  }
+
+  async function ratingsFor(ids: number[]) {
+    const unique = [...new Set(ids)];
+    if (!unique.length) return new Map<number, Rating[]>();
+    const { data } = await supabase
+      .from('squashlevels_ratings')
+      .select('player_id, recorded_on, level, kind')
+      .in('player_id', unique)
+      .order('recorded_on', { ascending: true });
+    const grouped = new Map<number, Rating[]>();
+    for (const row of (data ?? []) as Rating[]) {
+      if (row.player_id == null) continue;
+      const list = grouped.get(row.player_id) ?? [];
+      list.push(row);
+      grouped.set(row.player_id, list);
+    }
+    return grouped;
+  }
+
+  async function paintMatches(
+    account: Account,
+    squads: Squad[],
+    teamIds: number[],
+    fixtures: Fixture[],
+    names: string[],
+    clubNames: Map<string, string>,
+  ) {
+    const squadByTeam = new Map(squads.map((squad) => [squad.team_id, squad]));
+    const ours = (fixture: Fixture) => sideOf(fixture, teamIds);
+    if (!teamIds.length) {
+      const competition = account.groups.filter((group) => group.slug === 'jc_players' || group.slug === 'bc_players' || group.slug === 'rb_players' || group.slug === 'junior_organisers');
+      const note = competition.length
+        ? `<p class="muted">You are in ${competition.map((group) => group.name).join(' and ')}. League matches are not linked to this account. Your competition appears here when its draws are on the site.</p>`
+        : '<p class="muted">No team is linked to this account yet. An admin sets that from Administration.</p>';
+      nextEl.innerHTML = note;
+      recentEl.innerHTML = '<p class="muted">No played matches for your teams yet.</p>';
+      return;
+    }
+    const upcoming = fixtures
+      .filter((fixture) => ours(fixture) && fixture.status !== 'played' && new Date(fixture.starts_at).getTime() > Date.now() - 6 * 3600_000)
+      .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+    const played = fixtures
+      .filter((fixture) => ours(fixture) && fixture.status === 'played' && fixture.home_points != null && fixture.away_points != null)
+      .sort((a, b) => b.starts_at.localeCompare(a.starts_at));
+    const recent = played.slice(0, 2);
+    recentEl.innerHTML = recent.length
+      ? `<ul class="results">${recent
+          .map((fixture) => `<li><span>${esc(day(fixture.starts_at))}</span><span>${esc(scoreLine(fixture))}</span></li>`)
+          .join('')}</ul>`
+      : '<p class="muted">No played matches for your teams yet.</p>';
+    const next = upcoming[0];
+    if (!next) {
+      nextEl.innerHTML = '<p class="muted">No upcoming matches for your team.</p>';
+      return;
+    }
+    const side = ours(next)!;
+    const teamId = side === 'home' ? next.home.team_id : next.away.team_id;
+    const squad = teamId != null ? squadByTeam.get(teamId) : undefined;
+    const us = side === 'home' ? next.home : next.away;
+    const opponent = side === 'home' ? next.away : next.home;
+    const previous =
+      played.find((past) => past.starts_at < next.starts_at && (teamId == null || past.home.team_id === teamId || past.away.team_id === teamId)) ?? null;
+    const team = teamIds.length > 1 ? `${esc(squad?.name ?? us.name)} · ` : '';
+    const later = upcoming.slice(1, 4);
+    const also = later.length
+      ? `<p class="also">Also coming up: ${later
+          .map((fixture) => {
+            const otherSide = ours(fixture)!;
+            const otherUs = otherSide === 'home' ? fixture.home : fixture.away;
+            const otherThem = otherSide === 'home' ? fixture.away : fixture.home;
+            return `${esc(otherUs.name)} ${otherSide === 'home' ? 'v' : 'at'} ${esc(otherThem.name)} (${esc(day(fixture.starts_at))})`;
+          })
+          .join('; ')}.</p>`
+      : '';
+    const personNames = new Set([account.displayName, ...names].map((name) => nameKey(name)).filter(Boolean));
+    let detail = '';
+    if (isCaptain(account)) {
+      const sameTeam = previous
+        ? played.filter((fixture) => teamId != null && (fixture.home.team_id === teamId || fixture.away.team_id === teamId))
+        : played;
+      const scoreList = sameTeam.length
+        ? `<h3>Previous scores</h3><ul class="results">${sameTeam
+            .map((fixture) => `<li><span>${esc(day(fixture.starts_at))}</span><span>${esc(scoreLine(fixture))}</span></li>`)
+            .join('')}</ul>`
+        : '<p>No previous scores for this team yet.</p>';
+      let likely = '<p>Nobody has said they are in, so the likely side is not known.</p>';
+      let outlook = '<p>No individual scores were on the last match, so there is no prediction yet.</p>';
+      const squadId = squad?.id;
+      const [playerRes, availRes, rubberRes] = await Promise.all([
+        squadId != null
+          ? supabase.from('squad_players').select('id, squad_id, display_name').eq('squad_id', squadId)
+          : Promise.resolve({ data: [] as SquadPlayer[] }),
+        supabase.from('availability').select('squad_player_id, status, fixture_id').eq('fixture_id', next.id),
+        previous
+          ? supabase.from('rubbers').select('fixture_id, position, home_player, away_player, score, winner').eq('fixture_id', previous.id).order('position')
+          : Promise.resolve({ data: [] as Rubber[] }),
+      ]);
+      const squadPlayers = ((playerRes.data ?? []) as SquadPlayer[]).filter((player) => squadId == null || player.squad_id === squadId);
+      const avail = new Map(((availRes.data ?? []) as AvailRow[]).map((row) => [row.squad_player_id, row.status]));
+      const rubbers = ((rubberRes.data ?? []) as Rubber[]).slice().sort((a, b) => a.position - b.position);
+      const inNames = squadPlayers.filter((player) => avail.get(player.id) === 'in').map((player) => player.display_name);
+      const maybeNames = squadPlayers.filter((player) => avail.get(player.id) === 'maybe').map((player) => player.display_name);
+      const sheetSide = previous ? ours(previous) ?? side : side;
+      const lastNames = rubbers
+        .map((rubber) => (sheetSide === 'home' ? rubber.home_player : rubber.away_player))
+        .filter((name): name is string => Boolean(name));
+      const likelyNames = inNames.length ? inNames : maybeNames.length ? maybeNames : lastNames;
+      const likelyFrom = inNames.length ? 'who have said they are in' : maybeNames.length ? 'who have said they might play' : 'who played last time';
+      const rubberNames = rubbers.flatMap((rubber) => [rubber.home_player, rubber.away_player].filter((name): name is string => Boolean(name)));
+      const levels = await knownLevels([...likelyNames, ...rubberNames]);
+      if (likelyNames.length) {
+        likely = `<p>Likely to play, from ${likelyFrom}: ${likelyNames
+          .map((name) => {
+            const known = levels.get(nameKey(name));
+            const current = known?.current_level;
+            return current == null ? esc(name) : `${esc(name)} (${levelText(current)})`;
+          })
+          .join(', ')}.</p>`;
+      }
+      if (rubbers.length && previous) {
+        const history = await ratingsFor([...levels.values()].map((row) => row.id));
+        const gaps = rubbers
+          .map((rubber) => {
+            const oursName = sheetSide === 'home' ? rubber.home_player : rubber.away_player;
+            const theirsName = sheetSide === 'home' ? rubber.away_player : rubber.home_player;
+            if (!oursName || !theirsName) return '';
+            const oursId = levels.get(nameKey(oursName))?.id;
+            const theirsId = levels.get(nameKey(theirsName))?.id;
+            const oursLevel = oursId != null ? levelOn(history.get(oursId) ?? [], previous.starts_at) : null;
+            const theirsLevel = theirsId != null ? levelOn(history.get(theirsId) ?? [], previous.starts_at) : null;
+            if (oursLevel == null || theirsLevel == null) return '';
+            const gap = oursLevel - theirsLevel;
+            const ahead = gap === 0 ? 'level' : gap > 0 ? `${levelText(gap)} ahead of` : `${levelText(Math.abs(gap))} behind`;
+            return `<li>${esc(oursName)} (${levelText(oursLevel)}) was ${ahead} ${esc(theirsName)} (${levelText(theirsLevel)})${rubber.score ? `, ${esc(rubber.score)}` : ''}.</li>`;
+          })
+          .filter(Boolean);
+        const lastLevels = rubbers
+          .map((rubber) => {
+            const oursName = sheetSide === 'home' ? rubber.home_player : rubber.away_player;
+            const oursId = oursName ? levels.get(nameKey(oursName))?.id : undefined;
+            return oursId != null ? levelOn(history.get(oursId) ?? [], previous.starts_at) : null;
+          })
+          .filter((value): value is number => value != null);
+        const nextLevels = likelyNames
+          .map((name) => levels.get(nameKey(name))?.current_level)
+          .filter((value): value is number => value != null);
+        const lastAvg = average(lastLevels);
+        const nextAvg = average(nextLevels);
+        let prediction = 'The level gaps from last time are below.';
+        if (lastAvg != null && nextAvg != null) {
+          const delta = nextAvg - lastAvg;
+          prediction =
+            Math.abs(delta) < 25
+              ? 'The likely side is about as strong as last time, so the result is likely to be similar.'
+              : delta > 0
+                ? 'The likely side is stronger than last time, so the team is more likely to be successful.'
+                : 'The likely side is weaker than last time, so the team is less likely to be successful.';
+        }
+        outlook = `${gaps.length ? `<ul class="gaps">${gaps.join('')}</ul>` : '<p>SquashLevels has no levels for both players in those rubbers.</p>'}<p>${prediction}</p>`;
+      }
+      const own = rubbers.find((rubber) => {
+        const mine = sheetSide === 'home' ? rubber.home_player : rubber.away_player;
+        return mine && personNames.has(nameKey(mine));
+      });
+      const ownLine = own
+        ? `<p>You played ${esc((sheetSide === 'home' ? own.away_player : own.home_player) || 'an unnamed player')}${own.score ? `, ${esc(own.score)}` : ''}.</p>`
+        : '';
+      detail = `${scoreList}${likely}${outlook}${ownLine}`;
+    } else if (isPlayer(account)) {
+      if (!previous) {
+        detail = '<p>No previous score for this team yet.</p>';
+      } else {
+        let personal = 'No individual scores were on that sheet.';
+        const { data } = await supabase
+          .from('rubbers')
+          .select('fixture_id, position, home_player, away_player, score, winner')
+          .eq('fixture_id', previous.id)
+          .order('position');
+        const rubbers = (data ?? []) as Rubber[];
+        const sheetSide = ours(previous) ?? side;
+        const own = rubbers.find((rubber) => {
+          const mine = sheetSide === 'home' ? rubber.home_player : rubber.away_player;
+          return mine && personNames.has(nameKey(mine));
+        });
+        if (own) {
+          const opponentName = sheetSide === 'home' ? own.away_player : own.home_player;
+          personal = `You played ${esc(opponentName || 'an unnamed player')}${own.score ? `, ${esc(own.score)}` : ''}.`;
+        } else if (rubbers.length) {
+          personal = 'You did not play in that match.';
+        }
+        detail = `<p class="last">Last time: ${esc(scoreLine(previous))}, ${esc(day(previous.starts_at))}.</p><p>${personal}</p>`;
+      }
+    }
+    nextEl.innerHTML = `<article class="card"><div class="card__body">
+      <p class="eyebrow">${team}${esc(next.divisions?.name ?? 'League match')}</p>
+      <h3>${esc(us.name)} ${side === 'home' ? 'v' : 'at'} ${esc(opponent.name)}</h3>
+      <p class="meta">${esc(when(next.starts_at))} · ${side === 'home' ? 'Home' : 'Away'}</p>
+      <p class="where">${esc(beAt(next.home.club_slug, clubNames, next.home.name))}</p>
+      ${detail}
+      ${also}
+    </div></article>`;
   }
 
   async function levelById(id: number) {
     const { data } = await supabase
       .from('squashlevels_players')
-      .select('display_name, current_level, updated_at')
+      .select('id, display_name, current_level, updated_at')
       .eq('id', id)
       .maybeSingle();
     return (data ?? null) as Level | null;
@@ -267,7 +669,7 @@ import { url } from '@/lib/site';
       }
       const { data } = await supabase
         .from('squashlevels_players')
-        .select('display_name, current_level, updated_at')
+        .select('id, display_name, current_level, updated_at')
         .ilike('display_name', name)
         .limit(1)
         .maybeSingle();
@@ -279,13 +681,13 @@ import { url } from '@/lib/site';
   async function loadUploads(account: Account) {
     const own = await supabase
       .from('contributions')
-      .select('id, kind, title, caption, status, created_at, credit')
+      .select('id, kind, title, caption, status, created_at, credit, credit_key')
       .eq('submitted_by', account.userId)
       .order('created_at', { ascending: false });
     const named = account.displayName.trim()
       ? await supabase
           .from('contributions')
-          .select('id, kind, title, caption, status, created_at, credit')
+          .select('id, kind, title, caption, status, created_at, credit, credit_key')
           .eq('credit_key', account.displayName.trim().toLowerCase())
           .eq('status', 'published')
           .order('created_at', { ascending: false })
@@ -307,6 +709,16 @@ import { url } from '@/lib/site';
       return;
     }
     whoEl.textContent = `Signed in as ${account.displayName || account.email}`;
+    paintSummary(account, []);
+    const stop = await privateStop(supabase, account, { role: true });
+    const work = root.querySelector<HTMLElement>('[data-private]')!;
+    if (stop) {
+      statusEl.textContent = stopMessage(stop);
+      work.hidden = true;
+      return;
+    }
+    work.hidden = false;
+    void noteActivity(supabase);
     statusEl.textContent = '';
     const found = await squadsFor(account);
     const { squads, teamIds } = found;
@@ -315,7 +727,20 @@ import { url } from '@/lib/site';
     groupsEl.textContent = account.groups.length
       ? `Groups: ${account.groups.map((group) => group.name).join(', ')}`
       : '';
-    const [level, uploads] = await Promise.all([loadLevel(account, found.names), loadUploads(account)]);
+    const [level, uploads, published] = await Promise.all([
+      loadLevel(account, found.names),
+      loadUploads(account),
+      supabase.from('contributions').select('credit, credit_key, kind, status').eq('kind', 'article').eq('status', 'published').limit(1000),
+    ]);
+    let ratings: Rating[] = [];
+    if (level?.id != null) {
+      const { data } = await supabase
+        .from('squashlevels_ratings')
+        .select('player_id, recorded_on, level, kind')
+        .eq('player_id', level.id)
+        .order('recorded_on', { ascending: true });
+      ratings = ((data ?? []) as Rating[]).filter((row) => row.level != null);
+    }
     let fixtures: Fixture[] = [];
     if (teamIds.length) {
       const { data: leagueTeams, error: teamError } = await supabase.from('league_teams').select('id, team_id').in('team_id', teamIds);
@@ -333,10 +758,16 @@ import { url } from '@/lib/site';
         fixtures = ((data ?? []) as unknown as Fixture[]).map(normalise).filter((fixture) => fixture.home && fixture.away);
       }
     }
-    drawMatches(squads, teamIds, fixtures, account);
-    drawLevel(level);
+    await paintMatches(account, squads, teamIds, fixtures, found.names, found.clubNames);
+    drawLevel(level, ratings);
     if (uploads.error) statusEl.textContent = uploads.error;
-    drawUploads(uploads.rows);
+    const publishedRows = ((published.error ? [] : published.data) ?? []) as Upload[];
+    for (const row of uploads.rows) {
+      if (row.kind === 'article' && row.status === 'published') publishedRows.push(row);
+    }
+    const keys = [account.displayName, ...found.names, ...uploads.rows.map((row) => row.credit_key || row.credit)];
+    drawArticles(uploads.rows, articleRank(publishedRows, keys));
+    paintSummary(account, found.league);
   }
 
   void showSession();
@@ -344,7 +775,7 @@ import { url } from '@/lib/site';
 
 <style>
   .you {
-    max-width: 44rem;
+    max-width: 52rem;
   }
   .lede,
   .places,
@@ -388,8 +819,56 @@ import { url } from '@/lib/site';
   }
   .meta,
   .last,
+  .where,
+  .also,
   .level {
     margin: 0.2rem 0 0;
+  }
+  .where {
+    font-weight: 700;
+  }
+  .results,
+  .gaps {
+    list-style: none;
+    margin: 0.4rem 0 0;
+    padding: 0;
+  }
+  .results li,
+  .gaps li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.8rem;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .chart {
+    margin-top: 0.8rem;
+  }
+  .chart svg {
+    width: 100%;
+    height: auto;
+    color: var(--ink, #0e2744);
+  }
+  .chart text {
+    fill: currentColor;
+    font-size: 12px;
+  }
+  .chart .grid {
+    stroke: currentColor;
+    stroke-opacity: 0.18;
+  }
+  .chart .line {
+    fill: none;
+    stroke: #f15a22;
+    stroke-width: 2.5;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+  .stars {
+    margin: 0 0 0.6rem;
+    color: #f15a22;
+    font-weight: 700;
+    letter-spacing: 0.08em;
   }
   .level strong {
     font-size: 1.6rem;
@@ -414,6 +893,15 @@ import { url } from '@/lib/site';
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
+  }
+  .account-summary {
+    margin-top: 2.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    color: var(--ink-200);
+  }
+  .account-summary p {
+    margin: 0.35rem 0;
   }
   @media (max-width: 640px) {
     .uploads li {

@@ -7,16 +7,26 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 ---
 
 <Base
-  title="Minigame mk2"
-  description="A one-player squash game on a court floor. Enter your initials, serve, and send the ball back to the front wall. The racket stays behind the service line."
-  crumbs={[{ name: 'Minigame mk2', path: '/minigame/' }]}
+  title="Minigame mk3"
+  description="A Halloween squash game. The ball rebounds off the front wall. Hit it before the second bounce. Boasts off the side wall count."
+  crumbs={[{ name: 'Minigame mk3', path: '/minigame/' }]}
 >
   <PageHero
-    eyebrow="Arcade"
-    title="Minigame mk2"
-    lede="One player, looking down the court. Type your initials, press Serve, and send the ball back to the front wall. The racket cannot cross the service line."
+    eyebrow="Halloween arcade"
+    title="Minigame mk3"
+    lede="The ball comes back off the front wall, often via the side. Hit it before it bounces twice. The racket stays behind the service line. Pumpkins, skulls and bats are worth 10, 20 and 30."
   />
-  <section class="section">
+  <section class="section halloween">
+    <div class="web web--left" aria-hidden="true"></div>
+    <div class="web web--right" aria-hidden="true"></div>
+    <div class="skelly skelly--left" aria-hidden="true">
+      <span class="skelly__skull"></span>
+      <span class="skelly__ribs"></span>
+    </div>
+    <div class="skelly skelly--right" aria-hidden="true">
+      <span class="skelly__skull"></span>
+      <span class="skelly__ribs"></span>
+    </div>
     <div class="container arcade" id="minigame" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
       <div class="play">
         <form class="card name-card" data-start>
@@ -33,10 +43,22 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
           <span data-lives></span>
         </p>
         <div class="court" style={`--serve-x: ${SERVE_SPOT.x}%; --serve-y: ${SERVE_SPOT.y}%;`}>
+          <span class="lantern lantern--left" aria-hidden="true"></span>
+          <span class="lantern lantern--right" aria-hidden="true"></span>
           <canvas width={COURT.width} height={COURT.height} data-court tabindex="0" aria-label="Squash court"></canvas>
           <button class="btn btn--primary serve-on-court" type="button" data-serve-btn hidden>Serve</button>
         </div>
         <p class="result" data-result hidden></p>
+        <div class="fright" data-fright hidden>
+          <svg class="fright__face" viewBox="0 0 120 140" role="img" aria-label="A ghost looms over the court">
+            <path fill="#f5f0e6" d="M60 8c-28 0-48 22-48 54v62l14-12 12 12 12-16 10 16 12-16 12 16 12-12 12 12V62C108 30 88 8 60 8z" />
+            <ellipse cx="42" cy="62" rx="10" ry="14" fill="#111" />
+            <ellipse cx="78" cy="62" rx="10" ry="14" fill="#111" />
+            <ellipse cx="44" cy="58" rx="3" ry="4" fill="#f97316" />
+            <ellipse cx="80" cy="58" rx="3" ry="4" fill="#f97316" />
+            <path d="M44 92c6 8 26 8 32 0" fill="none" stroke="#111" stroke-width="4" stroke-linecap="round" />
+          </svg>
+        </div>
         <p class="again" data-again hidden>
           <button class="btn btn--primary btn--sm" type="button" data-replay>Play again</button>
           <button class="btn btn--ghost btn--sm" type="button" data-rename>Change initials</button>
@@ -73,6 +95,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   const canvas = root.querySelector<HTMLCanvasElement>('[data-court]')!;
   const resultEl = root.querySelector<HTMLElement>('[data-result]')!;
   const again = root.querySelector<HTMLElement>('[data-again]')!;
+  const frightEl = root.querySelector<HTMLElement>('[data-fright]')!;
   const boardEl = root.querySelector<HTMLElement>('[data-board]')!;
   const naughty = root.querySelector<HTMLDialogElement>('[data-naughty]')!;
   const naughtyLine = root.querySelector<HTMLElement>('[data-naughty-line]')!;
@@ -92,6 +115,12 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   let saved = false;
   let blockedInitials: string[] = [];
   let audioCtx: AudioContext | null = null;
+  let musicOn = false;
+  let musicStep = 0;
+  let musicTimer = 0;
+  const tune = [146.83, 174.61, 196, 174.61, 146.83, 130.81, 116.54, 146.83];
+  let drone: OscillatorNode | null = null;
+  let droneGain: GainNode | null = null;
 
   const escapeHtml = (value: string) =>
     value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
@@ -124,6 +153,89 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       osc.start(start);
       osc.stop(start + dur);
     });
+  }
+
+  function startMusic() {
+    if (musicOn) return;
+    musicOn = true;
+    musicStep = 0;
+    try {
+      whenReady((ctxAudio) => {
+        drone = ctxAudio.createOscillator();
+        droneGain = ctxAudio.createGain();
+        drone.type = 'sine';
+        drone.frequency.value = 73.42;
+        droneGain.gain.value = 0.028;
+        drone.connect(droneGain);
+        droneGain.connect(ctxAudio.destination);
+        drone.start();
+        window.clearInterval(musicTimer);
+        musicTimer = window.setInterval(() => {
+          if (!musicOn) return;
+          const note = tune[musicStep % tune.length]!;
+          musicStep += 1;
+          beep(note, audio().currentTime, 0.34, 'triangle', 0.045);
+        }, 460);
+      });
+    } catch {
+      musicOn = false;
+    }
+  }
+
+  function stopMusic() {
+    musicOn = false;
+    window.clearInterval(musicTimer);
+    try {
+      drone?.stop();
+    } catch {
+      /* already stopped */
+    }
+    drone = null;
+    droneGain = null;
+  }
+
+  function frightSound() {
+    try {
+      whenReady((ctxAudio) => {
+        const dur = 0.7;
+        const buffer = ctxAudio.createBuffer(1, Math.floor(ctxAudio.sampleRate * dur), ctxAudio.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < data.length; i += 1) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+        const src = ctxAudio.createBufferSource();
+        src.buffer = buffer;
+        const filter = ctxAudio.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 540;
+        const gain = ctxAudio.createGain();
+        gain.gain.setValueAtTime(0.2, ctxAudio.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctxAudio.currentTime + dur);
+        src.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctxAudio.destination);
+        src.start();
+        const osc = ctxAudio.createOscillator();
+        const oscGain = ctxAudio.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, ctxAudio.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(55, ctxAudio.currentTime + 0.65);
+        oscGain.gain.setValueAtTime(0.08, ctxAudio.currentTime);
+        oscGain.gain.exponentialRampToValueAtTime(0.0001, ctxAudio.currentTime + 0.7);
+        osc.connect(oscGain);
+        oscGain.connect(ctxAudio.destination);
+        osc.start();
+        osc.stop(ctxAudio.currentTime + 0.7);
+      });
+    } catch {
+      /* the scare still shows if sound is blocked */
+    }
+  }
+
+  function showFright() {
+    frightEl.hidden = false;
+    frightSound();
+    window.setTimeout(() => {
+      frightEl.hidden = true;
+    }, 1400);
   }
 
   function intro() {
@@ -249,6 +361,8 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
   function finish(name: string) {
     if (!game) return;
+    stopMusic();
+    showFright();
     resultEl.hidden = false;
     again.hidden = false;
     hud.hidden = true;
@@ -266,10 +380,11 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     try {
       if (events.includes('hit')) batHit();
       if (events.includes('score')) beep(740, audio().currentTime, 0.08, 'square', 0.06);
-      if (events.includes('bonus')) {
+      if (events.includes('bonus') && game) {
         const nowTone = audio().currentTime;
-        beep(880, nowTone, 0.08, 'square', 0.07);
-        beep(1180, nowTone + 0.08, 0.1, 'square', 0.06);
+        const base = game.lastBonusPoints >= 30 ? 1320 : game.lastBonusPoints >= 20 ? 1040 : 880;
+        beep(base, nowTone, 0.08, 'square', 0.07);
+        beep(base * 1.25, nowTone + 0.08, 0.12, 'square', 0.06);
       }
       if (events.includes('miss') || events.includes('over')) beep(120, audio().currentTime, 0.1, 'square', 0.07);
     } catch {
@@ -292,8 +407,10 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     form.hidden = true;
     resultEl.hidden = true;
     again.hidden = true;
+    frightEl.hidden = true;
     hud.hidden = true;
     serveBtn.hidden = false;
+    startMusic();
     paint();
   }
 
@@ -363,7 +480,9 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   root.querySelector('[data-replay]')!.addEventListener('click', () => showServe());
   root.querySelector('[data-rename]')!.addEventListener('click', () => {
     playId += 1;
+    stopMusic();
     game = null;
+    frightEl.hidden = true;
     form.hidden = false;
     again.hidden = true;
     resultEl.hidden = true;
@@ -451,10 +570,158 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     width: 100%;
     height: auto;
     display: block;
-    background: #07182c;
-    border: 1px solid var(--gold-500);
+    background: #140810;
+    border: 1px solid #f97316;
     border-radius: var(--radius-sm);
     touch-action: none;
+  }
+  :global(body:has(#minigame) .page-hero) {
+    background: #140810;
+    color: #f6e7d4;
+  }
+  :global(body:has(#minigame) .page-hero h1) {
+    color: #fb923c;
+  }
+  :global(body:has(#minigame) .page-hero .lede),
+  :global(body:has(#minigame) .page-hero .eyebrow) {
+    color: #f6e7d4;
+  }
+  .halloween {
+    position: relative;
+    background:
+      radial-gradient(circle at 12% 20%, rgba(249, 115, 22, 0.16), transparent 28%),
+      radial-gradient(circle at 88% 70%, rgba(88, 28, 135, 0.28), transparent 32%),
+      #1a0b14;
+    overflow: hidden;
+  }
+  .web {
+    position: absolute;
+    width: 9rem;
+    height: 9rem;
+    pointer-events: none;
+    background:
+      linear-gradient(rgba(245, 236, 220, 0.55), rgba(245, 236, 220, 0.55)) 0 0 / 1px 100% no-repeat,
+      linear-gradient(rgba(245, 236, 220, 0.45), rgba(245, 236, 220, 0.45)) 0 0 / 100% 1px no-repeat,
+      repeating-radial-gradient(circle at 0 0, transparent 0 12px, rgba(245, 236, 220, 0.45) 13px 14px);
+    opacity: 0.8;
+  }
+  .web--left {
+    top: 0;
+    left: 0;
+  }
+  .web--right {
+    top: 0;
+    right: 0;
+    transform: scaleX(-1);
+  }
+  .skelly {
+    position: absolute;
+    top: 4.5rem;
+    width: 3.2rem;
+    pointer-events: none;
+    opacity: 0.8;
+  }
+  .skelly--left {
+    left: 0.6rem;
+  }
+  .skelly--right {
+    right: 0.6rem;
+  }
+  .skelly__skull {
+    display: block;
+    width: 2.1rem;
+    height: 2.4rem;
+    margin: 0 auto 0.2rem;
+    border: 3px solid #f5f0e6;
+    border-radius: 1rem 1rem 0.8rem 0.8rem;
+    box-shadow: inset 0.45rem 0.7rem 0 #1a0b14, inset -0.45rem 0.7rem 0 #1a0b14, inset 0 1.45rem 0 #1a0b14;
+  }
+  .skelly__ribs {
+    display: block;
+    width: 2.4rem;
+    height: 3.4rem;
+    margin: 0 auto;
+    border: 3px solid #f5f0e6;
+    border-radius: 1rem;
+    background:
+      linear-gradient(#f5f0e6, #f5f0e6) center / 3px 100% no-repeat,
+      repeating-linear-gradient(#f5f0e6 0 3px, transparent 3px 14px);
+  }
+  .lantern {
+    position: absolute;
+    top: -0.2rem;
+    width: 1.5rem;
+    height: 1.7rem;
+    border-radius: 0.7rem 0.7rem 0.55rem 0.55rem;
+    background: #f97316;
+    box-shadow: 0 0 16px rgba(249, 115, 22, 0.85);
+    z-index: 1;
+  }
+  .lantern::before {
+    content: '';
+    position: absolute;
+    left: 0.55rem;
+    top: -0.35rem;
+    width: 0.35rem;
+    height: 0.4rem;
+    background: #166534;
+    border-radius: 0.1rem;
+  }
+  .lantern::after {
+    content: '';
+    position: absolute;
+    left: 0.35rem;
+    top: 0.45rem;
+    width: 0.8rem;
+    height: 0.55rem;
+    background:
+      linear-gradient(#fde68a, #fde68a) 0 0 / 0.18rem 0.18rem no-repeat,
+      linear-gradient(#fde68a, #fde68a) 100% 0 / 0.18rem 0.18rem no-repeat,
+      linear-gradient(#fde68a, #fde68a) 50% 100% / 0.22rem 0.16rem no-repeat;
+  }
+  .lantern--left {
+    left: -0.4rem;
+  }
+  .lantern--right {
+    right: -0.4rem;
+  }
+  .fright {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    display: grid;
+    place-items: center;
+    background: rgba(60, 0, 0, 0.78);
+  }
+  .fright__face {
+    width: min(70vw, 22rem);
+    height: auto;
+    filter: drop-shadow(0 0 28px #7f1d1d);
+    animation: loom 1.1s ease-out;
+  }
+  @media (max-width: 900px) {
+    .skelly {
+      display: none;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .fright__face {
+      animation: none;
+    }
+  }
+  @keyframes loom {
+    from {
+      transform: scale(0.2);
+      opacity: 0;
+    }
+    30% {
+      transform: scale(1.15);
+      opacity: 1;
+    }
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
   }
   @media (max-width: 700px) {
     .play {

@@ -37,7 +37,7 @@ const scoresHref = url('/captains/admin/minigame/');
           <a class="btn btn--ghost btn--sm" data-junior-link hidden href={juniorEntriesHref}>Junior entries</a>
           <a class="btn btn--ghost btn--sm" href={articlesHref}>Match articles</a>
           <a class="btn btn--ghost btn--sm" data-share-link hidden href={shareHref}>Shared content</a>
-          <a class="btn btn--ghost btn--sm" data-scores-link hidden href={scoresHref}>Minigame mk2 scores</a>
+          <a class="btn btn--ghost btn--sm" data-scores-link hidden href={scoresHref}>Minigame mk3 scores</a>
           <button class="btn btn--ghost btn--sm" type="button" data-lm-only data-tab-button="traffic" hidden>Traffic</button>
           <a class="btn btn--ghost btn--sm" href={`${captainsHref}profile/`}>Profile</a>
           <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
@@ -101,8 +101,6 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="site-player" hidden>
             <h2>Player</h2>
             <p class="muted small" data-site-player-note></p>
-            <p class="muted small">Signed in as <strong data-own-name></strong>. Email <strong data-own-email></strong>. Name and password are changed on your profile.</p>
-            <div class="site-facts" data-own-facts></div>
             <div data-site-player-list></div>
           </section>
 
@@ -169,7 +167,7 @@ const scoresHref = url('/captains/admin/minigame/');
             <div class="member-tools">
               <label class="directory-search">
                 Search
-                <input type="search" data-member-search placeholder="Name, place or email" autocomplete="off" />
+                <input type="search" data-member-search placeholder="Name, place, email, ES or mobile" autocomplete="off" />
               </label>
               <label>
                 Group
@@ -218,28 +216,22 @@ const scoresHref = url('/captains/admin/minigame/');
                   <col class="col-name" />
                   <col class="col-place" />
                   <col class="col-email" />
-                  <col class="col-es" />
-                  <col class="col-mobile" />
                   <col class="col-roles" />
                   <col class="col-active" />
                   <col class="col-password" />
                   <col class="col-delete" />
-                  <col class="col-status" />
-                  <col class="col-login" />
+                  <col class="col-more" />
                 </colgroup>
                 <thead>
                   <tr>
                     <th>Name</th>
                     <th>Place</th>
                     <th>Email</th>
-                    <th>ES number</th>
-                    <th>Mobile</th>
                     <th>Roles</th>
                     <th>Active</th>
                     <th>Password</th>
                     <th>Delete</th>
-                    <th>Status</th>
-                    <th>Last login</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody data-users data-group-members></tbody>
@@ -350,6 +342,7 @@ const scoresHref = url('/captains/admin/minigame/');
                   <tr>
                     <th>Role</th>
                     <th>Given by</th>
+                    <th>Can do</th>
                   </tr>
                 </thead>
                 <tbody data-permission-roles></tbody>
@@ -379,7 +372,7 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="traffic" data-lm-only hidden>
             <h2>Site traffic</h2>
             <p class="muted small">
-              Page views are anonymous counts from public pages, including Minigame mk2. Sign-ins record who logged in, and when. Admin and captain tools, and switching these tabs, are not counted as page views.
+              Public page views stay anonymous unless that browser is signed in. A signed-in visit is stored against that person, including captain and admin pages. The name opens that person on Users.
             </p>
             <p class="muted small" data-traffic-status hidden role="status"></p>
             <div class="traffic-stats" data-traffic-stats hidden>
@@ -434,6 +427,20 @@ const scoresHref = url('/captains/admin/minigame/');
                   <tbody data-traffic-top></tbody>
                 </table>
               </div>
+              <h3>Signed-in visits (30 days)</h3>
+              <div class="overview-box">
+                <table class="overview traffic-table">
+                  <thead>
+                    <tr>
+                      <th>When</th>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Path</th>
+                    </tr>
+                  </thead>
+                  <tbody data-traffic-members></tbody>
+                </table>
+              </div>
               <h3>Sign-ins (30 days)</h3>
               <div class="overview-box">
                 <table class="overview traffic-table">
@@ -458,7 +465,7 @@ const scoresHref = url('/captains/admin/minigame/');
 <script>
   import { createClient } from '@supabase/supabase-js';
   import { bindPasswordRules, bindPasswordToggles, callManageAccounts, fetchAccountStates, fillSuggestedPassword, passwordIssue, suggestPassword } from '@/lib/passwords';
-  import { loadAccount, sendToLogin, type Account } from '@/lib/account';
+  import { loadAccount, noteActivity, privateStop, sendToLogin, stopMessage, type Account } from '@/lib/account';
 
   type Person = { id: string; display_name: string; email: string | null; is_admin: boolean };
   type Club = { slug: string; name: string; contact_name: string | null; contact_email: string | null; leaguemaster_club_id?: string | null };
@@ -598,6 +605,16 @@ const scoresHref = url('/captains/admin/minigame/');
   const trafficByDay = root.querySelector<HTMLElement>('[data-traffic-by-day]')!;
   const trafficTop = root.querySelector<HTMLElement>('[data-traffic-top]')!;
   const trafficSignIns = root.querySelector<HTMLElement>('[data-traffic-sign-ins]')!;
+  const trafficMembers = root.querySelector<HTMLElement>('[data-traffic-members]')!;
+  trafficMembers.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-open-traffic-user]');
+    const name = button?.dataset.openTrafficUser ?? '';
+    if (!name) return;
+    memberSearch.value = name;
+    memberPage = 0;
+    showTab('members');
+    paintMembers();
+  });
 
   const formatDay = (iso: string) => {
     const d = new Date(`${iso}T12:00:00`);
@@ -636,6 +653,7 @@ const scoresHref = url('/captains/admin/minigame/');
       sign_ins_30d?: number;
       by_day: { day: string; page_views: number; sessions: number }[];
       top_pages: { path: string; page_views: number }[];
+      signed_in_views?: { viewed_at: string; path: string; display_name: string; email: string }[];
       recent_sign_ins?: { signed_in_at: string; display_name: string; email: string }[];
     };
     root.querySelector('[data-kpi="views-7"]')!.textContent = String(stats.total_7d ?? 0);
@@ -661,10 +679,20 @@ const scoresHref = url('/captains/admin/minigame/');
         : top
             .map((row) => `<tr><td><code>${escapeHtml(row.path)}</code></td><td>${row.page_views}</td></tr>`)
             .join('');
+    const memberViews = stats.signed_in_views ?? [];
+    trafficMembers.innerHTML =
+      memberViews.length === 0
+        ? '<tr><td colspan="4">No signed-in visits yet. A row appears when someone who is logged in opens a page.</td></tr>'
+        : memberViews
+            .map(
+              (row) =>
+                `<tr><td>${escapeHtml(formatWhen(row.viewed_at))}</td><td><button type="button" class="count-button" data-open-traffic-user="${escapeHtml(row.display_name)}">${escapeHtml(row.display_name)}</button></td><td>${escapeHtml(row.email || '—')}</td><td><code>${escapeHtml(row.path)}</code></td></tr>`,
+            )
+            .join('');
     const signIns = stats.recent_sign_ins ?? [];
     trafficSignIns.innerHTML =
       signIns.length === 0
-        ? '<tr><td colspan="3">No sign-ins yet. A row appears when someone logs in.</td></tr>'
+        ? '<tr><td colspan="3">No activity yet. A row appears when someone uses a signed-in page.</td></tr>'
         : signIns
             .map(
               (row) =>
@@ -966,16 +994,27 @@ const scoresHref = url('/captains/admin/minigame/');
       const active = setActive.dataset.activeNext === 'true';
       const userId = setActive.dataset.setActive ?? '';
       setStatus(active ? 'Turning the account on…' : 'Turning the account off…');
-      const message = await callManageAccounts(supabase, {
+      let message = await callManageAccounts(supabase, {
         action: 'set-active',
         user_id: userId,
         active,
       });
+      if (message === 'Unknown action.') {
+        const { error } = await supabase.rpc('set_account_active', { p_user_id: userId, p_active: active });
+        message = error
+          ? /set_account_active|schema cache/i.test(error.message)
+            ? 'Active changes are not on the database yet. Run the set_account_active SQL, then try again.'
+            : error.message
+          : null;
+      }
       const card = memberCards.find((item) => item.profileId === userId);
       if (message) {
         setStatus(message);
         setActive.title = message;
-        if (card) card.statusHtml = message;
+        if (card) {
+          card.statusHtml = message;
+          openMore.add(card.key);
+        }
         paintMembers();
         return;
       }
@@ -1023,8 +1062,21 @@ const scoresHref = url('/captains/admin/minigame/');
     setStatus(makingAdmin ? 'Admin access granted.' : 'Admin access removed.');
     await showSession();
   };
+  const openMore = new Set<string>();
   membersHost.addEventListener('click', (event) => {
     const target = event.target as HTMLElement;
+    const more = target.closest<HTMLButtonElement>('[data-toggle-more]');
+    if (more) {
+      const key = more.dataset.toggleMore ?? '';
+      const detail = [...membersHost.querySelectorAll<HTMLElement>('[data-member-detail]')].find((row) => row.dataset.memberDetail === key);
+      const open = Boolean(detail?.hidden);
+      if (detail) detail.hidden = !open;
+      more.setAttribute('aria-expanded', String(open));
+      more.textContent = open ? '−' : '+';
+      if (open) openMore.add(key);
+      else openMore.delete(key);
+      return;
+    }
     if (target.closest('[data-open-role-pop], [data-set-active], [data-delete-person], [data-reset-password]')) {
       void onAccountAction(event);
       return;
@@ -1048,14 +1100,16 @@ const scoresHref = url('/captains/admin/minigame/');
   membersHost.addEventListener('focusout', (event) => {
     const input = event.target as HTMLInputElement;
     if (!input.matches?.('[data-row-field]')) return;
-    const row = input.closest('tr');
+    const key = input.dataset.rowKey ?? '';
     const next = event.relatedTarget;
-    if (row && next instanceof Node && row.contains(next)) return;
-    const card = memberCards.find((item) => item.key === (input.dataset.rowKey ?? ''));
+    if (next instanceof HTMLElement && next.dataset.rowKey === key) return;
+    const card = memberCards.find((item) => item.key === key);
     if (!card || !viewerIsAdmin || card.protectedAccount) return;
-    const valueOf = (field: string) => row?.querySelector<HTMLInputElement>(`[data-row-field="${field}"]`)?.value ?? '';
+    const fieldInput = (field: string) =>
+      [...membersHost.querySelectorAll<HTMLInputElement>('[data-row-field]')].find((item) => item.dataset.rowField === field && item.dataset.rowKey === key);
+    const valueOf = (field: string) => fieldInput(field)?.value ?? '';
     const email = valueOf('email').trim().toLowerCase();
-    const emailInput = row?.querySelector<HTMLInputElement>('[data-row-field="email"]');
+    const emailInput = fieldInput('email');
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       emailInput?.setAttribute('aria-invalid', 'true');
       setStatus('Enter a valid email address.');
@@ -1103,9 +1157,6 @@ const scoresHref = url('/captains/admin/minigame/');
   const playerNote = root.querySelector<HTMLElement>('[data-site-player-note]')!;
   const siteClubHost = root.querySelector<HTMLElement>('[data-site-club]')!;
   const siteTeamHost = root.querySelector<HTMLElement>('[data-site-team]')!;
-  const ownName = root.querySelector<HTMLElement>('[data-own-name]')!;
-  const ownEmail = root.querySelector<HTMLElement>('[data-own-email]')!;
-  const ownFacts = root.querySelector<HTMLElement>('[data-own-facts]')!;
   const playerListHost = root.querySelector<HTMLElement>('[data-site-player-list]')!;
   type WebsitePlayer = { teamId: number; name: string; email: string; playerId: number };
   let websitePlayers: WebsitePlayer[] = [];
@@ -1128,13 +1179,28 @@ const scoresHref = url('/captains/admin/minigame/');
     if (group.source === 'account') return 'Admin accounts';
     return 'League Master';
   };
+  const roleCanDo = (slug: string) => {
+    const text: Record<string, string> = {
+      admin: 'Users, groups, roles, links, traffic, League Master lists, juniors, Beds Closed, publish content, match articles, minigame scores',
+      lm_club_captain: 'Their club on League Master, the squad, club matches',
+      lm_team_captain: 'Their team, the squad, the match sheet',
+      lm_player: 'My squash, mark availability, send something in',
+      sl_player: 'Listed on SquashLevels',
+      jc_player: 'Listed from a junior entry',
+      jc_parent: 'Listed as the parent on a junior entry',
+      junior_organiser: 'Junior admin menu, County Closed entries',
+      bc_player: 'Beds Closed section',
+      rb_player: 'Racketball group',
+    };
+    return text[slug] ?? '';
+  };
   function paintPermissionCatalog(groupCatalog: GroupCatalog[], roleCatalog: RoleCatalog[], members: GroupMember[]) {
     permissionGroupsHost.innerHTML = groupCatalog.length
       ? groupCatalog
           .map((group) => {
             const role = roleCatalog.find((item) => item.slug === group.role_slug)?.name ?? group.role_slug;
             const people = members.filter((member) => member.group_slug === group.slug).length;
-            return `<tr><td>${escapeHtml(group.name)}</td><td>${escapeHtml(role)}</td><td>${escapeHtml(filledFrom(group))}</td><td><button type="button" class="count-button" data-open-group="${escapeHtml(group.slug)}">${people}</button></td></tr>`;
+            return `<tr><td>${escapeHtml(group.name)}</td><td>${roleMark(group.role_slug, role)}</td><td>${escapeHtml(filledFrom(group))}</td><td><button type="button" class="count-button" data-open-group="${escapeHtml(group.slug)}">${people}</button></td></tr>`;
           })
           .join('')
       : '<tr><td colspan="4">Groups are not on the database yet.</td></tr>';
@@ -1142,10 +1208,10 @@ const scoresHref = url('/captains/admin/minigame/');
       ? roleCatalog
           .map((role) => {
             const given = groupCatalog.filter((group) => group.role_slug === role.slug).map((group) => group.name);
-            return `<tr><td>${escapeHtml(role.name)}</td><td>${escapeHtml(given.join(', ') || 'No group')}</td></tr>`;
+            return `<tr><td>${roleMark(role.slug, role.name)}</td><td>${escapeHtml(given.join(', ') || 'No group')}</td><td class="can-do">${escapeHtml(roleCanDo(role.slug))}</td></tr>`;
           })
           .join('')
-      : '<tr><td colspan="2">Roles are not on the database yet.</td></tr>';
+      : '<tr><td colspan="3">Roles are not on the database yet.</td></tr>';
   }
   function paintGroupPeople() {
     const group = groupCatalogLive.find((item) => item.slug === openGroupSlug);
@@ -1170,7 +1236,7 @@ const scoresHref = url('/captains/admin/minigame/');
             nameKey(item.profileName) === nameKey(member.person_name),
         );
         const key = card?.key ?? '';
-        return `<tr><td><button type="button" class="count-button" data-open-person="${escapeHtml(key)}">${escapeHtml(member.person_name)}</button></td><td>${escapeHtml(member.place || '—')}</td></tr>`;
+        return `<tr><td><button type="button" class="count-button" data-open-person="${escapeHtml(key)}">${escapeHtml(member.person_name)}</button></td><td>${escapeHtml(groupPeoplePlace(member, card))}</td></tr>`;
       })
       .join('');
   }
@@ -1204,6 +1270,51 @@ const scoresHref = url('/captains/admin/minigame/');
     emergency_phone: string;
     notes: string | null;
   };
+  let juniorEntriesLive: JuniorEntry[] = [];
+  const placeParts = (value: string | null | undefined) =>
+    (value ?? '')
+      .split(';')
+      .map((part) => part.trim())
+      .filter(Boolean);
+  function groupPeoplePlace(member: GroupMember, card: MemberCard | undefined) {
+    if (member.group_slug !== 'jc_players' && member.group_slug !== 'jc_parents') return member.place || '—';
+    const names = new Set<string>();
+    const addName = (value: string | null | undefined) => {
+      const key = nameKey(value ?? '');
+      if (key) names.add(key);
+    };
+    addName(member.person_name);
+    addName(card?.name);
+    addName(card?.profileName);
+    for (const other of listedGroups) {
+      const otherKey = nameKey(other.person_name);
+      if (!otherKey) continue;
+      const sameProfile = Boolean(member.profile_id) && other.profile_id === member.profile_id;
+      if (sameProfile || names.has(otherKey)) addName(other.person_name);
+    }
+    const samePerson = (other: GroupMember) => {
+      const otherKey = nameKey(other.person_name);
+      return (Boolean(member.profile_id) && other.profile_id === member.profile_id) || (otherKey !== '' && names.has(otherKey));
+    };
+    const isLm = (slug: string) => slug.startsWith('lm_') || groupCatalogLive.some((item) => item.slug === slug && item.source === 'leaguemaster');
+    const lmParts = listedGroups.filter((other) => isLm(other.group_slug) && samePerson(other)).flatMap((other) => placeParts(other.place));
+    const clubs =
+      member.group_slug === 'jc_players'
+        ? juniorEntriesLive
+            .filter((entry) => names.has(nameKey(`${entry.player_first_name ?? ''} ${entry.player_last_name ?? ''}`)))
+            .map((entry) => (entry.club ?? '').trim())
+        : juniorEntriesLive.filter((entry) => names.has(nameKey(entry.guardian_name ?? ''))).map((entry) => (entry.club ?? '').trim());
+    const juniorParts = clubs.some(Boolean) ? clubs.filter(Boolean) : placeParts(member.place);
+    const seen = new Set<string>();
+    const combined: string[] = [];
+    for (const part of [...lmParts, ...juniorParts]) {
+      const token = part.toLowerCase();
+      if (seen.has(token)) continue;
+      seen.add(token);
+      combined.push(part);
+    }
+    return combined.join('; ') || '—';
+  }
   function paintJuniorEntries(entries: JuniorEntry[], problem = '') {
     if (problem) {
       juniorsHost.innerHTML = `<tr><td colspan="11">${escapeHtml(problem)}</td></tr>`;
@@ -1268,7 +1379,9 @@ const scoresHref = url('/captains/admin/minigame/');
       if (groupFilter && !(groupFilter === 'admins' ? card.isAdmin || card.groupSlugs.includes('admins') : card.groupSlugs.includes(groupFilter))) return false;
       if (placeFilter && !card.teams.split(';').map((part) => part.trim()).includes(placeFilter)) return false;
       if (!query) return true;
-      return [card.name, card.profileName, card.teams, card.place, card.email, card.groupNames, card.roleNames].some((value) => value.toLowerCase().includes(query));
+      return [card.name, card.profileName, card.teams, card.place, card.email, card.es, card.phone, card.groupNames, card.roleNames].some((value) =>
+        value.toLowerCase().includes(query),
+      );
     });
     const narrowed = Boolean(query || groupFilter || placeFilter);
     memberCount.textContent = narrowed ? `${shown.length} of ${players.length} players` : `${players.length} players`;
@@ -1291,12 +1404,13 @@ const scoresHref = url('/captains/admin/minigame/');
     usersRange.textContent = shown.length ? `${start + 1}–${start + pageRows.length} of ${shown.length}` : '';
     usersPrev.disabled = memberPage <= 0;
     usersNext.disabled = memberPage >= pageCount - 1;
-    const roleLabel = (card: MemberCard) => {
-      const names = roleMenuChoices()
+    const roleBits = (card: MemberCard) =>
+      roleMenuChoices()
         .filter((group) => (group.slug === 'admins' ? card.isAdmin || card.groupSlugs.includes('admins') : card.groupSlugs.includes(group.slug)))
-        .map((group) => roleCatalogLive.find((item) => item.slug === group.role_slug)?.name ?? group.name);
-      return names.length ? names.join(', ') : 'Roles';
-    };
+        .map((group) => {
+          const match = roleCatalogLive.find((item) => item.slug === group.role_slug);
+          return { slug: match?.slug ?? group.role_slug, name: match?.name ?? group.name };
+        });
     membersHost.innerHTML = pageRows.length
       ? pageRows
           .map((card) => {
@@ -1304,7 +1418,8 @@ const scoresHref = url('/captains/admin/minigame/');
             const email = contactCell(card, 'email', card.protectedAccount ? '' : card.email, 'Email', 'email', 'Add an email');
             const es = contactCell(card, 'es', card.es, 'ES number', 'text', 'Add an ES number');
             const mobile = contactCell(card, 'phone', card.phone, 'Mobile', 'tel', 'Add a mobile number');
-            const roles = `<button type="button" class="count-button" data-open-role-pop="${escapeHtml(card.key)}" aria-label="Roles for ${escapeHtml(card.name)}">${escapeHtml(roleLabel(card))}</button>`;
+            const bits = roleBits(card);
+            const roles = `<button type="button" class="count-button role-label" data-open-role-pop="${escapeHtml(card.key)}" aria-label="Roles for ${escapeHtml(card.name)}">${bits.length ? bits.map((bit) => roleMark(bit.slug, bit.name)).join(', ') : 'Roles'}</button>`;
             const activeLabel = card.active ? 'Active' : 'Inactive';
             const active =
               viewerIsAdmin && card.profileId && !card.protectedAccount && card.profileId !== viewerId
@@ -1315,10 +1430,13 @@ const scoresHref = url('/captains/admin/minigame/');
               viewerIsAdmin && card.profileId && !card.protectedAccount
                 ? actionButton('Delete', `data-delete-person="${card.profileId}" data-person-name="${escapeHtml(card.name)}" aria-label="Delete ${escapeHtml(card.name)}" title="Deletes the login only. The League Master record stays."`)
                 : '—';
-            return `<tr${selected} data-member-key="${escapeHtml(card.key)}"><td>${escapeHtml(card.label)}</td><td>${escapeHtml(card.teams || '—')}</td><td>${email}</td><td>${es}</td><td>${mobile}</td><td class="row-action">${roles}</td><td class="row-action">${active}</td><td class="row-action">${password}</td><td class="row-action">${remove}</td><td>${escapeHtml(card.statusHtml)}</td><td>${escapeHtml(card.lastLogin)}</td></tr>`;
+            const expanded = openMore.has(card.key);
+            const more = `<button type="button" class="row-more" data-toggle-more="${escapeHtml(card.key)}" aria-expanded="${expanded ? 'true' : 'false'}" aria-label="More for ${escapeHtml(card.name)}">${expanded ? '−' : '+'}</button>`;
+            const detail = `<tr class="member-more" data-member-detail="${escapeHtml(card.key)}" ${expanded ? '' : 'hidden'}><td colspan="8"><div class="more-grid"><label>ES number ${es}</label><label>Mobile ${mobile}</label><p><span>Status</span> ${escapeHtml(card.statusHtml)}</p><p><span>Last active</span> ${escapeHtml(card.lastLogin)}</p></div></td></tr>`;
+            return `<tr${selected} data-member-key="${escapeHtml(card.key)}"><td>${escapeHtml(card.label)}</td><td>${escapeHtml(card.teams || '—')}</td><td>${email}</td><td class="row-action">${roles}</td><td class="row-action">${active}</td><td class="row-action">${password}</td><td class="row-action">${remove}</td><td class="row-action">${more}</td></tr>${detail}`;
           })
           .join('')
-      : `<tr><td colspan="11">${players.length ? 'No players match that search.' : 'No players yet.'}</td></tr>`;
+      : `<tr><td colspan="8">${players.length ? 'No players match that search.' : 'No players yet.'}</td></tr>`;
     createAccountForm.hidden = true;
   }
   function websiteRoleChoices() {
@@ -1340,7 +1458,7 @@ const scoresHref = url('/captains/admin/minigame/');
         const role = roleCatalogLive.find((item) => item.slug === group.role_slug)?.name ?? group.name;
         const checked = group.slug === 'admins' ? card.isAdmin || card.groupSlugs.includes('admins') : card.groupSlugs.includes(group.slug);
         const locked = LOCKED_ROLE_SLUGS.has(group.slug) || (group.slug === 'admins' && (!card.profileId || card.protectedAccount || card.profileId === viewerId));
-        return `<label class="${locked ? 'is-locked' : ''}"><input type="checkbox" data-role-slug="${escapeHtml(group.slug)}" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''} /> ${escapeHtml(role)}</label>`;
+        return `<label class="${locked ? 'is-locked' : ''}"><input type="checkbox" data-role-slug="${escapeHtml(group.slug)}" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''} /> ${roleMark(group.role_slug, role)}</label>`;
       })
       .join('');
   }
@@ -1536,8 +1654,6 @@ const scoresHref = url('/captains/admin/minigame/');
   };
 
   async function loadWebsite(account: Account) {
-    ownName.textContent = account.displayName || '—';
-    ownEmail.textContent = account.email || '—';
     const [{ data: mineRows }, { data: clubRows }, { data: teamRows }, { data: squadRows }, { data: nomRows }, contactResult, { data: slRows }, linkResult, profileResult, roleMembershipResult, nameResult] = await Promise.all([
       supabase.from('memberships').select('role, club_slug, team_id').eq('profile_id', account.userId),
       supabase.from('clubs').select('slug, name, contact_name, contact_email').order('name', { ascending: true }),
@@ -1836,39 +1952,9 @@ const scoresHref = url('/captains/admin/minigame/');
       slHost.innerHTML = `<div class="overview-box"><table class="overview"><thead><tr><th>Club</th><th>Team</th><th>Player</th><th>Level</th><th>Updated</th></tr></thead><tbody>${body}</tbody></table></div>`;
     }
 
-    const linkedLm = mineLink?.lm_player_name ? nameKey(mineLink.lm_player_name) : '';
     const myNames = new Set(rows.filter((row) => isSelf(account, row.name, row.email)).map((row) => nameKey(row.name)));
     const selfRow = rows.find((row) => myNames.has(nameKey(row.name)));
-    if (selfRow) {
-      ownName.textContent = selfRow.name;
-      whoEl.textContent = `Signed in as ${selfRow.name}`;
-    }
-    const myNominations = nominations.filter((row) => myNames.has(nameKey(row.player_name)) || isSelf(account, row.player_name, null) || (linkedLm && nameKey(row.player_name) === linkedLm));
-    const lmHtml = myNominations.length
-      ? `<ul>${myNominations
-          .map((row) => {
-            const team = teamById.get(row.team_id);
-            const club = team ? clubBySlug.get(team.club_slug) : undefined;
-            return `<li>${escapeHtml(club?.name ?? 'Club')} · ${escapeHtml(team?.name ?? 'Team')} · ${escapeHtml(row.player_name)}</li>`;
-          })
-          .join('')}</ul>`
-      : '<p class="muted small">No League Master nomination matches your name.</p>';
-    const teamFacts = account.isAdmin
-      ? '<p class="muted small">Every team is on the Team tab.</p>'
-      : hasClubRole
-        ? '<p class="muted small">Every team at your club is on the Team tab.</p>'
-        : teamIds.size
-          ? teamList
-              .filter((team) => teamIds.has(team.id))
-              .map((team) => `<p>${escapeHtml(team.division ? `${team.name} · ${team.division}` : team.name)}${team.captain_name ? ` · Captain ${escapeHtml(team.captain_name)}` : ''}</p>`)
-              .join('')
-          : '<p class="muted small">No team on this account yet.</p>';
-    const clubFacts = account.isAdmin
-      ? '<p class="muted small">Every club is on the Club tab.</p>'
-      : (account.playerOnly ? clubList.filter((club) => homeClubSlugs.has(club.slug)) : hasClubRole ? clubList.filter((club) => clubSlugs.has(club.slug)) : clubList.filter((club) => homeClubSlugs.has(club.slug)))
-          .map((club) => `<p>${escapeHtml(club.name)}${club.contact_name ? ` · ${escapeHtml(club.contact_name)}` : ''}${club.contact_email ? ` · ${escapeHtml(club.contact_email)}` : ''}</p>`)
-          .join('') || '<p class="muted small">No club on this account yet.</p>';
-    ownFacts.innerHTML = `<h3>League Master</h3>${lmHtml}<h3>Team</h3>${teamFacts}<h3>Club</h3>${clubFacts}`;
+    if (selfRow) whoEl.textContent = `Signed in as ${selfRow.name}`;
   }
 
   const rememberWebsiteEmail = (teamId: number, name: string, email: string, playerId: number) => {
@@ -2014,6 +2100,16 @@ const scoresHref = url('/captains/admin/minigame/');
     }
 
     whoEl.textContent = `Signed in as ${account.displayName || account.email}`;
+    const stop = await privateStop(supabase, account, { role: true });
+    if (stop) {
+      workspace.hidden = true;
+      juniorLink.hidden = true;
+      shareLink.hidden = true;
+      scoresLink.hidden = true;
+      setStatus(stopMessage(stop));
+      return;
+    }
+    void noteActivity(supabase);
     viewerIsAdmin = account.isAdmin;
     viewerId = account.userId;
     viewerSeesJuniors = account.isAdmin || account.groups.some((group) => group.slug === 'junior_organisers');
@@ -2095,6 +2191,7 @@ const scoresHref = url('/captains/admin/minigame/');
     roleCatalogLive = roleCatalog;
     paintPermissionCatalog(groupCatalog, roleCatalog, groupMembers);
     const juniorEntries = (juniorError ? [] : (juniorRows ?? [])) as JuniorEntry[];
+    juniorEntriesLive = juniorEntries;
     paintJuniorEntries(juniorEntries, juniorError?.message ?? '');
     if (groupError || groupCatalogError || permissionError) groupNote.textContent = 'Groups are not on the database yet. Apply the groups migration, then reload.';
     const clubNames = new Map(clubs.map((club) => [club.slug, club.name]));
@@ -2579,6 +2676,10 @@ const scoresHref = url('/captains/admin/minigame/');
     return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
   }
 
+  function roleMark(slug: string, name: string) {
+    return `<span class="role-name" data-role="${escapeHtml(slug)}">${escapeHtml(name)}</span>`;
+  }
+
   memberSearch.addEventListener('input', () => {
     memberPage = 0;
     paintMembers();
@@ -2832,11 +2933,29 @@ const scoresHref = url('/captains/admin/minigame/');
   }
 
   #setup-app .member-tools {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: minmax(12rem, 1.6fr) minmax(10rem, 1fr) minmax(10rem, 1fr);
     gap: 0.75rem 1rem;
     align-items: end;
-    margin: 0.5rem 0;
+    margin: 0.5rem 0 0.75rem;
+  }
+  #setup-app .member-tools label {
+    display: grid;
+    gap: 0.3rem;
+    margin: 0;
+    min-width: 0;
+    font-weight: 600;
+  }
+  #setup-app .member-tools .directory-search {
+    max-width: none;
+    margin: 0;
+  }
+  #setup-app .member-tools input,
+  #setup-app .member-tools select {
+    width: 100%;
+    min-height: 2.4rem;
+    margin: 0;
+    box-sizing: border-box;
   }
   #setup-app .member-tools select,
   #setup-app [data-form='member'] input,
@@ -2894,14 +3013,9 @@ const scoresHref = url('/captains/admin/minigame/');
   #setup-app .site-card {
     margin: 0 0 1rem;
   }
-  #setup-app .site-card h3,
-  #setup-app .site-facts h3 {
+  #setup-app .site-card h3 {
     margin: 0.8rem 0 0.3rem;
     font-size: 1rem;
-  }
-  #setup-app .site-facts ul {
-    margin: 0.25rem 0 0;
-    padding-left: 1.2rem;
   }
   #setup-app .sl-chart svg {
     width: 100%;
@@ -3055,17 +3169,91 @@ const scoresHref = url('/captains/admin/minigame/');
     table-layout: fixed;
     font-size: 0.72rem;
   }
-  #setup-app .users-box .col-name { width: 12%; }
-  #setup-app .users-box .col-place { width: 11%; }
-  #setup-app .users-box .col-email { width: 16%; }
-  #setup-app .users-box .col-es { width: 8%; }
-  #setup-app .users-box .col-mobile { width: 9%; }
-  #setup-app .users-box .col-roles { width: 8%; }
-  #setup-app .users-box .col-active { width: 7%; }
-  #setup-app .users-box .col-password { width: 7%; }
+  #setup-app .users-box .col-name { width: 16%; }
+  #setup-app .users-box .col-place { width: 16%; }
+  #setup-app .users-box .col-email { width: 22%; }
+  #setup-app .users-box .col-roles { width: 20%; }
+  #setup-app .users-box .col-active { width: 8%; }
+  #setup-app .users-box .col-password { width: 8%; }
   #setup-app .users-box .col-delete { width: 6%; }
-  #setup-app .users-box .col-status { width: 7%; }
-  #setup-app .users-box .col-login { width: 9%; }
+  #setup-app .users-box .col-more { width: 4%; }
+  #setup-app .users-box .role-label {
+    font-size: 0.62rem;
+    line-height: 1.15;
+    white-space: normal;
+    color: #e7eef6;
+    text-underline-offset: 0.12em;
+  }
+  #setup-app {
+    --role-admin: #ffb088;
+    --role-lm-club-captain: #ffe14a;
+    --role-lm-team-captain: #c6e85a;
+    --role-lm-player: #6ee7a8;
+    --role-sl-player: #7dd3fc;
+    --role-jc-player: #93c5fd;
+    --role-jc-parent: #c4b5fd;
+    --role-junior-organiser: #f0abfc;
+    --role-bc-player: #5eead4;
+    --role-rb-player: #fda4af;
+  }
+  #setup-app .role-name {
+    color: #e7eef6;
+    font-weight: 700;
+  }
+  #setup-app .role-pop .role-name {
+    color: #0e2744;
+  }
+  #setup-app .role-name[data-role='admin'] { color: var(--role-admin); }
+  #setup-app .role-name[data-role='lm_club_captain'] { color: var(--role-lm-club-captain); }
+  #setup-app .role-name[data-role='lm_team_captain'] { color: var(--role-lm-team-captain); }
+  #setup-app .role-name[data-role='lm_player'] { color: var(--role-lm-player); }
+  #setup-app .role-name[data-role='sl_player'] { color: var(--role-sl-player); }
+  #setup-app .role-name[data-role='jc_player'] { color: var(--role-jc-player); }
+  #setup-app .role-name[data-role='jc_parent'] { color: var(--role-jc-parent); }
+  #setup-app .role-name[data-role='junior_organiser'] { color: var(--role-junior-organiser); }
+  #setup-app .role-name[data-role='bc_player'] { color: var(--role-bc-player); }
+  #setup-app .role-name[data-role='rb_player'] { color: var(--role-rb-player); }
+  #setup-app .users-box .row-more {
+    width: 1.6rem;
+    height: 1.6rem;
+    padding: 0;
+    border: 1px solid var(--gold-500);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: #fff;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  #setup-app .users-box tr[hidden] {
+    display: none;
+  }
+  #setup-app .users-box .member-more td {
+    background: rgba(255, 255, 255, 0.04);
+  }
+  #setup-app .users-box .more-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.45rem 0.75rem;
+    padding: 0.35rem 0.15rem;
+  }
+  #setup-app .users-box .more-grid label,
+  #setup-app .users-box .more-grid p {
+    display: grid;
+    gap: 0.2rem;
+    margin: 0;
+    font-size: 0.68rem;
+    font-weight: 700;
+  }
+  #setup-app .users-box .more-grid p span {
+    color: var(--gold-400);
+  }
+  @media (max-width: 800px) {
+    #setup-app .member-tools,
+    #setup-app .users-box .more-grid {
+      grid-template-columns: 1fr;
+    }
+  }
   #setup-app .users-box .overview th,
   #setup-app .users-box .overview td {
     white-space: normal;
@@ -3121,6 +3309,16 @@ const scoresHref = url('/captains/admin/minigame/');
     border-radius: var(--radius-sm);
     box-shadow: 0 10px 28px rgba(14, 39, 68, 0.18);
     padding: 0.55rem 0.7rem;
+    --role-admin: #c2410c;
+    --role-lm-club-captain: #a16207;
+    --role-lm-team-captain: #4d7c0f;
+    --role-lm-player: #166534;
+    --role-sl-player: #0369a1;
+    --role-jc-player: #1d4ed8;
+    --role-jc-parent: #6d28d9;
+    --role-junior-organiser: #a21caf;
+    --role-bc-player: #0f766e;
+    --role-rb-player: #be123c;
   }
   #setup-app .role-pop__who {
     margin: 0 0 0.35rem;
@@ -3398,6 +3596,10 @@ const scoresHref = url('/captains/admin/minigame/');
   }
   #setup-app .overview .col-action--wrap .btn {
     margin: 0.15rem 0 0.15rem 0.35rem;
+  }
+  #setup-app [data-tab='permissions-roles'] .can-do {
+    white-space: normal;
+    max-width: 28rem;
   }
   #setup-app .pill {
     display: inline-block;

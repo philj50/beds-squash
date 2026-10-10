@@ -7,13 +7,14 @@ import { url } from '@/lib/site';
 
 <Base
   title="Share a photo, video, link or article"
-  description="Players, captains and admins can send Bedfordshire squash photos, short videos, links and articles. An admin publishes them before they appear on the site."
+  description="Signed-in players send Bedfordshire squash photos, short videos, links and articles under their own name. An admin publishes them before they appear on the site."
   crumbs={[{ name: 'Share', path: '/share/' }]}
+  noindex
 >
   <PageHero
     eyebrow="From the courts"
     title="Share"
-    lede="Players, team captains, club captains and admins can send a photo, a short video, a link or an article. Nothing appears on the site until an admin publishes it."
+    lede="This is for the person signed in. A photo, short video, link or article is saved under that name. Nothing appears on the site until an admin publishes it."
   />
   <section class="section">
     <div class="container share" id="share-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
@@ -21,14 +22,14 @@ import { url } from '@/lib/site';
         <div>
           <h2>Send something in</h2>
           <p class="status" data-status role="status"></p>
-          <p class="gate" data-gate>
-            Sign in as a player, team captain, club captain or admin to send something in.
+          <p class="gate" data-gate hidden>
+            Sign in to send something in.
             <a href={url('/login/')} data-login>Log in</a>
           </p>
           <p class="thanks" data-thanks hidden>Thanks. An admin will look at it before it goes on the site.</p>
           <form class="card" data-form hidden>
             <div class="card__body stack">
-              <label>Your name <input name="credit" required minlength="2" maxlength="80" autocomplete="name" /></label>
+              <p class="sender">Sending as <strong data-sender></strong></p>
               <fieldset>
                 <legend>What are you sending?</legend>
                 <div class="kinds">
@@ -77,7 +78,7 @@ import { url } from '@/lib/site';
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { loadAccount, sendToLogin, type Account } from '@/lib/account';
+  import { loadAccount, noteActivity, privateStop, sendToLogin, stopMessage, type Account } from '@/lib/account';
   import {
     GALLERY_BODY_MAX,
     GALLERY_BODY_MIN,
@@ -126,21 +127,61 @@ import { url } from '@/lib/site';
     sendToLogin();
   });
 
+  const senderEl = root.querySelector<HTMLElement>('[data-sender]')!;
+  let lockedCredit = '';
+  const playerGroups = new Set([
+    'admins',
+    'lm_club_captains',
+    'lm_team_captains',
+    'lm_players',
+    'sl_players',
+    'jc_players',
+    'jc_parents',
+    'junior_organisers',
+    'bc_players',
+    'rb_players',
+  ]);
+
   const maySend = (account: Account) =>
     account.isAdmin ||
-    account.places.some((place) => place.role === 'club_captain' || place.role === 'team_captain' || place.role === 'team_player');
+    account.places.some((place) => place.role === 'club_captain' || place.role === 'team_captain' || place.role === 'team_player') ||
+    account.groups.some((group) => playerGroups.has(group.slug));
+
+  async function senderName(account: Account) {
+    const { data } = await supabase.from('group_members').select('group_slug, person_name').eq('profile_id', account.userId);
+    const preferred = ((data ?? []) as { group_slug: string; person_name: string }[]).find(
+      (seat) => ['lm_players', 'lm_team_captains', 'lm_club_captains'].includes(seat.group_slug) && seat.person_name.trim(),
+    );
+    return (preferred?.person_name || account.displayName || '').trim();
+  }
 
   async function openForm() {
     const account = await loadAccount(supabase);
-    if (!account) return;
+    if (!account) {
+      sendToLogin();
+      return;
+    }
+    const stop = await privateStop(supabase, account);
+    if (stop) {
+      gate.hidden = false;
+      gate.textContent = stopMessage(stop);
+      form.hidden = true;
+      return;
+    }
+    void noteActivity(supabase);
+    gate.hidden = false;
+    lockedCredit = await senderName(account);
     if (!maySend(account)) {
-      gate.textContent = 'This account cannot send content. It needs to be a player, a team captain, a club captain or an admin.';
+      gate.textContent = 'This account cannot send content. It needs to be a player, a captain or an admin.';
+      return;
+    }
+    if (lockedCredit.length < 2) {
+      gate.textContent = 'Add your name on your profile before sending something in.';
       return;
     }
     gate.hidden = true;
     form.hidden = false;
-    const credit = form.querySelector<HTMLInputElement>('[name="credit"]');
-    if (credit && !credit.value && account.displayName) credit.value = account.displayName;
+    senderEl.textContent = lockedCredit;
   }
 
   function boardLine(row: BoardRow) {
@@ -210,7 +251,11 @@ import { url } from '@/lib/site';
       return;
     }
     const kind = kindOf();
-    const credit = String(data.get('credit') ?? '').trim();
+    const credit = lockedCredit;
+    if (credit.length < 2) {
+      statusEl.textContent = 'Add your name on your profile before sending something in.';
+      return;
+    }
     let caption: string | null = null;
     let title: string | null = null;
     let body: string | null = null;
@@ -339,6 +384,12 @@ import { url } from '@/lib/site';
   }
   .kinds input {
     width: auto;
+  }
+  .sender {
+    margin: 0;
+  }
+  .sender strong {
+    font-weight: 700;
   }
   input,
   textarea {

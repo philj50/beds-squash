@@ -13,9 +13,10 @@ type Hooks = {
   squadWrites: number;
   actions: string[];
   bodies: Record<string, unknown>[];
+  activityAt: string | null;
 };
 
-const hooks: Hooks = { refuseActive: false, requireClub: false, squadWrites: 0, actions: [], bodies: [] };
+const hooks: Hooks = { refuseActive: false, requireClub: false, squadWrites: 0, actions: [], bodies: [], activityAt: null };
 
 type DifferenceRow = {
   id: number;
@@ -91,6 +92,7 @@ test.beforeEach(async ({ context, baseURL, page }) => {
   hooks.squadWrites = 0;
   hooks.actions = [];
   hooks.bodies = [];
+  hooks.activityAt = null;
   differencePlayers = freshDifferences();
   await context.addCookies([{ name: 'beds_cookies', value: 'essential', url: baseURL! }]);
   await installAdmin(page);
@@ -190,6 +192,35 @@ test.describe('Users', () => {
     await expect(page.getByRole('checkbox', { name: 'LM Player' })).toBeDisabled();
   });
 
+  test('role names on a row use different colours', async ({ page }) => {
+    await openUsers(page);
+    const pat = page.getByRole('button', { name: 'Roles for Pat Player' });
+    await expect(pat).toHaveText('LM Player, JC Player');
+    await expect(pat).toHaveCSS('text-decoration-line', 'underline');
+    const lm = pat.locator('.role-name[data-role="lm_player"]');
+    const jc = pat.locator('.role-name[data-role="jc_player"]');
+    await expect(lm).toHaveText('LM Player');
+    await expect(jc).toHaveText('JC Player');
+    const lmColor = await lm.evaluate((node) => getComputedStyle(node).color);
+    const jcColor = await jc.evaluate((node) => getComputedStyle(node).color);
+    expect(lmColor).not.toBe(jcColor);
+    await expect(lm).toHaveCSS('color', 'rgb(110, 231, 168)');
+    await expect(jc).toHaveCSS('color', 'rgb(147, 197, 253)');
+
+    await pat.click();
+    const pop = page.locator('[data-role-pop]');
+    const popLm = pop.locator('.role-name[data-role="lm_player"]');
+    const popJc = pop.locator('.role-name[data-role="jc_player"]');
+    await expect(popLm).toHaveCSS('color', 'rgb(22, 101, 52)');
+    await expect(popJc).toHaveCSS('color', 'rgb(29, 78, 216)');
+
+    await page.getByRole('heading', { name: 'Users', exact: true }).click();
+    await page.getByRole('button', { name: 'Roles', exact: true }).click();
+    const catalog = page.locator('[data-permission-roles]');
+    await expect(catalog.locator('.role-name[data-role="lm_player"]')).toHaveCSS('color', 'rgb(110, 231, 168)');
+    await expect(catalog.locator('.role-name[data-role="admin"]')).toHaveCSS('color', 'rgb(255, 176, 136)');
+  });
+
   test('Active is green, turns red, and stays red if the next account check fails', async ({ page }) => {
     await openUsers(page);
     const active = page.getByRole('button', { name: 'Active for Sam Morris' });
@@ -213,7 +244,7 @@ test.describe('Users', () => {
     const active = page.getByRole('button', { name: 'Active for Sam Morris' });
     await active.click();
     await expect(page.locator('[data-status]')).toHaveText('That account stays active.');
-    await expect(page.locator('[data-users] tr', { hasText: 'Sam Morris' })).toContainText('That account stays active.');
+    await expect(page.locator('[data-member-detail]').filter({ hasText: 'That account stays active.' })).toBeVisible();
     await expect(active).toHaveCSS('background-color', 'rgb(21, 128, 61)');
     await expect(page.getByRole('button', { name: 'Inactive for Sam Morris' })).toHaveCount(0);
   });
@@ -230,8 +261,12 @@ test.describe('Users', () => {
       await dialog.accept();
     });
     await sam.getByRole('button', { name: 'Delete Sam Morris' }).click();
-    await expect(page.locator('[data-users] tr', { hasText: 'Sam Morris' })).toContainText('No login');
     await expect(page.getByRole('button', { name: 'Delete Sam Morris' })).toHaveCount(0);
+    const samRow = page.locator('[data-users] tr[data-member-key]', { hasText: 'Sam Morris' });
+    const samMore = samRow.getByRole('button', { name: 'More for Sam Morris' });
+    if ((await samMore.getAttribute('aria-expanded')) !== 'true') await samMore.click();
+    const samKey = await samRow.getAttribute('data-member-key');
+    await expect(page.locator(`[data-member-detail="${samKey}"]`)).toContainText('No login');
     await expect(page.getByRole('cell', { name: 'Sam Morris', exact: true })).toBeVisible();
   });
 
@@ -244,8 +279,10 @@ test.describe('Users', () => {
 
   test('Group and Place narrow the list, and a login outside League Master keeps its sign-in', async ({ page }) => {
     await openUsers(page);
-    const ada = page.locator('[data-users] tr', { hasText: 'Ada Admin' });
-    await expect(ada).toContainText(/4 Oct 2026/);
+    const ada = page.locator('[data-users] tr[data-member-key]', { hasText: 'Ada Admin' });
+    await ada.getByRole('button', { name: 'More for Ada Admin' }).click();
+    const adaKey = await ada.getAttribute('data-member-key');
+    await expect(page.locator(`[data-member-detail="${adaKey}"]`)).toContainText(/4 Oct 2026/);
     await page.getByLabel('Group').selectOption({ label: 'Admin' });
     await expect(ada).toBeVisible();
     await expect(page.locator('[data-users] tr', { hasText: 'Pat Player' })).toHaveCount(0);
@@ -254,6 +291,18 @@ test.describe('Users', () => {
     await expect(page.locator('[data-users] tr', { hasText: 'Alex Away' })).toBeVisible();
     await expect(page.locator('[data-users] tr', { hasText: 'Pat Player' })).toHaveCount(0);
     await expect(ada).toHaveCount(0);
+  });
+
+  test('Last active follows later use, not only the password sign-in', async ({ page }) => {
+    hooks.activityAt = '2026-10-08T15:00:00.000Z';
+    await openUsers(page);
+    const ada = page.locator('[data-users] tr[data-member-key]', { hasText: 'Ada Admin' });
+    await ada.getByRole('button', { name: 'More for Ada Admin' }).click();
+    const adaKey = await ada.getAttribute('data-member-key');
+    const detail = page.locator(`[data-member-detail="${adaKey}"]`);
+    await expect(detail).toContainText('Last active');
+    await expect(detail).toContainText('8 Oct 2026');
+    await expect(detail).not.toContainText('4 Oct 2026');
   });
 
   test('search finds a player by team and by email, and a miss says so', async ({ page }) => {
@@ -282,7 +331,8 @@ test.describe('Users', () => {
     await expect(robin).toBeVisible();
     await expect(jamie.locator('td').nth(1)).toHaveText('Test Club');
     await expect(jamie.getByRole('textbox', { name: 'Email for Jamie Junior' })).toHaveValue('');
-    await expect(jamie.getByRole('textbox', { name: 'Mobile for Jamie Junior' })).toHaveValue('');
+    await jamie.getByRole('button', { name: 'More for Jamie Junior' }).click();
+    await expect(page.getByRole('textbox', { name: 'Mobile for Jamie Junior' })).toHaveValue('');
     await expect(jamie.getByRole('button', { name: 'Roles for Jamie Junior' })).toHaveText('JC Player');
     await expect(page.locator('[data-users] tr', { hasText: 'Pat Guardian' })).toHaveCount(0);
     await jamie.getByRole('button', { name: 'Roles for Jamie Junior' }).click();
@@ -298,12 +348,26 @@ test.describe('Users', () => {
     await expect(page.locator('[data-users] tr', { hasText: 'Jamie Junior' })).toHaveCount(0);
     await expect(parent.locator('td').nth(1)).toHaveText('Test Club; Other Club');
     await expect(parent.getByRole('textbox', { name: 'Email for Pat Guardian' })).toHaveValue('guardian@example.test');
-    await expect(parent.getByRole('textbox', { name: 'Mobile for Pat Guardian' })).toHaveValue('07000999999');
+    await parent.getByRole('button', { name: 'More for Pat Guardian' }).click();
+    await expect(page.getByRole('textbox', { name: 'Mobile for Pat Guardian' })).toHaveValue('07000999999');
     await expect(parent.getByRole('button', { name: 'Roles for Pat Guardian' })).toHaveText('JC Parent');
     await parent.getByRole('button', { name: 'Roles for Pat Guardian' }).click();
     await expect(page.getByRole('checkbox', { name: 'JC Parent' })).toBeChecked();
     await expect(page.getByRole('checkbox', { name: 'JC Parent' })).toBeDisabled();
     await expect(page.getByRole('checkbox', { name: 'JC Player' })).not.toBeChecked();
+    await page.getByRole('heading', { name: 'Users', exact: true }).click();
+
+    await page.getByRole('button', { name: 'Groups' }).click();
+    await page.locator('[data-permission-groups] tr', { hasText: 'JC Players' }).getByRole('button').click();
+    const jcPeople = page.locator('[data-group-people]');
+    await expect(jcPeople.locator('tr', { hasText: 'Pat Player' }).locator('td').nth(1)).toHaveText('Test Club / Test Team 1; Test Club');
+    await expect(jcPeople.locator('tr', { hasText: 'Jamie Junior' }).locator('td').nth(1)).toHaveText('Test Club');
+    await expect(jcPeople.locator('tr', { hasText: 'Robin Junior' }).locator('td').nth(1)).toHaveText('Other Club');
+    await page.locator('[data-permission-groups] tr', { hasText: 'LM Players' }).getByRole('button').click();
+    await expect(page.locator('[data-group-people] tr', { hasText: 'Pat Player' }).locator('td').nth(1)).toHaveText('Test Club / Test Team 1');
+    await expect(page.locator('[data-group-people] tr', { hasText: 'Zoe Player' }).locator('td').nth(1)).toHaveText('Test Club / Test Team 1');
+    await page.locator('[data-permission-groups] tr', { hasText: 'JC Parents' }).getByRole('button').click();
+    await expect(page.locator('[data-group-people] tr', { hasText: 'Pat Guardian' }).locator('td').nth(1)).toHaveText('Test Club; Other Club');
   });
 
   test('the county row stays locked', async ({ page }) => {
@@ -334,6 +398,7 @@ test.describe('Users', () => {
 
     await diff.getByRole('button', { name: 'Use League Master ES number for Zoe Player' }).click();
     await expect(diff.getByRole('row', { name: /Zoe Player/ })).toHaveCount(1);
+    await page.getByRole('button', { name: 'More for Zoe Player' }).click();
     await expect(page.getByRole('textbox', { name: 'ES number for Zoe Player' })).toHaveValue('222');
     await expect(page.locator('[data-users-status]')).toContainText('League Master ES number saved for Zoe Player.');
   });
@@ -629,6 +694,10 @@ async function installAdmin(page: Page) {
           if (row) Object.assign(row, body);
         }
       }
+    }
+    if (path.endsWith('/site_sign_ins')) {
+      await respond(hooks.activityAt ? [{ user_id: adminId, signed_in_at: hooks.activityAt }] : []);
+      return;
     }
     await respond([]);
   });

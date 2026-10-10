@@ -30,7 +30,10 @@ test.describe('Public site', () => {
     await expect(nav.getByRole('link', { name: 'Leagues', exact: true })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Juniors', exact: true })).toBeVisible();
     const labels = (await nav.getByRole('link').allTextContents()).map((label) => label.trim());
-    expect(labels.indexOf('Minigame mk2')).toBe(labels.indexOf('Contact') + 1);
+    expect(labels.indexOf('Minigame mk3')).toBe(labels.indexOf('Contact') + 1);
+    expect(labels[labels.indexOf('News') + 1]).toBe('Events');
+    await expect(nav.locator('[data-your-squash]')).toBeHidden();
+    await expect(nav.getByRole('link', { name: 'My Squash', exact: true })).toHaveCount(0);
   });
 
   test('news index and a league match article', async ({ page }) => {
@@ -241,20 +244,19 @@ test.describe('Public site', () => {
       await send([]);
     });
     await open(page, 'share/');
-    await expect(page.getByRole('heading', { level: 1, name: 'Share' })).toBeVisible();
-    await expect(page.getByText('Pat Player')).toBeVisible();
-    await expect(page.getByText('2 photos · 1 video · 1 article')).toBeVisible();
-    await expect(page.locator('[data-form]')).toBeHidden();
-    await expect(page.getByText('Sign in as a player, team captain, club captain or admin')).toBeVisible();
+    await expect(page).toHaveURL(/\/login\/\?next=/);
 
     await page.evaluate((stored) => {
       localStorage.setItem('sb-klxyjmwiaivvqjbhxzak-auth-token', JSON.stringify(stored));
     }, session);
-    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.goto('share/', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { level: 1, name: 'Share' })).toBeVisible();
+    await expect(page.locator('[data-sender]')).toHaveText('Pat Player');
+    await expect(page.getByText('2 photos · 1 video · 1 article')).toBeVisible();
     await expect(page.locator('[data-form]')).toBeVisible();
+    await expect(page.getByLabel('Your name')).toHaveCount(0);
     await page.getByRole('radio', { name: 'Video' }).check();
     await expect(page.getByText('up to 10 MB')).toBeVisible();
-    await page.getByLabel('Your name').fill('Pat Player');
     await page.getByLabel('Caption').fill('A short rally');
     await page.locator('input[name="video"]').setInputFiles({
       name: 'too-big.mp4',
@@ -327,7 +329,7 @@ test.describe('Public site', () => {
 
   test('minigame asks for initials and serves from the court', async ({ page }) => {
     await open(page, 'minigame/');
-    await expect(page.getByRole('heading', { level: 1, name: 'Minigame mk2' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Minigame mk3' })).toBeVisible();
     await expect(page.getByLabel('Your initials')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'High scores' })).toBeVisible();
@@ -375,7 +377,7 @@ test.describe('Public site', () => {
           const r = data[i] ?? 0;
           const g = data[i + 1] ?? 0;
           const b = data[i + 2] ?? 0;
-          if (b > 220 && g > 180 && r > 120 && r < 190 && b > g) return y;
+          if (b > 230 && r > 160 && r < 220 && g > 100 && g < 170 && b > r && b > g) return y;
         }
       }
       return height;
