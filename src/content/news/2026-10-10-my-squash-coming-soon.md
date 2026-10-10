@@ -2,6 +2,8 @@
 title: My Squash is coming soon
 date: 2026-10-10T16:00:00
 summary: A page for the person signed in. Your next match and where to be, the last scores, a SquashLevels graph, and the articles you have sent in.
+image: /uploads/news/my-squash.jpg
+imageAlt: A player faces a court beside three cards showing a club with a map pin, a rising SquashLevels line, and three gold stars.
 category: website
 featured: false
 ---

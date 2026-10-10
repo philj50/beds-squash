@@ -2,6 +2,8 @@
 title: Outsider wins get their own story
 date: 2026-10-10T13:00:00
 summary: When a lower-rated player beats someone at least 200 SquashLevels higher, or 12 percent higher, that upset is the day's match story.
+image: /uploads/news/outsider-win.jpg
+imageAlt: A player in orange lifts a racket after a winning shot, while a taller player in navy watches the ball finish in the back corner.
 category: website
 featured: false
 ---

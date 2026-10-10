@@ -1,5 +1,6 @@
-/** Top-down squash. The ball leaves the front wall at an angle and the player
- * has to play it before the second bounce, including boasts off the side wall.
+/** Top-down squash. The ball leaves the front wall, arcs, and bounces once
+ * before the service line. The player has to play that ball in the back court
+ * before it would bounce again, including boasts off the side wall.
  *
  * Singles court, World Squash: 9.75 m long and 6.40 m wide.
  * The short line is 5.49 m from the front wall.
@@ -21,8 +22,17 @@ const SERVICE_Y = FRONT + (BACK - FRONT) * (5.49 / 9.75);
 const RACKET_HEAD = 22;
 const BALL = 7;
 const LIVES = 3;
-const GRAVITY = 620;
-const HIT_HEIGHT = 86;
+/** How far the ball is drawn above its floor spot, so the bounce reads as an arc. */
+const LIFT = 0.5;
+/** A normal return stays under this. Anything higher can pass over the racket. */
+const HIT_HEIGHT = 140;
+const LAUNCH_Y = FRONT + 16;
+/** The first bounce is short of the service line. The second would be past the back. */
+const FIRST_BOUNCE_Y = SERVICE_Y - 68;
+const SECOND_BOUNCE_Y = BACK + 44;
+const LAUNCH_Z = 40;
+const FIRST_PEAK = 112;
+const SECOND_PEAK = 92;
 const BALL_COLORS = ['#ff6a00', '#c026d3', '#39d353', '#38bdf8', '#fb7185', '#facc15'];
 
 export const PLAY = { left: LEFT, right: RIGHT, front: FRONT, back: BACK };
@@ -50,6 +60,9 @@ type Ball = {
   /** Stays at the front until the other ball is on its way back. */
   wait: boolean;
   color: number;
+  /** Where the last racket shot started, so the return can arc to the front wall. */
+  returnFrom: number;
+  returnZ: number;
 };
 
 export type BonusDrop = {
@@ -79,7 +92,20 @@ export type Arcade = {
 };
 
 function stillBall(x: number): Ball {
-  return { x, y: FRONT + 28, vx: 0, vy: 0, z: 18, vz: 0, bounces: 0, returned: false, wait: false, color: 0 };
+  return {
+    x,
+    y: FRONT + 28,
+    vx: 0,
+    vy: 0,
+    z: 18,
+    vz: 0,
+    bounces: 0,
+    returned: false,
+    wait: false,
+    color: 0,
+    returnFrom: 0,
+    returnZ: 0,
+  };
 }
 
 function parked(count: number): Ball[] {
@@ -146,7 +172,7 @@ export function tick(game: Arcade, dt: number): TickEvent[] {
   releaseWaiting(game);
   maybeSpawn(game);
   const speed = pace(game);
-  const slices = Math.max(6, Math.ceil((speed * step) / 8));
+  const slices = Math.max(8, Math.ceil((speed * step) / 6));
   let missed = false;
   for (let i = 0; i < slices && !missed; i += 1) {
     const piece = step / slices;
@@ -159,17 +185,12 @@ export function tick(game: Arcade, dt: number): TickEvent[] {
         ball.vz = 0;
         continue;
       }
-      const prevY = ball.y;
-      ball.vz -= GRAVITY * piece;
-      ball.z += ball.vz * piece;
-      if (ball.z <= 0) {
-        ball.z = 0;
-        ball.vz = Math.abs(ball.vz) * 0.56;
-        if (ball.vz < 50) ball.vz = 0;
-        ball.bounces += 1;
-      }
+      const prevX = ball.x;
+      const prevDraw = ball.y - ball.z * LIFT;
       ball.x += ball.vx * piece;
       ball.y += ball.vy * piece;
+      ball.z = flightHeight(ball);
+      ball.vz = 0;
 
       if (ball.x < LEFT + BALL) {
         ball.x = LEFT + BALL;
@@ -205,26 +226,25 @@ export function tick(game: Arcade, dt: number): TickEvent[] {
         }
       }
 
-      const racketY = game.racketY;
-      if (ball.vy > 0 && ball.z < HIT_HEIGHT && prevY <= racketY + 18 && ball.y >= racketY - BALL) {
+      const drawY = ball.y - ball.z * LIFT;
+      if (ball.vy > 0 && ball.z < HIT_HEIGHT && meetsRacket(prevX, prevDraw, ball.x, drawY, game)) {
         const half = RACKET_W / 2;
-        if (ball.x >= game.racketX - half && ball.x <= game.racketX + half) {
-          const along = (ball.x - game.racketX) / half;
-          ball.y = racketY - BALL;
-          ball.vy = -speed;
-          const boast = Math.abs(along) > 0.42;
-          ball.vx = boast ? Math.sign(along || 1) * speed * (0.72 + Math.abs(along) * 0.28) : along * speed * 0.95;
-          ball.vx = clamp(ball.vx, -speed * 0.98, speed * 0.98);
-          ball.z = Math.max(ball.z, 40);
-          ball.vz = 360;
-          ball.bounces = 0;
-          ball.returned = true;
-          ball.color = (ball.color + 1) % BALL_COLORS.length;
-          events.push('hit');
-        }
+        const along = (ball.x - game.racketX) / half;
+        ball.returnFrom = ball.y;
+        ball.returnZ = ball.z;
+        ball.vy = -speed;
+        const boast = Math.abs(along) > 0.42;
+        ball.vx = boast ? Math.sign(along || 1) * speed * (0.72 + Math.abs(along) * 0.28) : along * speed * 0.95;
+        ball.vx = clamp(ball.vx, -speed * 0.98, speed * 0.98);
+        ball.bounces = 0;
+        ball.returned = true;
+        ball.z = flightHeight(ball);
+        ball.color = (ball.color + 1) % BALL_COLORS.length;
+        events.push('hit');
       }
 
-      if (ball.bounces >= 2 || ball.y > BACK + 8) {
+      ball.bounces = !ball.returned && ball.y >= FIRST_BOUNCE_Y ? 1 : 0;
+      if (!ball.returned && ball.y > BACK + 8) {
         events.push(loseLife(game));
         missed = true;
         break;
@@ -232,6 +252,53 @@ export function tick(game: Arcade, dt: number): TickEvent[] {
     }
   }
   return events;
+}
+
+/** The ball arcs to a bounce short of the service line, then sits up in the back court. */
+function flightHeight(ball: Ball) {
+  if (ball.returned) return heightReturn(ball);
+  return heightTowardPlayer(ball.y);
+}
+
+function heightTowardPlayer(y: number) {
+  if (y <= FIRST_BOUNCE_Y) {
+    const span = FIRST_BOUNCE_Y - LAUNCH_Y;
+    const p = clamp((y - LAUNCH_Y) / span, 0, 1);
+    return (1 - p) * LAUNCH_Z + 4 * FIRST_PEAK * p * (1 - p);
+  }
+  const span = SECOND_BOUNCE_Y - FIRST_BOUNCE_Y;
+  const p = clamp((y - FIRST_BOUNCE_Y) / span, 0, 1);
+  return 4 * SECOND_PEAK * p * (1 - p);
+}
+
+function heightReturn(ball: Ball) {
+  const span = Math.max(48, ball.returnFrom - LAUNCH_Y);
+  const p = clamp((ball.returnFrom - ball.y) / span, 0, 1);
+  return (1 - p) * ball.returnZ + p * LAUNCH_Z + 4 * FIRST_PEAK * p * (1 - p);
+}
+
+/** The racket is the head plus the shaft. The test follows the ball across the step, so a fast ball cannot skip the head. */
+function meetsRacket(x0: number, draw0: number, x1: number, draw1: number, game: Arcade) {
+  const top = game.racketY - RACKET_HEAD - BALL;
+  const bottom = game.racketY + 8 + BALL;
+  const left = game.racketX - RACKET_W / 2 - BALL;
+  const right = game.racketX + RACKET_W / 2 + BALL;
+  const yLo = Math.min(draw0, draw1);
+  const yHi = Math.max(draw0, draw1);
+  if (yHi < top || yLo > bottom) return false;
+  const span = draw1 - draw0;
+  let tEnter = 0;
+  let tExit = 1;
+  if (Math.abs(span) > 0.0001) {
+    const ta = (top - draw0) / span;
+    const tb = (bottom - draw0) / span;
+    tEnter = Math.max(0, Math.min(ta, tb));
+    tExit = Math.min(1, Math.max(ta, tb));
+  }
+  if (tEnter > tExit) return false;
+  const xEnter = x0 + (x1 - x0) * tEnter;
+  const xExit = x0 + (x1 - x0) * tExit;
+  return Math.max(xEnter, xExit) >= left && Math.min(xEnter, xExit) <= right;
 }
 
 /** The front wall sends the ball back at an angle, often toward a side wall. */
@@ -247,8 +314,11 @@ function reboundFromFront(ball: Ball, speed: number) {
   ball.vx = clamp(ball.vx, -paceNow * 0.95, paceNow * 0.95);
   ball.returned = false;
   ball.bounces = 0;
-  ball.z = Math.max(ball.z, 64);
-  ball.vz = 440;
+  ball.returnFrom = 0;
+  ball.returnZ = 0;
+  ball.y = LAUNCH_Y;
+  ball.z = heightTowardPlayer(ball.y);
+  ball.vz = 0;
   ball.color = (ball.color + 1) % BALL_COLORS.length;
 }
 
@@ -268,6 +338,8 @@ function maybeTwin(game: Arcade) {
     returned: false,
     wait: true,
     color: 2,
+    returnFrom: 0,
+    returnZ: 0,
   });
 }
 
@@ -277,7 +349,7 @@ function releaseWaiting(game: Arcade) {
   const waiting = game.balls.find((ball) => ball.wait);
   if (!waiting) return;
   waiting.wait = false;
-  waiting.y = FRONT + 16;
+  waiting.y = LAUNCH_Y;
   reboundFromFront(waiting, pace(game));
 }
 
@@ -325,15 +397,17 @@ function flying(game: Arcade, slot: number): Ball {
   const mid = (LEFT + RIGHT) / 2;
   return {
     x: lead ? mid + dir * (30 + Math.random() * 70) : mid - dir * 50,
-    y: FRONT + 16,
+    y: LAUNCH_Y,
     vx: lead ? dir * speed * (0.4 + Math.random() * 0.35) : 0,
     vy: lead ? speed * 0.92 : 0,
-    z: lead ? 64 : 18,
-    vz: lead ? 440 : 0,
+    z: lead ? LAUNCH_Z : 18,
+    vz: 0,
     bounces: 0,
     returned: false,
     wait: !lead,
     color: Math.floor(Math.random() * BALL_COLORS.length),
+    returnFrom: 0,
+    returnZ: 0,
   };
 }
 
@@ -414,11 +488,11 @@ export function drawCourt(ctx: CanvasRenderingContext2D, game: Arcade) {
   const showBall = game.phase === 'serve' || game.phase === 'rally' || game.phase === 'point' || game.phase === 'over';
   if (showBall) {
     for (const ball of game.balls) {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.fillStyle = 'rgba(253, 186, 116, 0.9)';
       ctx.beginPath();
-      ctx.ellipse(ball.x, ball.y + 2, BALL * 0.85, BALL * 0.45, 0, 0, Math.PI * 2);
+      ctx.ellipse(ball.x, ball.y + 1, BALL * 0.7, BALL * 0.4, 0, 0, Math.PI * 2);
       ctx.fill();
-      const lift = ball.z * 0.12;
+      const lift = ball.z * LIFT;
       ctx.fillStyle = BALL_COLORS[ball.color % BALL_COLORS.length]!;
       ctx.beginPath();
       ctx.arc(ball.x, ball.y - lift, BALL, 0, Math.PI * 2);

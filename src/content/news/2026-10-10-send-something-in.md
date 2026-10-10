@@ -2,6 +2,8 @@
 title: Send a photo or an article from your login
 date: 2026-10-10T12:00:00
 summary: Signed-in players can send a photo, a video, a link or an article. It keeps their name, and it waits for an admin before it appears on the site.
+image: /uploads/news/send-something-in.jpg
+imageAlt: A phone, a printed match photograph, a blank card and a pen on a table, with a squash court behind them.
 category: website
 featured: false
 ---

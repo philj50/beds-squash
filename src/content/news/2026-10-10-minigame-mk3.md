@@ -2,6 +2,8 @@
 title: Minigame mk3 is a Halloween rally
 date: 2026-10-10T15:00:00
 summary: The ball comes back off the front wall. Hit it before the second bounce, play a boast off the side wall, and collect pumpkins, skulls and bats.
+image: /uploads/news/minigame-mk3.jpg
+imageAlt: A top-down Halloween squash court with orange lines, cobwebs, lanterns, a purple racket, and a ball in the air above its shadow. A pumpkin, a skull and a bat sit on the court.
 category: website
 featured: false
 ---

@@ -2,6 +2,8 @@
 title: Close matches are written up on their own
 date: 2026-10-10T14:00:00
 summary: On a match day the site picks the rubber where the two SquashLevels ratings were closest, and publishes that as the news story.
+image: /uploads/news/close-match.jpg
+imageAlt: Two players of similar build stretch for an orange ball that sits exactly between their rackets.
 category: website
 featured: false
 ---
