@@ -22,7 +22,7 @@ const news = defineCollection({
     image: uploadPath.optional(),
     imageAlt: z.string().optional(),
     category: z
-      .enum(['county', 'juniors', 'leagues', 'tournaments', 'england-squash', 'clubs', 'racketball'])
+      .enum(['county', 'juniors', 'leagues', 'tournaments', 'england-squash', 'clubs', 'racketball', 'website'])
       .default('county'),
     featured: z.boolean().default(false),
     draft: z.boolean().default(false),

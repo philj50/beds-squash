@@ -7,7 +7,7 @@ import { getNews, getUpcomingEvents, getClubs } from '@/lib/content';
 import { toMapClubs } from '@/lib/geo';
 import { SITE, url } from '@/lib/site';
 
-const news = await getNews();
+const news = (await getNews()).filter((post) => post.data.category !== 'website');
 const featured = news.find((p) => p.data.featured) ?? news[0];
 const latest = news.filter((p) => p.id !== featured?.id).slice(0, 3);
 const upcoming = (await getUpcomingEvents()).slice(0, 4);

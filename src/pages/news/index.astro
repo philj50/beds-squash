@@ -7,7 +7,9 @@ import { CATEGORY_LABEL, url } from '@/lib/site';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 const posts = await getNews();
-const categories = [...new Set(posts.map((p) => p.data.category))];
+const updates = posts.filter((post) => post.data.category === 'website');
+const reports = posts.filter((post) => post.data.category !== 'website');
+const categories = [...new Set(reports.map((p) => p.data.category))];
 ---
 
 <Base title="Bedfordshire squash news" description="News from Bedfordshire Squash — tournaments, leagues, juniors, county teams and England Squash updates." crumbs={[{ name: 'News', path: '/news/' }]}>
@@ -28,14 +30,29 @@ const categories = [...new Set(posts.map((p) => p.data.category))];
       }
       <div class="grid grid--3" data-news-grid>
         {
-          posts.map((p) => (
+          reports.map((p) => (
             <div data-category={p.data.category}>
               <NewsCard post={p} />
             </div>
           ))
         }
       </div>
-      {posts.length === 0 && <p class="notice">No news yet.</p>}
+      {reports.length === 0 && <p class="notice">No news yet.</p>}
+      {
+        updates.length > 0 && (
+          <div class="website-updates">
+            <div class="section-head">
+              <h2>Website updates</h2>
+            </div>
+            <p class="updates-lede">What has changed on this site, written for players and captains.</p>
+            <div class="grid grid--3">
+              {updates.map((post) => (
+                <NewsCard post={post} />
+              ))}
+            </div>
+          </div>
+        )
+      }
     </div>
   </section>
   <section class="section" id="shared-news" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} hidden>
@@ -109,6 +126,15 @@ const categories = [...new Set(posts.map((p) => p.data.category))];
     background: var(--accent);
     color: var(--ink-950);
     border-color: var(--accent);
+  }
+  .website-updates {
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+  .updates-lede {
+    margin: -0.4rem 0 1rem;
+    color: var(--ink-200);
   }
   #shared-news[hidden] {
     display: none;

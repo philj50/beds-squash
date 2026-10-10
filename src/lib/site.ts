@@ -88,6 +88,7 @@ export const CATEGORY_LABEL: Record<string, string> = {
   tournaments: 'Tournaments',
   'england-squash': 'England Squash',
   clubs: 'Clubs',
+  website: 'Website',
 };
 
 export const DOC_CATEGORY_LABEL: Record<string, string> = {

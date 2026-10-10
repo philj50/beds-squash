@@ -71,6 +71,7 @@ collections:
           - { label: England Squash, value: england-squash }
           - { label: Clubs, value: clubs }
           - { label: Racketball, value: racketball }
+          - { label: Website, value: website }
       - { label: Image, name: image, widget: image, required: false, hint: 'Landscape photos work best (16:9). Keep under ~1MB.' }
       - { label: Image description, name: imageAlt, widget: string, required: false, hint: 'Describe the photo for screen readers.' }
       - { label: Featured on home page, name: featured, widget: boolean, default: false }
