@@ -177,7 +177,7 @@ node scripts/squashlevels-daily.mjs --date 2026-08-11
 node scripts/backfill-squashlevels-articles.mjs --from 2026-08-01 --to 2026-08-31
 ```
 
-Match articles use a factual template by default. If `NVIDIA_API_KEY` is set (local `.env` or GitHub secret), the daily job asks NVIDIA NIM to rephrase using the same facts; on failure it falls back to the template. When a lower-rated player beats someone at least 200 SquashLevels (or 12%) higher, that upset is preferred over a closer even match. Toggle auto vs manual publish in **captains admin → Match articles**. The daily GitHub Action commits a published news file so it goes live with the next deploy.
+Match articles use a factual template by default. If `NVIDIA_API_KEY` is set (local `.env` or GitHub secret), the daily job asks NVIDIA NIM to rephrase using the same facts; on failure it falls back to the template. When a lower-rated player beats someone at least 200 SquashLevels (or 12%) higher, that upset is preferred over a closer even match. Each new article is given an illustrated match picture: an upset uses one of the upset scenes, and a close match uses one of the close-match scenes. The match date chooses which scene, so the same picture is not used every day. The BSR logo remains the stand-in only when an article has no picture. Toggle auto vs manual publish in **captains admin → Match articles**. The daily GitHub Action commits a published news file so it goes live with the next deploy.
 
 Optional repo **Variable** `NVIDIA_MODEL` (default `openai/gpt-oss-20b`). Older docs referenced `meta/llama-3.3-70b-instruct`, which NVIDIA retired (410). Create a key at [build.nvidia.com](https://build.nvidia.com) and enable the model you want before calling the API.
 

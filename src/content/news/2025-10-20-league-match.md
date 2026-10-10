@@ -2,6 +2,8 @@
 title: "Patryk Konopacki beat David Gibson in Division 1"
 date: 2025-10-20
 summary: "Patryk Konopacki (Bedford Bulls 1) beat David Gibson (Open University 1) 3-2 on 20 October 2025. SquashLevels had them at 1,830 and 2,700 beforehand."
+image: /uploads/news/league-upset.jpg
+imageAlt: A player in orange plays a shot into the back corner while a player in navy watches.
 category: leagues
 featured: false
 draft: false

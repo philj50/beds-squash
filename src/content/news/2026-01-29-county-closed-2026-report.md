@@ -2,6 +2,8 @@
 title: Adeyi and Kemp crowned at 2026 County Closed
 date: 2026-01-29
 summary: 140 matches, 100+ players and two Ladies grades for the first time as Club Towers hosts a bumper County Closed.
+image: /uploads/news/county-closed-2026.jpg
+imageAlt: Two players shake hands beside a trophy, with a crowd watching an indoor squash final.
 category: tournaments
 featured: true
 ---

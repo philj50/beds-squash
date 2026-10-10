@@ -2,6 +2,8 @@
 title: "Charlie Jenkins beat James O'Connor in Division 2"
 date: 2026-07-28
 summary: "Charlie Jenkins (Club Towers 4) defeated James O'Connor (Bedford Bulls 2) 3‑1 on 28 July 2026. The match saw Jenkins rise from 2045 to 2123 points, while O'Connor fell from 2048 to 1957."
+image: /uploads/news/league-handshake.jpg
+imageAlt: Two players shake hands at the end of a match, rackets still in hand.
 category: leagues
 featured: false
 draft: false

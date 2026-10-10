@@ -2,6 +2,8 @@
 title: "Adam Routh beat Ahmed Shaaban in Division 2"
 date: 2026-06-16
 summary: "Adam Routh (Biggleswade 2) beat Ahmed Shaaban (Bedford Bulls 2) 3-2 on 16 June 2026. SquashLevels were 1,223 and 1,770 before the match."
+image: /uploads/news/league-sidewall.jpg
+imageAlt: A player hits a ball that has come off the side wall, with the opponent waiting behind.
 category: leagues
 featured: false
 draft: false

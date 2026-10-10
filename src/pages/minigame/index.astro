@@ -754,12 +754,15 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     margin-top: 0.7rem;
   }
   .board-card {
-    border: 1px solid var(--border);
+    background: #fff;
+    color: #0e2744;
+    border: 1px solid rgba(14, 39, 68, 0.28);
     border-radius: var(--radius);
     padding: 0.8rem 0.9rem;
   }
   .board-card h2 {
     margin: 0 0 0.6rem;
+    color: #0e2744;
   }
   [data-board] {
     list-style: none;
@@ -772,26 +775,29 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     column-gap: 0.55rem;
     align-items: baseline;
     padding: 0.4rem 0;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid rgba(14, 39, 68, 0.22);
+    color: #0e2744;
   }
   [data-board] :global(li:last-child) {
     border-bottom: 0;
     padding-bottom: 0;
   }
   [data-board] :global(.rank) {
-    color: var(--gold-400);
+    color: #9a3412;
     font-weight: 700;
   }
   [data-board] :global(.who) {
+    color: #0e2744;
     overflow-wrap: anywhere;
   }
   [data-board] :global(.tally) {
+    color: #0e2744;
     font-variant-numeric: tabular-nums;
     font-weight: 700;
   }
   [data-board] :global(li.empty) {
     display: block;
-    color: var(--text-muted);
+    color: #3d4d5f;
     font-size: 0.85rem;
   }
   [hidden] {

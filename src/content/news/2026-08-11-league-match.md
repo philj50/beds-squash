@@ -2,6 +2,8 @@
 title: "David Gibson beat Luke Horner in Division 2"
 date: 2026-08-11
 summary: "David Gibson (Open University 2) beat Luke Horner (Biggleswade 3) 3-1 on 11 August 2026. SquashLevels had them at 2,434 and 1,836 beforehand."
+image: /uploads/news/league-drive.jpg
+imageAlt: A player stretches for a low drive along the side wall.
 category: leagues
 featured: false
 draft: false

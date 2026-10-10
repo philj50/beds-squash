@@ -2,6 +2,8 @@
 title: Welcome to the new Bedfordshire Squash website
 date: 2026-09-26
 summary: A fresh home for squash and racketball in Bedfordshire — clubs map, events calendar, results, minutes and photos, all in one place.
+image: /uploads/news/welcome-website.jpg
+imageAlt: A laptop showing a map of clubs and a calendar, with a squash ball and racket on the desk beside it.
 category: county
 featured: true
 ---

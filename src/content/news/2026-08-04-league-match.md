@@ -2,6 +2,8 @@
 title: "Ahmed Shaaban beat Lewis Noble in Division 2"
 date: 2026-08-04
 summary: "Ahmed Shaaban (Bedford Bulls 2) beat Lewis Noble (Bedford Bulls 3) 3-2 on 4 August 2026. SquashLevels had them at 1,756 and 2,251 beforehand."
+image: /uploads/news/league-nick.jpg
+imageAlt: A player reaches down to the nick while the opponent waits on the T.
 category: leagues
 featured: false
 draft: false

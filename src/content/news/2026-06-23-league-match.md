@@ -2,6 +2,8 @@
 title: "Adam Routh beat Alex Farman in Division 2"
 date: 2026-06-23
 summary: "Adam Routh (Biggleswade 2) beat Alex Farman (Biggleswade 3) 3‑2 on 23 June 2026. SquashLevels were 1 308 and 1 702 before the match."
+image: /uploads/news/league-decider.jpg
+imageAlt: Two players pause at the end of a long rally, the ball sitting in the back corner.
 category: leagues
 featured: false
 draft: false

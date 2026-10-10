@@ -826,20 +826,74 @@ async function buildArticle(choice) {
   return { ...template, prose: 'template' };
 }
 
-function writeNews(article) {
+/** Illustrated match scenes. An upset and a close match use different pictures, and the match date picks which one so the same scene is not used every day. */
+const MATCH_PICTURES = {
+  upset: [
+    {
+      image: '/uploads/news/league-upset.jpg',
+      imageAlt: 'A player in orange plays a shot into the back corner while a player in navy watches.',
+    },
+    {
+      image: '/uploads/news/league-nick.jpg',
+      imageAlt: 'A player reaches down to the nick while the opponent waits on the T.',
+    },
+    {
+      image: '/uploads/news/league-sidewall.jpg',
+      imageAlt: 'A player hits a ball that has come off the side wall, with the opponent waiting behind.',
+    },
+  ],
+  close: [
+    {
+      image: '/uploads/news/league-decider.jpg',
+      imageAlt: 'Two players pause at the end of a long rally, the ball sitting in the back corner.',
+    },
+    {
+      image: '/uploads/news/league-handshake.jpg',
+      imageAlt: 'Two players shake hands at the end of a match, rackets still in hand.',
+    },
+    {
+      image: '/uploads/news/league-drive.jpg',
+      imageAlt: 'A player stretches for a low drive along the side wall.',
+    },
+  ],
+};
+
+function pictureKind(article, choice) {
+  const marked = String(article.body ?? '').match(/<!-- match-picture: (upset|close) -->/);
+  if (marked) return marked[1];
+  const text = `${article.title ?? ''}\n${article.summary ?? ''}\n${article.body ?? ''}`;
+  const significant = choice
+    ? Boolean(choice.upset && (choice.levelGap >= 200 || choice.gap >= 0.12))
+    : /lower(?: SquashLevels)? rating/i.test(text);
+  return significant ? 'upset' : 'close';
+}
+
+function matchPicture(article, choice) {
+  if (article.image && article.imageAlt) return { image: article.image, imageAlt: article.imageAlt };
+  const pool = MATCH_PICTURES[pictureKind(article, choice)];
+  const day = Math.floor(Date.parse(`${article.articleOn}T00:00:00Z`) / 86400000);
+  const index = Number.isFinite(day) ? Math.abs(day) % pool.length : 0;
+  return pool[index];
+}
+
+function writeNews(article, choice) {
   mkdirSync(NEWS_DIR, { recursive: true });
   const path = join(NEWS_DIR, `${article.slug}.md`);
   if (existsSync(path)) return path;
+  const picture = matchPicture(article, choice);
+  const body = String(article.body ?? '').replace(/\n*<!-- match-picture: (?:upset|close) -->\s*$/, '').trimEnd();
   const markdown = `---
 title: ${JSON.stringify(article.title)}
 date: ${article.articleOn}
 summary: ${JSON.stringify(article.summary)}
+image: ${picture.image}
+imageAlt: ${JSON.stringify(picture.imageAlt)}
 category: leagues
 featured: false
 draft: false
 ---
 
-${article.body}
+${body}
 `;
   writeFileSync(path, markdown);
   return path;
@@ -1258,8 +1312,12 @@ async function main() {
     const { prose, ...articleFields } = draft;
     articleProse = prose ?? null;
     article = { ...articleFields, status: mode === 'manual' ? 'held' : 'published' };
+    const kind = pictureKind(article, choice);
+    if (!String(article.body).includes('match-picture:')) {
+      article.body = `${String(article.body).trimEnd()}\n\n<!-- match-picture: ${kind} -->`;
+    }
     if (article.status === 'published' && !existingFile) {
-      console.error(`wrote ${writeNews(article)}`);
+      console.error(`wrote ${writeNews(article, choice)}`);
     } else if (article.status === 'published') {
       console.error(`Article file already exists for ${playedOn}.`);
     } else {
