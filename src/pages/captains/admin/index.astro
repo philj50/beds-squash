@@ -616,6 +616,17 @@ const scoresHref = url('/captains/admin/minigame/');
     paintMembers();
   });
 
+  const trafficMembers = root.querySelector<HTMLElement>('[data-traffic-members]')!;
+  trafficMembers.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-open-traffic-user]');
+    const name = button?.dataset.openTrafficUser ?? '';
+    if (!name) return;
+    memberSearch.value = name;
+    memberPage = 0;
+    showTab('members');
+    paintMembers();
+  });
+
   const formatDay = (iso: string) => {
     const d = new Date(`${iso}T12:00:00`);
     return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
