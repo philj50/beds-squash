@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { passwordIssue } from '../../src/lib/passwords';
 
 /** Administration → Users, with Supabase stubbed. This does not touch live accounts. */
 
@@ -180,6 +181,31 @@ test.describe('Users', () => {
     await dialog.getByRole('button', { name: 'Set password' }).click();
     await expect(dialog.locator('[data-password-dialog-error]')).toHaveText('Password set. Copy the player, login and password. Nothing was emailed.');
     expect(hooks.bodies.find((body) => body.action === 'create')?.must_change_password).toBe(true);
+    expect(hooks.bodies.find((body) => body.action === 'create')?.password).toMatch(/^\d{8}$/);
+    await expect(dialog.locator('[data-password-dialog-error]')).not.toContainText('12');
+  });
+
+  test('an 8-digit password is accepted and a shorter one is refused', async ({ page }) => {
+    expect(passwordIssue('12345678', 'pat.player@example.test')).toBeNull();
+    expect(passwordIssue('1234567', 'pat.player@example.test')).toBe('Password needs: at least 8 characters.');
+    await openUsers(page);
+    await page.getByRole('button', { name: 'Password for Pat Player' }).click();
+    const dialog = page.getByRole('dialog');
+    const value = dialog.locator('[data-password-dialog-value]');
+    await value.evaluate((input: HTMLInputElement) => {
+      input.value = '1234567';
+    });
+    await dialog.getByRole('button', { name: 'Set password' }).click();
+    await expect(dialog.locator('[data-password-dialog-error]')).toHaveText('Password needs: at least 8 characters.');
+    expect(hooks.actions.filter((action) => action === 'create' || action === 'set-password')).toEqual([]);
+
+    await value.evaluate((input: HTMLInputElement) => {
+      input.value = '12345678';
+    });
+    await dialog.getByRole('button', { name: 'Set password' }).click();
+    await expect(dialog.locator('[data-password-dialog-error]')).toHaveText('Password set. Copy the player, login and password. Nothing was emailed.');
+    await expect(dialog.locator('[data-password-dialog-error]')).not.toContainText('12');
+    expect(hooks.bodies.find((body) => body.action === 'create')?.password).toBe('12345678');
   });
 
   test('a password for someone with no login retries when the account service asks for a club', async ({ page }) => {
@@ -503,6 +529,8 @@ async function installAdmin(page: Page) {
         group_slug?: string;
         person_name?: string;
         role?: string;
+        password?: string;
+        email?: string;
       } | null;
       const action = payload?.action ?? '';
       hooks.actions.push(action);
@@ -510,6 +538,13 @@ async function installAdmin(page: Page) {
       if (action === 'create' && hooks.requireClub && !payload?.role) {
         await respond({ error: 'Choose a club.' });
         return;
+      }
+      if ((action === 'create' || action === 'set-password') && typeof payload?.password === 'string') {
+        const issue = passwordIssue(payload.password, payload.email ?? '');
+        if (issue) {
+          await respond({ error: issue });
+          return;
+        }
       }
       if (action === 'states') {
         if (statesDown) {
