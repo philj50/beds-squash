@@ -169,7 +169,7 @@ test.describe('Users', () => {
     await expect(dialog.locator('[data-password-must-change]')).toBeChecked();
     await dialog.getByRole('button', { name: 'Generate' }).click();
     const value = dialog.locator('[data-password-dialog-value]');
-    await expect(value).toHaveValue(/\S{12,}/);
+    await expect(value).toHaveValue(/^\d{8}$/);
     await dialog.getByRole('button', { name: 'Copy details' }).click();
     await expect(dialog.locator('[data-password-dialog-error]')).toHaveText('Player, login and password copied. Paste them into an email.');
     const copied = await page.evaluate(() => navigator.clipboard.readText());

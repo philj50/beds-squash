@@ -5,9 +5,6 @@ export const PASSWORD_MAX = 72;
 /** Tells Safari and other browsers how long a suggested password must be. */
 export const PASSWORD_RULES = 'minlength: 8;';
 
-const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
-const symbols = '!@#$%&*?';
-
 export type PasswordCheck = { id: string; label: string; met: boolean };
 
 /** The checklist shown beside a new password. */
@@ -32,15 +29,11 @@ export function passwordIssue(password: string, email = ''): string | null {
   return null;
 }
 
-export function suggestPassword(length = 16): string {
+export function suggestPassword(length = 8): string {
+  const digits = '0123456789';
   const bytes = new Uint8Array(length);
   crypto.getRandomValues(bytes);
-  let value = Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join('');
-  if (!/[0-9]/.test(value)) value = `${value.slice(0, -1)}7`;
-  if (!/[a-z]/.test(value)) value = `a${value.slice(1)}`;
-  if (!/[A-Z]/.test(value)) value = `A${value.slice(1)}`;
-  if (!/[^A-Za-z0-9]/.test(value)) value = `${value.slice(0, -1)}${symbols[bytes[0] % symbols.length]}`;
-  return value;
+  return Array.from(bytes, (byte) => digits[byte % digits.length]).join('');
 }
 
 /** Live strength checklist for each new-password field in a form. */
