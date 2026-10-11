@@ -135,21 +135,17 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.getByText('This account cannot see entries.')).toBeVisible();
   });
 
-  test('team captain sets availability order and the team sheet', async ({ page }) => {
+  test('team captain sees the fixture and cannot choose who plays', async ({ page }) => {
     await signIn(page, 'team_captain');
     await page.goto('captains/matches/', { waitUntil: 'domcontentloaded' });
     await expect(page.getByText('Signed in as Taylor Team')).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'Pat Player' })).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'Sam Spare' })).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'Order' })).toBeVisible();
-    await expect(page.getByText('Add players')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Test Team 1 v Visitors' })).toBeVisible();
-
-    const pat = page.locator('tr', { hasText: 'Pat Player' });
-    await pat.getByRole('button', { name: 'In' }).click();
-    await expect(page.locator('.chip--in')).toHaveText('1 in');
-    await pat.locator('select.pos').selectOption('1');
-    await expect(page.locator('.team')).toContainText('Pat Player');
+    await expect(page.getByText('Who can play, and the team for this match, are not chosen on this site.')).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Order' })).toHaveCount(0);
+    await expect(page.getByRole('columnheader', { name: 'Availability' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'In' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Team for this match' })).toHaveCount(0);
+    await expect(page.getByText('Add players')).toHaveCount(0);
 
     await page.goto('captains/admin/', { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'Player', exact: true }).click();
@@ -177,31 +173,34 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.locator('[data-site-sl]')).not.toContainText('Sam Squad');
   });
 
-  test('player only marks their own availability', async ({ page }) => {
+  test('player sees their team and fixture and cannot mark availability', async ({ page }) => {
     await signIn(page, 'team_player');
     await page.goto('captains/', { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: 'Your team' })).toBeVisible();
     await expect(page.getByText(PEOPLE.team_player.place)).toBeVisible();
-    await expect(page.getByText('Your captain looks after the squad list')).toBeVisible();
+    await expect(page.getByText('Who plays each match is not chosen on this site.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add' })).toHaveCount(0);
 
     await page.goto('captains/matches/', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('button', { name: /This season/ })).toHaveClass(/pill--active/);
     await expect(page.getByRole('link', { name: 'Your team' })).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'Pat Player' })).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'Sam Spare' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Test Team 1 v Visitors' })).toBeVisible();
+    await expect(page.getByText('Who can play, and the team for this match, are not chosen on this site.')).toBeVisible();
+    await expect(page.getByRole('cell', { name: 'Pat Player' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'In' })).toHaveCount(0);
     await expect(page.getByRole('columnheader', { name: 'Order' })).toHaveCount(0);
     await expect(page.getByText('Add players')).toHaveCount(0);
-    await expect(page.getByText('Team for this match')).toHaveCount(0);
-
-    await page.locator('tr', { hasText: 'Pat Player' }).getByRole('button', { name: 'In' }).click();
-    await expect(page.locator('.chip--in')).toHaveText('1 in');
-    await expect(page.locator('[data-status]')).toHaveText('');
+    await expect(page.getByRole('heading', { name: 'Team for this match' })).toHaveCount(0);
 
     await page.goto('captains/profile/', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('[data-places]')).toHaveText(PEOPLE.team_player.place);
     await expect(page.locator('[data-squad-link]')).toHaveText('Your team');
 
     await page.goto('captains/admin/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.admin-tabs .tab-label').filter({ visible: true })).toHaveText(['League Master', 'SquashLevels']);
+    await expect(page.locator('[data-juniors-nav]')).toBeHidden();
+    await expect(page.locator('[data-junior-link]')).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Juniors', exact: true })).toHaveCount(0);
     await expect(page.locator('[data-site-player-list]')).toContainText('Pat Player');
     await expect(page.locator('[data-tab="site-player"]')).not.toContainText('Sam Spare');
     await expect(page.locator('[data-site-player-list]').getByRole('textbox')).toHaveCount(0);
@@ -791,22 +790,33 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.getByText('Visitors 4–1 Test Team 1').first()).toBeVisible();
     await expect(page.getByText('No individual scores were on that sheet.')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Recent matches' })).toBeVisible();
+    const recent = page.locator('[data-recent] li');
+    await expect(recent).toBeVisible();
+    const recentLefts = await recent.locator('span').evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().left));
+    expect(recentLefts).toHaveLength(2);
+    expect(recentLefts[1]).toBeGreaterThan(recentLefts[0] + 8);
     await expect(page.locator('[data-level] svg')).toBeVisible();
     await expect(page.getByText('4,321')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Articles' })).toBeVisible();
-    await expect(page.getByText('Club night')).toBeVisible();
-    await expect(page.getByText('Pending')).toBeVisible();
+    const article = page.locator('[data-articles] li', { hasText: 'Club night' });
+    await expect(article).toBeVisible();
+    await expect(article.getByText('Pending')).toBeVisible();
+    const lefts = await article.locator('span').evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().left));
+    expect(lefts).toHaveLength(4);
+    expect(lefts[1]).toBeGreaterThan(lefts[0] + 8);
+    expect(lefts[2]).toBeGreaterThan(lefts[1] + 8);
+    expect(lefts[3]).toBeGreaterThan(lefts[2] + 8);
   });
 
-  test('a captain sees previous scores and a likely side on My Squash', async ({ page }) => {
+  test('a captain sees previous scores on My Squash and not a likely side', async ({ page }) => {
     await signIn(page, 'team_captain');
     await page.goto('captains/you/', { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: 'Next match' })).toBeVisible();
     await expect(page.getByText('Be at Test Club.')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Previous scores' })).toBeVisible();
     await expect(page.getByText('Visitors 4–1 Test Team 1').first()).toBeVisible();
-    await expect(page.getByText('Nobody has said they are in, so the likely side is not known.')).toBeVisible();
-    await expect(page.getByText('No individual scores were on the last match, so there is no prediction yet.')).toBeVisible();
+    await expect(page.getByText('likely side')).toHaveCount(0);
+    await expect(page.getByText('said they are in')).toHaveCount(0);
   });
 
   test('a top article uploader gets stars on My Squash', async ({ page }) => {
@@ -995,6 +1005,55 @@ test.describe('Junior admin stays off the public juniors pages', () => {
       await expect(page.locator('[data-junior-admin]')).toBeHidden();
     });
   }
+
+  test('a player does not see the junior competition menu', async ({ page }) => {
+    await signIn(page, 'team_player');
+    await page.route(`${SUPABASE}/rest/v1/group_members*`, async (route) => {
+      const single = (route.request().headers().accept ?? '').includes('application/vnd.pgrst.object+json');
+      const rows = [
+        {
+          group_slug: 'junior_organisers',
+          profile_id: PEOPLE.team_player.id,
+          groups: { name: 'Junior Organisers', position: 7, roles: { name: 'Junior Organiser' } },
+        },
+        {
+          group_slug: 'jc_players',
+          profile_id: PEOPLE.team_player.id,
+          groups: { name: 'JC Players', position: 6, roles: { name: 'JC Player' } },
+        },
+      ];
+      const wanted = new URL(route.request().url()).searchParams.get('group_slug') ?? '';
+      const matched = wanted ? rows.filter((row) => wanted === `eq.${row.group_slug}`) : rows;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(single ? (matched[0] ?? null) : matched),
+      });
+    });
+
+    await page.goto('captains/admin/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-juniors-nav]')).toBeHidden();
+    await expect(page.locator('[data-junior-link]')).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Juniors', exact: true })).toHaveCount(0);
+    await expect(page.locator('.admin-tabs .tab-label').filter({ visible: true })).toHaveText(['League Master', 'SquashLevels']);
+
+    const juniorsReady = page.waitForResponse((res) => res.url().includes('/rest/v1/profiles'));
+    await page.goto('juniors/', { waitUntil: 'domcontentloaded' });
+    await juniorsReady;
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('[data-junior-admin]')).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Junior admin' })).toHaveCount(0);
+
+    const closedReady = page.waitForResponse((res) => res.url().includes('/rest/v1/profiles'));
+    await page.goto('juniors/closed/', { waitUntil: 'domcontentloaded' });
+    await closedReady;
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('[data-junior-admin]')).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Junior admin' })).toHaveCount(0);
+
+    await page.goto('juniors/closed/entries/', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByText('This account cannot see entries.')).toBeVisible();
+  });
 });
 
 async function signIn(page: Page, role: RoleName) {

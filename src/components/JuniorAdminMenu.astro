@@ -54,7 +54,7 @@ import { url } from '@/lib/site';
     const session = data.session;
     if (session) {
       const account = await loadAccount(supabase);
-      if (account && !await privateStop(supabase, account) && await organisesGroup(supabase, session.user.id, 'junior_organisers')) {
+      if (account && !account.playerOnly && !await privateStop(supabase, account) && await organisesGroup(supabase, session.user.id, 'junior_organisers')) {
         for (const root of roots) root.hidden = false;
       }
     }

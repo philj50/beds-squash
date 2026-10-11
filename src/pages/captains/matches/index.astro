@@ -5,14 +5,14 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 <Base
   title="Matches"
-  description="Fixtures, availability and team selection for Bedfordshire squash captains."
+  description="League fixtures for Bedfordshire squash. Choosing who plays is not done on this site."
   noindex
 >
   <section class="section">
     <div class="container" id="match-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
       <h1>Matches</h1>
-      <p class="lede">
-        Fixtures come from League Master each morning. Switch between this season and last season, pick a match, mark who is in or out, then set the playing order. Nothing is emailed.
+      <p class="lede" data-lede>
+        Fixtures come from League Master each morning. Who can play, and the team for a match, are not chosen on this site.
       </p>
       <p class="status" data-status role="status"></p>
 
@@ -96,6 +96,8 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   let currentFixture: Fixture | null = null;
   let players: Player[] = [];
   let playerOnly = false;
+  /** Only an admin marks availability and picks the team. Players and captains do not. */
+  let canOrganise = false;
   let canAddPlayers = false;
   let accountEmail = '';
 
@@ -138,7 +140,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   matchHost.addEventListener('click', async (event) => {
     const target = event.target as HTMLElement;
     const availButton = target.closest<HTMLButtonElement>('[data-avail]');
-    if (availButton && currentFixture) {
+    if (availButton && currentFixture && canOrganise) {
       await setAvailability(Number(availButton.dataset.player), availButton.dataset.avail as Availability['status'] | 'clear');
       return;
     }
@@ -152,7 +154,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       return;
     }
     const clearButton = target.closest<HTMLButtonElement>('[data-clear-selection]');
-    if (clearButton && currentFixture && currentSquad && !playerOnly) {
+    if (clearButton && currentFixture && currentSquad && canOrganise) {
       const { error } = await supabase
         .from('selections')
         .delete()
@@ -165,7 +167,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
   matchHost.addEventListener('change', async (event) => {
     const select = (event.target as HTMLElement).closest<HTMLSelectElement>('[data-position]');
-    if (!select || !currentFixture || !currentSquad || playerOnly) return;
+    if (!select || !currentFixture || !currentSquad || !canOrganise) return;
     await setPosition(Number(select.dataset.position), select.value ? Number(select.value) : null);
   });
 
@@ -189,7 +191,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   });
 
   async function setAvailability(playerId: number, status: Availability['status'] | 'clear') {
-    if (!currentFixture) return;
+    if (!currentFixture || !canOrganise) return;
     if (playerOnly && !players.some((player) => player.id === playerId)) return;
     setStatus('Saving…');
     const { data: existing } = await supabase
@@ -213,7 +215,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   }
 
   async function setPosition(playerId: number, position: number | null) {
-    if (!currentFixture || !currentSquad || playerOnly) return;
+    if (!currentFixture || !currentSquad || !canOrganise) return;
     setStatus('Saving…');
     // Remove this player's existing slot and anyone already in the target slot.
     let query = supabase
@@ -243,6 +245,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       layout.hidden = true;
       unassigned.hidden = true;
       playerOnly = false;
+      canOrganise = false;
       sendToLogin();
       return;
     }
@@ -255,11 +258,17 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       layout.hidden = true;
       unassigned.hidden = true;
       playerOnly = false;
+      canOrganise = false;
       return;
     }
     void noteActivity(supabase);
     playerOnly = account.playerOnly;
+    canOrganise = account.isAdmin;
     canAddPlayers = account.isAdmin;
+    const lede = root!.querySelector<HTMLElement>('[data-lede]');
+    if (lede && canOrganise) {
+      lede.textContent = 'Fixtures come from League Master each morning. Mark who is in or out, then set the playing order. Nothing is emailed.';
+    }
     accountEmail = account.email.toLowerCase();
     root!.querySelector('[data-squad-link]')!.textContent = account.playerOnly ? 'Your team' : 'Squad';
     adminLink.hidden = !account.isAdmin;
@@ -291,7 +300,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       return;
     }
     squads = squadError ? [] : ((squadRows ?? []) as Squad[]);
-    // The two latest seasons: this winter, then last winter as the worked example.
+    // The two latest seasons, newest first: this season, then last season.
     seasons = ((seasonRows ?? []) as Season[]).slice(0, 2);
     clubNames = new Map((clubRows ?? []).map((c: { slug: string; name: string }) => [c.slug, c.name]));
     unassigned.hidden = squads.length > 0;
@@ -306,14 +315,14 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       button.textContent = squad.name;
       teamMenu.append(button);
     }
+    const hash = location.hash.replace('#', '');
+    const [seasonPart, squadPart] = hash.split('/');
+    const wantedSeason = seasons.find((s) => s.id === Number(seasonPart));
+    const wantedSquad = Number(squadPart ?? seasonPart);
+    // No choice in the link: open on this season, the latest one.
+    currentSeason = wantedSeason ?? seasons[0] ?? null;
     renderSeasonMenu();
     if (squads.length) {
-      const hash = location.hash.replace('#', '');
-      const [seasonPart, squadPart] = hash.split('/');
-      const wantedSeason = seasons.find((s) => s.id === Number(seasonPart));
-      const wantedSquad = Number(squadPart ?? seasonPart);
-      // No choice in the link: open on last season, which is the worked example.
-      currentSeason = wantedSeason ?? seasons[1] ?? seasons[0] ?? null;
       await pickSquad(squads.find((s) => s.id === wantedSquad) ?? squads[0]);
     }
   }
@@ -502,25 +511,19 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
               .join('')}</tbody></table>`
           : ''
       }
-      <div class="summary">
+      ${
+        canOrganise
+          ? `<div class="summary">
         <span class="chip chip--in">${counts.in} in</span>
         <span class="chip chip--maybe">${counts.maybe} maybe</span>
         <span class="chip chip--out">${counts.out} out</span>
         <span class="chip">${players.length - counts.in - counts.out - counts.maybe} no reply</span>
       </div>
       <table class="squad">
-        <thead><tr><th>Player</th><th>Availability</th>${playerOnly ? '' : '<th>Order</th>'}</tr></thead>
-        <tbody>${
-          rows ||
-          (playerOnly
-            ? '<tr><td colspan="2" class="muted">Your captain has not added your email to this squad yet, so you cannot mark availability.</td></tr>'
-            : '<tr><td colspan="3" class="muted">No players in this squad yet.</td></tr>')
-        }</tbody>
+        <thead><tr><th>Player</th><th>Availability</th><th>Order</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="3" class="muted">No players in this squad yet.</td></tr>'}</tbody>
       </table>
-      ${
-        playerOnly
-          ? ''
-          : `<div class="selection">
+      <div class="selection">
         <h3>Team for this match</h3>
         ${
           order.length
@@ -554,6 +557,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       </details>`
           : ''
       }`
+          : '<p class="muted">Who can play, and the team for this match, are not chosen on this site.</p>'
       }`;
   }
 

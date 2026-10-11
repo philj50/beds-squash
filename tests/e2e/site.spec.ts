@@ -269,6 +269,11 @@ test.describe('Public site', () => {
 
     await page.getByRole('radio', { name: 'Link' }).check();
     await page.getByLabel('Title').fill('Club night');
+    await page.locator('input[name="url"]').fill('www.example.com/match');
+    await page.getByRole('button', { name: 'Send' }).click();
+    await expect(page.getByRole('status')).toHaveText('Use an https link.');
+    expect(submitted).toBeNull();
+
     await page.locator('input[name="url"]').fill('https://vimeo.com/1153984252/ad198677f7');
     await page.getByRole('button', { name: 'Send' }).click();
     await expect(page.getByText('An admin will look at it before it goes on the site.')).toBeVisible();

@@ -100,11 +100,8 @@ const venues = (await getClubs()).map((club) => ({
     score: string | null;
     winner: string | null;
   };
-  type SquadPlayer = { id: number; squad_id: number; display_name: string };
-  type AvailRow = { squad_player_id: number; status: string; fixture_id: number };
   type Rating = { player_id: number; recorded_on: string; level: number; kind: string | null };
   type Venue = { id: string; name: string; venue: string; address: string; town: string; postcode: string };
-  type KnownLevel = { id: number; display_name: string; current_level: number | null };
 
   const youApp = document.getElementById('you-app');
   if (!youApp) throw new Error('my squash missing');
@@ -323,17 +320,6 @@ const venues = (await getClubs()).map((club) => ({
     return `Be at ${parts.join(', ')}.`;
   }
 
-  function levelOn(ratings: Rating[], on: string) {
-    const dayStamp = on.slice(0, 10);
-    const prior = ratings.filter((row) => (row.kind == null || row.kind === 'after') && row.recorded_on.slice(0, 10) <= dayStamp);
-    return prior.length ? prior[prior.length - 1].level : null;
-  }
-
-  function average(values: number[]) {
-    if (!values.length) return null;
-    return values.reduce((sum, value) => sum + value, 0) / values.length;
-  }
-
   const levelText = (value: number) => value.toLocaleString('en-GB');
 
   function drawChart(points: Rating[]) {
@@ -425,41 +411,6 @@ const venues = (await getClubs()).map((club) => ({
       .join('')}</ul>`;
   }
 
-  async function knownLevels(names: string[]) {
-    const found = new Map<string, KnownLevel>();
-    const unique = [...new Set(names.map((name) => name.trim()).filter(Boolean))];
-    await Promise.all(
-      unique.map(async (name) => {
-        const { data } = await supabase
-          .from('squashlevels_players')
-          .select('id, display_name, current_level')
-          .ilike('display_name', name)
-          .limit(1)
-          .maybeSingle();
-        if (data?.id != null) found.set(nameKey(data.display_name || name), data as KnownLevel);
-      }),
-    );
-    return found;
-  }
-
-  async function ratingsFor(ids: number[]) {
-    const unique = [...new Set(ids)];
-    if (!unique.length) return new Map<number, Rating[]>();
-    const { data } = await supabase
-      .from('squashlevels_ratings')
-      .select('player_id, recorded_on, level, kind')
-      .in('player_id', unique)
-      .order('recorded_on', { ascending: true });
-    const grouped = new Map<number, Rating[]>();
-    for (const row of (data ?? []) as Rating[]) {
-      if (row.player_id == null) continue;
-      const list = grouped.get(row.player_id) ?? [];
-      list.push(row);
-      grouped.set(row.player_id, list);
-    }
-    return grouped;
-  }
-
   async function paintMatches(
     account: Account,
     squads: Squad[],
@@ -526,89 +477,24 @@ const venues = (await getClubs()).map((club) => ({
             .map((fixture) => `<li><span>${esc(day(fixture.starts_at))}</span><span>${esc(scoreLine(fixture))}</span></li>`)
             .join('')}</ul>`
         : '<p>No previous scores for this team yet.</p>';
-      let likely = '<p>Nobody has said they are in, so the likely side is not known.</p>';
-      let outlook = '<p>No individual scores were on the last match, so there is no prediction yet.</p>';
-      const squadId = squad?.id;
-      const [playerRes, availRes, rubberRes] = await Promise.all([
-        squadId != null
-          ? supabase.from('squad_players').select('id, squad_id, display_name').eq('squad_id', squadId)
-          : Promise.resolve({ data: [] as SquadPlayer[] }),
-        supabase.from('availability').select('squad_player_id, status, fixture_id').eq('fixture_id', next.id),
-        previous
-          ? supabase.from('rubbers').select('fixture_id, position, home_player, away_player, score, winner').eq('fixture_id', previous.id).order('position')
-          : Promise.resolve({ data: [] as Rubber[] }),
-      ]);
-      const squadPlayers = ((playerRes.data ?? []) as SquadPlayer[]).filter((player) => squadId == null || player.squad_id === squadId);
-      const avail = new Map(((availRes.data ?? []) as AvailRow[]).map((row) => [row.squad_player_id, row.status]));
-      const rubbers = ((rubberRes.data ?? []) as Rubber[]).slice().sort((a, b) => a.position - b.position);
-      const inNames = squadPlayers.filter((player) => avail.get(player.id) === 'in').map((player) => player.display_name);
-      const maybeNames = squadPlayers.filter((player) => avail.get(player.id) === 'maybe').map((player) => player.display_name);
-      const sheetSide = previous ? ours(previous) ?? side : side;
-      const lastNames = rubbers
-        .map((rubber) => (sheetSide === 'home' ? rubber.home_player : rubber.away_player))
-        .filter((name): name is string => Boolean(name));
-      const likelyNames = inNames.length ? inNames : maybeNames.length ? maybeNames : lastNames;
-      const likelyFrom = inNames.length ? 'who have said they are in' : maybeNames.length ? 'who have said they might play' : 'who played last time';
-      const rubberNames = rubbers.flatMap((rubber) => [rubber.home_player, rubber.away_player].filter((name): name is string => Boolean(name)));
-      const levels = await knownLevels([...likelyNames, ...rubberNames]);
-      if (likelyNames.length) {
-        likely = `<p>Likely to play, from ${likelyFrom}: ${likelyNames
-          .map((name) => {
-            const known = levels.get(nameKey(name));
-            const current = known?.current_level;
-            return current == null ? esc(name) : `${esc(name)} (${levelText(current)})`;
-          })
-          .join(', ')}.</p>`;
-      }
-      if (rubbers.length && previous) {
-        const history = await ratingsFor([...levels.values()].map((row) => row.id));
-        const gaps = rubbers
-          .map((rubber) => {
-            const oursName = sheetSide === 'home' ? rubber.home_player : rubber.away_player;
-            const theirsName = sheetSide === 'home' ? rubber.away_player : rubber.home_player;
-            if (!oursName || !theirsName) return '';
-            const oursId = levels.get(nameKey(oursName))?.id;
-            const theirsId = levels.get(nameKey(theirsName))?.id;
-            const oursLevel = oursId != null ? levelOn(history.get(oursId) ?? [], previous.starts_at) : null;
-            const theirsLevel = theirsId != null ? levelOn(history.get(theirsId) ?? [], previous.starts_at) : null;
-            if (oursLevel == null || theirsLevel == null) return '';
-            const gap = oursLevel - theirsLevel;
-            const ahead = gap === 0 ? 'level' : gap > 0 ? `${levelText(gap)} ahead of` : `${levelText(Math.abs(gap))} behind`;
-            return `<li>${esc(oursName)} (${levelText(oursLevel)}) was ${ahead} ${esc(theirsName)} (${levelText(theirsLevel)})${rubber.score ? `, ${esc(rubber.score)}` : ''}.</li>`;
-          })
-          .filter(Boolean);
-        const lastLevels = rubbers
-          .map((rubber) => {
-            const oursName = sheetSide === 'home' ? rubber.home_player : rubber.away_player;
-            const oursId = oursName ? levels.get(nameKey(oursName))?.id : undefined;
-            return oursId != null ? levelOn(history.get(oursId) ?? [], previous.starts_at) : null;
-          })
-          .filter((value): value is number => value != null);
-        const nextLevels = likelyNames
-          .map((name) => levels.get(nameKey(name))?.current_level)
-          .filter((value): value is number => value != null);
-        const lastAvg = average(lastLevels);
-        const nextAvg = average(nextLevels);
-        let prediction = 'The level gaps from last time are below.';
-        if (lastAvg != null && nextAvg != null) {
-          const delta = nextAvg - lastAvg;
-          prediction =
-            Math.abs(delta) < 25
-              ? 'The likely side is about as strong as last time, so the result is likely to be similar.'
-              : delta > 0
-                ? 'The likely side is stronger than last time, so the team is more likely to be successful.'
-                : 'The likely side is weaker than last time, so the team is less likely to be successful.';
+      let ownLine = '';
+      if (previous) {
+        const { data } = await supabase
+          .from('rubbers')
+          .select('fixture_id, position, home_player, away_player, score, winner')
+          .eq('fixture_id', previous.id)
+          .order('position');
+        const rubbers = (data ?? []) as Rubber[];
+        const sheetSide = ours(previous) ?? side;
+        const own = rubbers.find((rubber) => {
+          const mine = sheetSide === 'home' ? rubber.home_player : rubber.away_player;
+          return mine && personNames.has(nameKey(mine));
+        });
+        if (own) {
+          ownLine = `<p>You played ${esc((sheetSide === 'home' ? own.away_player : own.home_player) || 'an unnamed player')}${own.score ? `, ${esc(own.score)}` : ''}.</p>`;
         }
-        outlook = `${gaps.length ? `<ul class="gaps">${gaps.join('')}</ul>` : '<p>SquashLevels has no levels for both players in those rubbers.</p>'}<p>${prediction}</p>`;
       }
-      const own = rubbers.find((rubber) => {
-        const mine = sheetSide === 'home' ? rubber.home_player : rubber.away_player;
-        return mine && personNames.has(nameKey(mine));
-      });
-      const ownLine = own
-        ? `<p>You played ${esc((sheetSide === 'home' ? own.away_player : own.home_player) || 'an unnamed player')}${own.score ? `, ${esc(own.score)}` : ''}.</p>`
-        : '';
-      detail = `${scoreList}${likely}${outlook}${ownLine}`;
+      detail = `${scoreList}${ownLine}`;
     } else if (isPlayer(account)) {
       if (!previous) {
         detail = '<p>No previous score for this team yet.</p>';
@@ -828,14 +714,14 @@ const venues = (await getClubs()).map((club) => ({
   .where {
     font-weight: 700;
   }
-  .results,
-  .gaps {
+  [data-recent] :global(.results),
+  [data-next] :global(.results) {
     list-style: none;
     margin: 0.4rem 0 0;
     padding: 0;
   }
-  .results li,
-  .gaps li {
+  [data-recent] :global(.results li),
+  [data-next] :global(.results li) {
     display: flex;
     flex-wrap: wrap;
     gap: 0.35rem 0.8rem;
@@ -875,20 +761,20 @@ const venues = (await getClubs()).map((club) => ({
     font-size: 1.6rem;
     font-variant-numeric: tabular-nums;
   }
-  .uploads {
+  [data-articles] :global(.uploads) {
     list-style: none;
     margin: 0;
     padding: 0;
   }
-  .uploads li {
+  [data-articles] :global(.uploads li) {
     display: grid;
     grid-template-columns: 5.5rem minmax(0, 1fr) auto auto;
-    gap: 0.75rem;
+    gap: 0.75rem 1rem;
     align-items: baseline;
     padding: 0.55rem 0;
     border-bottom: 1px solid var(--border);
   }
-  .uploads li span:first-child {
+  [data-articles] :global(.uploads li span:first-child) {
     color: var(--gold-400);
     font-size: 0.8rem;
     font-weight: 700;
@@ -905,7 +791,7 @@ const venues = (await getClubs()).map((club) => ({
     margin: 0.35rem 0;
   }
   @media (max-width: 640px) {
-    .uploads li {
+    [data-articles] :global(.uploads li) {
       grid-template-columns: 1fr auto;
     }
   }

@@ -2214,7 +2214,7 @@ const scoresHref = url('/captains/admin/minigame/');
     void noteActivity(supabase);
     viewerIsAdmin = account.isAdmin;
     viewerId = account.userId;
-    viewerSeesJuniors = account.isAdmin || account.groups.some((group) => group.slug === 'junior_organisers');
+    viewerSeesJuniors = !account.playerOnly && (account.isAdmin || account.groups.some((group) => group.slug === 'junior_organisers'));
     viewerSeesBeds = account.isAdmin || account.groups.some((group) => group.slug === 'bc_players');
     workspace.hidden = false;
     for (const el of root.querySelectorAll<HTMLElement>('[data-lm-only]')) el.hidden = !account.isAdmin;

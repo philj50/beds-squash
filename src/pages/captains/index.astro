@@ -14,8 +14,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       <p class="lede">
         League Master names the players. Set each email here, or on Administration under Player.
         Only an admin can add or remove a player. Nothing is emailed.
-        Players mark whether they can play on
-        <a href={`${import.meta.env.BASE_URL}captains/matches/`}>Matches</a>.
+        Who can play, and the team for a match, are not chosen on this site.
         Your name, team and password are on your <a href={`${import.meta.env.BASE_URL}captains/profile/`}>profile</a>.
         A county admin creates each account.
       </p>
@@ -41,7 +40,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
           <div class="card__body">
             <h2>Your team</h2>
             <p data-player-places></p>
-            <p class="muted">Mark whether you can play on <a href={`${import.meta.env.BASE_URL}captains/matches/`}>Matches</a>. Your captain looks after the squad list and the playing order.</p>
+            <p class="muted">Your team is shown here. Who plays each match is not chosen on this site.</p>
           </div>
         </div>
 

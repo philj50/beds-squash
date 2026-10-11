@@ -98,7 +98,7 @@ import { url } from '@/lib/site';
         return;
       }
     }
-    if (!(await organisesGroup(supabase, session.user.id, 'junior_organisers'))) {
+    if (account?.playerOnly || !(await organisesGroup(supabase, session.user.id, 'junior_organisers'))) {
       denied.hidden = false;
       denied.textContent = 'This account cannot see entries.';
       list.hidden = true;
