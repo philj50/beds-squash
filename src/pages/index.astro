@@ -5,12 +5,33 @@ import EventCard from '@/components/EventCard.astro';
 import ClubMap from '@/components/ClubMap.astro';
 import { getNews, getUpcomingEvents, getClubs } from '@/lib/content';
 import { toMapClubs } from '@/lib/geo';
-import { SITE, url } from '@/lib/site';
+import { CATEGORY_LABEL, SITE, formatShort, url } from '@/lib/site';
 
 const news = (await getNews()).filter((post) => post.data.category !== 'website');
 const featured = news.find((p) => p.data.featured) ?? news[0];
 const latest = news.filter((p) => p.id !== featured?.id).slice(0, 3);
 const upcoming = (await getUpcomingEvents()).slice(0, 4);
+const stories = news.slice(0, 6).map((post) => ({
+  kicker: CATEGORY_LABEL[post.data.category] ?? 'News',
+  title: post.data.title,
+  href: url(`/news/${post.id}/`),
+  when: formatShort(post.data.date),
+}));
+const nextOn = upcoming[0];
+const hooks = [
+  ...(stories[0] ? [stories[0]] : []),
+  ...(nextOn
+    ? [
+        {
+          kicker: 'Coming up',
+          title: nextOn.data.title,
+          href: url(`/events/${nextOn.id}/`),
+          when: formatShort(nextOn.data.start),
+        },
+      ]
+    : []),
+  ...stories.slice(1),
+];
 const clubs = await getClubs();
 const mapClubs = await toMapClubs(clubs);
 const leagueClubs = clubs.filter((c) => c.data.leagueClub);
@@ -32,6 +53,35 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
           The county home of squash and racketball — leagues, tournaments, juniors, county teams and every club and
           court from Luton to Bedford.
         </p>
+        {
+          hooks.length > 0 && (
+            <div class="now" data-now>
+              <div class="now__bar">
+                <p class="now__label">Just in</p>
+                <div class="now__nav">
+                  <button class="now__btn" type="button" data-now-prev>
+                    Back
+                  </button>
+                  <button class="now__btn" type="button" data-now-next>
+                    Next
+                  </button>
+                </div>
+              </div>
+              <div class="now__links">
+                {hooks.map((item, index) => (
+                  <a class="now__link" href={item.href} data-now-item hidden={index > 1}>
+                    <span class="now__kicker">{item.kicker}</span>
+                    <span class="now__when">{item.when}</span>
+                    <span class="now__title">{item.title}</span>
+                  </a>
+                ))}
+              </div>
+              <div class="now__meter" aria-hidden="true">
+                <span data-now-meter />
+              </div>
+            </div>
+          )
+        }
         <div class="hero__cta">
           <a class="btn btn--primary" href={url('/clubs/')}>Find a club near you</a>
           <a class="btn btn--ghost" href={url('/events/')}>What's on</a>
@@ -340,15 +390,280 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
     align-items: flex-start;
   }
 
+  .now {
+    margin: 0.85rem 0 0.15rem;
+    background: #fff;
+    border: 1px solid var(--border-strong);
+    border-left: 4px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 0.45rem 0.7rem 0.4rem;
+  }
+  .now__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .now__label {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    color: var(--accent);
+  }
+  .now__nav {
+    display: none;
+    gap: 0.35rem;
+  }
+  .now--live .now__nav {
+    display: flex;
+  }
+  .now__btn {
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #0e2744;
+    background: #fff;
+    border: 1px solid rgba(14, 39, 68, 0.28);
+    border-radius: 999px;
+    padding: 0.15rem 0.6rem;
+    cursor: pointer;
+  }
+  .now__btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .now__links {
+    display: grid;
+    gap: 0.15rem;
+  }
+  @media (min-width: 720px) {
+    .now__links {
+      grid-template-columns: 1fr 1fr;
+      gap: 0.65rem;
+    }
+  }
+  .now__link[hidden] {
+    display: none;
+  }
+  .now__link {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      'kicker when'
+      'title title';
+    column-gap: 0.6rem;
+    row-gap: 0.1rem;
+    padding: 0.4rem 0 0.25rem;
+    color: #0e2744;
+    text-decoration: none;
+    border-top: 1px solid rgba(14, 39, 68, 0.12);
+  }
+  @media (min-width: 720px) {
+    .now__link {
+      border-top: 0;
+      padding-top: 0.35rem;
+    }
+  }
+  .now__link.is-fresh {
+    animation: now-in 0.35s ease;
+  }
+  .now__kicker {
+    grid-area: kicker;
+    color: var(--accent);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .now__when {
+    grid-area: when;
+    justify-self: end;
+    color: #3d4d5f;
+    font-size: 0.75rem;
+  }
+  .now__title {
+    grid-area: title;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.08rem;
+    line-height: 1.15;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+  }
+  .now__link:hover .now__title {
+    color: var(--accent);
+  }
+  .now__meter {
+    display: none;
+    height: 2px;
+    margin-top: 0.2rem;
+    border-radius: 2px;
+    background: rgba(14, 39, 68, 0.08);
+    overflow: hidden;
+  }
+  .now--live .now__meter {
+    display: block;
+  }
+  .now__meter span {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: var(--accent);
+  }
+  .now__meter span.is-on {
+    animation: now-meter 5.6s linear;
+  }
+  @keyframes now-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes now-meter {
+    from {
+      width: 0;
+    }
+    to {
+      width: 100%;
+    }
+  }
+
   @media (max-width: 900px) {
     .hero__inner {
       grid-template-columns: 1fr;
     }
-    .hero__film {
-      order: -1;
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.35rem;
+    }
+    .stats strong {
+      font-size: 1.35rem;
+    }
+    .stats span {
+      font-size: 0.68rem;
+      letter-spacing: 0.04em;
     }
     .cta {
       grid-template-columns: 1fr;
     }
   }
 </style>
+
+<script>
+  const root = document.querySelector('[data-now]');
+  if (root instanceof HTMLElement) {
+    const items = [...root.querySelectorAll<HTMLElement>('[data-now-item]')];
+    const meter = root.querySelector<HTMLElement>('[data-now-meter]');
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (items.length > 2) {
+      const hold = 5600;
+      const pages = Math.ceil(items.length / 2);
+      let page = 0;
+      let timer = 0;
+      let paused = false;
+      let swiped = false;
+
+      const show = (nextPage: number) => {
+        page = ((nextPage % pages) + pages) % pages;
+        const start = page * 2;
+        items.forEach((item, index) => {
+          const on = index === start || index === start + 1;
+          item.hidden = !on;
+          item.classList.toggle('is-fresh', on && !reduce);
+        });
+        if (meter && !reduce && !paused) {
+          meter.classList.remove('is-on');
+          void meter.offsetWidth;
+          meter.classList.add('is-on');
+        }
+      };
+
+      const stop = () => {
+        window.clearInterval(timer);
+        timer = 0;
+        meter?.classList.remove('is-on');
+      };
+
+      const play = () => {
+        stop();
+        if (reduce || paused) return;
+        timer = window.setInterval(() => show(page + 1), hold);
+        if (meter) {
+          meter.classList.remove('is-on');
+          void meter.offsetWidth;
+          meter.classList.add('is-on');
+        }
+      };
+
+      root.querySelector('[data-now-prev]')?.addEventListener('click', () => {
+        show(page - 1);
+        play();
+      });
+      root.querySelector('[data-now-next]')?.addEventListener('click', () => {
+        show(page + 1);
+        play();
+      });
+      if (!window.matchMedia('(pointer: coarse)').matches) {
+        root.addEventListener('pointerenter', () => {
+          paused = true;
+          stop();
+        });
+        root.addEventListener('pointerleave', () => {
+          paused = false;
+          play();
+        });
+      }
+      root.addEventListener('focusin', () => {
+        paused = true;
+        stop();
+      });
+      root.addEventListener('focusout', (event) => {
+        if (event.relatedTarget instanceof Node && root.contains(event.relatedTarget)) return;
+        paused = false;
+        play();
+      });
+
+      let touchX = 0;
+      root.addEventListener(
+        'touchstart',
+        (event) => {
+          touchX = event.changedTouches[0]?.clientX ?? 0;
+          swiped = false;
+        },
+        { passive: true },
+      );
+      root.addEventListener(
+        'touchend',
+        (event) => {
+          const delta = (event.changedTouches[0]?.clientX ?? touchX) - touchX;
+          if (Math.abs(delta) < 36) return;
+          swiped = true;
+          show(delta < 0 ? page + 1 : page - 1);
+          play();
+        },
+        { passive: true },
+      );
+      root.addEventListener(
+        'click',
+        (event) => {
+          if (!swiped) return;
+          event.preventDefault();
+          swiped = false;
+        },
+        true,
+      );
+
+      root.classList.add('now--live');
+      show(0);
+      play();
+    }
+  }
+</script>

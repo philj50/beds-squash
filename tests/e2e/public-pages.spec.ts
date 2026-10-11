@@ -26,8 +26,10 @@ test.describe('Public pages', () => {
   test('home shows the news, the next event, and the main links', async ({ page }) => {
     await open(page);
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Squash in Bedfordshire');
-    await expect(page.getByRole('link', { name: 'Welcome to the new Bedfordshire Squash website' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Winter League 2026/27 begins' })).toBeVisible();
+    await expect(page.locator('.news-card').getByRole('link', { name: 'Welcome to the new Bedfordshire Squash website' })).toBeVisible();
+    await expect(page.locator('.event').getByRole('link', { name: 'Winter League 2026/27 begins' })).toBeVisible();
+    await expect(page.locator('[data-now]')).toBeVisible();
+    await expect(page.locator('[data-now] [data-now-item]:not([hidden])')).toHaveCount(2);
     await expect(page.getByRole('link', { name: 'Find a club near you' })).toBeVisible();
     await expect(page.getByRole('link', { name: "What's on" })).toBeVisible();
   });
