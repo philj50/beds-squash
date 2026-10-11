@@ -1,32 +1,26 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-export const PASSWORD_MIN = 12;
+export const PASSWORD_MIN = 8;
 export const PASSWORD_MAX = 72;
-/** Tells Safari and other browsers how strong a suggested password must be. */
-export const PASSWORD_RULES = 'minlength: 12; required: lower; required: upper; required: digit; required: special;';
+/** Tells Safari and other browsers how long a suggested password must be. */
+export const PASSWORD_RULES = 'minlength: 8;';
 
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
 const symbols = '!@#$%&*?';
 
 export type PasswordCheck = { id: string; label: string; met: boolean };
 
-/** The checklist shown beside a new password, the same kind of prompt other sites use. */
+/** The checklist shown beside a new password. */
 export function passwordChecks(password: string): PasswordCheck[] {
   return [
-    { id: 'length', label: 'At least 12 characters', met: password.length >= PASSWORD_MIN && password.length <= PASSWORD_MAX },
-    { id: 'lower', label: 'A lowercase letter', met: /[a-z]/.test(password) },
-    { id: 'upper', label: 'An uppercase letter', met: /[A-Z]/.test(password) },
-    { id: 'number', label: 'A number', met: /[0-9]/.test(password) },
-    { id: 'symbol', label: 'A symbol', met: /[^A-Za-z0-9]/.test(password) },
+    { id: 'length', label: `At least ${PASSWORD_MIN} characters`, met: password.length >= PASSWORD_MIN && password.length <= PASSWORD_MAX },
   ];
 }
 
-export function passwordStrength(password: string): 'empty' | 'weak' | 'fair' | 'strong' {
+export function passwordStrength(password: string): 'empty' | 'weak' | 'strong' {
   if (!password) return 'empty';
-  const met = passwordChecks(password).filter((check) => check.met).length;
-  if (met <= 2) return 'weak';
-  if (met < passwordChecks(password).length) return 'fair';
-  return 'strong';
+  const met = passwordChecks(password).every((check) => check.met);
+  return met ? 'strong' : 'weak';
 }
 
 /** Why a password is too weak, or null when it is acceptable. */
@@ -71,7 +65,7 @@ export function bindPasswordRules(root: ParentNode) {
       const level = passwordStrength(password);
       if (!meter) return;
       meter.dataset.level = level;
-      meter.textContent = level === 'weak' ? 'Weak' : level === 'fair' ? 'Fair' : level === 'strong' ? 'Strong' : '';
+      meter.textContent = level === 'weak' ? 'Too short' : level === 'strong' ? 'Long enough' : '';
     };
     input.addEventListener('input', paint);
     form?.addEventListener('reset', () => {

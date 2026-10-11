@@ -15,7 +15,7 @@
  * or from .env. Those values are never printed.
  */
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +23,8 @@ import { nvidiaArticle } from './lib/nvidia-article.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const NEWS_DIR = join(ROOT, 'src', 'content', 'news');
+const SEASON_NAME = 'Winter 2026/27';
+const MINIGAME_TOP = join(NEWS_DIR, '_minigame-top.json');
 const SL_BASE = 'https://api-leveltech.squashlevels.com/api/classic/';
 const SUPABASE_URL = 'https://klxyjmwiaivvqjbhxzak.supabase.co';
 const PUBLISHABLE_KEY = 'sb_publishable_wcOU09VyQcF7JWoZ6i-PHg_pFp6UM-4';
@@ -888,7 +890,7 @@ date: ${article.articleOn}
 summary: ${JSON.stringify(article.summary)}
 image: ${picture.image}
 imageAlt: ${JSON.stringify(picture.imageAlt)}
-category: leagues
+category: ${article.category ?? 'leagues'}
 featured: false
 draft: false
 ---
@@ -896,6 +898,194 @@ draft: false
 ${body}
 `;
   writeFileSync(path, markdown);
+  return path;
+}
+
+function seasonOpenerExists() {
+  if (!existsSync(NEWS_DIR)) return false;
+  return readdirSync(NEWS_DIR).some((name) => name.endsWith('-season-opens.md'));
+}
+
+function rubberSentence(rubber) {
+  const winner = rubber.winner === 'home' ? rubber.home_player : rubber.away_player;
+  const loser = rubber.winner === 'home' ? rubber.away_player : rubber.home_player;
+  if (!winner || !loser) return null;
+  if (rubber.winner !== 'home' && rubber.winner !== 'away') return null;
+  if (/walkover/i.test(`${winner} ${loser}`)) return 'One rubber was a walkover.';
+  const games = rubber.score ? winnerGames(rubber.score, rubber.winner) : '';
+  return games ? `${winner} beat ${loser} ${games}.` : `${winner} beat ${loser}.`;
+}
+
+function seasonOpenerFrom(fixture, playedOn, seasonId) {
+  const home = fixture.home?.name ?? 'The home team';
+  const away = fixture.away?.name ?? 'The away team';
+  const homePoints = fixture.home_points;
+  const awayPoints = fixture.away_points;
+  const drawn = homePoints === awayPoints;
+  const winner = homePoints > awayPoints ? home : away;
+  const loser = homePoints > awayPoints ? away : home;
+  const division = fixture.division?.name ?? 'the league';
+  const when = longDate(playedOn);
+  const title = drawn
+    ? `${home} and ${away} share the first Winter League result`
+    : `${winner} take the first Winter League result`;
+  let summary = drawn
+    ? `${home} and ${away} drew ${homePoints}-${awayPoints} in ${division} on ${when}, the first result logged for ${SEASON_NAME}.`
+    : `${winner} beat ${loser} ${homePoints > awayPoints ? homePoints : awayPoints}-${homePoints > awayPoints ? awayPoints : homePoints} in ${division} on ${when}, the first result logged for ${SEASON_NAME}.`;
+  if (summary.length > 280) {
+    summary = drawn
+      ? `${home} and ${away} share the first logged result of ${SEASON_NAME}.`
+      : `${winner} take the first logged result of ${SEASON_NAME}, beating ${loser}.`;
+  }
+  const rubbers = (fixture.rubbers ?? [])
+    .slice()
+    .sort((left, right) => (left.position ?? 0) - (right.position ?? 0))
+    .map((rubber) => rubberSentence(rubber))
+    .filter(Boolean);
+  const scorecard = `/leagues/results/#${seasonId}/${fixture.division?.id ?? fixture.division_id}/t${fixture.home_team_id}/m${fixture.id}`;
+  const lines = [
+    `The ${SEASON_NAME} league has its first result on the books.`,
+    '',
+    `${home} played ${away} in ${division} on ${when}. The fixture finished ${home} ${homePoints}, ${away} ${awayPoints}.`,
+    '',
+    rubbers.length
+      ? `The rubbers, with ${home} listed first: ${rubbers.join(' ')}`
+      : 'The team score is in. The individual rubbers are not on the card yet.',
+    '',
+    `The scorecard is on the [league tables](${scorecard}).`,
+  ];
+  return {
+    slug: `${playedOn}-season-opens`,
+    title,
+    summary,
+    body: lines.join('\n'),
+    articleOn: playedOn,
+    category: 'leagues',
+  };
+}
+
+async function writeSeasonOpener() {
+  if (seasonOpenerExists()) return null;
+  const seasons = await rest(`league_seasons?select=id&name=eq.${encodeURIComponent(SEASON_NAME)}`);
+  const seasonId = seasons?.[0]?.id;
+  if (!seasonId) return null;
+  const divisions = await rest(`divisions?select=id&season_id=eq.${seasonId}`);
+  const ids = (divisions ?? []).map((row) => row.id);
+  if (!ids.length) return null;
+  const select = [
+    'id',
+    'starts_at',
+    'division_id',
+    'home_team_id',
+    'home_points',
+    'away_points',
+    'home:league_teams!fixtures_home_team_id_fkey(name)',
+    'away:league_teams!fixtures_away_team_id_fkey(name)',
+    'division:divisions(id,name)',
+    'rubbers(position,home_player,away_player,score,winner)',
+  ].join(',');
+  const rows = await rest(
+    `fixtures?select=${encodeURIComponent(select)}&status=eq.played&division_id=in.(${ids.join(',')})&home_points=not.is.null&order=starts_at.asc&limit=8`,
+  );
+  const fixture = (rows ?? []).find((row) => row.home_points !== null && row.away_points !== null);
+  if (!fixture?.starts_at) return null;
+  const playedOn = londonDate(new Date(fixture.starts_at));
+  const path = writeNews(seasonOpenerFrom(fixture, playedOn, seasonId), { upset: false, levelGap: 0, gap: 0 });
+  console.error(`season opener ${path}`);
+  return playedOn;
+}
+
+function leadingScores(rows) {
+  const top = rows.find((row) => Number.isFinite(Number(row.score)) && row.name);
+  if (!top) return [];
+  const score = Number(top.score);
+  const names = [];
+  for (const row of rows) {
+    if (Number(row.score) !== score) break;
+    if (!names.some((leader) => leader.name === row.name)) names.push({ name: row.name, score });
+  }
+  return names;
+}
+
+function sameLeaders(left, right) {
+  const key = (rows) => (rows ?? []).map((row) => `${row.name}:${row.score}`).sort().join('|');
+  return key(left) === key(right);
+}
+
+function readMinigameTop() {
+  if (!existsSync(MINIGAME_TOP)) return null;
+  try {
+    const saved = JSON.parse(readFileSync(MINIGAME_TOP, 'utf8'));
+    return Array.isArray(saved.leaders) ? saved.leaders : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeMinigameTop(leaders) {
+  mkdirSync(NEWS_DIR, { recursive: true });
+  writeFileSync(MINIGAME_TOP, `${JSON.stringify({ leaders, recordedOn: londonDate(new Date()) }, null, 2)}\n`);
+}
+
+async function minigameLeaders() {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/minigame_leaderboard`, {
+    method: 'POST',
+    headers: {
+      apikey: PUBLISHABLE_KEY,
+      authorization: `Bearer ${PUBLISHABLE_KEY}`,
+      'content-type': 'application/json',
+    },
+    body: '{}',
+  });
+  if (!response.ok) return [];
+  const data = await response.json();
+  return Array.isArray(data) ? data : [];
+}
+
+function minigameArticle(leaders, today) {
+  const score = leaders[0].score;
+  const names = leaders.map((row) => row.name);
+  const who = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+  const plural = names.length > 1;
+  const title = plural ? `${who} lead the Minigame mk3 board` : `${who} leads the Minigame mk3 board`;
+  const summary = plural
+    ? `${who} are level on ${score}, at the top of the Minigame mk3 board.`
+    : `${who} scored ${score} on Minigame mk3 and leads the board.`;
+  return {
+    slug: `${today}-minigame-leader`,
+    title,
+    summary: summary.length > 280 ? `${who} ${plural ? 'lead' : 'leads'} Minigame mk3 with ${score}.` : summary,
+    body: [
+      `${who} ${plural ? 'have' : 'has'} the top score on [Minigame mk3](/minigame/), with ${score}.`,
+      '',
+      'The board beside the court shows the ten highest scores. A higher score takes the lead.',
+    ].join('\n'),
+    articleOn: today,
+    category: 'county',
+    image: '/uploads/news/minigame-mk3.jpg',
+    imageAlt: 'A top-down Halloween squash court with orange lines, cobwebs, lanterns, a purple racket, and a ball in the air above its shadow.',
+  };
+}
+
+async function writeMinigameLeader() {
+  const leaders = leadingScores(await minigameLeaders());
+  if (!leaders.length) return null;
+  const previous = readMinigameTop();
+  if (!previous) {
+    writeMinigameTop(leaders);
+    console.error(`minigame lead noted: ${leaders.map((row) => `${row.name} ${row.score}`).join(', ')}`);
+    return null;
+  }
+  if (sameLeaders(previous, leaders)) return null;
+  const previousScore = Math.max(...previous.map((row) => Number(row.score) || 0));
+  if (leaders[0].score < previousScore) {
+    writeMinigameTop(leaders);
+    return null;
+  }
+  const today = londonDate(new Date());
+  const path = writeNews(minigameArticle(leaders, today));
+  writeMinigameTop(leaders);
+  console.error(`minigame lead ${path}`);
   return path;
 }
 
@@ -1192,6 +1382,18 @@ async function main() {
     await exceptions();
     return;
   }
+  await publishApproved();
+  let openerOn = null;
+  try {
+    openerOn = await writeSeasonOpener();
+  } catch (error) {
+    console.error(`season opener skipped: ${error instanceof Error ? error.message : error}`);
+  }
+  try {
+    await writeMinigameLeader();
+  } catch (error) {
+    console.error(`minigame lead skipped: ${error instanceof Error ? error.message : error}`);
+  }
   const days = await leagueDays();
   if (!days.length) {
     console.error('No scored rubbers to read.');
@@ -1200,7 +1402,6 @@ async function main() {
   const yesterday = londonDate(new Date(Date.now() - 24 * 60 * 60 * 1000));
   const playedOn = wantDate ?? (wantLatest ? days[0][0] : yesterday);
   const rubbers = days.find(([date]) => date === playedOn)?.[1] ?? [];
-  await publishApproved();
   if (!rubbers.length) {
     console.error(`No player matches on ${playedOn}. No article.`);
     return;
@@ -1316,7 +1517,9 @@ async function main() {
     if (!String(article.body).includes('match-picture:')) {
       article.body = `${String(article.body).trimEnd()}\n\n<!-- match-picture: ${kind} -->`;
     }
-    if (article.status === 'published' && !existingFile) {
+    if (openerOn === playedOn) {
+      console.error(`Season opening article covers ${playedOn}.`);
+    } else if (article.status === 'published' && !existingFile) {
       console.error(`wrote ${writeNews(article, choice)}`);
     } else if (article.status === 'published') {
       console.error(`Article file already exists for ${playedOn}.`);

@@ -165,16 +165,11 @@ test.describe('Signed-in account', () => {
     await next.fill('short');
     await form.locator('input[name="confirm_password"]').fill('short');
     await page.getByRole('button', { name: 'Update password' }).click();
-    expect(await next.evaluate((input: HTMLInputElement) => input.validationMessage)).toMatch(/12/);
-
-    await next.fill('abcdefghijkl');
-    await form.locator('input[name="confirm_password"]').fill('abcdefghijkl');
-    await form.locator('input[name="current_password"]').fill('CurrentPass1!');
-    await page.getByRole('button', { name: 'Update password' }).click();
-    await expect(page.locator('[data-password-status]')).toHaveText('Password needs: an uppercase letter.');
+    expect(await next.evaluate((input: HTMLInputElement) => input.validationMessage)).toMatch(/8/);
 
     await next.fill(email);
     await form.locator('input[name="confirm_password"]').fill(email);
+    await form.locator('input[name="current_password"]').fill('anything1');
     await page.getByRole('button', { name: 'Update password' }).click();
     await expect(page.locator('[data-password-status]')).toHaveText('Do not use the email address as the password.');
   });

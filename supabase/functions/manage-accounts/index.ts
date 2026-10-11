@@ -6,7 +6,7 @@ const cors = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const PASSWORD_MIN = 12;
+const PASSWORD_MIN = 8;
 const PASSWORD_MAX = 72;
 /** This login stays an admin so a person can try the other roles on their own account. */
 const PERMANENT_ADMIN_EMAIL = 'county-admin@players.invalid';
@@ -20,11 +20,7 @@ function json(body: unknown, status = 200) {
 
 function passwordIssue(password: string, email = '') {
   if (password.length > PASSWORD_MAX) return `Use at most ${PASSWORD_MAX} characters.`;
-  if (password.length < PASSWORD_MIN) return 'Password needs: at least 12 characters.';
-  if (!/[a-z]/.test(password)) return 'Password needs: a lowercase letter.';
-  if (!/[A-Z]/.test(password)) return 'Password needs: an uppercase letter.';
-  if (!/[0-9]/.test(password)) return 'Password needs: a number.';
-  if (!/[^A-Za-z0-9]/.test(password)) return 'Password needs: a symbol.';
+  if (password.length < PASSWORD_MIN) return `Password needs: at least ${PASSWORD_MIN} characters.`;
   if (email && password.toLowerCase() === email.toLowerCase()) return 'Do not use the email address as the password.';
   return null;
 }
