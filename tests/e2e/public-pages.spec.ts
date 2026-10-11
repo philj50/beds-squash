@@ -78,10 +78,8 @@ test.describe('Public pages', () => {
 
     await open(page, 'documents/personal-disclosure-form/');
     await expect(page.getByRole('heading', { level: 1, name: 'Personal Disclosure Form' })).toBeVisible();
-    await expect(page.getByText('This document is available as a PDF download above.')).toBeVisible();
-    const missingHref = await page.getByRole('link', { name: 'Download PDF' }).getAttribute('href');
-    expect(missingHref).toMatch(/personal-disclosure-form\.pdf$/);
-    expect((await page.request.get(missingHref!)).ok()).toBeFalsy();
+    await expect(page.getByText('No file has been uploaded for this document yet.')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Download PDF' })).toHaveCount(0);
   });
 
   test('minutes are listed by date and the PDF opens', async ({ page }) => {
