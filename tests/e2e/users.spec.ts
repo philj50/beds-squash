@@ -111,6 +111,9 @@ test.describe('Users', () => {
     const otherEmails = page.locator('input[data-row-field="email"]:not([aria-label="Email for Pat Player"])');
     const before = await otherEmails.evaluateAll((els) => els.map((el) => (el as HTMLInputElement).value));
     await email.fill('flooded@example.test');
+    await expect(otherEmails).not.toHaveCount(0);
+    await expect(email).toBeEditable();
+    expect(await otherEmails.evaluateAll((els) => els.every((el) => (el as HTMLInputElement).readOnly))).toBe(true);
     await page.evaluate(() => {
       const active = document.activeElement;
       if (!(active instanceof HTMLInputElement)) return;
@@ -121,6 +124,18 @@ test.describe('Users', () => {
       }
     });
     await expect(email).toHaveValue('flooded@example.test');
+    expect(await otherEmails.evaluateAll((els) => els.map((el) => (el as HTMLInputElement).value))).toEqual(before);
+    await page.evaluate(() => {
+      const active = document.activeElement;
+      if (!(active instanceof HTMLInputElement)) return;
+      for (const input of document.querySelectorAll<HTMLInputElement>('input[data-row-field="email"]')) {
+        if (input === active) continue;
+        input.value = active.value;
+      }
+    });
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve(undefined)))),
+    );
     expect(await otherEmails.evaluateAll((els) => els.map((el) => (el as HTMLInputElement).value))).toEqual(before);
     await email.fill('not-an-email');
     await page.getByRole('searchbox', { name: 'Search' }).click();

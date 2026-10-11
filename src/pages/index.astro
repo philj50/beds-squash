@@ -559,7 +559,7 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
     background: var(--accent);
   }
   .now__meter span.is-on {
-    animation: now-meter 5.6s linear;
+    animation: now-meter var(--now-hold, 600s) linear;
   }
   @keyframes now-in {
     from {
@@ -625,7 +625,8 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
     const meter = root.querySelector<HTMLElement>('[data-now-meter]');
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (items.length > 2) {
-      const hold = 5600;
+      const hold = 10 * 60 * 1000;
+      root.style.setProperty('--now-hold', `${hold}ms`);
       const pages = Math.ceil(items.length / 2);
       let page = 0;
       let timer = 0;
