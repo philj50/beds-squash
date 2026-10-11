@@ -12,6 +12,7 @@ export const SITE = {
   leagueMaster: 'https://bedfordshiresquash.leaguemaster.co.uk/',
   englandSquash: 'https://www.englandsquash.com/',
   englandSquashEvents: 'https://www.englandsquash.com/competitions/calendar',
+  englandSquashMasters: 'https://www.englandsquashmasters.co.uk/',
 };
 
 type NavItem = { label: string; href: string; signedIn?: boolean };
