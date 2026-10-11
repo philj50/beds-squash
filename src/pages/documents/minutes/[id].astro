@@ -4,6 +4,7 @@ import Base from '@/layouts/Base.astro';
 import PageHero from '@/components/PageHero.astro';
 import { getMinutes } from '@/lib/content';
 import { formatDate, url } from '@/lib/site';
+import { uploadExists } from '@/lib/uploads';
 import { organizationId } from '@/lib/seo';
 
 export async function getStaticPaths() {
@@ -13,6 +14,7 @@ export async function getStaticPaths() {
 
 const { m } = Astro.props;
 const { Content } = await render(m);
+const hasFile = uploadExists(m.data.file);
 const TYPE_LABEL: Record<string, string> = { agm: 'AGM minutes', committee: 'Committee minutes', egm: 'EGM minutes', other: 'Minutes' };
 ---
 
@@ -35,13 +37,13 @@ const TYPE_LABEL: Record<string, string> = { agm: 'AGM minutes', committee: 'Com
   <PageHero eyebrow={TYPE_LABEL[m.data.type]} title={m.data.title} lede={m.data.summary}>
     <p class="muted" style="margin-top:.5rem">{formatDate(m.data.date)}</p>
     <div class="actions">
-      {m.data.file && <a class="btn btn--primary" href={url(m.data.file)} target="_blank" rel="noopener">Download PDF</a>}
+      {hasFile && <a class="btn btn--primary" href={url(m.data.file ?? '')} target="_blank" rel="noopener">Download PDF</a>}
       <a class="btn btn--ghost" href={url('/documents/')}>All minutes</a>
     </div>
   </PageHero>
   <section class="section">
     <div class="container narrow prose">
-      {m.body?.trim() ? <Content /> : <p class="notice">These minutes are available as a PDF download above.</p>}
+      {m.body?.trim() ? <Content /> : hasFile ? <p class="notice">These minutes are available as a PDF download above.</p> : <p class="notice">The PDF for these minutes has not been uploaded yet.</p>}
     </div>
   </section>
 </Base>

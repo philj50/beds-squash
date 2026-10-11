@@ -55,8 +55,9 @@ import { url } from '@/lib/site';
   import { createClient } from '@supabase/supabase-js';
   import { accountIsActive, hasAccountEmail, loadAccount, noteActivity, saveDisplayName, sendToLogin, stopMessage } from '@/lib/account';
 
-  const root = document.getElementById('profile-app');
-  if (!root) throw new Error('profile app missing');
+  const profileApp = document.getElementById('profile-app');
+  if (!profileApp) throw new Error('profile app missing');
+  const root: HTMLElement = profileApp;
   const supabase = createClient(root.dataset.url!, root.dataset.key!);
   const signedOut = root.querySelector<HTMLElement>('[data-panel="signed-out"]')!;
   const signedIn = root.querySelector<HTMLElement>('[data-panel="signed-in"]')!;

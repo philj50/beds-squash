@@ -4,6 +4,7 @@ import Base from '@/layouts/Base.astro';
 import PageHero from '@/components/PageHero.astro';
 import { getDocuments } from '@/lib/content';
 import { DOC_CATEGORY_LABEL, formatDate, url } from '@/lib/site';
+import { uploadExists } from '@/lib/uploads';
 
 export async function getStaticPaths() {
   const docs = await getDocuments();
@@ -13,6 +14,7 @@ export async function getStaticPaths() {
 const { doc } = Astro.props;
 const { Content } = await render(doc);
 const hasBody = Boolean(doc.body?.trim());
+const hasFile = uploadExists(doc.data.file);
 ---
 
 <Base
@@ -25,7 +27,7 @@ const hasBody = Boolean(doc.body?.trim());
 >
   <PageHero eyebrow={DOC_CATEGORY_LABEL[doc.data.category]} title={doc.data.title} lede={doc.data.summary}>
     <div class="actions">
-      {doc.data.file && <a class="btn btn--primary" href={url(doc.data.file)} target="_blank" rel="noopener">Download PDF</a>}
+      {hasFile && <a class="btn btn--primary" href={url(doc.data.file ?? '')} target="_blank" rel="noopener">Download PDF</a>}
       <a class="btn btn--ghost" href={url('/documents/')}>All documents</a>
     </div>
     {doc.data.updated && <p class="muted" style="margin-top:1rem">Last updated {formatDate(doc.data.updated)}</p>}
@@ -35,7 +37,7 @@ const hasBody = Boolean(doc.body?.trim());
       {
         hasBody ? (
           <Content />
-        ) : doc.data.file ? (
+        ) : hasFile ? (
           <p class="notice">This document is available as a PDF download above.</p>
         ) : (
           <p class="notice">No file has been uploaded for this document yet.</p>

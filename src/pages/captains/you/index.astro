@@ -106,8 +106,9 @@ const venues = (await getClubs()).map((club) => ({
   type Venue = { id: string; name: string; venue: string; address: string; town: string; postcode: string };
   type KnownLevel = { id: number; display_name: string; current_level: number | null };
 
-  const root = document.getElementById('you-app');
-  if (!root) throw new Error('my squash missing');
+  const youApp = document.getElementById('you-app');
+  if (!youApp) throw new Error('my squash missing');
+  const root: HTMLElement = youApp;
   const supabase = createClient(root.dataset.url!, root.dataset.key!);
   const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
   const signedIn = root.querySelector<HTMLElement>('[data-panel="signed-in"]')!;

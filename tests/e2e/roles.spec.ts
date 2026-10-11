@@ -550,8 +550,14 @@ test.describe('Club captain, team captain, and player', () => {
         if (method === 'POST') {
           const body = route.request().postDataJSON() as { profile_id: string; group_slug: string; role: string };
           const index = groupMembers.findIndex((row) => row.profile_id === body.profile_id && row.group_slug === body.group_slug);
-          if (index >= 0) groupMembers[index] = body;
-          else groupMembers.push(body);
+          const stored = {
+            profile_id: body.profile_id,
+            group_slug: body.group_slug,
+            person_name: index >= 0 ? groupMembers[index].person_name : '',
+            place: index >= 0 ? groupMembers[index].place : null,
+          };
+          if (index >= 0) groupMembers[index] = stored;
+          else groupMembers.push(stored);
           return send(body);
         }
         if (method === 'DELETE') {

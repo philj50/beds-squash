@@ -3,6 +3,7 @@ import Base from '@/layouts/Base.astro';
 import PageHero from '@/components/PageHero.astro';
 import { getDocuments, getMinutes } from '@/lib/content';
 import { DOC_CATEGORY_LABEL, formatDate, url } from '@/lib/site';
+import { uploadExists } from '@/lib/uploads';
 
 const docs = await getDocuments();
 const minutes = await getMinutes();
@@ -35,7 +36,7 @@ const TYPE_LABEL: Record<string, string> = { agm: 'AGM', committee: 'Committee',
                   </div>
                   <div class="actions">
                     {m.body?.trim() && <a class="btn btn--ghost btn--sm" href={url(`/documents/minutes/${m.id}/`)}>Read</a>}
-                    {m.data.file && (
+                    {uploadExists(m.data.file) && (
                       <a class="btn btn--primary btn--sm" href={url(m.data.file)} target="_blank" rel="noopener">
                         PDF
                       </a>
@@ -66,7 +67,7 @@ const TYPE_LABEL: Record<string, string> = { agm: 'AGM', committee: 'Committee',
                         </strong>
                         {d.data.summary && <span class="muted small"> — {d.data.summary}</span>}
                       </div>
-                      {d.data.file && (
+                      {uploadExists(d.data.file) && (
                         <a class="btn btn--ghost btn--sm" href={url(d.data.file)} target="_blank" rel="noopener">
                           PDF
                         </a>
