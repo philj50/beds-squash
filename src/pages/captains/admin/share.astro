@@ -28,7 +28,7 @@ import { url } from '@/lib/site';
           <div data-live></div>
           <h2>Add to the site</h2>
           <p class="hint">This goes on the site now, because you are publishing it. Videos can be up to 10 MB. Photos can be up to 8 MB.</p>
-          <form class="card" data-form="add">
+          <form class="card" data-form="add" novalidate>
             <div class="card__body stack">
               <label>Name <input name="credit" required minlength="2" maxlength="80" /></label>
               <fieldset>
@@ -48,7 +48,7 @@ import { url } from '@/lib/site';
                 <label>Video <input name="video" type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov" /></label>
               </div>
               <label data-for="link article" hidden>Title <input name="title" maxlength="140" /></label>
-              <label data-for="link" hidden>Link <input name="url" type="url" placeholder="https://" /></label>
+              <label data-for="link" hidden>Link <input name="url" type="text" inputmode="url" placeholder="https://" autocomplete="off" spellcheck="false" /></label>
               <label data-for="link" hidden>Note, optional <input name="note" maxlength="200" /></label>
               <label data-for="article" hidden>Summary, optional <input name="summary" maxlength="280" /></label>
               <label data-for="article" hidden>Article <textarea name="body" maxlength="8000" rows="6"></textarea></label>

@@ -27,7 +27,7 @@ import { url } from '@/lib/site';
             <a href={url('/login/')} data-login>Log in</a>
           </p>
           <p class="thanks" data-thanks hidden>Thanks. An admin will look at it before it goes on the site.</p>
-          <form class="card" data-form hidden>
+          <form class="card" data-form hidden novalidate>
             <div class="card__body stack">
               <p class="sender">Sending as <strong data-sender></strong></p>
               <fieldset>
@@ -50,7 +50,7 @@ import { url } from '@/lib/site';
               </div>
               <label data-for="link article" hidden>Title <input name="title" maxlength="140" /></label>
               <div data-for="link" hidden>
-                <label>Link <input name="url" type="url" placeholder="https://" /></label>
+                <label>Link <input name="url" type="text" inputmode="url" placeholder="https://" autocomplete="off" spellcheck="false" /></label>
                 <p class="hint">Any https link. YouTube, Vimeo and Facebook videos can be played on the page.</p>
               </div>
               <label data-for="link" hidden>Note, optional <input name="note" maxlength="200" /></label>
