@@ -31,6 +31,11 @@ test.describe('Public pages', () => {
     await expect(page.locator('[data-now]')).toBeVisible();
     await expect(page.locator('[data-now] [data-now-item]:not([hidden])')).toHaveCount(2);
     await expect(page.getByRole('link', { name: 'Find a club near you' })).toBeVisible();
+    const rule = page.locator('[data-rule]');
+    await expect(page.getByRole('heading', { name: 'Rule of the day' })).toBeVisible();
+    await expect(rule.locator('h3')).toHaveText(/.+/);
+    await expect(rule.locator('[data-rule-text]')).not.toBeEmpty();
+    await expect(page.getByRole('link', { name: 'Singles rules →' })).toHaveAttribute('href', /worldsquash\.sport/);
     await expect(page.getByRole('link', { name: "What's on" })).toBeVisible();
   });
 

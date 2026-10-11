@@ -107,6 +107,21 @@ test.describe('Users', () => {
   test('an email that is not a real address is marked and is not saved', async ({ page }) => {
     await openUsers(page);
     const email = page.getByRole('textbox', { name: 'Email for Pat Player' });
+    await expect(email).toBeVisible();
+    const otherEmails = page.locator('input[data-row-field="email"]:not([aria-label="Email for Pat Player"])');
+    const before = await otherEmails.evaluateAll((els) => els.map((el) => (el as HTMLInputElement).value));
+    await email.fill('flooded@example.test');
+    await page.evaluate(() => {
+      const active = document.activeElement;
+      if (!(active instanceof HTMLInputElement)) return;
+      for (const input of document.querySelectorAll<HTMLInputElement>('input[data-row-field="email"]')) {
+        if (input === active) continue;
+        input.value = active.value;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    });
+    await expect(email).toHaveValue('flooded@example.test');
+    expect(await otherEmails.evaluateAll((els) => els.map((el) => (el as HTMLInputElement).value))).toEqual(before);
     await email.fill('not-an-email');
     await page.getByRole('searchbox', { name: 'Search' }).click();
     await expect(email).toHaveAttribute('aria-invalid', 'true');

@@ -6,6 +6,7 @@ import ClubMap from '@/components/ClubMap.astro';
 import { getNews, getUpcomingEvents, getClubs } from '@/lib/content';
 import { toMapClubs } from '@/lib/geo';
 import { CATEGORY_LABEL, SITE, formatShort, url } from '@/lib/site';
+import { ruleFor, SINGLES_RULES_URL } from '@/lib/squash-rules';
 
 const news = (await getNews()).filter((post) => post.data.category !== 'website');
 const featured = news.find((p) => p.data.featured) ?? news[0];
@@ -32,6 +33,7 @@ const hooks = [
     : []),
   ...stories.slice(1),
 ];
+const rule = ruleFor(new Date());
 const clubs = await getClubs();
 const mapClubs = await toMapClubs(clubs);
 const leagueClubs = clubs.filter((c) => c.data.leagueClub);
@@ -124,6 +126,22 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
         <span class="quick__icon">📄</span>
         <span><strong>Minutes &amp; policies</strong><small>AGM minutes, constitution, safeguarding</small></span>
       </a>
+    </div>
+  </section>
+
+  <!-- RULE OF THE DAY -->
+  <section class="section section--tight">
+    <div class="container">
+      <div class="section-head">
+        <h2>Rule of the day</h2>
+        <a href={SINGLES_RULES_URL} target="_blank" rel="noopener">Singles rules →</a>
+      </div>
+      <article class="rule" data-rule data-rule-index={rule.index}>
+        <p class="rule__when" data-rule-when>{rule.when}</p>
+        <h3 data-rule-title>{rule.title}</h3>
+        <p class="rule__text" data-rule-text>{rule.text}</p>
+        <p class="rule__note">A plain-language reminder for a league night. The official singles rules decide a match.</p>
+      </article>
     </div>
   </section>
 
@@ -328,6 +346,33 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
   .quick__item small {
     color: var(--text-muted);
     display: block;
+  }
+
+  .rule {
+    background: #fff;
+    border: 1px solid var(--border-strong);
+    border-left: 4px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 0.75rem 0.9rem 0.65rem;
+  }
+  .rule__when {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+  .rule h3 {
+    margin: 0.15rem 0 0.35rem;
+  }
+  .rule__text {
+    margin: 0;
+    max-width: 68ch;
+    font-size: 1.05rem;
+    line-height: 1.45;
+  }
+  .rule__note {
+    margin: 0.55rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
   }
 
   .events-band {
@@ -558,6 +603,22 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
 </style>
 
 <script>
+  import { ruleFor } from '@/lib/squash-rules';
+
+  const ruleCard = document.querySelector('[data-rule]');
+  if (ruleCard instanceof HTMLElement) {
+    const today = ruleFor(new Date());
+    if (ruleCard.dataset.ruleIndex !== String(today.index)) {
+      ruleCard.dataset.ruleIndex = String(today.index);
+      const when = ruleCard.querySelector('[data-rule-when]');
+      const title = ruleCard.querySelector('[data-rule-title]');
+      const text = ruleCard.querySelector('[data-rule-text]');
+      if (when) when.textContent = today.when;
+      if (title) title.textContent = today.title;
+      if (text) text.textContent = today.text;
+    }
+  }
+
   const root = document.querySelector('[data-now]');
   if (root instanceof HTMLElement) {
     const items = [...root.querySelectorAll<HTMLElement>('[data-now-item]')];

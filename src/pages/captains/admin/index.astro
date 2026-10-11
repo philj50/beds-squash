@@ -1116,6 +1116,7 @@ const scoresHref = url('/captains/admin/minigame/');
       return;
     }
     emailInput?.removeAttribute('aria-invalid');
+    if (emailInput) emailInput.defaultValue = emailInput.value;
     const es = valueOf('es').trim();
     const phone = valueOf('phone').trim();
     if (email === card.email.trim().toLowerCase() && es === card.es && phone === card.phone) return;
@@ -1342,6 +1343,37 @@ const scoresHref = url('/captains/admin/minigame/');
     select.innerHTML = [`<option value="">${escapeHtml(allLabel)}</option>`, ...choices.map((choice) => `<option value="${escapeHtml(choice.value)}">${escapeHtml(choice.label)}</option>`)].join('');
     select.value = next.includes(current) ? current : '';
   }
+  const contactFieldName = (raw: string) => {
+    let hash = 0;
+    for (const char of raw) hash = (hash * 33 + char.charCodeAt(0)) >>> 0;
+    return `c${hash.toString(36)}`;
+  };
+
+  const undoEmailFlood = (event: Event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) return;
+    if (input.dataset.rowField !== 'email' && input.dataset.squadField !== 'email') return;
+    const active = document.activeElement;
+    if (active === input) return;
+    const copied =
+      active instanceof HTMLInputElement &&
+      (active.dataset.rowField === 'email' || active.dataset.squadField === 'email') &&
+      input.value === active.value;
+    if (!copied || input.value === input.defaultValue) return;
+    input.value = input.defaultValue;
+  };
+  root.addEventListener('input', undoEmailFlood);
+  root.addEventListener('change', undoEmailFlood);
+  root.addEventListener('focusout', (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) return;
+    if (input.dataset.rowField !== 'email' && input.dataset.squadField !== 'email') return;
+    for (const other of root.querySelectorAll<HTMLInputElement>('input[data-row-field="email"], input[data-squad-field="email"]')) {
+      if (other === input) continue;
+      if (other.value !== other.defaultValue) other.value = other.defaultValue;
+    }
+  });
+
   function paintMembers() {
     const query = memberSearch.value.trim().toLowerCase();
     groupNote.textContent = 'Filled from League Master. Each LM Player is listed, and so is a sign-in for an admin or organiser. Junior entries add a JC Player and a JC Parent.';
@@ -1387,7 +1419,8 @@ const scoresHref = url('/captains/admin/minigame/');
     memberCount.textContent = narrowed ? `${shown.length} of ${players.length} players` : `${players.length} players`;
     const contactCell = (card: MemberCard, field: 'email' | 'es' | 'phone', value: string, label: string, type: string, placeholder: string) => {
       if (!viewerIsAdmin || card.protectedAccount) return escapeHtml(field === 'email' && card.protectedAccount ? 'BSCA' : value || '—');
-      return `<input data-row-field="${field}" data-row-key="${escapeHtml(card.key)}" aria-label="${label} for ${escapeHtml(card.name)}" type="${type}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" autocomplete="off" />`;
+      const emailField = field === 'email';
+      return `<input data-row-field="${field}" data-row-key="${escapeHtml(card.key)}" name="${contactFieldName(`${card.key}:${field}`)}" aria-label="${label} for ${escapeHtml(card.name)}" type="${emailField ? 'text' : type}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" autocomplete="off"${emailField ? ' inputmode="email" autocapitalize="none" spellcheck="false"' : ''} />`;
     };
     const actionButton = (label: string, attrs: string) => `<button class="btn btn--ghost btn--sm" type="button" ${attrs}>${label}</button>`;
     const pageCount = Math.max(1, Math.ceil(shown.length / USER_PAGE));
@@ -1631,8 +1664,10 @@ const scoresHref = url('/captains/admin/minigame/');
   };
 
   const siteTable = (rows: SiteRow[], fields: 'all' | 'open' | 'none', showTeam: boolean) => {
-    const box = (row: SiteRow, field: 'email' | 'es' | 'phone', value: string, label: string, type: string) =>
-      `<input data-squad-field="${field}" data-squad-email="${row.playerId || ''}" data-team-id="${row.teamId ?? ''}" data-team-name="${escapeHtml(row.team)}" data-player-name="${escapeHtml(row.name)}" data-saved="${escapeHtml(value)}" aria-label="${label} for ${escapeHtml(row.name)}" type="${type}" value="${escapeHtml(value)}" autocomplete="off" />`;
+    const box = (row: SiteRow, field: 'email' | 'es' | 'phone', value: string, label: string, type: string) => {
+      const emailField = field === 'email';
+      return `<input data-squad-field="${field}" data-squad-email="${row.playerId || ''}" data-team-id="${row.teamId ?? ''}" data-team-name="${escapeHtml(row.team)}" data-player-name="${escapeHtml(row.name)}" data-saved="${escapeHtml(value)}" name="${contactFieldName(`${row.teamId ?? ''}:${row.playerId || row.name}:${field}`)}" aria-label="${label} for ${escapeHtml(row.name)}" type="${emailField ? 'text' : type}" value="${escapeHtml(value)}" autocomplete="off"${emailField ? ' inputmode="email" autocapitalize="none" spellcheck="false"' : ''} />`;
+    };
     const body = rows
       .map((row) => {
         const detailsOpen = fields === 'all' || fields === 'open';
@@ -2030,6 +2065,7 @@ const scoresHref = url('/captains/admin/minigame/');
       for (const box of row?.querySelectorAll<HTMLInputElement>('input') ?? []) box.dataset.squadEmail = String(playerId);
     }
     input.dataset.saved = value;
+    input.defaultValue = input.value;
     if (field === 'email') {
       rememberWebsiteEmail(teamId, name, value, playerId);
       if (viewerIsAdmin) {
