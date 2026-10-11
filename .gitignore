@@ -21,6 +21,9 @@ pnpm-debug.log*
 .env.production
 scripts/.trial-season.json
 
+# Supabase CLI scratch files
+supabase/.temp/
+
 # macOS / Windows / editors
 .DS_Store
 Thumbs.db
