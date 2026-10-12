@@ -10,7 +10,8 @@ import { url } from '@/lib/site';
       <h1>Shared content</h1>
       <p class="lede">
         People send photos, videos, links and articles from the <a href={url('/share/')}>Share</a> page.
-        Nothing goes on the site until you publish it. Publishing stays manual.
+        Nothing goes on the site until you publish it. You can correct the file, link, title or text first.
+        The name of the person who sent it in stays on it.
       </p>
       <p class="status" data-status role="status"></p>
       <div data-panel="signed-in" hidden>
@@ -132,6 +133,40 @@ import { url } from '@/lib/site';
     return '';
   }
 
+  function editor(item: Item) {
+    const who = `<p class="hint">Sent in by ${escapeHtml(item.credit)}. Saving keeps that name.</p>`;
+    const actions = `<p class="actions"><button class="btn btn--primary btn--sm" type="submit">Save</button><button class="btn btn--ghost btn--sm" type="button" data-cancel>Cancel</button></p>`;
+    if (item.kind === 'photo' || item.kind === 'video') {
+      const fileLabel = item.kind === 'photo' ? 'Replace the photo' : 'Replace the video';
+      const accept = item.kind === 'photo'
+        ? 'image/jpeg,image/png,image/webp,image/gif'
+        : 'video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov';
+      return `<form class="stack editor" data-editor="${item.id}" data-kind="${item.kind}" hidden>
+        ${who}
+        <label>Caption <input name="caption" maxlength="200" value="${escapeHtml(item.caption ?? '')}" /></label>
+        <label>${fileLabel} <input name="file" type="file" accept="${accept}" /></label>
+        <p class="hint">Leave the file empty to keep the one already sent in.</p>
+        ${actions}
+      </form>`;
+    }
+    if (item.kind === 'link') {
+      return `<form class="stack editor" data-editor="${item.id}" data-kind="link" hidden>
+        ${who}
+        <label>Title <input name="title" maxlength="140" value="${escapeHtml(item.title ?? '')}" /></label>
+        <label>Link <input name="url" type="text" inputmode="url" maxlength="500" value="${escapeHtml(item.url ?? '')}" autocomplete="off" spellcheck="false" /></label>
+        <label>Note, optional <input name="note" maxlength="200" value="${escapeHtml(item.caption ?? '')}" /></label>
+        ${actions}
+      </form>`;
+    }
+    return `<form class="stack editor" data-editor="${item.id}" data-kind="article" hidden>
+      ${who}
+      <label>Title <input name="title" maxlength="140" value="${escapeHtml(item.title ?? '')}" /></label>
+      <label>Summary, optional <input name="summary" maxlength="280" value="${escapeHtml(item.caption ?? '')}" /></label>
+      <label>Article <textarea name="body" maxlength="8000" rows="8">${escapeHtml(item.body ?? '')}</textarea></label>
+      ${actions}
+    </form>`;
+  }
+
   function cards(items: Item[], signed: Map<string, string>) {
     if (!items.length) return '<p class="hint">Nothing here.</p>';
     return items
@@ -139,7 +174,8 @@ import { url } from '@/lib/site';
         const when = new Date(item.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
         const heading = item.title || item.caption || item.kind;
         const publish = item.status === 'pending' ? `<button class="btn btn--primary btn--sm" type="button" data-publish="${item.id}">Publish</button>` : '';
-        return `<article class="item"><div class="item__media">${preview(item, signed)}</div><div><p class="pill">${escapeHtml(item.kind)}</p><h3>${escapeHtml(heading)}</h3><p class="hint">${escapeHtml(item.credit)} · ${when}</p><p class="actions">${publish}<button class="btn btn--ghost btn--sm" type="button" data-delete="${item.id}">Delete</button></p></div></article>`;
+        const edit = `<button class="btn btn--ghost btn--sm" type="button" data-edit="${item.id}">Edit</button>`;
+        return `<article class="item" data-item="${item.id}"><div class="item__media">${preview(item, signed)}</div><div><p class="pill">${escapeHtml(item.kind)}</p><h3>${escapeHtml(heading)}</h3><p class="hint">${escapeHtml(item.credit)} · ${when}</p><p class="actions">${edit}${publish}<button class="btn btn--ghost btn--sm" type="button" data-delete="${item.id}">Delete</button></p>${editor(item)}</div></article>`;
       })
       .join('');
   }
@@ -148,9 +184,13 @@ import { url } from '@/lib/site';
     const paths = items.map((item) => item.storage_path).filter((path): path is string => Boolean(path));
     const signed = new Map<string, string>();
     if (!paths.length) return signed;
-    const { data } = await supabase.storage.from('contributions').createSignedUrls(paths, 3600);
-    for (const row of data ?? []) {
-      if (row.path && row.signedUrl) signed.set(row.path, row.signedUrl);
+    try {
+      const { data } = await supabase.storage.from('contributions').createSignedUrls(paths, 3600);
+      for (const row of data ?? []) {
+        if (row.path && row.signedUrl) signed.set(row.path, row.signedUrl);
+      }
+    } catch {
+      return signed;
     }
     return signed;
   }
@@ -175,6 +215,18 @@ import { url } from '@/lib/site';
 
   admin.addEventListener('click', async (event) => {
     const target = event.target as HTMLElement;
+    const edit = target.closest<HTMLButtonElement>('[data-edit]');
+    const cancel = target.closest<HTMLButtonElement>('[data-cancel]');
+    if (edit?.dataset.edit) {
+      const form = admin.querySelector<HTMLElement>(`[data-editor="${edit.dataset.edit}"]`);
+      if (form) form.hidden = false;
+      return;
+    }
+    if (cancel) {
+      const form = cancel.closest<HTMLElement>('[data-editor]');
+      if (form) form.hidden = true;
+      return;
+    }
     const publish = target.closest<HTMLButtonElement>('[data-publish]');
     const remove = target.closest<HTMLButtonElement>('[data-delete]');
     if (publish?.dataset.publish) {
@@ -202,6 +254,74 @@ import { url } from '@/lib/site';
     if (error) throw error;
     return path;
   }
+
+  admin.addEventListener('submit', async (event) => {
+    const form = (event.target as HTMLElement).closest<HTMLFormElement>('[data-editor]');
+    if (!form?.dataset.editor) return;
+    event.preventDefault();
+    const kind = (form.dataset.kind ?? 'article') as Kind;
+    const data = new FormData(form);
+    let caption: string | null = null;
+    let title: string | null = null;
+    let body: string | null = null;
+    let link: string | null = null;
+    let storagePath: string | null = null;
+    if (kind === 'photo' || kind === 'video') {
+      caption = String(data.get('caption') ?? '').trim();
+      if (caption.length < 2 || caption.length > 200) {
+        statusEl.textContent = 'Add a caption.';
+        return;
+      }
+      const file = data.get('file') as File | null;
+      if (file && file.size > 0) {
+        const problem = kind === 'photo' ? photoProblem(file) : videoProblem(file);
+        if (problem) {
+          statusEl.textContent = problem;
+          return;
+        }
+        const ext = kind === 'photo' ? photoExtension(file) : videoExtension(file);
+        if (!ext) return;
+        statusEl.textContent = 'Uploading…';
+        try {
+          storagePath = await upload(file, ext);
+        } catch (error) {
+          statusEl.textContent = error instanceof Error ? error.message : 'The file did not upload.';
+          return;
+        }
+      }
+    } else if (kind === 'link') {
+      title = String(data.get('title') ?? '').trim();
+      caption = String(data.get('note') ?? '').trim() || null;
+      link = cleanLinkUrl(String(data.get('url') ?? ''));
+      if (title.length < 2 || title.length > 140 || !link || (caption && caption.length > 200)) {
+        statusEl.textContent = link ? 'Add a title.' : 'Use an https link.';
+        return;
+      }
+    } else {
+      title = String(data.get('title') ?? '').trim();
+      caption = String(data.get('summary') ?? '').trim() || null;
+      body = String(data.get('body') ?? '').trim();
+      if (title.length < 4 || title.length > 140 || body.length < GALLERY_BODY_MIN || body.length > GALLERY_BODY_MAX || (caption && caption.length > 280)) {
+        statusEl.textContent = 'Add a title and write the article.';
+        return;
+      }
+    }
+    statusEl.textContent = 'Saving…';
+    const { data: oldPath, error } = await supabase.rpc('edit_contribution', {
+      p_id: form.dataset.editor,
+      p_caption: caption,
+      p_title: title,
+      p_body: body,
+      p_url: link,
+      p_storage_path: storagePath,
+    });
+    if (error && storagePath) await supabase.storage.from('contributions').remove([storagePath]);
+    if (!error && typeof oldPath === 'string' && oldPath && oldPath !== storagePath) {
+      await supabase.storage.from('contributions').remove([oldPath]);
+    }
+    statusEl.textContent = error ? error.message : 'Saved. The name on it is unchanged.';
+    if (!error) await loadItems();
+  });
 
   addForm.addEventListener('submit', async (event) => {
     event.preventDefault();

@@ -293,6 +293,221 @@ test.describe('Public site', () => {
     expect(submitted).not.toHaveProperty('status');
   });
 
+  test('an admin can correct an upload and the sender stays on it', async ({ page }) => {
+    const adminId = '44444444-4444-4444-8444-444444444444';
+    const articleId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const linkId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+    const videoId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+    const expiresAt = Math.floor(Date.now() / 1000) + 60 * 60;
+    const enc = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
+    const session = {
+      access_token: `${enc({ alg: 'HS256', typ: 'JWT' })}.${enc({ sub: adminId, email: 'admin@example.test', role: 'authenticated', exp: expiresAt })}.simulated`,
+      refresh_token: 'simulated-refresh',
+      token_type: 'bearer',
+      expires_in: 3600,
+      expires_at: expiresAt,
+      user: {
+        id: adminId,
+        aud: 'authenticated',
+        role: 'authenticated',
+        email: 'admin@example.test',
+        app_metadata: { provider: 'email', providers: ['email'] },
+        user_metadata: { display_name: 'Ada Admin' },
+        identities: [],
+        created_at: '2026-10-02T00:00:00Z',
+        updated_at: '2026-10-02T00:00:00Z',
+      },
+    };
+    const items = [
+      {
+        id: articleId,
+        kind: 'article',
+        credit: 'Pat Player',
+        title: 'Clse match',
+        caption: 'A short note',
+        body: 'This sentance has a typo and is long enough to be an article for the site queue.',
+        storage_path: null,
+        url: null,
+        status: 'pending',
+        created_at: '2026-10-11T12:00:00Z',
+      },
+      {
+        id: linkId,
+        kind: 'link',
+        credit: 'Pat Player',
+        title: 'Bad subject',
+        caption: 'Watch this',
+        body: null,
+        storage_path: null,
+        url: 'https://example.com/old',
+        status: 'pending',
+        created_at: '2026-10-11T11:30:00Z',
+      },
+      {
+        id: videoId,
+        kind: 'video',
+        credit: 'Pat Player',
+        title: null,
+        caption: 'Shaky rally',
+        body: null,
+        storage_path: 'incoming/11111111-1111-4111-8111-111111111111.mp4',
+        url: null,
+        status: 'pending',
+        created_at: '2026-10-11T11:00:00Z',
+      },
+      {
+        id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        kind: 'photo',
+        credit: 'Pat Player',
+        title: null,
+        caption: 'Court photo',
+        body: null,
+        storage_path: 'incoming/22222222-2222-4222-8222-222222222222.jpg',
+        url: null,
+        status: 'pending',
+        created_at: '2026-10-11T10:00:00Z',
+      },
+    ];
+    let edited: Record<string, unknown> | null = null;
+    let published: Record<string, unknown> | null = null;
+    const fields = ['p_body', 'p_caption', 'p_id', 'p_storage_path', 'p_title', 'p_url'];
+    await page.addInitScript((stored) => {
+      localStorage.setItem('sb-klxyjmwiaivvqjbhxzak-auth-token', JSON.stringify(stored));
+    }, session);
+    await page.route('**/storage/v1/**', async (route) => {
+      const requestUrl = route.request().url();
+      if (requestUrl.includes('/object/sign/')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([
+            { error: null, path: 'incoming/11111111-1111-4111-8111-111111111111.mp4', signedURL: '/object/sign/contributions/incoming/rally.mp4?token=t' },
+            { error: null, path: 'incoming/22222222-2222-4222-8222-222222222222.jpg', signedURL: '/object/sign/contributions/incoming/court.jpg?token=t' },
+          ]),
+        });
+        return;
+      }
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ Key: 'contributions/incoming/replaced.mp4' }) });
+    });
+    await page.route('**/rest/v1/**', async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      const send = (payload: unknown, status = 200) =>
+        route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(payload) });
+      if (url.pathname.endsWith('/profiles')) {
+        const row = { id: adminId, display_name: 'Ada Admin', email: 'admin@example.test', is_admin: true };
+        const single = (request.headers().accept ?? '').includes('application/vnd.pgrst.object+json');
+        await send(single ? row : [row]);
+        return;
+      }
+      if (url.pathname.endsWith('/contributions') && request.method() === 'GET') {
+        await send(items);
+        return;
+      }
+      if (url.pathname.endsWith('/rpc/edit_contribution') && request.method() === 'POST') {
+        edited = request.postDataJSON();
+        const row = items.find((item) => item.id === edited?.p_id);
+        if (row && edited) {
+          if (edited.p_title != null) row.title = String(edited.p_title);
+          if (edited.p_caption != null) row.caption = String(edited.p_caption);
+          if (edited.p_body != null) row.body = String(edited.p_body);
+          if (edited.p_url != null) row.url = String(edited.p_url);
+          if (edited.p_storage_path != null) row.storage_path = String(edited.p_storage_path);
+        }
+        await send(null);
+        return;
+      }
+      if (url.pathname.endsWith('/rpc/publish_contribution') && request.method() === 'POST') {
+        published = request.postDataJSON();
+        const row = items.find((item) => item.id === published?.p_id);
+        if (row) row.status = 'published';
+        await send(null);
+        return;
+      }
+      await send([]);
+    });
+
+    await open(page, 'captains/admin/share/');
+    await expect(page.getByRole('heading', { level: 1, name: 'Shared content' })).toBeVisible();
+    const article = page.locator('[data-item]', { hasText: 'Clse match' });
+    await expect(article).toContainText('Pat Player');
+    await article.getByRole('button', { name: 'Edit' }).click();
+    const articleEditor = article.locator('[data-editor]');
+    await expect(articleEditor).toContainText('Sent in by Pat Player');
+    await expect(articleEditor.locator('input[name="credit"]')).toHaveCount(0);
+    await articleEditor.getByLabel('Title').fill('Close match');
+    await articleEditor.getByLabel('Article').fill('This sentence is long enough to be an article for the site queue.');
+    await articleEditor.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByRole('status')).toHaveText('Saved. The name on it is unchanged.');
+    expect(Object.keys(edited ?? {}).sort()).toEqual(fields);
+    expect(edited).toMatchObject({
+      p_id: articleId,
+      p_title: 'Close match',
+      p_caption: 'A short note',
+      p_body: 'This sentence is long enough to be an article for the site queue.',
+      p_url: null,
+      p_storage_path: null,
+    });
+    expect(edited).not.toHaveProperty('p_credit');
+
+    const link = page.locator('[data-item]', { hasText: 'Bad subject' });
+    await link.getByRole('button', { name: 'Edit' }).click();
+    const linkEditor = link.locator('[data-editor]');
+    await expect(linkEditor.locator('input[name="credit"]')).toHaveCount(0);
+    await linkEditor.getByLabel('Title').fill('Club night');
+    await linkEditor.getByLabel('Link').fill('https://example.com/match');
+    await linkEditor.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByRole('status')).toHaveText('Saved. The name on it is unchanged.');
+    expect(edited).toMatchObject({
+      p_id: linkId,
+      p_title: 'Club night',
+      p_caption: 'Watch this',
+      p_url: 'https://example.com/match',
+      p_body: null,
+      p_storage_path: null,
+    });
+    expect(edited).not.toHaveProperty('p_credit');
+    await expect(page.locator('[data-item]', { hasText: 'Club night' })).toContainText('Pat Player');
+
+    const photo = page.locator('[data-item]', { hasText: 'Court photo' });
+    await photo.getByRole('button', { name: 'Edit' }).click();
+    const photoEditor = photo.locator('[data-editor]');
+    await photoEditor.getByLabel('Caption').fill('Match photo');
+    await photoEditor.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByRole('status')).toHaveText('Saved. The name on it is unchanged.');
+    expect(edited).toMatchObject({
+      p_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      p_caption: 'Match photo',
+      p_storage_path: null,
+      p_title: null,
+      p_url: null,
+    });
+    await expect(page.locator('[data-item]', { hasText: 'Match photo' })).toContainText('Pat Player');
+
+    const video = page.locator('[data-item]', { hasText: 'Shaky rally' });
+    await video.getByRole('button', { name: 'Edit' }).click();
+    const videoEditor = video.locator('[data-editor]');
+    await videoEditor.getByLabel('Caption').fill('Clean rally');
+    await videoEditor.locator('input[name="file"]').setInputFiles({
+      name: 'rally.mp4',
+      mimeType: 'video/mp4',
+      buffer: Buffer.from('fake-video'),
+    });
+    await videoEditor.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByRole('status')).toHaveText('Saved. The name on it is unchanged.');
+    expect(edited).toMatchObject({ p_id: videoId, p_caption: 'Clean rally', p_title: null, p_url: null, p_body: null });
+    expect(String(edited?.p_storage_path)).toMatch(/^incoming\/[0-9a-f-]{36}\.mp4$/);
+    expect(edited).not.toHaveProperty('p_credit');
+    await expect(page.locator('[data-item]', { hasText: 'Clean rally' })).toContainText('Pat Player');
+
+    const saved = page.locator('[data-item]', { hasText: 'Close match' });
+    await saved.getByRole('button', { name: 'Publish' }).click();
+    await expect(page.getByRole('status')).toHaveText('Published.');
+    expect(published).toEqual({ p_id: articleId });
+    await expect(page.locator('[data-live]')).toContainText('Pat Player');
+    await expect(page.locator('[data-live]')).toContainText('Close match');
+  });
+
   test('a signed-in account with no role cannot send content', async ({ page }) => {
     const userId = '55555555-5555-4555-8555-555555555555';
     const expiresAt = Math.floor(Date.now() / 1000) + 60 * 60;
