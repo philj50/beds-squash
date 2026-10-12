@@ -6,15 +6,21 @@ updated: 2026-10-07
 
 ## County squad programme
 
-The junior programme has been rebuilt over the last 18 months. Sessions are organised through an app: about 36 players are on the squad, with around 10 at a typical session. Age groups are split into **under-13 and under-11**, and **under-15, under-17 and under-19**.
+The Junior Programme has over 40 juniors across 2 squads. The U11 and U13 squad, and the U15, U17 and U19 squad.
 
-**Gail Clark** is Junior Team Manager and **Sam Morris** is County Coach. **Dan Evans** is the second coach.
+A typical session usually has an attendance of approximately 10–15 players.
+
+**Gail Clark** — Junior Team Manager
+
+**Sam Morris** — County Coach
+
+**Dan Evans** — Assistant Coach
 
 ## Coming up
 
 - **Junior County Closed** — Sunday 8th November, 10am–5pm at Towers Health & Racquets Club. Entry is free. Entries close on Wednesday 28th October. Scan the code at the top of this page, or [enter a player](/juniors/closed/). Queries: [bsrajunior@gmail.com](mailto:bsrajunior@gmail.com).
-- **Northants Grand Prix** — February
-- **Beds schools** — March / April
+- **Northants Grand Prix** — Sunday 7th February 2027
+- **Bedford Schools Tournament** — March 2027
 
 ## Where to start
 

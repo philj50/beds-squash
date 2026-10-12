@@ -15,23 +15,23 @@ export const SITE = {
   englandSquashMasters: 'https://www.englandsquashmasters.co.uk/',
 };
 
-type NavItem = { label: string; href: string; signedIn?: boolean };
+type NavItem = { label: string; href: string; signedIn?: boolean; more?: boolean };
 
 export const NAV: NavItem[] = [
   { label: 'News', href: '/news/' },
   { label: 'My Squash', href: '/captains/you/', signedIn: true },
-  { label: 'Events', href: '/events/' },
   { label: 'Clubs', href: '/clubs/' },
+  { label: 'Juniors', href: '/juniors/' },
   { label: 'Leagues', href: '/leagues/' },
   { label: 'Tournaments', href: '/tournaments/' },
-  { label: 'Juniors', href: '/juniors/' },
-  { label: 'County Teams', href: '/county-teams/' },
-  { label: 'Gallery', href: '/gallery/' },
-  { label: 'Documents', href: '/documents/' },
-  { label: 'About', href: '/about/' },
-  { label: 'Contact', href: '/contact/' },
-  { label: 'Minigame mk3', href: '/minigame/' },
-  { label: 'Administration', href: '/captains/admin/' },
+  { label: 'Events', href: '/events/', more: true },
+  { label: 'County Teams', href: '/county-teams/', more: true },
+  { label: 'Gallery', href: '/gallery/', more: true },
+  { label: 'Documents', href: '/documents/', more: true },
+  { label: 'About', href: '/about/', more: true },
+  { label: 'Contact', href: '/contact/', more: true },
+  { label: 'Minigame mk3', href: '/minigame/', more: true },
+  { label: 'Administration', href: '/captains/admin/', more: true },
 ];
 
 /** Prefix a root-relative path with the configured base (works for "/" and "/beds-squash"). */

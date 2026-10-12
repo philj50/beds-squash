@@ -17,6 +17,8 @@ const clubs = [
   'John Bunyan Sports & Fitness',
   'Leighton Leisure Centre',
   'Luton & Dunstable Squash Club',
+  'Lewsey Sports Park',
+  'Mowsbury Golf & Squash Club',
   'Open University Squash Club',
   'Saxon Pool & Leisure Centre',
   'Shenley Leisure Squash',
@@ -151,6 +153,10 @@ test.describe('Public pages', () => {
   test('the juniors page links to the entry form and not the missing codes of conduct', async ({ page }) => {
     await open(page, 'juniors/');
     await expect(page.getByRole('heading', { level: 1, name: 'Juniors' })).toBeVisible();
+    await expect(page.getByText('Gail Clark — Junior Team Manager')).toBeVisible();
+    await expect(page.getByText('Dan Evans — Assistant Coach')).toBeVisible();
+    await expect(page.getByText('Sunday 7th February 2027')).toBeVisible();
+    await expect(page.getByText('Bedford Schools Tournament')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Enter', exact: true })).toHaveAttribute('href', /\/juniors\/closed\/$/);
     await expect(page.getByRole('img', { name: /Bedfordshire County Closed junior squash tournament/i })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Download the poster' })).toHaveAttribute('href', /beds-junior-county-closed-2026\.pdf$/);

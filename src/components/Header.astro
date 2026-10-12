@@ -9,19 +9,21 @@ const loginHref = url('/login/');
 const youHref = url('/captains/you/');
 const shareHref = url('/share/');
 const profileHref = url('/captains/profile/');
+const primaryNav = NAV.filter((item) => !item.more);
+const moreNav = NAV.filter((item) => item.more);
 ---
 
 <header class="site-header" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} data-login={loginHref} data-profile={profileHref}>
   <div class="container bar">
     <a class="brand" href={url('/')} aria-label={`${SITE.name} home`}>
-      <img src={url('/brand/logo-coral.png')} alt="" width="154" height="91" />
+      <img src={url('/brand/logo-coral.png')} alt="" width="168" height="99" />
     </a>
 
     <div class="bar-end">
       <nav id="site-nav" class="nav" aria-label="Primary">
         <ul>
           {
-            NAV.map((item) =>
+            primaryNav.map((item) =>
               item.signedIn ? (
                 <li data-your-squash hidden>
                   <a href={url(item.href)} aria-current={isActive(item.href) ? 'page' : undefined}>
@@ -37,6 +39,20 @@ const profileHref = url('/captains/profile/');
               ),
             )
           }
+          <li class="more" data-more-item>
+            <button class="more-toggle" type="button" data-more-toggle aria-expanded="false" aria-controls="more-menu">
+              More
+            </button>
+            <div id="more-menu" class="more-menu" data-more-menu hidden>
+              {
+                moreNav.map((item) => (
+                  <a href={url(item.href)} aria-current={isActive(item.href) ? 'page' : undefined}>
+                    {item.label}
+                  </a>
+                ))
+              }
+            </div>
+          </li>
           <li class="account" data-account-item>
             <a data-account-login href={loginHref}>Log in</a>
             <div data-account-signed hidden>
@@ -66,11 +82,42 @@ const profileHref = url('/captains/profile/');
 
   const btn = document.querySelector<HTMLButtonElement>('[data-menu-toggle]');
   const nav = document.getElementById('site-nav');
+  const moreItem = headerQuery('[data-more-item]');
+  const moreToggle = headerQuery('[data-more-toggle]') as HTMLButtonElement | null;
+  const moreMenu = headerQuery('[data-more-menu]');
+
+  function headerQuery(selector: string) {
+    return document.querySelector<HTMLElement>(selector);
+  }
+
+  function setMoreOpen(open: boolean) {
+    if (!moreToggle || !moreMenu) return;
+    moreToggle.setAttribute('aria-expanded', String(open));
+    moreMenu.hidden = !open;
+  }
+
   btn?.addEventListener('click', () => {
     const open = btn.getAttribute('aria-expanded') === 'true';
     btn.setAttribute('aria-expanded', String(!open));
     nav?.classList.toggle('is-open', !open);
     document.body.classList.toggle('nav-open', !open);
+    if (open) setMoreOpen(false);
+  });
+  moreToggle?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const open = moreToggle.getAttribute('aria-expanded') !== 'true';
+    setMoreOpen(open);
+    if (open) {
+      document.querySelector<HTMLButtonElement>('[data-account-toggle]')?.setAttribute('aria-expanded', 'false');
+      const accountMenu = document.querySelector<HTMLElement>('[data-account-menu]');
+      if (accountMenu) accountMenu.hidden = true;
+    }
+  });
+  document.addEventListener('click', (event) => {
+    if (moreItem && !moreItem.contains(event.target as Node)) setMoreOpen(false);
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') setMoreOpen(false);
   });
 
   const header = document.querySelector<HTMLElement>('.site-header');
@@ -92,7 +139,9 @@ const profileHref = url('/captains/profile/');
 
     toggle.addEventListener('click', (event) => {
       event.stopPropagation();
-      setMenuOpen(toggle.getAttribute('aria-expanded') !== 'true');
+      const open = toggle.getAttribute('aria-expanded') !== 'true';
+      setMenuOpen(open);
+      if (open) setMoreOpen(false);
     });
     document.addEventListener('click', (event) => {
       if (!accountItem.contains(event.target as Node)) setMenuOpen(false);
@@ -157,7 +206,7 @@ const profileHref = url('/captains/profile/');
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    min-height: 72px;
+    min-height: 88px;
   }
   .bar-end {
     display: flex;
@@ -175,7 +224,7 @@ const profileHref = url('/captains/profile/');
   }
   .brand img {
     width: auto;
-    height: 52px;
+    height: 68px;
     border-radius: 6px;
     flex-shrink: 0;
   }
@@ -195,7 +244,8 @@ const profileHref = url('/captains/profile/');
     display: none;
   }
   .nav > ul > li > a,
-  .account-toggle {
+  .account-toggle,
+  .more-toggle {
     display: block;
     padding: 0.5rem 0.55rem;
     color: var(--ink-200);
@@ -206,13 +256,15 @@ const profileHref = url('/captains/profile/');
     position: relative;
     white-space: nowrap;
   }
-  .account-toggle {
+  .account-toggle,
+  .more-toggle {
     background: none;
     border: none;
     cursor: pointer;
     font-family: inherit;
   }
-  .account-toggle::after {
+  .account-toggle::after,
+  .more-toggle::after {
     content: '';
     display: inline-block;
     margin-left: 0.35rem;
@@ -222,22 +274,30 @@ const profileHref = url('/captains/profile/');
   }
   .nav > ul > li > a:hover,
   .account-toggle:hover,
-  .account-toggle[aria-expanded='true'] {
+  .account-toggle[aria-expanded='true'],
+  .more-toggle:hover,
+  .more-toggle[aria-expanded='true'] {
     color: #fff;
     background: rgba(255, 255, 255, 0.05);
   }
   :global(html[data-theme='navy']) .nav > ul > li > a,
   :global(html[data-theme='navy']) .account-toggle,
+  :global(html[data-theme='navy']) .more-toggle,
   :global(html[data-theme='light']) .nav > ul > li > a,
-  :global(html[data-theme='light']) .account-toggle {
+  :global(html[data-theme='light']) .account-toggle,
+  :global(html[data-theme='light']) .more-toggle {
     color: var(--text);
   }
   :global(html[data-theme='navy']) .nav > ul > li > a:hover,
   :global(html[data-theme='navy']) .account-toggle:hover,
   :global(html[data-theme='navy']) .account-toggle[aria-expanded='true'],
+  :global(html[data-theme='navy']) .more-toggle:hover,
+  :global(html[data-theme='navy']) .more-toggle[aria-expanded='true'],
   :global(html[data-theme='light']) .nav > ul > li > a:hover,
   :global(html[data-theme='light']) .account-toggle:hover,
-  :global(html[data-theme='light']) .account-toggle[aria-expanded='true'] {
+  :global(html[data-theme='light']) .account-toggle[aria-expanded='true'],
+  :global(html[data-theme='light']) .more-toggle:hover,
+  :global(html[data-theme='light']) .more-toggle[aria-expanded='true'] {
     color: var(--accent);
     background: transparent;
   }
@@ -263,14 +323,18 @@ const profileHref = url('/captains/profile/');
   }
   :global(html[data-theme='navy']) .nav.is-open > ul > li > a:not([data-account-login]),
   :global(html[data-theme='navy']) .nav.is-open .account-toggle,
+  :global(html[data-theme='navy']) .nav.is-open .more-toggle,
   :global(html[data-theme='light']) .nav.is-open > ul > li > a:not([data-account-login]),
-  :global(html[data-theme='light']) .nav.is-open .account-toggle {
+  :global(html[data-theme='light']) .nav.is-open .account-toggle,
+  :global(html[data-theme='light']) .nav.is-open .more-toggle {
     color: #fff;
   }
   :global(html[data-theme='navy']) .nav.is-open > ul > li > a:not([data-account-login]):hover,
   :global(html[data-theme='navy']) .nav.is-open .account-toggle:hover,
+  :global(html[data-theme='navy']) .nav.is-open .more-toggle:hover,
   :global(html[data-theme='light']) .nav.is-open > ul > li > a:not([data-account-login]):hover,
-  :global(html[data-theme='light']) .nav.is-open .account-toggle:hover {
+  :global(html[data-theme='light']) .nav.is-open .account-toggle:hover,
+  :global(html[data-theme='light']) .nav.is-open .more-toggle:hover {
     color: #ffb088;
     background: transparent;
   }
@@ -300,8 +364,51 @@ const profileHref = url('/captains/profile/');
     background: var(--accent);
     border-radius: 1px;
   }
-  .account {
+  .account,
+  .more {
     position: relative;
+  }
+  .more-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.35rem);
+    min-width: 12rem;
+    background: var(--ink-900);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 0.35rem;
+    box-shadow: var(--shadow);
+    z-index: 30;
+  }
+  .more-menu a {
+    display: block;
+    color: var(--ink-200);
+    font-weight: 600;
+    font-size: 0.9rem;
+    padding: 0.55rem 0.7rem;
+    border-radius: 6px;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .more-menu a:hover,
+  .more-menu a[aria-current='page'] {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.06);
+  }
+  :global(html[data-theme='navy']) .more-menu,
+  :global(html[data-theme='light']) .more-menu {
+    background: #fff;
+  }
+  :global(html[data-theme='navy']) .more-menu a,
+  :global(html[data-theme='light']) .more-menu a {
+    color: var(--text);
+  }
+  :global(html[data-theme='navy']) .more-menu a:hover,
+  :global(html[data-theme='navy']) .more-menu a[aria-current='page'],
+  :global(html[data-theme='light']) .more-menu a:hover,
+  :global(html[data-theme='light']) .more-menu a[aria-current='page'] {
+    color: var(--accent);
+    background: rgba(241, 90, 34, 0.08);
   }
   .account-menu {
     position: absolute;
@@ -394,7 +501,7 @@ const profileHref = url('/captains/profile/');
       border-bottom: 1px solid var(--border);
       box-shadow: var(--shadow);
       padding: 0.75rem var(--gutter) 1.25rem;
-      max-height: calc(100dvh - 72px);
+      max-height: calc(100dvh - 88px);
       overflow: auto;
     }
     .nav.is-open {
@@ -406,7 +513,8 @@ const profileHref = url('/captains/profile/');
       gap: 0;
     }
     .nav > ul > li > a,
-    .account-toggle {
+    .account-toggle,
+    .more-toggle {
       padding: 0.8rem 0.5rem;
       font-size: 1.1rem;
       border-bottom: 1px solid var(--border);
@@ -415,7 +523,8 @@ const profileHref = url('/captains/profile/');
     .nav > ul > li > a[aria-current='page']::after {
       display: none;
     }
-    .account-menu {
+    .account-menu,
+    .more-menu {
       position: static;
       min-width: 0;
       margin: 0;
@@ -424,6 +533,14 @@ const profileHref = url('/captains/profile/');
       border-radius: 0;
       box-shadow: none;
       background: transparent;
+    }
+    :global(html[data-theme='navy']) .nav.is-open .more-menu,
+    :global(html[data-theme='light']) .nav.is-open .more-menu {
+      background: transparent;
+    }
+    :global(html[data-theme='navy']) .nav.is-open .more-menu a,
+    :global(html[data-theme='light']) .nav.is-open .more-menu a {
+      color: #fff;
     }
   }
 </style>

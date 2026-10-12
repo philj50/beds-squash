@@ -16,6 +16,6 @@ tags: [squash, juniors, pay-and-play]
 order: 20
 ---
 
-The three league teams play home matches at Bedford School, on De Parys Avenue. The Recreation Centre has four squash courts. Kick-off is 7pm on Monday nights and 7:15pm on Tuesday nights.
+The three league teams play home matches at Bedford School, on De Parys Avenue. The Recreation Centre has four squash courts, and they are open to the public as pay-and-play. Kick-off is 7pm on Monday nights and 7:15pm on Tuesday nights.
 
-Juniors and pay-and-play are still at [Mowsbury Golf & Squash Centre](https://www.better.org.uk/leisure-centre/bedfordshire/mowsbury-golf-squash-centre), Kimbolton Road, Cleat Hill, Bedford, MK41 8BJ. Three glass-backed courts with a spectator area. Courts are pay-and-play through Better (GLL).
+Juniors also play at [Mowsbury Golf & Squash Club](/clubs/mowsbury/). Three glass-backed courts with a spectator area, on Kimbolton Road. Courts there are pay-and-play through Better (GLL).
