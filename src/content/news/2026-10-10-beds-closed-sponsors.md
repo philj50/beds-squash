@@ -14,27 +14,46 @@ A first look at the confirmed sponsors — at least so far — for the [Bedfords
 
 ## Main sponsor
 
-**The Dental Centre Bedford**
+[The Dental Centre Bedford](https://www.dentalcentrebedford.co.uk/)
+
+![The Dental Centre Bedford](/uploads/news/dental-centre-bedford.png)
 
 ## Additional sponsors
 
-- JR Builders Ltd
-- Decant Wine & Cheese Bar
-- The Bedford Cheese Company
-- My Next Car
+- [JR Builders Ltd](https://jrbuilders-ltd.co.uk/)
+
+  ![JR Builders](/uploads/news/jr-builders.png)
+
+- [Decant Wine & Cheese Bar](https://decantbar.co.uk/)
+
+  ![Decant Wine & Cheese Bar](/uploads/news/decant.png)
+
+- [The Bedford Cheese Company](https://bedfordcheesecompany.co.uk/)
+
+  ![The Bedford Cheese Company](/uploads/news/bedford-cheese-company.png)
+
+- [My Next Car](https://www.my-next-car.co.uk/)
 
   ![My Next Car](/uploads/news/my-next-car.png)
 
-- Brook Harris Bespoke Tailors
-- Open House
-- Specsavers
+- [Brook Harris Bespoke Tailors](https://www.brookharris.co.uk/)
+
+  ![Brook Harris](/uploads/news/brook-harris.png)
+
+- [Open House](https://www.openhousebedford.co.uk/)
+
+  ![Open House](/uploads/news/open-house.png)
+
+- [Specsavers](https://www.specsavers.co.uk/stores/bedford)
 
   ![Specsavers](/uploads/news/specsavers.png)
 
-- Samo Sports
+- [Samo Sports](https://www.instagram.com/samo.sports/)
 
   ![Samo Sports](/uploads/news/samo-sports.png)
 
 - Thomas Garlich’s new company (business name to follow)
 
 Thanks to everyone who has come on board. More names may still be added before the event.
+
+Logos supplied by the sponsors.
