@@ -37,6 +37,7 @@ test.describe('Public pages', () => {
     await expect(page.getByRole('heading', { name: 'Rule of the day' })).toBeVisible();
     await expect(rule.locator('h3')).toHaveText(/.+/);
     await expect(rule.locator('[data-rule-text]')).not.toBeEmpty();
+    await expect(rule.locator('.rule__ref')).toHaveText(/^World Squash Singles Rules 2025, (Introduction and )?Rules? \d+\.\d+/);
     await expect(page.getByRole('link', { name: 'Singles rules →' })).toHaveAttribute('href', /worldsquash\.sport/);
     await expect(page.getByRole('link', { name: "What's on" })).toBeVisible();
   });
