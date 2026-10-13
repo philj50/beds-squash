@@ -1,0 +1,15 @@
+---
+description: Require a relevant, credited image for every news article
+globs: src/content/news/**/*.md
+alwaysApply: false
+---
+
+# News article images
+
+- Give every news article a relevant image in `public/uploads/news/`.
+- Prefer an image supplied for the story or an official image from the event, organiser, club or governing body.
+- Check that the source permits or reasonably supports editorial use. Do not copy an unrelated search-result image.
+- Prepare the image at 1200 × 675 where practical so it fits the 16:9 news cards without cropping important content.
+- Set both `image` and meaningful `imageAlt` frontmatter.
+- Credit the image source at the end of the article and retain the source URL in the article where useful.
+- If no suitable image can be verified, ask the user for one before publishing rather than inventing or silently using the site placeholder.

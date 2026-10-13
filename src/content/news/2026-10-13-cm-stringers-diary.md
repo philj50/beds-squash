@@ -2,6 +2,8 @@
 title: Graded tournaments on the CM Stringers diary
 date: 2026-10-13
 summary: CM Stringers has listed graded events through December, including Harrow on 8 November and Radlett on 21 November. Online entry is not open yet.
+image: /uploads/news/cm-stringers-tournament-entry.png
+imageAlt: CM Stringers tournament entry banner showing squash players and spectators.
 category: tournaments
 ---
 
@@ -37,3 +39,5 @@ The nearest events for Bedfordshire players are Harrow and Radlett.
 **Saturday 8 to Sunday 9 May** — The Amsterdam Classic IV, a graded squash and racketball weekend. The diary gives Sunday 25 April 2026 as the closing date, which has already passed, and entry is marked not open.
 
 Unless a fee is given above, the one-day events are £30 and include an event shirt. Most are grades A to E, for SquashLevels 0–15,000. Organisers and entry forms are on the [CM Stringers entry page](https://www.cmstringers.com/entry/).
+
+*Image: CM Stringers.*
