@@ -22,10 +22,19 @@ A first look at the confirmed sponsors — at least so far — for the [Bedfords
 - Decant Wine & Cheese Bar
 - The Bedford Cheese Company
 - My Next Car
+
+  ![My Next Car](/uploads/news/my-next-car.png)
+
 - Brook Harris Bespoke Tailors
 - Open House
 - Specsavers
+
+  ![Specsavers](/uploads/news/specsavers.png)
+
 - Samo Sports
+
+  ![Samo Sports](/uploads/news/samo-sports.png)
+
 - Thomas Garlich’s new company (business name to follow)
 
 Thanks to everyone who has come on board. More names may still be added before the event.
