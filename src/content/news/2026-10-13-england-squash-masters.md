@@ -2,6 +2,8 @@
 title: England Squash Masters events for the rest of the season
 date: 2026-10-13
 summary: The remaining England Squash Masters events for 2026-27, starting with the East of England regional at Grantham. Entries close at 6pm on Friday 16 October.
+image: /uploads/news/england-squash-masters.png
+imageAlt: England Squash Masters logo.
 category: england-squash
 ---
 
@@ -23,3 +25,5 @@ Entries close at 6pm on Friday 16 October 2026. [Event details and entry](https:
 - **British National Squash Championships 2027** — Wednesday 17 to Sunday 21 February 2027, Colets Health & Fitness Club, St Nicholas Road, Thames Ditton, KT7 0PW. [Details](https://www.englandsquashmasters.co.uk/Events/EventDetails.aspx?@EventID=164).
 
 Questions go to Brian Brock, the event manager, on 07757 739156 or [events@englandsquashmasters.co.uk](mailto:events@englandsquashmasters.co.uk). The full list is on the [England Squash Masters](https://www.englandsquashmasters.co.uk/) site.
+
+*Image: England Squash Masters.*
