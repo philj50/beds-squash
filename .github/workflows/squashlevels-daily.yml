@@ -17,6 +17,7 @@ concurrency:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   sync:
@@ -69,6 +70,8 @@ jobs:
           fi
           bash .github/scripts/ntfy-notify.sh "Beds Squash · SquashLevels" "$body"
       - name: Commit a published article
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git add src/content/news
           if git diff --cached --quiet; then
@@ -78,4 +81,5 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git commit -m "Publish the latest match and minigame notes."
             git push
+            gh workflow run deploy.yml --ref main
           fi
