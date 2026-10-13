@@ -496,7 +496,8 @@ test.describe('Public site', () => {
     await videoEditor.getByRole('button', { name: 'Save' }).click();
     await expect(page.getByRole('status')).toHaveText('Saved. The name on it is unchanged.');
     expect(edited).toMatchObject({ p_id: videoId, p_caption: 'Clean rally', p_title: null, p_url: null, p_body: null });
-    expect(String(edited?.p_storage_path)).toMatch(/^incoming\/[0-9a-f-]{36}\.mp4$/);
+    const videoEdit = edited as Record<string, unknown> | null;
+    expect(String(videoEdit?.p_storage_path)).toMatch(/^incoming\/[0-9a-f-]{36}\.mp4$/);
     expect(edited).not.toHaveProperty('p_credit');
     await expect(page.locator('[data-item]', { hasText: 'Clean rally' })).toContainText('Pat Player');
 
