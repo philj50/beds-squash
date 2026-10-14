@@ -123,6 +123,17 @@ export async function noteActivity(supabase: SupabaseClient) {
   } catch {
     /* The sign-in table may not be on the database yet. */
   }
+  try {
+    const key = 'beds_traffic_session';
+    let sessionId = sessionStorage.getItem(key);
+    if (!sessionId) {
+      sessionId = crypto.randomUUID();
+      sessionStorage.setItem(key, sessionId);
+    }
+    await supabase.rpc('record_site_page_view', { p_path: location.pathname, p_session_id: sessionId });
+  } catch {
+    /* The page-view table may not be on the database yet. */
+  }
 }
 
 /** True when this login organises a website group, or is an admin. */

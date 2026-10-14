@@ -181,6 +181,41 @@ test('a public visit stays anonymous until that browser is signed in', async ({ 
   expect(signed?.authorization).not.toBe(`Bearer ${signed?.apikey}`);
 });
 
+test('a returning login is recorded once the saved session is refreshed', async ({ page }) => {
+  const fresh = sessionFor('66666666-6666-4666-8666-666666666666', 'sam.morris@example.test', 'Sam Morris');
+  const stale = { ...fresh, access_token: 'stale-token', expires_at: Math.floor(Date.now() / 1000) - 120, expires_in: 0 };
+  const seen: { authorization: string; path: string }[] = [];
+  await page.addInitScript((stored) => {
+    localStorage.setItem('sb-klxyjmwiaivvqjbhxzak-auth-token', JSON.stringify(stored));
+  }, stale);
+  await page.route(`${SUPABASE}/**`, async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (url.pathname.endsWith('/rpc/record_site_page_view')) {
+      const body = request.postDataJSON() as { p_path?: string } | null;
+      seen.push({ authorization: request.headers()['authorization'] ?? '', path: body?.p_path ?? '' });
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+    if (url.pathname.endsWith('/token')) {
+      await send(route, fresh);
+      return;
+    }
+    if (url.pathname.startsWith('/auth/v1/')) {
+      await send(route, url.pathname.endsWith('/user') ? fresh.user : fresh);
+      return;
+    }
+    if (url.pathname.endsWith('/profiles')) {
+      await send(route, { id: fresh.user.id, display_name: 'Sam Morris', email: fresh.user.email, is_admin: true });
+      return;
+    }
+    await send(route, []);
+  });
+  await page.goto('captains/you/', { waitUntil: 'domcontentloaded' });
+  await expect.poll(() => seen.some((row) => row.path.includes('/captains/you') && row.authorization === `Bearer ${fresh.access_token}`)).toBe(true);
+  expect(seen.some((row) => row.path.includes('/captains/you') && row.authorization.includes('stale-token'))).toBe(false);
+});
+
 test('a captain page is counted only when someone is signed in', async ({ page }) => {
   let views = 0;
   await page.route(`${SUPABASE}/**`, async (route) => {
