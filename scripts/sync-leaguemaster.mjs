@@ -129,6 +129,11 @@ function clubFor(teamName, clubs) {
   return best;
 }
 
+function scorePair(value) {
+  const match = String(value ?? '').match(/^(\d+)\s*-\s*(\d+)$/);
+  return match ? [Number(match[1]), Number(match[2])] : null;
+}
+
 function parseFixtures(html) {
   const fixtures = [];
   for (const m of html.matchAll(/<tr[^>]*class="([^"]*)"[\s\S]*?<\/tr>/gi)) {
@@ -142,7 +147,6 @@ function parseFixtures(html) {
     const teams = c.filter(
       (x) => x && !/^\d+$/.test(x) && !/\d{2}\/\d{2}\/\d{2}/.test(x) && !/^\d+\s*-\s*\d+$/.test(x) && x !== 'View',
     );
-    const scores = c.filter((x) => /^\d+\s*-\s*\d+$/.test(x));
     const dm = when.match(/(\d{2})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})/);
     let startsAt = null;
     if (dm) {
@@ -151,25 +155,62 @@ function parseFixtures(html) {
       const local = `${year}-${dm[2]}-${dm[1]}T${dm[4]}:${dm[5]}:00`;
       startsAt = toUtc(local);
     }
-    const points = scores[0]?.split(/\s*-\s*/).map(Number);
-    const games = scores[1]?.split(/\s*-\s*/).map(Number);
-    const played = Boolean(points) || cls.toLowerCase().includes('done');
+    const viewAt = c.lastIndexOf('View');
+    const listedGames = viewAt > 1 ? scorePair(c[viewAt - 1]) : null;
+    const listedResult = viewAt > 2 ? scorePair(c[viewAt - 2]) : null;
     const lower = row.toLowerCase();
-    const status = lower.includes('postponed') ? 'postponed' : lower.includes('walkover') || lower.includes('w/o') ? 'walkover' : played ? 'played' : 'scheduled';
+    const status = lower.includes('postponed') ? 'postponed' : lower.includes('walkover') || lower.includes('w/o') ? 'walkover' : 'scheduled';
     fixtures.push({
       lm_id: id[1],
       starts_at: startsAt,
       home: teams[0] ?? '',
       away: teams[1] ?? '',
       status,
-      home_points: points?.[0] ?? null,
-      away_points: points?.[1] ?? null,
-      home_games: games?.[0] ?? null,
-      away_games: games?.[1] ?? null,
+      home_points: null,
+      away_points: null,
+      home_games: null,
+      away_games: null,
       rubbers: [],
+      needsCard: status === 'scheduled' && (cls.toLowerCase().includes('done') || Boolean(listedResult) || Boolean(listedGames)),
     });
   }
   return fixtures;
+}
+
+/** One point per game, plus five for the side that wins more rubbers. */
+function applyScorecard(fixture) {
+  let homeGames = 0;
+  let awayGames = 0;
+  let homeRubbers = 0;
+  let awayRubbers = 0;
+  for (const rubber of fixture.rubbers) {
+    let home = 0;
+    let away = 0;
+    for (const bit of String(rubber.score ?? '').match(/\d+\s*\/\s*\d+/g) ?? []) {
+      const [left, right] = bit.split('/').map((part) => Number(part.trim()));
+      if (left > right) home += 1;
+      else if (right > left) away += 1;
+    }
+    homeGames += home;
+    awayGames += away;
+    const winner = home === away ? rubber.winner : home > away ? 'home' : 'away';
+    if (winner === 'home') homeRubbers += 1;
+    else if (winner === 'away') awayRubbers += 1;
+  }
+  if (homeGames + awayGames + homeRubbers + awayRubbers === 0) {
+    if (fixture.status === 'played') fixture.status = 'scheduled';
+    fixture.home_points = null;
+    fixture.away_points = null;
+    fixture.home_games = null;
+    fixture.away_games = null;
+    return;
+  }
+  const decided = homeRubbers !== awayRubbers && (homeRubbers >= 3 || awayRubbers >= 3 || homeRubbers + awayRubbers >= 5);
+  fixture.status = 'played';
+  fixture.home_games = homeGames;
+  fixture.away_games = awayGames;
+  fixture.home_points = homeGames + (decided && homeRubbers > awayRubbers ? 5 : 0);
+  fixture.away_points = awayGames + (decided && awayRubbers > homeRubbers ? 5 : 0);
 }
 
 /** Convert a Europe/London wall-clock time to an ISO string in UTC. */
@@ -248,10 +289,12 @@ async function buildPayload(season) {
     });
     for (const fx of fixtures) {
       if (fx.starts_at) allDates.push(fx.starts_at);
-      if (fx.status === 'played') {
+      if (fx.needsCard) {
         fx.rubbers = parseMatch(await request(`/cgi-county/icounty.exe/showmatch?fixtureid=${fx.lm_id}&divid=${division.lmId}`));
+        applyScorecard(fx);
         await pause(40);
       }
+      delete fx.needsCard;
     }
     payload.divisions.push({ name: division.name, scoring: division.scoring, teams, fixtures });
     console.error(`${season.name} ${division.name}: ${teams.length} teams, ${fixtures.length} fixtures`);
@@ -342,6 +385,23 @@ function parseAdminPlayers(html) {
   return players;
 }
 
+function assertScorecard() {
+  const fixture = {
+    status: 'scheduled',
+    rubbers: [
+      { score: '5/11 11/13 10/12', winner: 'away' },
+      { score: '2/11 6/11 5/11', winner: 'away' },
+      { score: '6/11 11/13 11/9 11/5 11/5', winner: 'home' },
+      { score: '11/6 4/11 0/11 0/11', winner: 'away' },
+      { score: '11/2 11/2 11/7', winner: 'home' },
+    ],
+  };
+  applyScorecard(fixture);
+  if (fixture.home_games !== 7 || fixture.away_games !== 11 || fixture.home_points !== 7 || fixture.away_points !== 16) {
+    throw new Error(`scorecard points were ${fixture.home_points}-${fixture.away_points} from ${fixture.home_games}-${fixture.away_games} games`);
+  }
+}
+
 function assertPlayerParse() {
   const html = `<tr class="firstRow"><input value="24"><td><a href="editplayer?playerid=24">Samuel</a></td><td><a href="editplayer?playerid=24">Morris</a></td><td>1234567</td><td></td><td><img title="Valid"></td><td>sam@example.test</td><td>07000</td></tr>`;
   const parsed = parseAdminPlayers(html);
@@ -354,6 +414,7 @@ function assertPlayerParse() {
 async function main() {
   if (selfTest) {
     assertPlayerParse();
+    assertScorecard();
     console.error('player parse ok');
     return;
   }
