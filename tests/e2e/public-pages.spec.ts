@@ -153,7 +153,7 @@ test.describe('Public pages', () => {
     await page.getByRole('link', { name: 'Welcome to the new Bedfordshire Squash website' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Welcome to the new Bedfordshire Squash website' })).toBeVisible();
     await expect(page.locator('article time').first()).toHaveText('26 September 2026');
-    await expect(page.getByText('County', { exact: true })).toBeVisible();
+    await expect(page.locator('[data-article-slug] .pill')).toHaveText('County');
   });
 
   test('the juniors page links to the entry form and not the missing codes of conduct', async ({ page }) => {

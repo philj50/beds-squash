@@ -860,6 +860,12 @@ const MATCH_PICTURES = {
   ],
 };
 
+/** Used on about one match day in ten, so the usual scenes stay the regular set. */
+const OCCASIONAL_PICTURE = {
+  image: '/uploads/news/league-boast.jpg',
+  imageAlt: 'A player in orange stretches along the side wall for a boast, while a player in navy waits on the T.',
+};
+
 function pictureKind(article, choice) {
   const marked = String(article.body ?? '').match(/<!-- match-picture: (upset|close) -->/);
   if (marked) return marked[1];
@@ -874,6 +880,7 @@ function matchPicture(article, choice) {
   if (article.image && article.imageAlt) return { image: article.image, imageAlt: article.imageAlt };
   const pool = MATCH_PICTURES[pictureKind(article, choice)];
   const day = Math.floor(Date.parse(`${article.articleOn}T00:00:00Z`) / 86400000);
+  if (Number.isFinite(day) && Math.abs(day) % 10 === 0) return OCCASIONAL_PICTURE;
   const index = Number.isFinite(day) ? Math.abs(day) % pool.length : 0;
   return pool[index];
 }
