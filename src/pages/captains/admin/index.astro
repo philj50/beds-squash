@@ -373,7 +373,7 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="traffic" data-lm-only hidden>
             <h2>Site traffic</h2>
             <p class="muted small">
-              Public page views stay anonymous unless that browser is signed in. A signed-in visit is stored against that person, including captain and admin pages. The name opens that person on Users.
+              Each page keeps its own hit count. A hit stores the page, the time, the IP address, and the person when that browser is signed in. Only an admin can see this. The name opens that person on Users.
             </p>
             <p class="muted small" data-traffic-status hidden role="status"></p>
             <div class="traffic-stats" data-traffic-stats hidden>
@@ -416,6 +416,19 @@ const scoresHref = url('/captains/admin/minigame/');
                   <tbody data-traffic-by-day></tbody>
                 </table>
               </div>
+              <h3>Hits by page (30 days)</h3>
+              <div class="overview-box">
+                <table class="overview traffic-table">
+                  <thead>
+                    <tr>
+                      <th>Page</th>
+                      <th>Hits</th>
+                      <th>Signed-in hits</th>
+                    </tr>
+                  </thead>
+                  <tbody data-traffic-pages></tbody>
+                </table>
+              </div>
               <h3>Top pages (30 days)</h3>
               <div class="overview-box">
                 <table class="overview traffic-table">
@@ -436,6 +449,7 @@ const scoresHref = url('/captains/admin/minigame/');
                       <th>When</th>
                       <th>Name</th>
                       <th>Email</th>
+                      <th>IP address</th>
                       <th>Path</th>
                     </tr>
                   </thead>
@@ -606,6 +620,7 @@ const scoresHref = url('/captains/admin/minigame/');
   const trafficStats = root.querySelector<HTMLElement>('[data-traffic-stats]')!;
   const trafficByDay = root.querySelector<HTMLElement>('[data-traffic-by-day]')!;
   const trafficTop = root.querySelector<HTMLElement>('[data-traffic-top]')!;
+  const trafficPages = root.querySelector<HTMLElement>('[data-traffic-pages]')!;
   const trafficSignIns = root.querySelector<HTMLElement>('[data-traffic-sign-ins]')!;
   const trafficMembers = root.querySelector<HTMLElement>('[data-traffic-members]')!;
   trafficMembers.addEventListener('click', (event) => {
@@ -655,7 +670,8 @@ const scoresHref = url('/captains/admin/minigame/');
       sign_ins_30d?: number;
       by_day: { day: string; page_views: number; sessions: number }[];
       top_pages: { path: string; page_views: number }[];
-      signed_in_views?: { viewed_at: string; path: string; display_name: string; email: string }[];
+      page_hits?: { path: string; hits: number; signed_in_hits: number }[];
+      signed_in_views?: { viewed_at: string; path: string; display_name: string; email: string; client_ip?: string }[];
       recent_sign_ins?: { signed_in_at: string; display_name: string; email: string }[];
     };
     root.querySelector('[data-kpi="views-7"]')!.textContent = String(stats.total_7d ?? 0);
@@ -674,6 +690,16 @@ const scoresHref = url('/captains/admin/minigame/');
                 `<tr><td>${escapeHtml(formatDay(row.day))}</td><td>${row.page_views}</td><td>${row.sessions}</td></tr>`,
             )
             .join('');
+    const pages = stats.page_hits ?? [];
+    trafficPages.innerHTML =
+      pages.length === 0
+        ? '<tr><td colspan="3">No hits yet. Each page adds a row after someone opens it.</td></tr>'
+        : pages
+            .map(
+              (row) =>
+                `<tr><td><code>${escapeHtml(row.path)}</code></td><td>${row.hits}</td><td>${row.signed_in_hits}</td></tr>`,
+            )
+            .join('');
     const top = stats.top_pages ?? [];
     trafficTop.innerHTML =
       top.length === 0
@@ -684,11 +710,11 @@ const scoresHref = url('/captains/admin/minigame/');
     const memberViews = stats.signed_in_views ?? [];
     trafficMembers.innerHTML =
       memberViews.length === 0
-        ? '<tr><td colspan="4">No signed-in visits yet. A row appears when someone who is logged in opens a page.</td></tr>'
+        ? '<tr><td colspan="5">No signed-in visits yet. A row appears when someone who is logged in opens a page.</td></tr>'
         : memberViews
             .map(
               (row) =>
-                `<tr><td>${escapeHtml(formatWhen(row.viewed_at))}</td><td><button type="button" class="count-button" data-open-traffic-user="${escapeHtml(row.display_name)}">${escapeHtml(row.display_name)}</button></td><td>${escapeHtml(row.email || '—')}</td><td><code>${escapeHtml(row.path)}</code></td></tr>`,
+                `<tr><td>${escapeHtml(formatWhen(row.viewed_at))}</td><td><button type="button" class="count-button" data-open-traffic-user="${escapeHtml(row.display_name)}">${escapeHtml(row.display_name)}</button></td><td>${escapeHtml(row.email || '—')}</td><td>${escapeHtml(row.client_ip || '—')}</td><td><code>${escapeHtml(row.path)}</code></td></tr>`,
             )
             .join('');
     const signIns = stats.recent_sign_ins ?? [];
