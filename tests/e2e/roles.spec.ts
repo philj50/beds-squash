@@ -481,6 +481,22 @@ test.describe('Club captain, team captain, and player', () => {
           sign_ins_30d: 1,
           by_day: [],
           top_pages: [],
+          visitors_today: [
+            {
+              display_name: 'Not signed in',
+              email: '',
+              hits: 12,
+              client_ip: '203.0.113.20',
+              user_agent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+              referrer: 'https://www.google.com/search?q=squash',
+              language: 'en-GB',
+              last_seen: '2026-10-14T16:00:00.000Z',
+              pages: [
+                { path: '/beds-squash/', hits: 8 },
+                { path: '/beds-squash/news/', hits: 4 },
+              ],
+            },
+          ],
           page_hits: [
             { path: '/beds-squash/news/', hits: 4, signed_in_hits: 1 },
             ...Array.from({ length: 11 }, (_, index) => ({ path: `/beds-squash/page-${index}/`, hits: 1, signed_in_hits: 0 })),
@@ -772,6 +788,18 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.locator('[data-site-team]').getByRole('columnheader', { name: 'Role' })).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Traffic' }).click();
+    await expect(page.getByRole('heading', { name: 'Visitors today' })).toBeVisible();
+    const todayVisitor = page.locator('[data-traffic-visitors] tr', { hasText: 'Not signed in' });
+    await expect(todayVisitor.locator('[data-traffic-count]')).toHaveText('12');
+    await expect(todayVisitor).toContainText('203.0.113.20');
+    await expect(todayVisitor).toContainText('Safari · iPhone');
+    await expect(todayVisitor).toContainText('google.com');
+    const todayPages = page.locator('[data-traffic-visitors] [data-traffic-detail]');
+    await expect(todayPages).toBeHidden();
+    await todayVisitor.getByRole('button', { name: 'Pages for Not signed in' }).click();
+    await expect(todayPages).toBeVisible();
+    await expect(todayPages).toContainText('/beds-squash/news/');
+    await expect(todayPages).toContainText('en-GB');
     await expect(page.getByRole('heading', { name: 'Hits by page (30 days)' })).toBeVisible();
     await expect(page.locator('[data-traffic-pages]')).toContainText('/beds-squash/news/');
     await expect(page.locator('[data-traffic-pages]')).toContainText('4');

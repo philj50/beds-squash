@@ -130,7 +130,12 @@ export async function noteActivity(supabase: SupabaseClient) {
       sessionId = crypto.randomUUID();
       sessionStorage.setItem(key, sessionId);
     }
-    await supabase.rpc('record_site_page_view', { p_path: location.pathname, p_session_id: sessionId });
+    await supabase.rpc('record_site_page_view', {
+      p_path: location.pathname,
+      p_session_id: sessionId,
+      p_referrer: document.referrer.slice(0, 300),
+      p_language: navigator.language.slice(0, 16),
+    });
   } catch {
     /* The page-view table may not be on the database yet. */
   }

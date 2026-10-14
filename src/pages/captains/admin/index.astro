@@ -373,7 +373,7 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="traffic" data-lm-only hidden>
             <h2>Site traffic</h2>
             <p class="muted small">
-              Each page keeps its own hit count. A hit stores the page, the time, the IP address, and the person when that browser is signed in. Only an admin can see this. The name opens that person on Users.
+              Each page keeps its own hit count. A hit stores the page, the time, the IP address, the browser, the language, where they came from, and the person when that browser is signed in. Visitors today is one line per browser. Only an admin can see this. A signed-in name opens that person on Users.
             </p>
             <p class="muted small" data-traffic-status hidden role="status"></p>
             <div class="traffic-stats" data-traffic-stats hidden>
@@ -403,6 +403,28 @@ const scoresHref = url('/captains/admin/minigame/');
                   <dd data-kpi="signins-30">—</dd>
                 </div>
               </dl>
+              <h3>Visitors today</h3>
+              <div class="overview-box">
+                <table class="overview traffic-table">
+                  <thead>
+                    <tr>
+                      <th><span class="sr-only">Pages</span></th>
+                      <th>Who</th>
+                      <th>Hits</th>
+                      <th>IP address</th>
+                      <th>Browser</th>
+                      <th>Came from</th>
+                      <th>Latest</th>
+                    </tr>
+                  </thead>
+                  <tbody data-traffic-visitors></tbody>
+                </table>
+              </div>
+              <nav class="pager" data-traffic-pager="visitors" hidden aria-label="Visitors today">
+                <button class="btn btn--ghost btn--sm" type="button" data-traffic-prev>Previous</button>
+                <span data-traffic-range></span>
+                <button class="btn btn--ghost btn--sm" type="button" data-traffic-next>Next</button>
+              </nav>
               <h3>Last 30 days</h3>
               <div class="overview-box">
                 <table class="overview traffic-table">
@@ -650,8 +672,9 @@ const scoresHref = url('/captains/admin/minigame/');
   const trafficPages = root.querySelector<HTMLElement>('[data-traffic-pages]')!;
   const trafficSignIns = root.querySelector<HTMLElement>('[data-traffic-sign-ins]')!;
   const trafficMembers = root.querySelector<HTMLElement>('[data-traffic-members]')!;
+  const trafficVisitors = root.querySelector<HTMLElement>('[data-traffic-visitors]')!;
   const TRAFFIC_PAGE = 10;
-  const trafficListPage: Record<string, number> = { 'by-day': 0, pages: 0, top: 0, members: 0, 'sign-ins': 0 };
+  const trafficListPage: Record<string, number> = { visitors: 0, 'by-day': 0, pages: 0, top: 0, members: 0, 'sign-ins': 0 };
   const paintTrafficList = (key: string, rows: string[], body: HTMLElement, empty: string) => {
     const pager = root.querySelector<HTMLElement>(`[data-traffic-pager="${key}"]`)!;
     const range = pager.querySelector<HTMLElement>('[data-traffic-range]')!;
@@ -673,12 +696,14 @@ const scoresHref = url('/captains/admin/minigame/');
     prev.disabled = trafficListPage[key] <= 0;
     next.disabled = trafficListPage[key] >= pageCount - 1;
   };
+  let trafficVisitorsHtml: string[] = [];
   let trafficDaysHtml: string[] = [];
   let trafficPagesHtml: string[] = [];
   let trafficTopHtml: string[] = [];
   let trafficMembersHtml: string[] = [];
   let trafficSignInsHtml: string[] = [];
   const paintTrafficLists = () => {
+    paintTrafficList('visitors', trafficVisitorsHtml, trafficVisitors, '<tr><td colspan="7">No visitors yet today.</td></tr>');
     paintTrafficList('by-day', trafficDaysHtml, trafficByDay, '<tr><td colspan="3">No data yet. Views appear after visitors browse public pages.</td></tr>');
     paintTrafficList('pages', trafficPagesHtml, trafficPages, '<tr><td colspan="3">No hits yet. Each page adds a row after someone opens it.</td></tr>');
     paintTrafficList('top', trafficTopHtml, trafficTop, '<tr><td colspan="2">No data yet.</td></tr>');
@@ -701,7 +726,7 @@ const scoresHref = url('/captains/admin/minigame/');
     trafficListPage[key] += button.hasAttribute('data-traffic-next') ? 1 : -1;
     paintTrafficLists();
   });
-  trafficMembers.addEventListener('click', (event) => {
+  trafficStats.addEventListener('click', (event) => {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-open-traffic-user]');
     const name = button?.dataset.openTrafficUser ?? '';
     if (!name) return;
@@ -728,6 +753,37 @@ const scoresHref = url('/captains/admin/minigame/');
       minute: '2-digit',
       timeZone: 'Europe/London',
     });
+  };
+
+  const describeBrowser = (agent: string) => {
+    if (!agent) return '—';
+    if (/googlebot/i.test(agent)) return 'Googlebot';
+    if (/bingbot/i.test(agent)) return 'Bingbot';
+    if (/bot|crawler|spider|slurp|facebookexternalhit/i.test(agent)) return 'Bot';
+    const browser = /Edg\//.test(agent)
+      ? 'Edge'
+      : /OPR\/|Opera/.test(agent)
+        ? 'Opera'
+        : /Chrome\/|CriOS\//.test(agent)
+          ? 'Chrome'
+          : /Firefox\/|FxiOS\//.test(agent)
+            ? 'Firefox'
+            : /Safari\//.test(agent)
+              ? 'Safari'
+              : 'Other browser';
+    const device = /iPhone/.test(agent) ? 'iPhone' : /iPad/.test(agent) ? 'iPad' : /Android/.test(agent) ? 'Android' : /Windows/.test(agent) ? 'Windows' : /Mac OS X/.test(agent) ? 'Mac' : /Linux/.test(agent) ? 'Linux' : '';
+    return device ? `${browser} · ${device}` : browser;
+  };
+
+  const cameFrom = (referrer: string) => {
+    if (!referrer) return '—';
+    try {
+      const host = new URL(referrer).hostname.replace(/^www\./, '');
+      if (!host || host === location.hostname || host === 'philj50.github.io') return 'This site';
+      return host;
+    } catch {
+      return '—';
+    }
   };
 
   const trafficExpandButton = (key: string, label: string) =>
@@ -770,6 +826,17 @@ const scoresHref = url('/captains/admin/minigame/');
       page_hits?: { path: string; hits: number; signed_in_hits: number }[];
       signed_in_views?: { viewed_at: string; path: string; display_name: string; email: string; client_ip?: string }[];
       recent_sign_ins?: { signed_in_at: string; display_name: string; email: string }[];
+      visitors_today?: {
+        display_name: string;
+        email: string;
+        hits: number;
+        client_ip?: string;
+        user_agent?: string;
+        referrer?: string;
+        language?: string;
+        last_seen: string;
+        pages?: { path: string; hits: number }[];
+      }[];
     };
     root.querySelector('[data-kpi="views-7"]')!.textContent = String(stats.total_7d ?? 0);
     root.querySelector('[data-kpi="sessions-7"]')!.textContent = String(stats.sessions_7d ?? 0);
@@ -777,6 +844,17 @@ const scoresHref = url('/captains/admin/minigame/');
     root.querySelector('[data-kpi="sessions-30"]')!.textContent = String(stats.sessions_30d ?? 0);
     root.querySelector('[data-kpi="signins-7"]')!.textContent = String(stats.sign_ins_7d ?? 0);
     root.querySelector('[data-kpi="signins-30"]')!.textContent = String(stats.sign_ins_30d ?? 0);
+    trafficVisitorsHtml = (stats.visitors_today ?? []).map((row, index) => {
+      const id = `today:${index}`;
+      const who = row.email
+        ? `<button type="button" class="count-button" data-open-traffic-user="${escapeHtml(row.display_name)}">${escapeHtml(row.display_name)}</button>`
+        : escapeHtml(row.display_name || 'Not signed in');
+      const pages = (row.pages ?? [])
+        .map((page) => `<tr><td><code>${escapeHtml(page.path)}</code></td><td>${page.hits}</td></tr>`)
+        .join('');
+      const language = row.language ? `<p class="muted small">Language ${escapeHtml(row.language)}</p>` : '';
+      return `<tr><td class="row-action">${trafficExpandButton(id, `Pages for ${row.display_name || 'this visitor'}`)}</td><td>${who}</td><td data-traffic-count>${row.hits}</td><td>${escapeHtml(row.client_ip || '—')}</td><td>${escapeHtml(describeBrowser(row.user_agent || ''))}</td><td>${escapeHtml(cameFrom(row.referrer || ''))}</td><td>${escapeHtml(formatWhen(row.last_seen))}</td></tr><tr data-traffic-detail="${escapeHtml(id)}" hidden><td colspan="7"><table class="traffic-records"><thead><tr><th>Page</th><th>Hits</th></tr></thead><tbody>${pages || '<tr><td colspan="2">No pages stored.</td></tr>'}</tbody></table>${language}</td></tr>`;
+    });
     trafficDaysHtml = (stats.by_day ?? []).map(
       (row) => `<tr><td>${escapeHtml(formatDay(row.day))}</td><td>${row.page_views}</td><td>${row.sessions}</td></tr>`,
     );
