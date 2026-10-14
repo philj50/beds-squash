@@ -373,7 +373,7 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="traffic" data-lm-only hidden>
             <h2>Site traffic</h2>
             <p class="muted small">
-              Each page keeps its own hit count. A hit stores the page, the time, the IP address, the browser, the language, where they came from, and the person when that browser is signed in. Visitors today is one line per browser. Only an admin can see this. A signed-in name opens that person on Users.
+              Each page keeps its own hit count. A hit stores the page, the time, the IP address, the browser, the language, where they came from, and the person when that browser is signed in. Visitors today is one line per IP address. A hit with no IP stays on its own line. Only an admin can see this. A signed-in name opens that person on Users.
             </p>
             <p class="muted small" data-traffic-status hidden role="status"></p>
             <div class="traffic-stats" data-traffic-stats hidden>
@@ -830,6 +830,8 @@ const scoresHref = url('/captains/admin/minigame/');
         display_name: string;
         email: string;
         hits: number;
+        sessions?: number;
+        names?: string[];
         client_ip?: string;
         user_agent?: string;
         referrer?: string;
@@ -846,14 +848,17 @@ const scoresHref = url('/captains/admin/minigame/');
     root.querySelector('[data-kpi="signins-30"]')!.textContent = String(stats.sign_ins_30d ?? 0);
     trafficVisitorsHtml = (stats.visitors_today ?? []).map((row, index) => {
       const id = `today:${index}`;
-      const who = row.email
-        ? `<button type="button" class="count-button" data-open-traffic-user="${escapeHtml(row.display_name)}">${escapeHtml(row.display_name)}</button>`
-        : escapeHtml(row.display_name || 'Not signed in');
+      const names = (row.names ?? []).map((name) => name.trim()).filter(Boolean);
+      const singleName = names.length === 1 ? names[0] : names.length === 0 && row.email ? row.display_name : '';
+      const who = singleName
+        ? `<button type="button" class="count-button" data-open-traffic-user="${escapeHtml(singleName)}">${escapeHtml(singleName)}</button>`
+        : escapeHtml(names.length > 1 ? names.join(', ') : row.display_name || 'Not signed in');
       const pages = (row.pages ?? [])
         .map((page) => `<tr><td><code>${escapeHtml(page.path)}</code></td><td>${page.hits}</td></tr>`)
         .join('');
+      const browsers = (row.sessions ?? 1) > 1 ? `<p class="muted small">${row.sessions} browsers${row.client_ip ? ' on this address' : ''}</p>` : '';
       const language = row.language ? `<p class="muted small">Language ${escapeHtml(row.language)}</p>` : '';
-      return `<tr><td class="row-action">${trafficExpandButton(id, `Pages for ${row.display_name || 'this visitor'}`)}</td><td>${who}</td><td data-traffic-count>${row.hits}</td><td>${escapeHtml(row.client_ip || '—')}</td><td>${escapeHtml(describeBrowser(row.user_agent || ''))}</td><td>${escapeHtml(cameFrom(row.referrer || ''))}</td><td>${escapeHtml(formatWhen(row.last_seen))}</td></tr><tr data-traffic-detail="${escapeHtml(id)}" hidden><td colspan="7"><table class="traffic-records"><thead><tr><th>Page</th><th>Hits</th></tr></thead><tbody>${pages || '<tr><td colspan="2">No pages stored.</td></tr>'}</tbody></table>${language}</td></tr>`;
+      return `<tr><td class="row-action">${trafficExpandButton(id, `Pages for ${row.display_name || 'this visitor'}`)}</td><td>${who}</td><td data-traffic-count>${row.hits}</td><td>${escapeHtml(row.client_ip || '—')}</td><td>${escapeHtml(describeBrowser(row.user_agent || ''))}</td><td>${escapeHtml(cameFrom(row.referrer || ''))}</td><td>${escapeHtml(formatWhen(row.last_seen))}</td></tr><tr data-traffic-detail="${escapeHtml(id)}" hidden><td colspan="7">${browsers}<table class="traffic-records"><thead><tr><th>Page</th><th>Hits</th></tr></thead><tbody>${pages || '<tr><td colspan="2">No pages stored.</td></tr>'}</tbody></table>${language}</td></tr>`;
     });
     trafficDaysHtml = (stats.by_day ?? []).map(
       (row) => `<tr><td>${escapeHtml(formatDay(row.day))}</td><td>${row.page_views}</td><td>${row.sessions}</td></tr>`,

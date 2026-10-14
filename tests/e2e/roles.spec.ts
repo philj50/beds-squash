@@ -486,6 +486,7 @@ test.describe('Club captain, team captain, and player', () => {
               display_name: 'Not signed in',
               email: '',
               hits: 12,
+              sessions: 2,
               client_ip: '203.0.113.20',
               user_agent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
               referrer: 'https://www.google.com/search?q=squash',
@@ -799,6 +800,7 @@ test.describe('Club captain, team captain, and player', () => {
     await todayVisitor.getByRole('button', { name: 'Pages for Not signed in' }).click();
     await expect(todayPages).toBeVisible();
     await expect(todayPages).toContainText('/beds-squash/news/');
+    await expect(todayPages).toContainText('2 browsers on this address');
     await expect(todayPages).toContainText('en-GB');
     await expect(page.getByRole('heading', { name: 'Hits by page (30 days)' })).toBeVisible();
     await expect(page.locator('[data-traffic-pages]')).toContainText('/beds-squash/news/');
