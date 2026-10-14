@@ -1,0 +1,79 @@
+---
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
+---
+
+<div id="match-article-edits" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} hidden></div>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+
+  type Row = { slug: string; title: string; summary: string | null; body: string };
+
+  const root = document.getElementById('match-article-edits');
+  if (root) {
+    const supabase = createClient(root.dataset.url!, root.dataset.key!);
+    const escapeHtml = (value: string) =>
+      value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
+
+    function withBase(href: string) {
+      if (!href.startsWith('/') || href.startsWith('//')) return href;
+      const base = import.meta.env.BASE_URL.replace(/\/+$/, '');
+      if (!base || href === base || href.startsWith(`${base}/`)) return href;
+      return `${base}${href}`;
+    }
+
+    function inline(text: string) {
+      return text
+        .split(/(\[[^\]]+\]\([^)\s]+\))/)
+        .map((part) => {
+          const link = part.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/);
+          if (!link) return escapeHtml(part);
+          const href = link[2];
+          if (!/^(\/|https:\/\/)/.test(href)) return escapeHtml(part);
+          return `<a href="${escapeHtml(withBase(href))}">${escapeHtml(link[1])}</a>`;
+        })
+        .join('');
+    }
+
+    function renderBody(body: string) {
+      const text = body.replace(/\n*<!-- match-picture: (?:upset|close) -->\s*$/, '').trim();
+      return text
+        .split(/\n{2,}/)
+        .map((part) => `<p>${inline(part).replaceAll('\n', '<br>')}</p>`)
+        .join('');
+    }
+
+    function slugFrom(href: string) {
+      const match = href.match(/\/news\/([^/#?]+)\/?(?:[?#].*)?$/);
+      return match?.[1] ?? '';
+    }
+
+    function apply(rows: Row[]) {
+      const bySlug = new Map(rows.filter((row) => row.slug && row.title && row.body).map((row) => [row.slug, row]));
+      if (!bySlug.size) return;
+      document.querySelectorAll<HTMLAnchorElement>('a[href*="/news/"]').forEach((link) => {
+        const row = bySlug.get(slugFrom(link.getAttribute('href') ?? ''));
+        if (!row) return;
+        const ticker = link.querySelector('.now__title');
+        if (ticker) ticker.textContent = row.title;
+        if (link.closest('h3')) link.textContent = row.title;
+      });
+      const page = document.querySelector<HTMLElement>('[data-article-slug]');
+      const row = page ? bySlug.get(page.dataset.articleSlug ?? '') : undefined;
+      if (!page || !row) return;
+      const heading = page.querySelector('[data-article-title]');
+      if (heading) heading.textContent = row.title;
+      const summary = page.querySelector<HTMLElement>('[data-article-summary]');
+      if (summary && row.summary) {
+        summary.hidden = false;
+        summary.textContent = row.summary;
+      }
+      const body = page.querySelector('[data-article-body]');
+      if (body) body.innerHTML = renderBody(row.body);
+      document.title = `${row.title} · Bedfordshire Squash`;
+    }
+
+    const { data, error } = await supabase.rpc('published_match_articles');
+    if (!error && Array.isArray(data)) apply(data as Row[]);
+  }
+</script>

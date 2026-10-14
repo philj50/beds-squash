@@ -8,6 +8,7 @@ import Header from '@/components/Header.astro';
 import Footer from '@/components/Footer.astro';
 import CookieNotice from '@/components/CookieNotice.astro';
 import SiteTrafficBeacon from '@/components/SiteTrafficBeacon.astro';
+import MatchArticleEdits from '@/components/MatchArticleEdits.astro';
 import JsonLd from '@/components/JsonLd.astro';
 import { SITE, url } from '@/lib/site';
 import { siteTheme, THEME_COLOR } from '@/lib/theme';
@@ -91,6 +92,7 @@ const structured = graph(
     <Footer />
     <CookieNotice />
     <SiteTrafficBeacon signedInOnly={noindex} />
+    <MatchArticleEdits />
   </body>
 </html>
 

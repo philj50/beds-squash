@@ -28,8 +28,12 @@ test.describe('Public pages', () => {
   test('home shows the news, the next event, and the main links', async ({ page }) => {
     await open(page);
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Squash in Bedfordshire');
-    await expect(page.locator('.news-card').getByRole('link', { name: 'Graded tournaments on the CM Stringers diary' })).toBeVisible();
-    await expect(page.locator('.news-card').getByRole('link', { name: 'Entries open for the Junior County Closed' })).toBeVisible();
+    await expect(page.locator('.news-card--large').getByRole('link', { name: 'Confirmed sponsors for the Beds County Closed' })).toBeVisible();
+    const latestCards = page.locator('.grid--3 .news-card');
+    await expect(latestCards).toHaveCount(3);
+    for (const card of await latestCards.all()) {
+      await expect(card.locator('h3 a')).not.toBeEmpty();
+    }
     await expect(page.locator('.event').getByRole('link', { name: 'Winter League 2026/27 begins' })).toBeVisible();
     await expect(page.locator('[data-now]')).toBeVisible();
     await expect(page.locator('[data-now] [data-now-item]:not([hidden])')).toHaveCount(2);

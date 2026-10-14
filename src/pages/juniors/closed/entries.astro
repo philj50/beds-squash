@@ -8,7 +8,7 @@ import { url } from '@/lib/site';
   <section class="section">
     <div class="container entries" id="entries-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
       <h1>Junior County Closed entries</h1>
-      <p class="lede">Player details stay on this page. They are not published, and saving or removing an entry does not send an email.</p>
+      <p class="lede">Player details stay on this page. An admin can correct every field on an entry. Saving or removing an entry does not send an email.</p>
       <p class="status" data-status role="status"></p>
 
       <div data-panel="signed-in" hidden>
@@ -67,14 +67,130 @@ import { url } from '@/lib/site';
     await showSession();
   });
 
+  function editField(label: string, hint: string, control: string, tag = 'Editable') {
+    return `<label class="field"><span class="field__name">${label} <span class="field__tag">${tag}</span></span>${control}<span class="field__hint">${hint}</span></label>`;
+  }
+
+  function editor(entry: Entry, columns: number) {
+    const section = ['Boys', 'Girls', 'Mixed']
+      .map((option) => `<option${entry.draw === option ? ' selected' : ''}>${option}</option>`)
+      .join('');
+    return `<tr data-editor-row="${entry.id}" hidden><td colspan="${columns}"><form class="stack editor" data-editor="${entry.id}">
+      <p class="editor__lead">Change any field, then save. The age group follows the date of birth. Under 9 is saved as Mixed.</p>
+      <div class="pair">
+        ${editField('First name', 'The junior who is playing.', `<input name="player_first_name" required maxlength="60" value="${escapeHtml(entry.player_first_name)}" autocomplete="off" />`)}
+        ${editField('Last name', 'The family name of the junior.', `<input name="player_last_name" required maxlength="60" value="${escapeHtml(entry.player_last_name)}" autocomplete="off" />`)}
+      </div>
+      <div class="pair">
+        ${editField('Date of birth', 'This sets the age group.', `<input name="date_of_birth" type="date" required value="${escapeHtml(entry.date_of_birth)}" />`)}
+        ${editField('Section', 'Boys, Girls, or Mixed for Under 9.', `<select name="draw">${section}</select>`)}
+      </div>
+      ${editField('Club', 'The club the junior plays for.', `<input name="club" required minlength="2" maxlength="80" value="${escapeHtml(entry.club)}" autocomplete="off" />`)}
+      <h3>Parent or guardian</h3>
+      ${editField('Parent name', 'The parent or guardian.', `<input name="guardian_name" required minlength="2" maxlength="80" value="${escapeHtml(entry.guardian_name)}" autocomplete="off" />`)}
+      <div class="pair">
+        ${editField('Parent email', 'Where the organiser can write.', `<input name="guardian_email" type="email" required maxlength="120" value="${escapeHtml(entry.guardian_email)}" autocomplete="off" />`)}
+        ${editField('Parent phone', 'A number for the parent.', `<input name="guardian_phone" type="tel" required minlength="8" maxlength="20" value="${escapeHtml(entry.guardian_phone)}" autocomplete="off" />`)}
+      </div>
+      <h3>Emergency contact</h3>
+      <div class="pair">
+        ${editField('Emergency name', 'Who to call in an emergency.', `<input name="emergency_name" required minlength="2" maxlength="80" value="${escapeHtml(entry.emergency_name)}" autocomplete="off" />`)}
+        ${editField('Emergency phone', 'A number for that contact.', `<input name="emergency_phone" type="tel" required minlength="8" maxlength="20" value="${escapeHtml(entry.emergency_phone)}" autocomplete="off" />`)}
+      </div>
+      ${editField('Notes', 'Anything the organiser should know. Leave this blank if there is nothing to add.', `<textarea name="notes" maxlength="500" rows="3">${escapeHtml(entry.notes ?? '')}</textarea>`, 'Optional')}
+      <p class="actions"><button class="btn btn--primary btn--sm" type="submit">Save changes</button><button class="btn btn--ghost btn--sm" type="button" data-cancel>Cancel</button></p>
+    </form></td></tr>`;
+  }
+
   list.addEventListener('click', async (event) => {
-    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-remove]');
+    const target = event.target as HTMLElement;
+    const edit = target.closest<HTMLButtonElement>('[data-edit]');
+    if (edit?.dataset.edit) {
+      const formRow = list.querySelector<HTMLElement>(`[data-editor-row="${edit.dataset.edit}"]`);
+      if (formRow) formRow.hidden = false;
+      return;
+    }
+    const cancel = target.closest<HTMLButtonElement>('[data-cancel]');
+    if (cancel) {
+      const formRow = cancel.closest<HTMLElement>('[data-editor-row]');
+      if (formRow) formRow.hidden = true;
+      return;
+    }
+    const button = target.closest<HTMLButtonElement>('[data-remove]');
     if (!button) return;
     const name = button.dataset.name ?? 'this player';
     if (!confirm(`Remove ${name} from the entry list?`)) return;
     const { error } = await supabase.from('junior_entries').delete().eq('id', Number(button.dataset.remove));
     if (error) statusEl.textContent = error.message;
     else await showSession();
+  });
+
+  list.addEventListener('submit', async (event) => {
+    const form = (event.target as HTMLElement).closest<HTMLFormElement>('[data-editor]');
+    if (!form?.dataset.editor) return;
+    event.preventDefault();
+    const data = new FormData(form);
+    const text = (name: string) => String(data.get(name) ?? '').trim().replace(/\s+/g, ' ');
+    const first = text('player_first_name');
+    const last = text('player_last_name');
+    const dateOfBirth = String(data.get('date_of_birth') ?? '');
+    const draw = String(data.get('draw') ?? '');
+    const club = text('club');
+    const guardian = text('guardian_name');
+    const email = String(data.get('guardian_email') ?? '').trim();
+    const guardianPhone = text('guardian_phone');
+    const emergency = text('emergency_name');
+    const emergencyPhone = text('emergency_phone');
+    const notes = String(data.get('notes') ?? '').trim();
+    if (!first || !last || first.length > 60 || last.length > 60) {
+      statusEl.textContent = "Add the junior's first and last name.";
+      return;
+    }
+    if (club.length < 2 || club.length > 80) {
+      statusEl.textContent = 'Add the club.';
+      return;
+    }
+    if (guardian.length < 2 || guardian.length > 80) {
+      statusEl.textContent = 'Add the parent or guardian.';
+      return;
+    }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 120) {
+      statusEl.textContent = 'Add a parent email.';
+      return;
+    }
+    if (guardianPhone.length < 8 || guardianPhone.length > 20 || emergencyPhone.length < 8 || emergencyPhone.length > 20) {
+      statusEl.textContent = 'Add a phone number.';
+      return;
+    }
+    if (emergency.length < 2 || emergency.length > 80) {
+      statusEl.textContent = 'Add an emergency contact.';
+      return;
+    }
+    if (notes.length > 500) {
+      statusEl.textContent = 'Keep the notes to 500 characters.';
+      return;
+    }
+    statusEl.textContent = 'Saving…';
+    const { error } = await supabase.rpc('edit_junior_entry', {
+      p_id: Number(form.dataset.editor),
+      p_first_name: first,
+      p_last_name: last,
+      p_date_of_birth: dateOfBirth,
+      p_draw: draw,
+      p_club: club,
+      p_guardian_name: guardian,
+      p_guardian_email: email,
+      p_guardian_phone: guardianPhone,
+      p_emergency_name: emergency,
+      p_emergency_phone: emergencyPhone,
+      p_notes: notes || null,
+    });
+    if (error) {
+      statusEl.textContent = error.message;
+      return;
+    }
+    statusEl.textContent = 'Saved.';
+    await showSession();
   });
 
   async function showSession() {
@@ -115,6 +231,7 @@ import { url } from '@/lib/site';
       return;
     }
     const entries = (rows ?? []) as Entry[];
+    const canEdit = Boolean(account?.isAdmin);
     list.hidden = false;
     const placed = new Set<number>();
     const sections = ENTRY_GROUPS.map((category) => {
@@ -130,6 +247,7 @@ import { url } from '@/lib/site';
                     <tbody>${group
                       .map((entry) => {
                         const player = `${entry.player_first_name} ${entry.player_last_name}`;
+                        const edit = canEdit ? `<button class="btn btn--ghost btn--sm" type="button" data-edit="${entry.id}">Edit</button>` : '';
                         return `<tr>
                           <td>${escapeHtml(player)}</td>
                           <td>${escapeHtml(when.format(new Date(`${entry.date_of_birth}T12:00:00`)))}</td>
@@ -137,8 +255,8 @@ import { url } from '@/lib/site';
                           <td>${escapeHtml(entry.guardian_name)}<br><span class="muted">${escapeHtml(entry.guardian_email)}</span><br><span class="muted">${escapeHtml(entry.guardian_phone)}</span></td>
                           <td>${escapeHtml(entry.emergency_name)}<br><span class="muted">${escapeHtml(entry.emergency_phone)}</span></td>
                           <td>${escapeHtml(entry.notes ?? '')}</td>
-                          <td><button class="btn btn--ghost btn--sm" type="button" data-remove="${entry.id}" data-name="${escapeHtml(player)}">Remove</button></td>
-                        </tr>`;
+                          <td class="row-actions">${edit}<button class="btn btn--ghost btn--sm" type="button" data-remove="${entry.id}" data-name="${escapeHtml(player)}">Remove</button></td>
+                        </tr>${canEdit ? editor(entry, 7) : ''}`;
                       })
                       .join('')}</tbody>
                   </table></div>`
@@ -156,6 +274,7 @@ import { url } from '@/lib/site';
           <tbody>${leftover
             .map((entry) => {
               const player = `${entry.player_first_name} ${entry.player_last_name}`;
+              const edit = canEdit ? `<button class="btn btn--ghost btn--sm" type="button" data-edit="${entry.id}">Edit</button>` : '';
               return `<tr>
                 <td>${escapeHtml(player)}</td>
                 <td>${escapeHtml(when.format(new Date(`${entry.date_of_birth}T12:00:00`)))}</td>
@@ -164,8 +283,8 @@ import { url } from '@/lib/site';
                 <td>${escapeHtml(entry.guardian_name)}<br><span class="muted">${escapeHtml(entry.guardian_email)}</span><br><span class="muted">${escapeHtml(entry.guardian_phone)}</span></td>
                 <td>${escapeHtml(entry.emergency_name)}<br><span class="muted">${escapeHtml(entry.emergency_phone)}</span></td>
                 <td>${escapeHtml(entry.notes ?? '')}</td>
-                <td><button class="btn btn--ghost btn--sm" type="button" data-remove="${entry.id}" data-name="${escapeHtml(player)}">Remove</button></td>
-              </tr>`;
+                <td class="row-actions">${edit}<button class="btn btn--ghost btn--sm" type="button" data-remove="${entry.id}" data-name="${escapeHtml(player)}">Remove</button></td>
+              </tr>${canEdit ? editor(entry, 8) : ''}`;
             })
             .join('')}</tbody>
         </table></div>`;
@@ -193,7 +312,9 @@ import { url } from '@/lib/site';
     gap: 0.3rem;
     font-size: 0.9rem;
   }
-  #entries-app input {
+  #entries-app input,
+  #entries-app select,
+  #entries-app textarea {
     width: 100%;
     background: var(--ink-900);
     color: #fff;
@@ -201,6 +322,69 @@ import { url } from '@/lib/site';
     border-radius: var(--radius-sm);
     padding: 0.65rem 0.75rem;
     font: inherit;
+  }
+  #entries-app .pair {
+    display: grid;
+    gap: 0.75rem;
+  }
+  @media (min-width: 700px) {
+    #entries-app .pair {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  #entries-app .editor {
+    margin: 0.4rem 0 0.8rem;
+    padding: 1rem;
+    border: 2px solid var(--accent);
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--accent) 10%, var(--bg-card));
+  }
+  #entries-app .editor__lead,
+  #entries-app .editor h3 {
+    margin: 0;
+  }
+  #entries-app .field__name {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-weight: 700;
+  }
+  #entries-app .field__tag {
+    display: inline-block;
+    padding: 0.05rem 0.45rem;
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    color: var(--accent);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  #entries-app .field__hint {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+  #entries-app .editor input,
+  #entries-app .editor select,
+  #entries-app .editor textarea,
+  html[data-theme='navy'] #entries-app .editor input,
+  html[data-theme='navy'] #entries-app .editor select,
+  html[data-theme='navy'] #entries-app .editor textarea,
+  html[data-theme='light'] #entries-app .editor input,
+  html[data-theme='light'] #entries-app .editor select,
+  html[data-theme='light'] #entries-app .editor textarea {
+    background: #fff;
+    color: #163556;
+    color-scheme: light;
+    border: 2px solid var(--accent);
+  }
+  #entries-app .row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  #entries-app [hidden] {
+    display: none !important;
   }
   #entries-app .status:empty {
     display: none;

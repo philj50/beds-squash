@@ -521,6 +521,95 @@ test.describe('Public site', () => {
     await expect(page.locator('[data-live]')).toContainText('Close match');
   });
 
+  test('an admin can edit a created match article and leave edit mode', async ({ page }) => {
+    const adminId = '44444444-4444-4444-8444-444444444444';
+    const expiresAt = Math.floor(Date.now() / 1000) + 60 * 60;
+    const enc = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
+    const session = {
+      access_token: `${enc({ alg: 'HS256', typ: 'JWT' })}.${enc({ sub: adminId, email: 'admin@example.test', role: 'authenticated', exp: expiresAt })}.simulated`,
+      refresh_token: 'simulated-refresh',
+      token_type: 'bearer',
+      expires_in: 3600,
+      expires_at: expiresAt,
+      user: {
+        id: adminId,
+        aud: 'authenticated',
+        role: 'authenticated',
+        email: 'admin@example.test',
+        app_metadata: { provider: 'email', providers: ['email'] },
+        user_metadata: { display_name: 'Ada Admin' },
+        identities: [],
+        created_at: '2026-10-02T00:00:00Z',
+        updated_at: '2026-10-02T00:00:00Z',
+      },
+    };
+    const article = {
+      id: 6,
+      article_on: '2026-07-28',
+      slug: '2026-07-28-league-match',
+      status: 'published',
+      title: 'Charlie Jenkins beat James O\'Connor in Division 2',
+      summary: 'A short summary of the match that is long enough.',
+      body: 'Charlie Jenkins beat James O\'Connor in Division 2.\n\nThe scorecard is on the league tables.\n\n<!-- match-picture: close -->',
+    };
+    let edited: Record<string, unknown> | null = null;
+    await page.addInitScript((stored) => {
+      localStorage.setItem('sb-klxyjmwiaivvqjbhxzak-auth-token', JSON.stringify(stored));
+    }, session);
+    await page.route('**/rest/v1/**', async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      const send = (payload: unknown, status = 200) =>
+        route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(payload) });
+      if (url.pathname.endsWith('/profiles')) {
+        const row = { id: adminId, display_name: 'Ada Admin', email: 'admin@example.test', is_admin: true };
+        const single = (request.headers().accept ?? '').includes('application/vnd.pgrst.object+json');
+        await send(single ? row : [row]);
+        return;
+      }
+      if (url.pathname.endsWith('/article_settings')) {
+        await send({ id: 1, publication_mode: 'auto' });
+        return;
+      }
+      if (url.pathname.endsWith('/match_articles') && request.method() === 'GET') {
+        await send([article]);
+        return;
+      }
+      if (url.pathname.endsWith('/rpc/edit_match_article') && request.method() === 'POST') {
+        edited = request.postDataJSON();
+        article.title = String(edited?.p_title ?? article.title);
+        article.summary = String(edited?.p_summary ?? article.summary);
+        article.body = String(edited?.p_body ?? article.body);
+        await send(null);
+        return;
+      }
+      await send([]);
+    });
+
+    await open(page, 'captains/admin/articles/');
+    await expect(page.getByRole('heading', { level: 1, name: 'Match articles' })).toBeVisible();
+    const row = page.locator('tr', { hasText: 'Charlie Jenkins beat James' });
+    await row.getByRole('button', { name: 'Edit' }).click();
+    const editor = page.locator('[data-editor="6"]');
+    await expect(editor).toBeVisible();
+    await expect(editor.getByLabel('Subject')).toHaveValue(article.title);
+    await expect(editor.locator('textarea[name="body"]')).not.toHaveValue(/match-picture/);
+    const nextTitle = 'Charlie Jenkins won the Division 2 match';
+    const nextBody = 'Charlie Jenkins beat James O\'Connor 3-1 in Division 2. The scorecard is on the league tables.';
+    await editor.getByLabel('Subject').fill(nextTitle);
+    await editor.getByLabel('Content').fill(nextBody);
+    await editor.getByRole('button', { name: 'Save changes' }).click();
+    await expect(page.getByRole('status')).toHaveText('Saved.');
+    await expect(editor).toBeHidden();
+    await expect(page.locator('[data-title-for="6"]')).toHaveText(nextTitle);
+    expect(edited).toMatchObject({
+      p_id: 6,
+      p_title: nextTitle,
+      p_summary: article.summary,
+      p_body: `${nextBody}\n\n<!-- match-picture: close -->`,
+    });
+  });
+
   test('a signed-in account with no role cannot send content', async ({ page }) => {
     const userId = '55555555-5555-4555-8555-555555555555';
     const expiresAt = Math.floor(Date.now() / 1000) + 60 * 60;

@@ -38,7 +38,7 @@ const more = (await getNews()).filter((p) => p.id !== post.id).slice(0, 3);
     publisher: { '@id': organizationId(Astro.site) },
   }}
 >
-  <article>
+  <article data-article-slug={post.id}>
     <header class="page-hero">
       <div class="container narrow">
         <a class="back" href={url('/news/')}>← All news</a>
@@ -46,8 +46,8 @@ const more = (await getNews()).filter((p) => p.id !== post.id).slice(0, 3);
           <span class="pill">{CATEGORY_LABEL[category] ?? category}</span>
           <time datetime={date.toISOString()}>{formatDate(date)}</time>
         </div>
-        <h1>{title}</h1>
-        {summary && <p class="lede">{summary}</p>}
+        <h1 data-article-title>{title}</h1>
+        <p class="lede" data-article-summary hidden={!summary}>{summary}</p>
       </div>
     </header>
     {
@@ -57,7 +57,7 @@ const more = (await getNews()).filter((p) => p.id !== post.id).slice(0, 3);
         </div>
       )
     }
-    <div class="container narrow section prose">
+    <div class="container narrow section prose" data-article-body>
       <Content />
     </div>
   </article>

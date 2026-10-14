@@ -10,7 +10,8 @@ import { url } from '@/lib/site';
       <h1>Match articles</h1>
       <p class="lede">
         One article a day, and only when a league match was played. Automatic publishing is on to start with.
-        Switch to manual and a match waits here until you approve it. Nothing is emailed.
+        Switch to manual and a match waits here until you approve it. Open Edit to change the subject, summary and text.
+        Nothing is emailed.
       </p>
       <p class="status" data-status role="status"></p>
 
@@ -63,6 +64,8 @@ import { url } from '@/lib/site';
     id: number;
     article_on: string;
     title: string;
+    summary: string | null;
+    body: string | null;
     status: 'held' | 'approved' | 'published';
     slug: string;
   };
@@ -93,13 +96,91 @@ import { url } from '@/lib/site';
     statusEl.textContent = error ? error.message : 'Saved.';
   });
 
+  function visibleBody(body: string | null) {
+    return (body ?? '').replace(/\n*<!-- match-picture: (?:upset|close) -->\s*$/, '').trim();
+  }
+
+  function pictureNote(body: string | null) {
+    return (body ?? '').match(/\n*<!-- match-picture: (?:upset|close) -->\s*$/)?.[0]?.trim() ?? '';
+  }
+
+  function editField(label: string, hint: string, control: string, tag = 'Editable') {
+    return `<label class="field"><span class="field__name">${label} <span class="field__tag">${tag}</span></span>${control}<span class="field__hint">${hint}</span></label>`;
+  }
+
+  function editor(article: Article) {
+    const lead = article.status === 'published'
+      ? 'Change the subject, summary and text in the boxes below. Save changes updates this article on the site.'
+      : 'Change the subject, summary and text in the boxes below. Save changes keeps them. Approve publishes the article.';
+    return `<tr data-editor-row="${article.id}" hidden><td colspan="4"><form class="stack editor" data-editor="${article.id}" data-picture="${escapeHtml(pictureNote(article.body))}">
+      <p class="editor__lead">${lead}</p>
+      ${editField('Subject', 'The heading on the news page.', `<input name="title" maxlength="180" value="${escapeHtml(article.title)}" />`)}
+      ${editField('Summary', 'The short line under the heading.', `<input name="summary" maxlength="400" value="${escapeHtml(article.summary ?? '')}" />`, 'Optional')}
+      ${editField('Content', 'The article text on the news page.', `<textarea name="body" maxlength="12000" rows="10">${escapeHtml(visibleBody(article.body))}</textarea>`)}
+      <p class="actions"><button class="btn btn--primary btn--sm" type="submit">Save changes</button><button class="btn btn--ghost btn--sm" type="button" data-cancel>Cancel</button></p>
+    </form></td></tr>`;
+  }
+
   rows.addEventListener('click', async (event) => {
-    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-approve]');
+    const target = event.target as HTMLElement;
+    const edit = target.closest<HTMLButtonElement>('[data-edit]');
+    if (edit?.dataset.edit) {
+      const formRow = rows.querySelector<HTMLElement>(`[data-editor-row="${edit.dataset.edit}"]`);
+      if (formRow) formRow.hidden = false;
+      return;
+    }
+    const cancel = target.closest<HTMLButtonElement>('[data-cancel]');
+    if (cancel) {
+      const formRow = cancel.closest<HTMLElement>('[data-editor-row]');
+      if (formRow) formRow.hidden = true;
+      return;
+    }
+    const button = target.closest<HTMLButtonElement>('[data-approve]');
     if (!button) return;
     statusEl.textContent = 'Approving…';
     const { error } = await supabase.rpc('approve_match_article', { p_id: Number(button.dataset.approve) });
     statusEl.textContent = error ? error.message : 'Approved. It will be published on the next daily run.';
     if (!error) await showSession();
+  });
+
+  rows.addEventListener('submit', async (event) => {
+    const form = (event.target as HTMLElement).closest<HTMLFormElement>('[data-editor]');
+    if (!form?.dataset.editor) return;
+    event.preventDefault();
+    const data = new FormData(form);
+    const title = String(data.get('title') ?? '').trim().replace(/\s+/g, ' ');
+    const summary = String(data.get('summary') ?? '').trim().replace(/\s+/g, ' ');
+    let body = String(data.get('body') ?? '').trim();
+    if (title.length < 4 || title.length > 180) {
+      statusEl.textContent = 'Add a subject of 4 to 180 characters.';
+      return;
+    }
+    if (summary.length > 400) {
+      statusEl.textContent = 'Keep the summary to 400 characters.';
+      return;
+    }
+    if (body.length < 20 || body.length > 12000) {
+      statusEl.textContent = 'Write the article.';
+      return;
+    }
+    const picture = form.dataset.picture ?? '';
+    if (picture) body = `${body}\n\n${picture}`;
+    statusEl.textContent = 'Saving…';
+    const { error } = await supabase.rpc('edit_match_article', {
+      p_id: Number(form.dataset.editor),
+      p_title: title,
+      p_summary: summary || null,
+      p_body: body,
+    });
+    if (error) {
+      statusEl.textContent = error.message;
+      return;
+    }
+    const formRow = form.closest<HTMLElement>('[data-editor-row]');
+    if (formRow) formRow.hidden = true;
+    const titleCell = rows.querySelector<HTMLElement>(`[data-title-for="${form.dataset.editor}"]`);
+    if (titleCell) titleCell.textContent = title;
+    statusEl.textContent = 'Saved.';
   });
 
   async function showSession() {
@@ -142,7 +223,7 @@ import { url } from '@/lib/site';
     else mode.value = settings.publication_mode;
     const { data: articles, error } = await supabase
       .from('match_articles')
-      .select('id, article_on, title, status, slug')
+      .select('id, article_on, title, summary, body, status, slug')
       .order('article_on', { ascending: false })
       .limit(30);
     if (error) {
@@ -153,7 +234,7 @@ import { url } from '@/lib/site';
       const approve = article.status === 'held'
         ? `<button class="btn btn--ghost btn--sm" type="button" data-approve="${article.id}">Approve</button>`
         : '';
-      return `<tr><td>${escapeHtml(article.article_on)}</td><td>${escapeHtml(article.title)}</td><td>${escapeHtml(article.status)}</td><td>${approve}</td></tr>`;
+      return `<tr><td>${escapeHtml(article.article_on)}</td><td data-title-for="${article.id}">${escapeHtml(article.title)}</td><td>${escapeHtml(article.status)}</td><td><button class="btn btn--ghost btn--sm" type="button" data-edit="${article.id}">Edit</button>${approve}</td></tr>${editor(article)}`;
     }).join('') || '<tr><td colspan="4">No articles yet.</td></tr>';
   }
 
@@ -178,7 +259,8 @@ import { url } from '@/lib/site';
     font-size: 0.9rem;
   }
   #articles-app input,
-  #articles-app select {
+  #articles-app select,
+  #articles-app textarea {
     width: 100%;
     background: var(--ink-900);
     color: #fff;
@@ -186,6 +268,56 @@ import { url } from '@/lib/site';
     border-radius: var(--radius-sm);
     padding: 0.65rem 0.75rem;
     font: inherit;
+  }
+  #articles-app .editor {
+    margin: 0.4rem 0 0.8rem;
+    padding: 1rem;
+    border: 2px solid var(--accent);
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--accent) 10%, var(--bg-card));
+  }
+  #articles-app .editor__lead {
+    margin: 0;
+    font-weight: 600;
+  }
+  #articles-app .field {
+    display: grid;
+    gap: 0.3rem;
+  }
+  #articles-app .field__name {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-weight: 700;
+  }
+  #articles-app .field__tag {
+    display: inline-block;
+    padding: 0.05rem 0.45rem;
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    color: var(--accent);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  #articles-app .field__hint {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+  #articles-app .editor input,
+  #articles-app .editor textarea,
+  html[data-theme='navy'] #articles-app .editor input,
+  html[data-theme='navy'] #articles-app .editor textarea,
+  html[data-theme='light'] #articles-app .editor input,
+  html[data-theme='light'] #articles-app .editor textarea {
+    background: #fff;
+    color: #163556;
+    color-scheme: light;
+    border: 2px solid var(--accent);
+  }
+  #articles-app [hidden] {
+    display: none !important;
   }
   #articles-app .status:empty {
     display: none;

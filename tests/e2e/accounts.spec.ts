@@ -380,6 +380,7 @@ test.describe('Junior County Closed', () => {
     });
     await page.goto('juniors/closed/entries/', { waitUntil: 'domcontentloaded' });
     const row = page.locator('tr', { hasText: 'Jamie Junior' });
+    await expect(row.getByRole('button', { name: 'Edit' })).toHaveCount(0);
     await expect(row).toContainText('Pat Guardian');
     await expect(row).toContainText('guardian@example.test');
     await expect(row).toContainText('Sam Emergency');
@@ -392,6 +393,100 @@ test.describe('Junior County Closed', () => {
     await row.getByRole('button', { name: 'Remove' }).click();
     await expect(page.getByRole('cell', { name: 'Jamie Junior' })).toHaveCount(0);
     await expect(page.getByText('No entries.').first()).toBeVisible();
+  });
+
+  test('an admin can correct every field on a junior entry', async ({ page }) => {
+    const session = sessionFor('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'admin@example.test', 'Ada Admin');
+    const entries = [
+      {
+        id: 4,
+        player_first_name: 'Pat',
+        player_last_name: 'Guardian',
+        date_of_birth: '2015-04-02',
+        age_category: 'Under 11',
+        draw: 'Girls',
+        club: 'Test Club',
+        guardian_name: 'Pat Guardian',
+        guardian_email: 'guardian@example.test',
+        guardian_phone: '07000000000',
+        emergency_name: 'Sam Emergency',
+        emergency_phone: '07000000001',
+        notes: 'Needs a spare racket',
+        created_at: '2026-10-01T12:00:00Z',
+      },
+    ];
+    let saved: Record<string, unknown> | null = null;
+    await remember(page, session);
+    await page.route(`${SUPABASE}/**`, async (route) => {
+      const url = new URL(route.request().url());
+      const path = url.pathname;
+      if (path.startsWith('/auth/v1/')) {
+        await send(route, path.endsWith('/user') ? session.user : session);
+        return;
+      }
+      if (path.endsWith('/profiles')) {
+        await send(route, { id: session.user.id, display_name: 'Ada Admin', is_admin: true });
+        return;
+      }
+      if (path.endsWith('/rpc/edit_junior_entry') && route.request().method() === 'POST') {
+        saved = route.request().postDataJSON() as Record<string, unknown>;
+        const entry = entries[0];
+        entry.player_first_name = String(saved.p_first_name);
+        entry.player_last_name = String(saved.p_last_name);
+        entry.date_of_birth = String(saved.p_date_of_birth);
+        entry.draw = String(saved.p_draw);
+        entry.club = String(saved.p_club);
+        entry.guardian_name = String(saved.p_guardian_name);
+        entry.guardian_email = String(saved.p_guardian_email);
+        entry.guardian_phone = String(saved.p_guardian_phone);
+        entry.emergency_name = String(saved.p_emergency_name);
+        entry.emergency_phone = String(saved.p_emergency_phone);
+        entry.notes = String(saved.p_notes ?? '');
+        entry.age_category = 'Under 13';
+        await send(route, null);
+        return;
+      }
+      if (path.endsWith('/junior_entries')) {
+        await send(route, entries);
+        return;
+      }
+      await send(route, []);
+    });
+    await page.goto('juniors/closed/entries/', { waitUntil: 'domcontentloaded' });
+    const row = page.locator('tr', { hasText: 'Pat Guardian' }).first();
+    await row.getByRole('button', { name: 'Edit' }).click();
+    const editor = page.locator('form[data-editor="4"]');
+    await expect(editor).toBeVisible();
+    await editor.getByLabel('First name').fill('Alex');
+    await editor.getByLabel('Last name').fill('Player');
+    await editor.getByLabel('Date of birth').fill('2014-06-01');
+    await editor.getByLabel('Section').selectOption('Boys');
+    await editor.getByLabel('Club').fill('New Club');
+    await editor.getByLabel('Parent name').fill('Pat Guardian');
+    await editor.getByLabel('Parent email').fill('pat@example.test');
+    await editor.getByLabel('Parent phone').fill('07111111111');
+    await editor.getByLabel('Emergency name').fill('Sam Contact');
+    await editor.getByLabel('Emergency phone').fill('07222222222');
+    await editor.getByLabel('Notes').fill('Bring kit');
+    await editor.getByRole('button', { name: 'Save changes' }).click();
+    await expect(editor).toBeHidden();
+    await expect(page.locator('[data-status]')).toHaveText('Saved.');
+    await expect(page.getByRole('cell', { name: 'Alex Player' })).toBeVisible();
+    await expect(page.getByRole('cell', { name: 'Pat Guardian' })).toBeVisible();
+    expect(saved).toMatchObject({
+      p_id: 4,
+      p_first_name: 'Alex',
+      p_last_name: 'Player',
+      p_date_of_birth: '2014-06-01',
+      p_draw: 'Boys',
+      p_club: 'New Club',
+      p_guardian_name: 'Pat Guardian',
+      p_guardian_email: 'pat@example.test',
+      p_guardian_phone: '07111111111',
+      p_emergency_name: 'Sam Contact',
+      p_emergency_phone: '07222222222',
+      p_notes: 'Bring kit',
+    });
   });
 
   test('a captain who is not an organiser cannot see entries', async ({ page }) => {
