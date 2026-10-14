@@ -52,8 +52,6 @@ A first look at the confirmed sponsors — at least so far — for the [Bedfords
 
   ![Samo Sports](/uploads/news/samo-sports.png)
 
-- Thomas Garlich’s new company (business name to follow)
-
 Thanks to everyone who has come on board. More names may still be added before the event.
 
 Logos supplied by the sponsors.
