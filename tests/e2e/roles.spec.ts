@@ -481,12 +481,29 @@ test.describe('Club captain, team captain, and player', () => {
           sign_ins_30d: 1,
           by_day: [],
           top_pages: [],
-          page_hits: [{ path: '/beds-squash/news/', hits: 4, signed_in_hits: 1 }],
+          page_hits: [
+            { path: '/beds-squash/news/', hits: 4, signed_in_hits: 1 },
+            ...Array.from({ length: 11 }, (_, index) => ({ path: `/beds-squash/page-${index}/`, hits: 1, signed_in_hits: 0 })),
+          ],
           signed_in_views: [
             { viewed_at: '2026-10-04T18:00:00.000Z', path: '/beds-squash/news/', display_name: 'Pat Player', email: 'pat.player@example.test', client_ip: '203.0.113.8' },
+            { viewed_at: '2026-10-04T16:00:00.000Z', path: '/beds-squash/clubs/', display_name: 'Pat Player', email: 'pat.player@example.test', client_ip: '198.51.100.4' },
+            ...Array.from({ length: 11 }, (_, index) => ({
+              viewed_at: '2026-10-04T17:00:00.000Z',
+              path: `/beds-squash/visit-${index}/`,
+              display_name: `Visitor ${index}`,
+              email: `visitor${index}@example.test`,
+              client_ip: '203.0.113.9',
+            })),
           ],
           recent_sign_ins: [
             { signed_in_at: '2026-10-04T12:00:00.000Z', display_name: 'Pat Player', email: 'pat.player@example.test' },
+            { signed_in_at: '2026-10-03T09:00:00.000Z', display_name: 'Pat Player', email: 'pat.player@example.test' },
+            ...Array.from({ length: 11 }, (_, index) => ({
+              signed_in_at: '2026-10-04T11:00:00.000Z',
+              display_name: `Signer ${index}`,
+              email: `signer${index}@example.test`,
+            })),
           ],
         });
       }
@@ -758,14 +775,44 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.getByRole('heading', { name: 'Hits by page (30 days)' })).toBeVisible();
     await expect(page.locator('[data-traffic-pages]')).toContainText('/beds-squash/news/');
     await expect(page.locator('[data-traffic-pages]')).toContainText('4');
+    await expect(page.locator('[data-traffic-pages]')).not.toContainText('/beds-squash/page-10/');
+    const pagesPager = page.locator('[data-traffic-pager="pages"]');
+    await expect(pagesPager).toContainText('1–10 of 12');
+    await pagesPager.getByRole('button', { name: 'Next' }).click();
+    await expect(page.locator('[data-traffic-pages]')).toContainText('/beds-squash/page-10/');
+    await expect(pagesPager).toContainText('11–12 of 12');
+    await pagesPager.getByRole('button', { name: 'Previous' }).click();
+    await expect(page.locator('[data-traffic-pages]')).toContainText('/beds-squash/news/');
     await expect(page.getByRole('heading', { name: 'Signed-in visits (30 days)' })).toBeVisible();
-    await expect(page.locator('[data-traffic-members]')).toContainText('Pat Player');
-    await expect(page.locator('[data-traffic-members]')).toContainText('/beds-squash/news/');
-    await expect(page.locator('[data-traffic-members]')).toContainText('203.0.113.8');
+    const patVisits = page.locator('[data-traffic-members] tr', { hasText: 'Pat Player' });
+    await expect(patVisits.locator('[data-traffic-count]')).toHaveText('2');
+    const patVisitRecords = page.locator('[data-traffic-members] [data-traffic-detail]', { hasText: '/beds-squash/news/' });
+    await expect(patVisitRecords).toBeHidden();
+    await patVisits.getByRole('button', { name: 'Records for Pat Player' }).click();
+    await expect(patVisitRecords).toBeVisible();
+    await expect(patVisitRecords).toContainText('/beds-squash/news/');
+    await expect(patVisitRecords).toContainText('/beds-squash/clubs/');
+    await expect(patVisitRecords).toContainText('203.0.113.8');
+    await expect(patVisitRecords).toContainText('198.51.100.4');
+    await expect(page.locator('[data-traffic-members]')).not.toContainText('Visitor 10');
+    const visitsPager = page.locator('[data-traffic-pager="members"]');
+    await expect(visitsPager).toContainText('1–10 of 12');
+    await visitsPager.getByRole('button', { name: 'Next' }).click();
+    await expect(page.locator('[data-traffic-members]')).toContainText('Visitor 10');
+    await visitsPager.getByRole('button', { name: 'Previous' }).click();
     await expect(page.getByRole('heading', { name: 'Sign-ins (30 days)' })).toBeVisible();
-    await expect(page.locator('[data-traffic-sign-ins]')).toContainText('Pat Player');
+    const patSignIns = page.locator('[data-traffic-sign-ins] tr', { hasText: 'Pat Player' });
+    await expect(patSignIns.locator('[data-traffic-count]')).toHaveText('2');
+    const patSignInRecords = page.locator('[data-traffic-sign-ins] [data-traffic-detail]').first();
+    await expect(patSignInRecords).toBeHidden();
+    await patSignIns.getByRole('button', { name: 'Records for Pat Player' }).click();
+    await expect(patSignInRecords).toBeVisible();
+    await expect(patSignInRecords.locator('tbody tr')).toHaveCount(2);
+    await expect(page.locator('[data-traffic-sign-ins]')).not.toContainText('Signer 10');
+    await expect(page.locator('[data-traffic-pager="sign-ins"]')).toContainText('1–10 of 12');
+    await expect(page.locator('[data-traffic-pager="by-day"]')).toBeHidden();
     await expect(page.locator('[data-kpi="signins-7"]')).toHaveText('1');
-    await page.locator('[data-traffic-members]').getByRole('button', { name: 'Pat Player' }).click();
+    await page.locator('[data-traffic-members]').getByRole('button', { name: 'Pat Player', exact: true }).click();
     await expect(page.getByRole('searchbox', { name: 'Search' })).toHaveValue('Pat Player');
     await expect(page.locator('[data-users]')).toContainText('Pat Player');
     await expect(page.locator('[data-users]')).not.toContainText('Zoe Player');

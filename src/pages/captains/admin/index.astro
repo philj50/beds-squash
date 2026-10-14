@@ -416,6 +416,11 @@ const scoresHref = url('/captains/admin/minigame/');
                   <tbody data-traffic-by-day></tbody>
                 </table>
               </div>
+              <nav class="pager" data-traffic-pager="by-day" hidden aria-label="Days">
+                <button class="btn btn--ghost btn--sm" type="button" data-traffic-prev>Previous</button>
+                <span data-traffic-range></span>
+                <button class="btn btn--ghost btn--sm" type="button" data-traffic-next>Next</button>
+              </nav>
               <h3>Hits by page (30 days)</h3>
               <div class="overview-box">
                 <table class="overview traffic-table">
@@ -429,6 +434,11 @@ const scoresHref = url('/captains/admin/minigame/');
                   <tbody data-traffic-pages></tbody>
                 </table>
               </div>
+              <nav class="pager" data-traffic-pager="pages" hidden aria-label="Hits by page">
+                <button class="btn btn--ghost btn--sm" type="button" data-traffic-prev>Previous</button>
+                <span data-traffic-range></span>
+                <button class="btn btn--ghost btn--sm" type="button" data-traffic-next>Next</button>
+              </nav>
               <h3>Top pages (30 days)</h3>
               <div class="overview-box">
                 <table class="overview traffic-table">
@@ -441,34 +451,51 @@ const scoresHref = url('/captains/admin/minigame/');
                   <tbody data-traffic-top></tbody>
                 </table>
               </div>
+              <nav class="pager" data-traffic-pager="top" hidden aria-label="Top pages">
+                <button class="btn btn--ghost btn--sm" type="button" data-traffic-prev>Previous</button>
+                <span data-traffic-range></span>
+                <button class="btn btn--ghost btn--sm" type="button" data-traffic-next>Next</button>
+              </nav>
               <h3>Signed-in visits (30 days)</h3>
               <div class="overview-box">
                 <table class="overview traffic-table">
                   <thead>
                     <tr>
-                      <th>When</th>
+                      <th><span class="sr-only">Records</span></th>
                       <th>Name</th>
                       <th>Email</th>
-                      <th>IP address</th>
-                      <th>Path</th>
+                      <th>Times</th>
+                      <th>Latest</th>
                     </tr>
                   </thead>
                   <tbody data-traffic-members></tbody>
                 </table>
               </div>
+              <nav class="pager" data-traffic-pager="members" hidden aria-label="Signed-in visits">
+                <button class="btn btn--ghost btn--sm" type="button" data-traffic-prev>Previous</button>
+                <span data-traffic-range></span>
+                <button class="btn btn--ghost btn--sm" type="button" data-traffic-next>Next</button>
+              </nav>
               <h3>Sign-ins (30 days)</h3>
               <div class="overview-box">
                 <table class="overview traffic-table">
                   <thead>
                     <tr>
-                      <th>When</th>
+                      <th><span class="sr-only">Records</span></th>
                       <th>Name</th>
                       <th>Email</th>
+                      <th>Times</th>
+                      <th>Latest</th>
                     </tr>
                   </thead>
                   <tbody data-traffic-sign-ins></tbody>
                 </table>
               </div>
+              <nav class="pager" data-traffic-pager="sign-ins" hidden aria-label="Sign-ins">
+                <button class="btn btn--ghost btn--sm" type="button" data-traffic-prev>Previous</button>
+                <span data-traffic-range></span>
+                <button class="btn btn--ghost btn--sm" type="button" data-traffic-next>Next</button>
+              </nav>
             </div>
           </section>
         </div>
@@ -623,6 +650,57 @@ const scoresHref = url('/captains/admin/minigame/');
   const trafficPages = root.querySelector<HTMLElement>('[data-traffic-pages]')!;
   const trafficSignIns = root.querySelector<HTMLElement>('[data-traffic-sign-ins]')!;
   const trafficMembers = root.querySelector<HTMLElement>('[data-traffic-members]')!;
+  const TRAFFIC_PAGE = 10;
+  const trafficListPage: Record<string, number> = { 'by-day': 0, pages: 0, top: 0, members: 0, 'sign-ins': 0 };
+  const paintTrafficList = (key: string, rows: string[], body: HTMLElement, empty: string) => {
+    const pager = root.querySelector<HTMLElement>(`[data-traffic-pager="${key}"]`)!;
+    const range = pager.querySelector<HTMLElement>('[data-traffic-range]')!;
+    const prev = pager.querySelector<HTMLButtonElement>('[data-traffic-prev]')!;
+    const next = pager.querySelector<HTMLButtonElement>('[data-traffic-next]')!;
+    if (rows.length === 0) {
+      body.innerHTML = empty;
+      pager.hidden = true;
+      return;
+    }
+    const pageCount = Math.max(1, Math.ceil(rows.length / TRAFFIC_PAGE));
+    if (trafficListPage[key] > pageCount - 1) trafficListPage[key] = pageCount - 1;
+    if (trafficListPage[key] < 0) trafficListPage[key] = 0;
+    const start = trafficListPage[key] * TRAFFIC_PAGE;
+    const pageRows = rows.slice(start, start + TRAFFIC_PAGE);
+    body.innerHTML = pageRows.join('');
+    pager.hidden = rows.length <= TRAFFIC_PAGE;
+    range.textContent = `${start + 1}–${start + pageRows.length} of ${rows.length}`;
+    prev.disabled = trafficListPage[key] <= 0;
+    next.disabled = trafficListPage[key] >= pageCount - 1;
+  };
+  let trafficDaysHtml: string[] = [];
+  let trafficPagesHtml: string[] = [];
+  let trafficTopHtml: string[] = [];
+  let trafficMembersHtml: string[] = [];
+  let trafficSignInsHtml: string[] = [];
+  const paintTrafficLists = () => {
+    paintTrafficList('by-day', trafficDaysHtml, trafficByDay, '<tr><td colspan="3">No data yet. Views appear after visitors browse public pages.</td></tr>');
+    paintTrafficList('pages', trafficPagesHtml, trafficPages, '<tr><td colspan="3">No hits yet. Each page adds a row after someone opens it.</td></tr>');
+    paintTrafficList('top', trafficTopHtml, trafficTop, '<tr><td colspan="2">No data yet.</td></tr>');
+    paintTrafficList('members', trafficMembersHtml, trafficMembers, '<tr><td colspan="5">No signed-in visits yet. A row appears when someone who is logged in opens a page.</td></tr>');
+    paintTrafficList('sign-ins', trafficSignInsHtml, trafficSignIns, '<tr><td colspan="5">No activity yet. A row appears when someone uses a signed-in page.</td></tr>');
+  };
+  trafficStats.addEventListener('click', (event) => {
+    const expand = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-traffic-expand]');
+    if (expand) {
+      const detail = [...trafficStats.querySelectorAll<HTMLElement>('[data-traffic-detail]')].find((row) => row.dataset.trafficDetail === expand.dataset.trafficExpand);
+      const open = Boolean(detail?.hidden);
+      if (detail) detail.hidden = !open;
+      expand.setAttribute('aria-expanded', String(open));
+      expand.textContent = open ? '−' : '+';
+      return;
+    }
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-traffic-prev], [data-traffic-next]');
+    const key = button?.closest<HTMLElement>('[data-traffic-pager]')?.dataset.trafficPager ?? '';
+    if (!button || !(key in trafficListPage)) return;
+    trafficListPage[key] += button.hasAttribute('data-traffic-next') ? 1 : -1;
+    paintTrafficLists();
+  });
   trafficMembers.addEventListener('click', (event) => {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-open-traffic-user]');
     const name = button?.dataset.openTrafficUser ?? '';
@@ -650,6 +728,25 @@ const scoresHref = url('/captains/admin/minigame/');
       minute: '2-digit',
       timeZone: 'Europe/London',
     });
+  };
+
+  const trafficExpandButton = (key: string, label: string) =>
+    `<button type="button" class="row-more" data-traffic-expand="${escapeHtml(key)}" aria-expanded="false" aria-label="${escapeHtml(label)}">+</button>`;
+
+  const groupTrafficAccounts = <T extends { display_name: string; email: string }>(rows: T[]) => {
+    const groups: { key: string; name: string; email: string; rows: T[] }[] = [];
+    const index = new Map<string, number>();
+    for (const row of rows) {
+      const key = (row.email || row.display_name || 'unknown').trim().toLowerCase();
+      const at = index.get(key);
+      if (at === undefined) {
+        index.set(key, groups.length);
+        groups.push({ key, name: row.display_name, email: row.email, rows: [row] });
+      } else {
+        groups[at].rows.push(row);
+      }
+    }
+    return groups;
   };
 
   const loadTraffic = async () => {
@@ -680,53 +777,33 @@ const scoresHref = url('/captains/admin/minigame/');
     root.querySelector('[data-kpi="sessions-30"]')!.textContent = String(stats.sessions_30d ?? 0);
     root.querySelector('[data-kpi="signins-7"]')!.textContent = String(stats.sign_ins_7d ?? 0);
     root.querySelector('[data-kpi="signins-30"]')!.textContent = String(stats.sign_ins_30d ?? 0);
-    const days = stats.by_day ?? [];
-    trafficByDay.innerHTML =
-      days.length === 0
-        ? '<tr><td colspan="3">No data yet. Views appear after visitors browse public pages.</td></tr>'
-        : days
-            .map(
-              (row) =>
-                `<tr><td>${escapeHtml(formatDay(row.day))}</td><td>${row.page_views}</td><td>${row.sessions}</td></tr>`,
-            )
-            .join('');
-    const pages = stats.page_hits ?? [];
-    trafficPages.innerHTML =
-      pages.length === 0
-        ? '<tr><td colspan="3">No hits yet. Each page adds a row after someone opens it.</td></tr>'
-        : pages
-            .map(
-              (row) =>
-                `<tr><td><code>${escapeHtml(row.path)}</code></td><td>${row.hits}</td><td>${row.signed_in_hits}</td></tr>`,
-            )
-            .join('');
-    const top = stats.top_pages ?? [];
-    trafficTop.innerHTML =
-      top.length === 0
-        ? '<tr><td colspan="2">No data yet.</td></tr>'
-        : top
-            .map((row) => `<tr><td><code>${escapeHtml(row.path)}</code></td><td>${row.page_views}</td></tr>`)
-            .join('');
-    const memberViews = stats.signed_in_views ?? [];
-    trafficMembers.innerHTML =
-      memberViews.length === 0
-        ? '<tr><td colspan="5">No signed-in visits yet. A row appears when someone who is logged in opens a page.</td></tr>'
-        : memberViews
-            .map(
-              (row) =>
-                `<tr><td>${escapeHtml(formatWhen(row.viewed_at))}</td><td><button type="button" class="count-button" data-open-traffic-user="${escapeHtml(row.display_name)}">${escapeHtml(row.display_name)}</button></td><td>${escapeHtml(row.email || '—')}</td><td>${escapeHtml(row.client_ip || '—')}</td><td><code>${escapeHtml(row.path)}</code></td></tr>`,
-            )
-            .join('');
-    const signIns = stats.recent_sign_ins ?? [];
-    trafficSignIns.innerHTML =
-      signIns.length === 0
-        ? '<tr><td colspan="3">No activity yet. A row appears when someone uses a signed-in page.</td></tr>'
-        : signIns
-            .map(
-              (row) =>
-                `<tr><td>${escapeHtml(formatWhen(row.signed_in_at))}</td><td>${escapeHtml(row.display_name)}</td><td>${escapeHtml(row.email || '—')}</td></tr>`,
-            )
-            .join('');
+    trafficDaysHtml = (stats.by_day ?? []).map(
+      (row) => `<tr><td>${escapeHtml(formatDay(row.day))}</td><td>${row.page_views}</td><td>${row.sessions}</td></tr>`,
+    );
+    trafficPagesHtml = (stats.page_hits ?? []).map(
+      (row) => `<tr><td><code>${escapeHtml(row.path)}</code></td><td>${row.hits}</td><td>${row.signed_in_hits}</td></tr>`,
+    );
+    trafficTopHtml = (stats.top_pages ?? []).map(
+      (row) => `<tr><td><code>${escapeHtml(row.path)}</code></td><td>${row.page_views}</td></tr>`,
+    );
+    trafficMembersHtml = groupTrafficAccounts(stats.signed_in_views ?? []).map((group) => {
+      const id = `visits:${group.key}`;
+      const latest = group.rows[0];
+      const records = group.rows
+        .map(
+          (row) =>
+            `<tr><td>${escapeHtml(formatWhen(row.viewed_at))}</td><td>${escapeHtml(row.client_ip || '—')}</td><td><code>${escapeHtml(row.path)}</code></td></tr>`,
+        )
+        .join('');
+      return `<tr><td class="row-action">${trafficExpandButton(id, `Records for ${group.name}`)}</td><td><button type="button" class="count-button" data-open-traffic-user="${escapeHtml(group.name)}">${escapeHtml(group.name)}</button></td><td>${escapeHtml(group.email || '—')}</td><td data-traffic-count>${group.rows.length}</td><td>${escapeHtml(formatWhen(latest.viewed_at))}</td></tr><tr data-traffic-detail="${escapeHtml(id)}" hidden><td colspan="5"><table class="traffic-records"><thead><tr><th>When</th><th>IP address</th><th>Path</th></tr></thead><tbody>${records}</tbody></table></td></tr>`;
+    });
+    trafficSignInsHtml = groupTrafficAccounts(stats.recent_sign_ins ?? []).map((group) => {
+      const id = `signins:${group.key}`;
+      const latest = group.rows[0];
+      const records = group.rows.map((row) => `<tr><td>${escapeHtml(formatWhen(row.signed_in_at))}</td></tr>`).join('');
+      return `<tr><td class="row-action">${trafficExpandButton(id, `Records for ${group.name}`)}</td><td>${escapeHtml(group.name)}</td><td>${escapeHtml(group.email || '—')}</td><td data-traffic-count>${group.rows.length}</td><td>${escapeHtml(formatWhen(latest.signed_in_at))}</td></tr><tr data-traffic-detail="${escapeHtml(id)}" hidden><td colspan="5"><table class="traffic-records"><thead><tr><th>When</th></tr></thead><tbody>${records}</tbody></table></td></tr>`;
+    });
+    paintTrafficLists();
     trafficStatus.hidden = true;
     trafficStats.hidden = false;
     trafficLoaded = true;
@@ -3357,6 +3434,33 @@ const scoresHref = url('/captains/admin/minigame/');
     font-size: 0.85rem;
     word-break: break-all;
   }
+  #setup-app .traffic-table .row-more {
+    width: 1.6rem;
+    height: 1.6rem;
+    padding: 0;
+    border: 1px solid var(--gold-500);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: #fff;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  #setup-app .traffic-table tr[hidden] {
+    display: none;
+  }
+  #setup-app .traffic-detail td {
+    background: rgba(255, 255, 255, 0.04);
+  }
+  #setup-app .traffic-records {
+    width: 100%;
+    margin: 0.15rem 0;
+    font-size: 0.85rem;
+  }
+  #setup-app .traffic-records th,
+  #setup-app .traffic-records td {
+    padding: 0.3rem 0.45rem;
+  }
   #setup-app .admin-panel h3 {
     margin: 1.5rem 0 0.75rem;
     font-size: 1.05rem;
@@ -3528,6 +3632,20 @@ const scoresHref = url('/captains/admin/minigame/');
     display: none;
   }
   #setup-app .users-box + .pager span {
+    color: var(--ink-200);
+    font-size: 0.8rem;
+  }
+  #setup-app .overview-box + .pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin: 0.5rem 0 1.25rem;
+  }
+  #setup-app .overview-box + .pager[hidden] {
+    display: none;
+  }
+  #setup-app .overview-box + .pager span {
     color: var(--ink-200);
     font-size: 0.8rem;
   }
