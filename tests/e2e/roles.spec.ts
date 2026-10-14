@@ -267,6 +267,23 @@ test.describe('Club captain, team captain, and player', () => {
         created_at: '2026-10-04T11:00:00.000Z',
       })),
     ];
+    const juniorEntries = [
+      {
+        id: 4,
+        player_first_name: 'Jamie',
+        player_last_name: 'Junior',
+        date_of_birth: '2015-04-02',
+        age_category: 'Under 11',
+        draw: 'Girls',
+        club: 'Test Club',
+        guardian_name: 'Pat Guardian',
+        guardian_email: 'guardian@example.test',
+        guardian_phone: '07000000000',
+        emergency_name: 'Sam Emergency',
+        emergency_phone: '07000000001',
+        notes: 'Needs a spare racket',
+      },
+    ];
     await page.route(`${SUPABASE}/**`, async (route) => {
       const url = new URL(route.request().url());
       const path = url.pathname;
@@ -526,23 +543,26 @@ test.describe('Club captain, team captain, and player', () => {
           { slug: 'rb_players', name: 'RB Players', role_slug: 'rb_player', source: 'website', managed: false, position: 9 },
         ]);
       }
+      if (path.endsWith('/rpc/edit_junior_entry') && route.request().method() === 'POST') {
+        const saved = route.request().postDataJSON() as Record<string, unknown>;
+        const entry = juniorEntries.find((row) => row.id === saved.p_id);
+        if (entry) {
+          entry.player_first_name = String(saved.p_first_name);
+          entry.player_last_name = String(saved.p_last_name);
+          entry.date_of_birth = String(saved.p_date_of_birth);
+          entry.draw = String(saved.p_draw);
+          entry.club = String(saved.p_club);
+          entry.guardian_name = String(saved.p_guardian_name);
+          entry.guardian_email = String(saved.p_guardian_email);
+          entry.guardian_phone = String(saved.p_guardian_phone);
+          entry.emergency_name = String(saved.p_emergency_name);
+          entry.emergency_phone = String(saved.p_emergency_phone);
+          entry.notes = String(saved.p_notes ?? '');
+        }
+        return send(null);
+      }
       if (path.endsWith('/junior_entries')) {
-        return send([
-          {
-            player_first_name: 'Jamie',
-            player_last_name: 'Junior',
-            date_of_birth: '2015-04-02',
-            age_category: 'Under 11',
-            draw: 'Girls',
-            club: 'Test Club',
-            guardian_name: 'Pat Guardian',
-            guardian_email: 'guardian@example.test',
-            guardian_phone: '07000000000',
-            emergency_name: 'Sam Emergency',
-            emergency_phone: '07000000001',
-            notes: 'Needs a spare racket',
-          },
-        ]);
+        return send(juniorEntries);
       }
       if (path.endsWith('/group_members')) {
         const method = route.request().method();
@@ -683,6 +703,14 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(junior).toContainText('Sam Emergency');
     await expect(junior).toContainText('07000000001');
     await expect(junior).toContainText('Needs a spare racket');
+    await junior.getByRole('button', { name: 'Edit' }).click();
+    const juniorEditor = page.locator('form[data-editor="4"]');
+    await expect(juniorEditor).toBeVisible();
+    await juniorEditor.getByLabel('First name').fill('Alex');
+    await juniorEditor.getByRole('button', { name: 'Save changes' }).click();
+    await expect(juniorEditor).toBeHidden();
+    await expect(page.locator('[data-status]')).toHaveText('Saved.');
+    await expect(page.locator('[data-juniors-people]')).toContainText('Alex Junior');
     await page.getByRole('button', { name: 'Players', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Beds Closed', exact: true })).toBeVisible();
     await expect(page.getByText('Beds Closed will be used later.', { exact: true })).toBeVisible();

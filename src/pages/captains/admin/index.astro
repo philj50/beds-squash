@@ -106,7 +106,7 @@ const scoresHref = url('/captains/admin/minigame/');
 
           <section class="admin-panel" data-tab="juniors" hidden>
             <h2>Juniors</h2>
-            <p class="muted small">Junior County Closed entries submitted on this website, with the details from the entry form.</p>
+            <p class="muted small">Junior County Closed entries submitted on this website. An admin can correct every field. Saving does not send an email.</p>
             <div class="overview-box">
               <table class="overview">
                 <thead>
@@ -122,6 +122,7 @@ const scoresHref = url('/captains/admin/minigame/');
                     <th>Emergency</th>
                     <th>Emergency phone</th>
                     <th>Notes</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody data-juniors-people></tbody>
@@ -1259,6 +1260,7 @@ const scoresHref = url('/captains/admin/minigame/');
   });
   const juniorsHost = root.querySelector<HTMLElement>('[data-juniors-people]')!;
   type JuniorEntry = {
+    id: number;
     player_first_name: string;
     player_last_name: string;
     date_of_birth: string;
@@ -1317,9 +1319,41 @@ const scoresHref = url('/captains/admin/minigame/');
     }
     return combined.join('; ') || '—';
   }
+  function juniorField(label: string, hint: string, control: string, tag = 'Editable') {
+    return `<label class="field"><span class="field__name">${label} <span class="field__tag">${tag}</span></span>${control}<span class="field__hint">${hint}</span></label>`;
+  }
+  function juniorEditor(entry: JuniorEntry) {
+    const born = (entry.date_of_birth ?? '').slice(0, 10);
+    const section = ['Boys', 'Girls', 'Mixed'].map((option) => `<option${entry.draw === option ? ' selected' : ''}>${option}</option>`).join('');
+    return `<tr data-editor-row="${entry.id}" hidden><td colspan="12"><form class="stack junior-editor" data-editor="${entry.id}">
+      <p class="editor__lead">Change any field, then save. The age group follows the date of birth. Under 9 is saved as Mixed.</p>
+      <div class="pair">
+        ${juniorField('First name', 'The junior who is playing.', `<input name="player_first_name" required maxlength="60" value="${escapeHtml(entry.player_first_name)}" autocomplete="off" />`)}
+        ${juniorField('Last name', 'The family name of the junior.', `<input name="player_last_name" required maxlength="60" value="${escapeHtml(entry.player_last_name)}" autocomplete="off" />`)}
+      </div>
+      <div class="pair">
+        ${juniorField('Date of birth', 'This sets the age group.', `<input name="date_of_birth" type="date" required value="${escapeHtml(born)}" />`)}
+        ${juniorField('Section', 'Boys, Girls, or Mixed for Under 9.', `<select name="draw">${section}</select>`)}
+      </div>
+      ${juniorField('Club', 'The club the junior plays for.', `<input name="club" required minlength="2" maxlength="80" value="${escapeHtml(entry.club)}" autocomplete="off" />`)}
+      <h3>Parent or guardian</h3>
+      ${juniorField('Parent name', 'The parent or guardian.', `<input name="guardian_name" required minlength="2" maxlength="80" value="${escapeHtml(entry.guardian_name)}" autocomplete="off" />`)}
+      <div class="pair">
+        ${juniorField('Parent email', 'Where the organiser can write.', `<input name="guardian_email" type="email" required maxlength="120" value="${escapeHtml(entry.guardian_email)}" autocomplete="off" />`)}
+        ${juniorField('Parent phone', 'A number for the parent.', `<input name="guardian_phone" type="tel" required minlength="8" maxlength="20" value="${escapeHtml(entry.guardian_phone)}" autocomplete="off" />`)}
+      </div>
+      <h3>Emergency contact</h3>
+      <div class="pair">
+        ${juniorField('Emergency name', 'Who to call in an emergency.', `<input name="emergency_name" required minlength="2" maxlength="80" value="${escapeHtml(entry.emergency_name)}" autocomplete="off" />`)}
+        ${juniorField('Emergency phone', 'A number for that contact.', `<input name="emergency_phone" type="tel" required minlength="8" maxlength="20" value="${escapeHtml(entry.emergency_phone)}" autocomplete="off" />`)}
+      </div>
+      ${juniorField('Notes', 'Anything the organiser should know. Leave this blank if there is nothing to add.', `<textarea name="notes" maxlength="500" rows="3">${escapeHtml(entry.notes ?? '')}</textarea>`, 'Optional')}
+      <p class="actions"><button class="btn btn--primary btn--sm" type="submit">Save changes</button><button class="btn btn--ghost btn--sm" type="button" data-cancel>Cancel</button></p>
+    </form></td></tr>`;
+  }
   function paintJuniorEntries(entries: JuniorEntry[], problem = '') {
     if (problem) {
-      juniorsHost.innerHTML = `<tr><td colspan="11">${escapeHtml(problem)}</td></tr>`;
+      juniorsHost.innerHTML = `<tr><td colspan="12">${escapeHtml(problem)}</td></tr>`;
       return;
     }
     const rows = entries.slice().sort((a, b) => a.player_last_name.localeCompare(b.player_last_name, 'en') || a.player_first_name.localeCompare(b.player_first_name, 'en'));
@@ -1327,11 +1361,92 @@ const scoresHref = url('/captains/admin/minigame/');
       ? rows
           .map((entry) => {
             const born = entry.date_of_birth ? formatDay(entry.date_of_birth.slice(0, 10)) : '—';
-            return `<tr><td>${escapeHtml(`${entry.player_first_name} ${entry.player_last_name}`.trim())}</td><td>${escapeHtml(born)}</td><td>${escapeHtml(entry.age_category || '—')}</td><td>${escapeHtml(entry.draw || '—')}</td><td>${escapeHtml(entry.club || '—')}</td><td>${escapeHtml(entry.guardian_name || '—')}</td><td>${escapeHtml(entry.guardian_email || '—')}</td><td>${escapeHtml(entry.guardian_phone || '—')}</td><td>${escapeHtml(entry.emergency_name || '—')}</td><td>${escapeHtml(entry.emergency_phone || '—')}</td><td>${escapeHtml(entry.notes || '—')}</td></tr>`;
+            const player = `${entry.player_first_name} ${entry.player_last_name}`.trim();
+            const edit = viewerIsAdmin && Number.isFinite(entry.id) ? `<button class="btn btn--ghost btn--sm" type="button" data-edit="${entry.id}">Edit</button>` : '';
+            return `<tr><td>${escapeHtml(player)}</td><td>${escapeHtml(born)}</td><td>${escapeHtml(entry.age_category || '—')}</td><td>${escapeHtml(entry.draw || '—')}</td><td>${escapeHtml(entry.club || '—')}</td><td>${escapeHtml(entry.guardian_name || '—')}</td><td>${escapeHtml(entry.guardian_email || '—')}</td><td>${escapeHtml(entry.guardian_phone || '—')}</td><td>${escapeHtml(entry.emergency_name || '—')}</td><td>${escapeHtml(entry.emergency_phone || '—')}</td><td>${escapeHtml(entry.notes || '—')}</td><td>${edit}</td></tr>${edit ? juniorEditor(entry) : ''}`;
           })
           .join('')
-      : '<tr><td colspan="11">No junior entries yet.</td></tr>';
+      : '<tr><td colspan="12">No junior entries yet.</td></tr>';
   }
+  juniorsHost.addEventListener('click', (event) => {
+    const target = event.target as HTMLElement;
+    const edit = target.closest<HTMLButtonElement>('[data-edit]');
+    if (edit?.dataset.edit) {
+      for (const row of juniorsHost.querySelectorAll<HTMLElement>('[data-editor-row]')) row.hidden = row.dataset.editorRow !== edit.dataset.edit;
+      return;
+    }
+    const cancel = target.closest<HTMLButtonElement>('[data-cancel]');
+    if (!cancel) return;
+    const formRow = cancel.closest<HTMLElement>('[data-editor-row]');
+    if (formRow) formRow.hidden = true;
+  });
+  juniorsHost.addEventListener('submit', async (event) => {
+    const form = (event.target as HTMLElement).closest<HTMLFormElement>('[data-editor]');
+    if (!form?.dataset.editor) return;
+    event.preventDefault();
+    const data = new FormData(form);
+    const text = (name: string) => String(data.get(name) ?? '').trim().replace(/\s+/g, ' ');
+    const first = text('player_first_name');
+    const last = text('player_last_name');
+    const dateOfBirth = String(data.get('date_of_birth') ?? '');
+    const draw = String(data.get('draw') ?? '');
+    const club = text('club');
+    const guardian = text('guardian_name');
+    const email = String(data.get('guardian_email') ?? '').trim();
+    const guardianPhone = text('guardian_phone');
+    const emergency = text('emergency_name');
+    const emergencyPhone = text('emergency_phone');
+    const notes = String(data.get('notes') ?? '').trim();
+    if (!first || !last || first.length > 60 || last.length > 60) {
+      setStatus("Add the junior's first and last name.");
+      return;
+    }
+    if (club.length < 2 || club.length > 80) {
+      setStatus('Add the club.');
+      return;
+    }
+    if (guardian.length < 2 || guardian.length > 80) {
+      setStatus('Add the parent or guardian.');
+      return;
+    }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 120) {
+      setStatus('Add a parent email.');
+      return;
+    }
+    if (guardianPhone.length < 8 || guardianPhone.length > 20 || emergencyPhone.length < 8 || emergencyPhone.length > 20) {
+      setStatus('Add a phone number.');
+      return;
+    }
+    if (emergency.length < 2 || emergency.length > 80) {
+      setStatus('Add an emergency contact.');
+      return;
+    }
+    if (notes.length > 500) {
+      setStatus('Keep the notes to 500 characters.');
+      return;
+    }
+    setStatus('Saving…');
+    const { error } = await supabase.rpc('edit_junior_entry', {
+      p_id: Number(form.dataset.editor),
+      p_first_name: first,
+      p_last_name: last,
+      p_date_of_birth: dateOfBirth,
+      p_draw: draw,
+      p_club: club,
+      p_guardian_name: guardian,
+      p_guardian_email: email,
+      p_guardian_phone: guardianPhone,
+      p_emergency_name: emergency,
+      p_emergency_phone: emergencyPhone,
+      p_notes: notes || null,
+    });
+    if (error) {
+      setStatus(error.message);
+      return;
+    }
+    await showSession();
+    setStatus('Saved.');
+  });
   const LOCKED_ROLE_SLUGS = new Set(['lm_club_captains', 'lm_team_captains', 'lm_players', 'jc_players', 'jc_parents']);
   function fillFilter(select: HTMLSelectElement, choices: { value: string; label: string }[], allLabel: string) {
     const current = select.value;
@@ -2261,7 +2376,7 @@ const scoresHref = url('/captains/admin/minigame/');
       supabase.from('group_members').select('profile_id, person_name, place, group_slug'),
       supabase.from('groups').select('slug, name, role_slug, source, managed, position').order('position'),
       supabase.from('roles').select('slug, name, position').order('position'),
-      supabase.from('junior_entries').select('player_first_name, player_last_name, date_of_birth, age_category, draw, club, guardian_name, guardian_email, guardian_phone, emergency_name, emergency_phone, notes').order('player_last_name'),
+      supabase.from('junior_entries').select('id, player_first_name, player_last_name, date_of_birth, age_category, draw, club, guardian_name, guardian_email, guardian_phone, emergency_name, emergency_phone, notes').order('player_last_name'),
       supabase.from('site_sign_ins').select('user_id, signed_in_at').order('signed_in_at', { ascending: false }).limit(1000),
     ]);
     if (peopleError || clubError || orgError || roleError) {
@@ -3513,6 +3628,80 @@ const scoresHref = url('/captains/admin/minigame/');
   }
   #setup-app .overview td input::placeholder {
     color: #5c6d80;
+  }
+  #setup-app [data-tab='juniors'] [hidden] {
+    display: none !important;
+  }
+  #setup-app .junior-editor {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0.35rem 0;
+    padding: 0.85rem;
+    border: 2px solid var(--accent);
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--accent) 10%, var(--bg-card));
+    text-align: left;
+  }
+  #setup-app .junior-editor .pair {
+    display: grid;
+    gap: 0.75rem;
+  }
+  @media (min-width: 700px) {
+    #setup-app .junior-editor .pair {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  #setup-app .junior-editor h3,
+  #setup-app .junior-editor .editor__lead {
+    margin: 0;
+    color: var(--text);
+  }
+  #setup-app .junior-editor .field {
+    display: grid;
+    gap: 0.3rem;
+  }
+  #setup-app .junior-editor .field__name {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-weight: 700;
+  }
+  #setup-app .junior-editor .field__tag {
+    display: inline-block;
+    padding: 0.05rem 0.45rem;
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    color: var(--accent);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  #setup-app .junior-editor .field__hint {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+  #setup-app .junior-editor input,
+  #setup-app .junior-editor select,
+  #setup-app .junior-editor textarea,
+  #setup-app .overview td .junior-editor input,
+  #setup-app .overview td .junior-editor select,
+  #setup-app .overview td .junior-editor textarea {
+    width: 100%;
+    min-width: 0;
+    background: #fff;
+    color: #163556;
+    color-scheme: light;
+    border: 2px solid var(--accent);
+    border-radius: var(--radius-sm);
+    padding: 0.55rem 0.7rem;
+    font: inherit;
+    font-size: 0.9rem;
+  }
+  #setup-app .junior-editor .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
   #setup-app .role-choices {
     display: grid;
