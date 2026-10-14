@@ -10,8 +10,8 @@ import { url } from '@/lib/site';
       <h1>Shared content</h1>
       <p class="lede">
         People send photos, videos, links and articles from the <a href={url('/share/')}>Share</a> page.
-        Nothing goes on the site until you publish it. You can correct the file, link, title or text first.
-        The name of the person who sent it in stays on it.
+        Nothing goes on the site until you publish it. Open Edit to change the sender, subject and content, then save.
+        Publish is a separate button.
       </p>
       <p class="status" data-status role="status"></p>
       <div data-panel="signed-in" hidden>
@@ -133,36 +133,47 @@ import { url } from '@/lib/site';
     return '';
   }
 
+  function editField(label: string, hint: string, control: string, tag = 'Editable') {
+    return `<label class="field"><span class="field__name">${label} <span class="field__tag">${tag}</span></span>${control}<span class="field__hint">${hint}</span></label>`;
+  }
+
   function editor(item: Item) {
-    const who = `<p class="hint">Sent in by ${escapeHtml(item.credit)}. Saving keeps that name.</p>`;
-    const actions = `<p class="actions"><button class="btn btn--primary btn--sm" type="submit">Save</button><button class="btn btn--ghost btn--sm" type="button" data-cancel>Cancel</button></p>`;
+    const lead = item.status === 'pending'
+      ? 'Change the sender, subject and content in the boxes below. Save changes stores them. Publish puts this on the site.'
+      : 'Change the sender, subject and content in the boxes below, then save. This is already on the site.';
+    const publish = item.status === 'pending'
+      ? `<button class="btn btn--ghost btn--sm editor__publish" type="button" data-publish="${item.id}">Publish</button>`
+      : '';
+    const actions = `<p class="actions editor__actions"><button class="btn btn--primary btn--sm" type="submit">Save changes</button>${publish}<button class="btn btn--ghost btn--sm" type="button" data-cancel>Cancel</button></p>`;
+    const sender = editField(
+      'Sender',
+      'The name shown on the site. Use the photographer or author when that is someone else.',
+      `<input name="credit" required minlength="2" maxlength="80" value="${escapeHtml(item.credit)}" autocomplete="name" />`,
+    );
+    const open = `<form class="stack editor" data-editor="${item.id}" data-kind="${item.kind}" hidden><p class="editor__lead">${lead}</p>${sender}`;
     if (item.kind === 'photo' || item.kind === 'video') {
       const fileLabel = item.kind === 'photo' ? 'Replace the photo' : 'Replace the video';
       const accept = item.kind === 'photo'
         ? 'image/jpeg,image/png,image/webp,image/gif'
         : 'video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov';
-      return `<form class="stack editor" data-editor="${item.id}" data-kind="${item.kind}" hidden>
-        ${who}
-        <label>Caption <input name="caption" maxlength="200" value="${escapeHtml(item.caption ?? '')}" /></label>
-        <label>${fileLabel} <input name="file" type="file" accept="${accept}" /></label>
-        <p class="hint">Leave the file empty to keep the one already sent in.</p>
+      return `${open}
+        ${editField('Subject', 'The caption shown with this photo or video.', `<input name="caption" maxlength="200" value="${escapeHtml(item.caption ?? '')}" />`)}
+        ${editField(fileLabel, 'Leave this empty to keep the file already sent in.', `<input name="file" type="file" accept="${accept}" />`, 'Optional')}
         ${actions}
       </form>`;
     }
     if (item.kind === 'link') {
-      return `<form class="stack editor" data-editor="${item.id}" data-kind="link" hidden>
-        ${who}
-        <label>Title <input name="title" maxlength="140" value="${escapeHtml(item.title ?? '')}" /></label>
-        <label>Link <input name="url" type="text" inputmode="url" maxlength="500" value="${escapeHtml(item.url ?? '')}" autocomplete="off" spellcheck="false" /></label>
-        <label>Note, optional <input name="note" maxlength="200" value="${escapeHtml(item.caption ?? '')}" /></label>
+      return `${open}
+        ${editField('Subject', 'The heading shown on the site.', `<input name="title" maxlength="140" value="${escapeHtml(item.title ?? '')}" />`)}
+        ${editField('Link', 'Use an https address.', `<input name="url" type="text" inputmode="url" maxlength="500" value="${escapeHtml(item.url ?? '')}" autocomplete="off" spellcheck="false" />`)}
+        ${editField('Content', 'A short note beside the address. Leave it blank if you have nothing to add.', `<input name="note" maxlength="200" value="${escapeHtml(item.caption ?? '')}" />`, 'Optional')}
         ${actions}
       </form>`;
     }
-    return `<form class="stack editor" data-editor="${item.id}" data-kind="article" hidden>
-      ${who}
-      <label>Title <input name="title" maxlength="140" value="${escapeHtml(item.title ?? '')}" /></label>
-      <label>Summary, optional <input name="summary" maxlength="280" value="${escapeHtml(item.caption ?? '')}" /></label>
-      <label>Article <textarea name="body" maxlength="8000" rows="8">${escapeHtml(item.body ?? '')}</textarea></label>
+    return `${open}
+      ${editField('Subject', 'The heading shown on the site.', `<input name="title" maxlength="140" value="${escapeHtml(item.title ?? '')}" />`)}
+      ${editField('Summary', 'A short line under the heading.', `<input name="summary" maxlength="280" value="${escapeHtml(item.caption ?? '')}" />`, 'Optional')}
+      ${editField('Content', 'The article text on the site.', `<textarea name="body" maxlength="8000" rows="8">${escapeHtml(item.body ?? '')}</textarea>`)}
       ${actions}
     </form>`;
   }
@@ -230,8 +241,14 @@ import { url } from '@/lib/site';
     const publish = target.closest<HTMLButtonElement>('[data-publish]');
     const remove = target.closest<HTMLButtonElement>('[data-delete]');
     if (publish?.dataset.publish) {
+      const id = publish.dataset.publish;
+      const form = publish.closest('[data-item]')?.querySelector<HTMLFormElement>('[data-editor]');
+      if (form && !form.hidden) {
+        const saved = await saveEditor(form);
+        if (!saved) return;
+      }
       statusEl.textContent = 'Publishing…';
-      const { error } = await supabase.rpc('publish_contribution', { p_id: publish.dataset.publish });
+      const { error } = await supabase.rpc('publish_contribution', { p_id: id });
       statusEl.textContent = error ? error.message : 'Published.';
       if (!error) await loadItems();
     }
@@ -255,38 +272,40 @@ import { url } from '@/lib/site';
     return path;
   }
 
-  admin.addEventListener('submit', async (event) => {
-    const form = (event.target as HTMLElement).closest<HTMLFormElement>('[data-editor]');
-    if (!form?.dataset.editor) return;
-    event.preventDefault();
+  async function saveEditor(form: HTMLFormElement) {
     const kind = (form.dataset.kind ?? 'article') as Kind;
     const data = new FormData(form);
+    const credit = String(data.get('credit') ?? '').trim().replace(/\s+/g, ' ');
     let caption: string | null = null;
     let title: string | null = null;
     let body: string | null = null;
     let link: string | null = null;
     let storagePath: string | null = null;
+    if (credit.length < 2 || credit.length > 80) {
+      statusEl.textContent = 'Add a sender name, up to 80 characters.';
+      return false;
+    }
     if (kind === 'photo' || kind === 'video') {
       caption = String(data.get('caption') ?? '').trim();
       if (caption.length < 2 || caption.length > 200) {
-        statusEl.textContent = 'Add a caption.';
-        return;
+        statusEl.textContent = 'Add a subject.';
+        return false;
       }
       const file = data.get('file') as File | null;
       if (file && file.size > 0) {
         const problem = kind === 'photo' ? photoProblem(file) : videoProblem(file);
         if (problem) {
           statusEl.textContent = problem;
-          return;
+          return false;
         }
         const ext = kind === 'photo' ? photoExtension(file) : videoExtension(file);
-        if (!ext) return;
+        if (!ext) return false;
         statusEl.textContent = 'Uploading…';
         try {
           storagePath = await upload(file, ext);
         } catch (error) {
           statusEl.textContent = error instanceof Error ? error.message : 'The file did not upload.';
-          return;
+          return false;
         }
       }
     } else if (kind === 'link') {
@@ -294,21 +313,22 @@ import { url } from '@/lib/site';
       caption = String(data.get('note') ?? '').trim() || null;
       link = cleanLinkUrl(String(data.get('url') ?? ''));
       if (title.length < 2 || title.length > 140 || !link || (caption && caption.length > 200)) {
-        statusEl.textContent = link ? 'Add a title.' : 'Use an https link.';
-        return;
+        statusEl.textContent = link ? 'Add a subject.' : 'Use an https link.';
+        return false;
       }
     } else {
       title = String(data.get('title') ?? '').trim();
       caption = String(data.get('summary') ?? '').trim() || null;
       body = String(data.get('body') ?? '').trim();
       if (title.length < 4 || title.length > 140 || body.length < GALLERY_BODY_MIN || body.length > GALLERY_BODY_MAX || (caption && caption.length > 280)) {
-        statusEl.textContent = 'Add a title and write the article.';
-        return;
+        statusEl.textContent = 'Add a subject and write the content.';
+        return false;
       }
     }
     statusEl.textContent = 'Saving…';
     const { data: oldPath, error } = await supabase.rpc('edit_contribution', {
       p_id: form.dataset.editor,
+      p_credit: credit,
       p_caption: caption,
       p_title: title,
       p_body: body,
@@ -319,8 +339,16 @@ import { url } from '@/lib/site';
     if (!error && typeof oldPath === 'string' && oldPath && oldPath !== storagePath) {
       await supabase.storage.from('contributions').remove([oldPath]);
     }
-    statusEl.textContent = error ? error.message : 'Saved. The name on it is unchanged.';
+    statusEl.textContent = error ? error.message : 'Saved.';
     if (!error) await loadItems();
+    return !error;
+  }
+
+  admin.addEventListener('submit', async (event) => {
+    const form = (event.target as HTMLElement).closest<HTMLFormElement>('[data-editor]');
+    if (!form?.dataset.editor) return;
+    event.preventDefault();
+    await saveEditor(form);
   });
 
   addForm.addEventListener('submit', async (event) => {
@@ -476,6 +504,65 @@ import { url } from '@/lib/site';
     border-radius: var(--radius-sm);
     padding: 0.65rem 0.75rem;
     font: inherit;
+  }
+  .editor {
+    margin-top: 0.85rem;
+    padding: 1rem;
+    border: 2px solid var(--accent);
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--accent) 10%, var(--bg-card));
+  }
+  .editor__lead {
+    margin: 0;
+    font-weight: 600;
+  }
+  .field__name {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-weight: 700;
+  }
+  .field__tag {
+    display: inline-block;
+    padding: 0.05rem 0.45rem;
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    color: var(--accent);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .field__hint {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+  .editor input:not([type='file']),
+  .editor textarea,
+  html[data-theme='navy'] .editor input:not([type='file']),
+  html[data-theme='navy'] .editor textarea,
+  html[data-theme='light'] .editor input:not([type='file']),
+  html[data-theme='light'] .editor textarea {
+    background: #fff;
+    color: #163556;
+    color-scheme: light;
+    border: 2px solid var(--accent);
+    box-shadow: inset 0 1px 0 rgba(241, 90, 34, 0.12);
+  }
+  .editor input:not([type='file']):focus,
+  .editor textarea:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .editor__actions {
+    margin-top: 0.25rem;
+  }
+  .editor__publish,
+  html[data-theme='navy'] .editor__publish,
+  html[data-theme='light'] .editor__publish {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: #fff;
   }
   .status:empty {
     display: none;

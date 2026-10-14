@@ -293,7 +293,7 @@ test.describe('Public site', () => {
     expect(submitted).not.toHaveProperty('status');
   });
 
-  test('an admin can correct an upload and the sender stays on it', async ({ page }) => {
+  test('an admin can correct an upload, including the sender', async ({ page }) => {
     const adminId = '44444444-4444-4444-8444-444444444444';
     const articleId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
     const linkId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
@@ -370,7 +370,7 @@ test.describe('Public site', () => {
     ];
     let edited: Record<string, unknown> | null = null;
     let published: Record<string, unknown> | null = null;
-    const fields = ['p_body', 'p_caption', 'p_id', 'p_storage_path', 'p_title', 'p_url'];
+    const fields = ['p_body', 'p_caption', 'p_credit', 'p_id', 'p_storage_path', 'p_title', 'p_url'];
     await page.addInitScript((stored) => {
       localStorage.setItem('sb-klxyjmwiaivvqjbhxzak-auth-token', JSON.stringify(stored));
     }, session);
@@ -408,6 +408,7 @@ test.describe('Public site', () => {
         edited = request.postDataJSON();
         const row = items.find((item) => item.id === edited?.p_id);
         if (row && edited) {
+          if (edited.p_credit != null) row.credit = String(edited.p_credit);
           if (edited.p_title != null) row.title = String(edited.p_title);
           if (edited.p_caption != null) row.caption = String(edited.p_caption);
           if (edited.p_body != null) row.body = String(edited.p_body);
@@ -433,72 +434,80 @@ test.describe('Public site', () => {
     await expect(article).toContainText('Pat Player');
     await article.getByRole('button', { name: 'Edit' }).click();
     const articleEditor = article.locator('[data-editor]');
-    await expect(articleEditor).toContainText('Sent in by Pat Player');
-    await expect(articleEditor.locator('input[name="credit"]')).toHaveCount(0);
-    await articleEditor.getByLabel('Title').fill('Close match');
-    await articleEditor.getByLabel('Article').fill('This sentence is long enough to be an article for the site queue.');
-    await articleEditor.getByRole('button', { name: 'Save' }).click();
-    await expect(page.getByRole('status')).toHaveText('Saved. The name on it is unchanged.');
+    await expect(articleEditor.getByLabel('Sender')).toHaveValue('Pat Player');
+    await expect(articleEditor.getByRole('button', { name: 'Save changes' })).toBeVisible();
+    await expect(articleEditor.getByRole('button', { name: 'Publish' })).toBeVisible();
+    await articleEditor.getByLabel('Subject').fill('Close match');
+    await articleEditor.getByLabel('Content').fill('This sentence is long enough to be an article for the site queue.');
+    await articleEditor.getByRole('button', { name: 'Save changes' }).click();
+    await expect(page.getByRole('status')).toHaveText('Saved.');
     expect(Object.keys(edited ?? {}).sort()).toEqual(fields);
     expect(edited).toMatchObject({
       p_id: articleId,
+      p_credit: 'Pat Player',
       p_title: 'Close match',
       p_caption: 'A short note',
       p_body: 'This sentence is long enough to be an article for the site queue.',
       p_url: null,
       p_storage_path: null,
     });
-    expect(edited).not.toHaveProperty('p_credit');
 
     const link = page.locator('[data-item]', { hasText: 'Bad subject' });
     await link.getByRole('button', { name: 'Edit' }).click();
     const linkEditor = link.locator('[data-editor]');
-    await expect(linkEditor.locator('input[name="credit"]')).toHaveCount(0);
-    await linkEditor.getByLabel('Title').fill('Club night');
+    await linkEditor.getByLabel('Subject').fill('Club night');
     await linkEditor.getByLabel('Link').fill('https://example.com/match');
-    await linkEditor.getByRole('button', { name: 'Save' }).click();
-    await expect(page.getByRole('status')).toHaveText('Saved. The name on it is unchanged.');
+    await linkEditor.getByRole('button', { name: 'Save changes' }).click();
+    await expect(page.getByRole('status')).toHaveText('Saved.');
     expect(edited).toMatchObject({
       p_id: linkId,
+      p_credit: 'Pat Player',
       p_title: 'Club night',
       p_caption: 'Watch this',
       p_url: 'https://example.com/match',
       p_body: null,
       p_storage_path: null,
     });
-    expect(edited).not.toHaveProperty('p_credit');
     await expect(page.locator('[data-item]', { hasText: 'Club night' })).toContainText('Pat Player');
 
     const photo = page.locator('[data-item]', { hasText: 'Court photo' });
     await photo.getByRole('button', { name: 'Edit' }).click();
     const photoEditor = photo.locator('[data-editor]');
-    await photoEditor.getByLabel('Caption').fill('Match photo');
-    await photoEditor.getByRole('button', { name: 'Save' }).click();
-    await expect(page.getByRole('status')).toHaveText('Saved. The name on it is unchanged.');
+    await photoEditor.getByLabel('Sender').fill('Charlie Jenkins');
+    await photoEditor.getByLabel('Subject').fill('Match photo');
+    await photoEditor.getByRole('button', { name: 'Save changes' }).click();
+    await expect(page.getByRole('status')).toHaveText('Saved.');
     expect(edited).toMatchObject({
       p_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      p_credit: 'Charlie Jenkins',
       p_caption: 'Match photo',
       p_storage_path: null,
       p_title: null,
       p_url: null,
     });
-    await expect(page.locator('[data-item]', { hasText: 'Match photo' })).toContainText('Pat Player');
+    await expect(page.locator('[data-item]', { hasText: 'Match photo' })).toContainText('Charlie Jenkins');
 
     const video = page.locator('[data-item]', { hasText: 'Shaky rally' });
     await video.getByRole('button', { name: 'Edit' }).click();
     const videoEditor = video.locator('[data-editor]');
-    await videoEditor.getByLabel('Caption').fill('Clean rally');
+    await videoEditor.getByLabel('Subject').fill('Clean rally');
     await videoEditor.locator('input[name="file"]').setInputFiles({
       name: 'rally.mp4',
       mimeType: 'video/mp4',
       buffer: Buffer.from('fake-video'),
     });
-    await videoEditor.getByRole('button', { name: 'Save' }).click();
-    await expect(page.getByRole('status')).toHaveText('Saved. The name on it is unchanged.');
-    expect(edited).toMatchObject({ p_id: videoId, p_caption: 'Clean rally', p_title: null, p_url: null, p_body: null });
+    await videoEditor.getByRole('button', { name: 'Save changes' }).click();
+    await expect(page.getByRole('status')).toHaveText('Saved.');
+    expect(edited).toMatchObject({
+      p_id: videoId,
+      p_credit: 'Pat Player',
+      p_caption: 'Clean rally',
+      p_title: null,
+      p_url: null,
+      p_body: null,
+    });
     const videoEdit = edited as Record<string, unknown> | null;
     expect(String(videoEdit?.p_storage_path)).toMatch(/^incoming\/[0-9a-f-]{36}\.mp4$/);
-    expect(edited).not.toHaveProperty('p_credit');
     await expect(page.locator('[data-item]', { hasText: 'Clean rally' })).toContainText('Pat Player');
 
     const saved = page.locator('[data-item]', { hasText: 'Close match' });
