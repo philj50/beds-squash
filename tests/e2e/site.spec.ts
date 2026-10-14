@@ -441,6 +441,7 @@ test.describe('Public site', () => {
     await articleEditor.getByLabel('Content').fill('This sentence is long enough to be an article for the site queue.');
     await articleEditor.getByRole('button', { name: 'Save changes' }).click();
     await expect(page.getByRole('status')).toHaveText('Saved.');
+    await expect(page.locator('[data-item]', { hasText: 'Close match' }).locator('[data-editor]')).toBeHidden();
     expect(Object.keys(edited ?? {}).sort()).toEqual(fields);
     expect(edited).toMatchObject({
       p_id: articleId,
@@ -485,7 +486,9 @@ test.describe('Public site', () => {
       p_title: null,
       p_url: null,
     });
-    await expect(page.locator('[data-item]', { hasText: 'Match photo' })).toContainText('Charlie Jenkins');
+    const savedPhoto = page.locator('[data-item]', { hasText: 'Match photo' });
+    await expect(savedPhoto.locator('[data-editor]')).toBeHidden();
+    await expect(savedPhoto).toContainText('Charlie Jenkins');
 
     const video = page.locator('[data-item]', { hasText: 'Shaky rally' });
     await video.getByRole('button', { name: 'Edit' }).click();

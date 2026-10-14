@@ -339,9 +339,32 @@ import { url } from '@/lib/site';
     if (!error && typeof oldPath === 'string' && oldPath && oldPath !== storagePath) {
       await supabase.storage.from('contributions').remove([oldPath]);
     }
-    statusEl.textContent = error ? error.message : 'Saved.';
-    if (!error) await loadItems();
-    return !error;
+    if (error) {
+      statusEl.textContent = error.message;
+      return false;
+    }
+    showSaved(form, credit, title, caption, body);
+    statusEl.textContent = 'Saved.';
+    await loadItems();
+    return true;
+  }
+
+  function showSaved(form: HTMLFormElement, credit: string, title: string | null, caption: string | null, body: string | null) {
+    const article = form.closest<HTMLElement>('[data-item]');
+    form.hidden = true;
+    if (!article) return;
+    const subject = title || caption;
+    const heading = article.querySelector('h3');
+    if (heading && subject) heading.textContent = subject;
+    const meta = article.querySelector<HTMLElement>(':scope > div > .hint');
+    if (meta) {
+      const when = (meta.textContent ?? '').split('·').slice(1).join('·').trim();
+      meta.textContent = when ? `${credit} · ${when}` : credit;
+    }
+    if (body) {
+      const preview = article.querySelector('.item__media p');
+      if (preview) preview.textContent = body.length > 280 ? `${body.slice(0, 280)}…` : body;
+    }
   }
 
   admin.addEventListener('submit', async (event) => {
