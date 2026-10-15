@@ -3,12 +3,13 @@ import Base from '@/layouts/Base.astro';
 import NewsCard from '@/components/NewsCard.astro';
 import EventCard from '@/components/EventCard.astro';
 import ClubMap from '@/components/ClubMap.astro';
-import { getNews, getUpcomingEvents, getClubs } from '@/lib/content';
+import PsaTour from '@/components/PsaTour.astro';
+import { getNews, getUpcomingEvents, getClubs, onMainNewsList } from '@/lib/content';
 import { toMapClubs } from '@/lib/geo';
 import { CATEGORY_LABEL, SITE, formatShort, url } from '@/lib/site';
 import { ruleFor, SINGLES_RULES_EDITION, SINGLES_RULES_URL } from '@/lib/squash-rules';
 
-const news = (await getNews()).filter((post) => post.data.category !== 'website');
+const news = (await getNews()).filter(onMainNewsList);
 const featured = news.find((p) => p.data.featured) ?? news[0];
 const latest = news.filter((p) => p.id !== featured?.id).slice(0, 3);
 const upcoming = (await getUpcomingEvents()).slice(0, 4);
@@ -190,6 +191,8 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
       </p>
     </div>
   </section>
+
+  <PsaTour compact />
 
   <!-- MAP -->
   <section class="section">

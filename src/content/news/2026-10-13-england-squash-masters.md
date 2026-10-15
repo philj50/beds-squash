@@ -4,7 +4,7 @@ date: 2026-10-13
 summary: The remaining England Squash Masters events for 2026-27, starting with the East of England regional at Grantham. Entries close at 6pm on Friday 16 October.
 image: /uploads/news/england-squash-masters.png
 imageAlt: England Squash Masters logo.
-category: england-squash
+category: wider
 ---
 
 England Squash Masters has asked counties to pass on the remaining events for the 2026-27 season to over-35 players.

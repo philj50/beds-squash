@@ -1,4 +1,4 @@
-import { getCollection } from 'astro:content';
+import { getCollection, type CollectionEntry } from 'astro:content';
 
 const startOfToday = () => {
   const d = new Date();
@@ -9,6 +9,11 @@ const startOfToday = () => {
 export async function getNews() {
   const posts = await getCollection('news', ({ data }) => !data.draft);
   return posts.sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+}
+
+/** Website notes sit under Website updates, unless one is raised onto the main list. */
+export function onMainNewsList(post: CollectionEntry<'news'>) {
+  return post.data.category !== 'website' || post.data.main;
 }
 
 export async function getEvents() {

@@ -116,6 +116,9 @@ test.describe('Public pages', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Events' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Junior County Closed' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Winter League 2026/27 begins' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'PSA tour in England' })).toBeVisible();
+    await expect(page.locator('#psa-tour a[href*="psasquashtour.com/tournament/"]').first()).toBeVisible();
+    await expect(page.locator('#psa-tour iframe')).toHaveAttribute('src', /youtube-nocookie\.com\/embed\//);
     const calendar = await page.request.get('events.ics');
     expect(calendar.ok()).toBeTruthy();
     const body = await calendar.text();
@@ -150,6 +153,11 @@ test.describe('Public pages', () => {
     for (const title of stories) {
       await expect(page.getByRole('link', { name: new RegExp(title, 'i') }).first()).toBeVisible();
     }
+    const mainNews = page.locator('[data-news-grid]');
+    await expect(mainNews.getByRole('link', { name: 'England dates from the PSA tour' })).toBeVisible();
+    await expect(mainNews.getByRole('link', { name: /SAM leads the Minigame/ })).toBeVisible();
+    await expect(page.locator('.website-updates').getByRole('link', { name: 'My Squash is coming soon' })).toBeVisible();
+    await expect(mainNews.getByRole('link', { name: 'My Squash is coming soon' })).toHaveCount(0);
     await page.getByRole('link', { name: 'Welcome to the new Bedfordshire Squash website' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Welcome to the new Bedfordshire Squash website' })).toBeVisible();
     await expect(page.locator('article time').first()).toHaveText('26 September 2026');

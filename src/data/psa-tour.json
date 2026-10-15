@@ -1,0 +1,67 @@
+{
+  "checkedAt": "2026-10-15T09:52:20.766Z",
+  "events": [
+    {
+      "title": "London Open 2026",
+      "start": "2026-11-04",
+      "end": "2026-11-08",
+      "venue": "London",
+      "level": "",
+      "prize": "$18,000",
+      "url": "https://www.psasquashtour.com/tournament/london-open-2026/"
+    },
+    {
+      "title": "GMS Accountants Sports Academy Open 2026",
+      "start": "2026-11-06",
+      "end": "2026-11-08",
+      "venue": "Cambridgeshire",
+      "level": "",
+      "prize": "$1,426",
+      "url": "https://www.psasquashtour.com/tournament/gms-accountants-sports-academy-open-2026/"
+    },
+    {
+      "title": "PSA World Championships 2026-2027",
+      "start": "2027-03-27",
+      "end": "2027-04-04",
+      "venue": "London",
+      "level": "World Championships",
+      "prize": "$710,000",
+      "url": "https://www.psasquashtour.com/tournament/psa-world-championships-2026-2027/"
+    },
+    {
+      "title": "British Open 2027",
+      "start": "2027-05-26",
+      "end": "2027-06-06",
+      "venue": "Birmingham",
+      "level": "Diamond",
+      "prize": "$371,500",
+      "url": "https://www.psasquashtour.com/tournament/british-open-2027/"
+    }
+  ],
+  "videos": [
+    {
+      "id": "8hEoXsWlq8E",
+      "title": "🇪🇬 Orfi v Kennedy 🏴󠁧󠁢󠁥󠁮󠁧󠁿 | Egyptian Open 2026 | QUARTER FINAL HIGHLIGHTS",
+      "published": "2026-10-15T08:55:48+00:00",
+      "url": "https://www.youtube.com/watch?v=8hEoXsWlq8E"
+    },
+    {
+      "id": "wJG1g-_L3DA",
+      "title": "🇪🇬 Gohar v ElSherbini 🇪🇬 | Egyptian Open 2026 | QUARTER FIANL HIGHLIGHTS",
+      "published": "2026-10-15T08:55:45+00:00",
+      "url": "https://www.youtube.com/watch?v=wJG1g-_L3DA"
+    },
+    {
+      "id": "MlA8M2H7J5E",
+      "title": "🇫🇷 Crouin v Coll 🇳🇿 | Egyptian Open 2026 | QUARTER FINAL HIGHLIGHTS",
+      "published": "2026-10-15T08:55:43+00:00",
+      "url": "https://www.youtube.com/watch?v=MlA8M2H7J5E"
+    },
+    {
+      "id": "m8eWGRtsz-M",
+      "title": "COURTSIDE: The return of Gohar V ElSherbini - The greatest rivalry of all time ⁉️🤔",
+      "published": "2026-10-14T16:06:14+00:00",
+      "url": "https://www.youtube.com/watch?v=m8eWGRtsz-M"
+    }
+  ]
+}

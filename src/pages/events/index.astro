@@ -2,6 +2,7 @@
 import Base from '@/layouts/Base.astro';
 import PageHero from '@/components/PageHero.astro';
 import EventCard from '@/components/EventCard.astro';
+import PsaTour from '@/components/PsaTour.astro';
 import { getUpcomingEvents, getPastEvents } from '@/lib/content';
 import { SITE, SOURCE_LABEL, url } from '@/lib/site';
 
@@ -64,6 +65,8 @@ const sources = [...new Set(upcoming.map((e) => e.data.source))];
       }
     </div>
   </section>
+
+  <PsaTour />
 
   {
     past.length > 0 && (

@@ -13,6 +13,10 @@ export const SITE = {
   englandSquash: 'https://www.englandsquash.com/',
   englandSquashEvents: 'https://www.englandsquash.com/competitions/calendar',
   englandSquashMasters: 'https://www.englandsquashmasters.co.uk/',
+  psaTour: 'https://www.psasquashtour.com/tournaments/',
+  squashTv: 'https://www.squash.tv/schedule/',
+  squashTvFree: 'https://www.squash.tv/free-for-you/',
+  squashTvYoutube: 'https://www.youtube.com/psasquashtv',
 };
 
 type NavItem = { label: string; href: string; signedIn?: boolean; more?: boolean };
@@ -87,7 +91,7 @@ export const CATEGORY_LABEL: Record<string, string> = {
   county: 'County',
   leagues: 'Leagues',
   tournaments: 'Tournaments',
-  'england-squash': 'England Squash',
+  wider: 'Wider squash',
   clubs: 'Clubs',
   website: 'Website',
 };
