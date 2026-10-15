@@ -898,7 +898,7 @@ summary: ${JSON.stringify(article.summary)}
 image: ${picture.image}
 imageAlt: ${JSON.stringify(picture.imageAlt)}
 category: ${article.category ?? 'leagues'}
-featured: false
+${article.main ? 'main: true\n' : ''}featured: false
 draft: false
 ---
 
@@ -1068,7 +1068,8 @@ function minigameArticle(leaders, today) {
       'The board beside the court shows the ten highest scores. A higher score takes the lead.',
     ].join('\n'),
     articleOn: today,
-    category: 'county',
+    category: 'website',
+    main: true,
     image: '/uploads/news/minigame-mk3.jpg',
     imageAlt: 'A top-down Halloween squash court with orange lines, cobwebs, lanterns, a purple racket, and a ball in the air above its shadow.',
   };

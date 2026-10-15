@@ -62,16 +62,13 @@ collections:
       - label: Category
         name: category
         widget: select
-        default: county
+        default: leagues
         hint: Wider squash is for squash outside Bedfordshire, such as England Squash or the PSA tour.
         options:
-          - { label: County, value: county }
-          - { label: Juniors, value: juniors }
           - { label: Leagues, value: leagues }
+          - { label: Juniors, value: juniors }
           - { label: Tournaments, value: tournaments }
           - { label: Wider squash, value: wider }
-          - { label: Clubs, value: clubs }
-          - { label: Racketball, value: racketball }
           - { label: Website, value: website }
       - { label: Image, name: image, widget: image, required: false, hint: 'Landscape photos work best (16:9). Keep under ~1MB.' }
       - { label: Image description, name: imageAlt, widget: string, required: false, hint: 'Describe the photo for screen readers.' }

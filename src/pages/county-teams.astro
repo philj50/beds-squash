@@ -2,11 +2,11 @@
 import Base from '@/layouts/Base.astro';
 import ContentPage from '@/components/ContentPage.astro';
 import EventCard from '@/components/EventCard.astro';
-import { getNews, getUpcomingEvents } from '@/lib/content';
+import { getUpcomingEvents } from '@/lib/content';
 import { url } from '@/lib/site';
 
 const weekends = (await getUpcomingEvents()).filter((e) => e.data.source === 'inter-county' || e.data.category === 'masters').slice(0, 4);
-const reports = (await getNews()).filter((n) => n.data.category === 'county').slice(0, 4);
+const reports: { id: string; data: { title: string } }[] = [];
 ---
 
 <Base title="Bedfordshire county squash teams" description="Bedfordshire county squash teams in the England Squash Inter-County Championships, including senior results and the racketball county team." crumbs={[{ name: 'County Teams', path: '/county-teams/' }]}>

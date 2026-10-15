@@ -88,13 +88,14 @@ export const CATEGORY_LABEL: Record<string, string> = {
   social: 'Social',
   racketball: 'Racketball',
   other: 'Event',
-  county: 'County',
   leagues: 'Leagues',
   tournaments: 'Tournaments',
   wider: 'Wider squash',
-  clubs: 'Clubs',
   website: 'Website',
 };
+
+/** News filters, in the order they appear on the news page. */
+export const NEWS_CATEGORIES = ['leagues', 'juniors', 'tournaments', 'wider', 'website'] as const;
 
 export const DOC_CATEGORY_LABEL: Record<string, string> = {
   constitution: 'Constitution',

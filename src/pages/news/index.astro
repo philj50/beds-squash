@@ -2,14 +2,14 @@
 import Base from '@/layouts/Base.astro';
 import PageHero from '@/components/PageHero.astro';
 import NewsCard from '@/components/NewsCard.astro';
-import { getNews, onMainNewsList } from '@/lib/content';
-import { CATEGORY_LABEL, url } from '@/lib/site';
+import { getNews } from '@/lib/content';
+import { CATEGORY_LABEL, NEWS_CATEGORIES, url } from '@/lib/site';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 const posts = await getNews();
-const updates = posts.filter((post) => post.data.category === 'website' && !post.data.main);
-const reports = posts.filter(onMainNewsList);
-const categories = [...new Set(reports.map((p) => p.data.category))];
+const reports = posts;
+const used = new Set(reports.map((post) => post.data.category));
+const categories = NEWS_CATEGORIES.filter((category) => used.has(category));
 ---
 
 <Base title="Bedfordshire squash news" description="News from Bedfordshire Squash — tournaments, leagues, juniors, county teams and England Squash updates." crumbs={[{ name: 'News', path: '/news/' }]}>
@@ -47,21 +47,6 @@ const categories = [...new Set(reports.map((p) => p.data.category))];
           <div class="grid grid--3" data-match-history-grid></div>
         </details>
       </div>
-      {
-        updates.length > 0 && (
-          <div class="website-updates">
-            <div class="section-head">
-              <h2>Website updates</h2>
-            </div>
-            <p class="updates-lede">What has changed on this site, written for players and captains.</p>
-            <div class="grid grid--3">
-              {updates.map((post) => (
-                <NewsCard post={post} />
-              ))}
-            </div>
-          </div>
-        )
-      }
     </div>
   </section>
   <section class="section" id="shared-news" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} hidden>
@@ -77,6 +62,19 @@ const categories = [...new Set(reports.map((p) => p.data.category))];
 
 <script>
   import { createClient } from '@supabase/supabase-js';
+
+  const buttons = document.querySelectorAll<HTMLButtonElement>('[data-filter]');
+  const items = document.querySelectorAll<HTMLElement>('[data-news-grid] > [data-category]');
+  buttons.forEach((b) =>
+    b.addEventListener('click', () => {
+      buttons.forEach((x) => x.classList.toggle('is-active', x === b));
+      const f = b.dataset.filter;
+      items.forEach((it) => {
+        if (it.closest('[data-match-history]')) return;
+        it.hidden = f !== 'all' && it.dataset.category !== f;
+      });
+    }),
+  );
 
   const shared = document.getElementById('shared-news');
   if (shared) {
@@ -104,19 +102,6 @@ const categories = [...new Set(reports.map((p) => p.data.category))];
       shared.hidden = false;
     }
   }
-
-  const buttons = document.querySelectorAll<HTMLButtonElement>('[data-filter]');
-  const items = document.querySelectorAll<HTMLElement>('[data-news-grid] > [data-category]');
-  buttons.forEach((b) =>
-    b.addEventListener('click', () => {
-      buttons.forEach((x) => x.classList.toggle('is-active', x === b));
-      const f = b.dataset.filter;
-      items.forEach((it) => {
-        if (it.closest('[data-match-history]')) return;
-        it.hidden = f !== 'all' && it.dataset.category !== f;
-      });
-    }),
-  );
 </script>
 
 <style>
@@ -134,12 +119,14 @@ const categories = [...new Set(reports.map((p) => p.data.category))];
     padding: 0.4rem 0.9rem;
     font-size: 0.85rem;
   }
+  [data-news-grid] > [hidden] {
+    display: none;
+  }
   .filters .pill.is-active {
     background: var(--accent);
     color: var(--ink-950);
     border-color: var(--accent);
   }
-  .website-updates,
   .match-history {
     margin-top: 2.5rem;
     padding-top: 1.5rem;
