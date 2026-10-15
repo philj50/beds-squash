@@ -62,7 +62,6 @@ collections:
       - label: Category
         name: category
         widget: select
-        default: leagues
         hint: Wider squash is for squash outside Bedfordshire, such as England Squash or the PSA tour.
         options:
           - { label: Leagues, value: leagues }

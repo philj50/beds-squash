@@ -21,9 +21,7 @@ const news = defineCollection({
     summary: z.string().max(280).optional(),
     image: uploadPath.optional(),
     imageAlt: z.string().optional(),
-    category: z
-      .enum(['leagues', 'juniors', 'tournaments', 'wider', 'website'])
-      .default('leagues'),
+    category: z.enum(['leagues', 'juniors', 'tournaments', 'wider', 'website']),
     featured: z.boolean().default(false),
     main: z.boolean().default(false),
     draft: z.boolean().default(false),

@@ -145,16 +145,15 @@ test.describe('Public pages', () => {
   test('news links to each story, and a story shows its date', async ({ page }) => {
     await open(page, 'news/');
     await expect(page.getByRole('heading', { level: 1, name: 'News' })).toBeVisible();
-    const stories = [
-      'Welcome to the new Bedfordshire Squash website',
-      'Entries open for the Junior County Closed',
-      'Guy Mercer beat Simon Bloomfield',
-    ];
-    for (const title of stories) {
-      await expect(page.getByRole('link', { name: new RegExp(title, 'i') }).first()).toBeVisible();
-    }
     const mainNews = page.locator('[data-news-grid]');
-    await expect(page.locator('[data-filter]')).toHaveText(['All', 'Leagues', 'Juniors', 'Tournaments', 'Wider squash', 'Website']);
+    await expect(page.locator('[data-filter]')).toHaveText(['Leagues', 'Juniors', 'Tournaments', 'Wider squash', 'Website', 'All']);
+    await expect(page.locator('[data-filter="leagues"]')).toHaveClass(/is-active/);
+    await expect(mainNews.getByRole('link', { name: /Guy Mercer beat Simon Bloomfield/ })).toBeVisible();
+    await expect(mainNews.getByRole('link', { name: 'Entries open for the Junior County Closed' })).toBeHidden();
+    await expect(mainNews.getByRole('link', { name: 'Welcome to the new Bedfordshire Squash website' })).toBeHidden();
+    await page.getByRole('button', { name: 'Juniors' }).click();
+    await expect(mainNews.getByRole('link', { name: 'Entries open for the Junior County Closed' })).toBeVisible();
+    await page.getByRole('button', { name: 'All' }).click();
     await expect(mainNews.getByRole('link', { name: 'England dates from the PSA tour' })).toBeVisible();
     await expect(mainNews.getByRole('link', { name: /SAM leads the Minigame/ })).toBeVisible();
     await expect(mainNews.getByRole('link', { name: 'My Squash is coming soon' })).toBeVisible();

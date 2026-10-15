@@ -10,6 +10,7 @@ const posts = await getNews();
 const reports = posts;
 const used = new Set(reports.map((post) => post.data.category));
 const categories = NEWS_CATEGORIES.filter((category) => used.has(category));
+const opening = categories.includes('leagues') ? 'leagues' : 'all';
 ---
 
 <Base title="Bedfordshire squash news" description="News from Bedfordshire Squash — tournaments, leagues, juniors, county teams and England Squash updates." crumbs={[{ name: 'News', path: '/news/' }]}>
@@ -19,19 +20,19 @@ const categories = NEWS_CATEGORIES.filter((category) => used.has(category));
       {
         categories.length > 1 && (
           <div class="filters" role="group" aria-label="Filter by category">
-            <button class="pill is-active" data-filter="all" type="button">All</button>
             {categories.map((c) => (
-              <button class="pill" data-filter={c} type="button">
+              <button class:list={['pill', { 'is-active': c === opening }]} data-filter={c} type="button">
                 {CATEGORY_LABEL[c] ?? c}
               </button>
             ))}
+            <button class:list={['pill', { 'is-active': opening === 'all' }]} data-filter="all" type="button">All</button>
           </div>
         )
       }
       <div class="grid grid--3" data-news-grid>
         {
           reports.map((p) => (
-            <div data-category={p.data.category}>
+            <div data-category={p.data.category} hidden={opening !== 'all' && p.data.category !== opening}>
               <NewsCard post={p} />
             </div>
           ))
