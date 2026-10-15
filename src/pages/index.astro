@@ -145,7 +145,7 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
   <!-- NEWS -->
   {
     featured && (
-      <section class="section">
+      <section class="section" data-home-news>
         <div class="container">
           <div class="section-head">
             <h2>Latest news</h2>
@@ -625,13 +625,13 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
 
   const root = document.querySelector('[data-now]');
   if (root instanceof HTMLElement) {
-    const items = [...root.querySelectorAll<HTMLElement>('[data-now-item]')];
+    let items = [...root.querySelectorAll<HTMLElement>('[data-now-item]')];
     const meter = root.querySelector<HTMLElement>('[data-now-meter]');
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (items.length > 2) {
       const hold = 10 * 60 * 1000;
       root.style.setProperty('--now-hold', `${hold}ms`);
-      const pages = Math.ceil(items.length / 2);
+      let pages = Math.ceil(items.length / 2);
       let page = 0;
       let timer = 0;
       let paused = false;
@@ -726,6 +726,17 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
         },
         true,
       );
+
+      document.addEventListener('beds-match-places', () => {
+        items = items.filter((item) => item.isConnected);
+        pages = Math.ceil(items.length / 2);
+        if (pages < 1) {
+          root.hidden = true;
+          stop();
+          return;
+        }
+        show(Math.min(page, pages - 1));
+      });
 
       root.classList.add('now--live');
       show(0);

@@ -156,6 +156,27 @@ test.describe('Public pages', () => {
     await expect(page.locator('[data-article-slug] .pill')).toHaveText('County');
   });
 
+  test('an archived match stays in the news list and a deleted match leaves the site', async ({ page }) => {
+    await page.route('**/rpc/match_article_places', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          { slug: '2026-10-13-jenkins-gibson', place: 'history' },
+          { slug: '2026-08-11-league-match', place: 'gone' },
+        ]),
+      }),
+    );
+    await open(page);
+    await expect(page.locator('[data-now] a[href*="2026-10-13-jenkins-gibson"]')).toHaveCount(0);
+    await expect(page.locator('[data-home-news] a[href*="2026-10-13-jenkins-gibson"]')).toHaveCount(0);
+    await open(page, 'news/');
+    await expect(page.getByRole('link', { name: /Charlie Jenkins beat David Gibson/i }).first()).toBeVisible();
+    await expect(page.locator('[data-news-grid] a[href*="2026-08-11-league-match"]')).toHaveCount(0);
+    await open(page, 'news/2026-08-11-league-match/');
+    await expect(page.locator('[data-article-body]')).toHaveText('This match article has been taken off the site.');
+  });
+
   test('the juniors page links to the entry form and not the missing codes of conduct', async ({ page }) => {
     await open(page, 'juniors/');
     await expect(page.getByRole('heading', { level: 1, name: 'Juniors' })).toBeVisible();

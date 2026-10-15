@@ -547,12 +547,13 @@ test.describe('Public site', () => {
       id: 6,
       article_on: '2026-07-28',
       slug: '2026-07-28-league-match',
-      status: 'published',
+      status: 'published' as string,
       title: 'Charlie Jenkins beat James O\'Connor in Division 2',
       summary: 'A short summary of the match that is long enough.',
       body: 'Charlie Jenkins beat James O\'Connor in Division 2.\n\nThe scorecard is on the league tables.\n\n<!-- match-picture: close -->',
     };
     let edited: Record<string, unknown> | null = null;
+    const places: { p_id?: number; p_place?: string }[] = [];
     await page.addInitScript((stored) => {
       localStorage.setItem('sb-klxyjmwiaivvqjbhxzak-auth-token', JSON.stringify(stored));
     }, session);
@@ -583,6 +584,15 @@ test.describe('Public site', () => {
         await send(null);
         return;
       }
+      if (url.pathname.endsWith('/rpc/set_match_article_place') && request.method() === 'POST') {
+        const body = request.postDataJSON() as { p_id?: number; p_place?: string };
+        places.push(body);
+        if (body.p_place === 'archive') article.status = 'archived';
+        if (body.p_place === 'home') article.status = 'published';
+        if (body.p_place === 'delete') article.status = 'deleted';
+        await send(null);
+        return;
+      }
       await send([]);
     });
 
@@ -608,6 +618,21 @@ test.describe('Public site', () => {
       p_summary: article.summary,
       p_body: `${nextBody}\n\n<!-- match-picture: close -->`,
     });
+
+    const savedRow = page.locator('tr', { hasText: nextTitle });
+    await savedRow.getByRole('button', { name: 'Archive' }).click();
+    await expect(page.getByRole('status')).toHaveText('Archived. It stays in the news list and is off the home page.');
+    await expect(savedRow.getByRole('cell', { name: 'In the news list' })).toBeVisible();
+    await expect(savedRow.getByRole('button', { name: 'Show on home' })).toBeVisible();
+    page.once('dialog', (dialog) => dialog.accept());
+    await savedRow.getByRole('button', { name: 'Delete' }).click();
+    await expect(page.getByRole('status')).toHaveText('Deleted. It is off the site.');
+    await expect(savedRow.getByRole('cell', { name: 'Removed' })).toBeVisible();
+    await expect(savedRow.getByRole('button', { name: 'Delete' })).toHaveCount(0);
+    expect(places).toEqual([
+      { p_id: 6, p_place: 'archive' },
+      { p_id: 6, p_place: 'delete' },
+    ]);
   });
 
   test('a signed-in account with no role cannot send content', async ({ page }) => {

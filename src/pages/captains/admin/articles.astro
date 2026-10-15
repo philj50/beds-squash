@@ -11,7 +11,7 @@ import { url } from '@/lib/site';
       <p class="lede">
         One article a day, and only when a league match was played. Automatic publishing is on to start with.
         Switch to manual and a match waits here until you approve it. Open Edit to change the subject, summary and text.
-        Nothing is emailed.
+        Archive takes it off the home page and leaves it in the news list. Delete takes it off the site. Nothing is emailed.
       </p>
       <p class="status" data-status role="status"></p>
 
@@ -66,7 +66,7 @@ import { url } from '@/lib/site';
     title: string;
     summary: string | null;
     body: string | null;
-    status: 'held' | 'approved' | 'published';
+    status: 'held' | 'approved' | 'published' | 'archived' | 'deleted';
     slug: string;
   };
 
@@ -109,7 +109,7 @@ import { url } from '@/lib/site';
   }
 
   function editor(article: Article) {
-    const lead = article.status === 'published'
+    const lead = article.status === 'published' || article.status === 'archived'
       ? 'Change the subject, summary and text in the boxes below. Save changes updates this article on the site.'
       : 'Change the subject, summary and text in the boxes below. Save changes keeps them. Approve publishes the article.';
     return `<tr data-editor-row="${article.id}" hidden><td colspan="4"><form class="stack editor" data-editor="${article.id}" data-picture="${escapeHtml(pictureNote(article.body))}">
@@ -136,10 +136,30 @@ import { url } from '@/lib/site';
       return;
     }
     const button = target.closest<HTMLButtonElement>('[data-approve]');
-    if (!button) return;
-    statusEl.textContent = 'Approving…';
-    const { error } = await supabase.rpc('approve_match_article', { p_id: Number(button.dataset.approve) });
-    statusEl.textContent = error ? error.message : 'Approved. It will be published on the next daily run.';
+    if (button) {
+      statusEl.textContent = 'Approving…';
+      const { error } = await supabase.rpc('approve_match_article', { p_id: Number(button.dataset.approve) });
+      statusEl.textContent = error ? error.message : 'Approved. It will be published on the next daily run.';
+      if (!error) await showSession();
+      return;
+    }
+    const placeButton = target.closest<HTMLButtonElement>('[data-place]');
+    if (!placeButton?.dataset.place || !placeButton.dataset.id) return;
+    const place = placeButton.dataset.place;
+    const title = placeButton.dataset.title ?? 'this article';
+    if (place === 'delete' && !window.confirm(`Remove “${title}” from the site? It leaves the home page and the news list.`)) return;
+    const waiting = place === 'archive' ? 'Archiving…' : place === 'home' ? 'Putting it back…' : 'Deleting…';
+    const done = place === 'archive'
+      ? 'Archived. It stays in the news list and is off the home page.'
+      : place === 'home'
+        ? 'It is back on the home page.'
+        : 'Deleted. It is off the site.';
+    statusEl.textContent = waiting;
+    const { error } = await supabase.rpc('set_match_article_place', {
+      p_id: Number(placeButton.dataset.id),
+      p_place: place,
+    });
+    statusEl.textContent = error ? error.message : done;
     if (!error) await showSession();
   });
 
@@ -230,11 +250,30 @@ import { url } from '@/lib/site';
       statusEl.textContent = error.message;
       return;
     }
+    const placeLabel: Record<Article['status'], string> = {
+      held: 'Waiting',
+      approved: 'Approved',
+      published: 'On the home page',
+      archived: 'In the news list',
+      deleted: 'Removed',
+    };
     rows.innerHTML = (articles as Article[]).map((article) => {
       const approve = article.status === 'held'
         ? `<button class="btn btn--ghost btn--sm" type="button" data-approve="${article.id}">Approve</button>`
         : '';
-      return `<tr><td>${escapeHtml(article.article_on)}</td><td data-title-for="${article.id}">${escapeHtml(article.title)}</td><td>${escapeHtml(article.status)}</td><td><button class="btn btn--ghost btn--sm" type="button" data-edit="${article.id}">Edit</button>${approve}</td></tr>${editor(article)}`;
+      const archive = article.status === 'published'
+        ? `<button class="btn btn--ghost btn--sm" type="button" data-place="archive" data-id="${article.id}" data-title="${escapeHtml(article.title)}">Archive</button>`
+        : '';
+      const restore = article.status === 'archived'
+        ? `<button class="btn btn--ghost btn--sm" type="button" data-place="home" data-id="${article.id}" data-title="${escapeHtml(article.title)}">Show on home</button>`
+        : '';
+      const remove = article.status === 'deleted'
+        ? ''
+        : `<button class="btn btn--ghost btn--sm" type="button" data-place="delete" data-id="${article.id}" data-title="${escapeHtml(article.title)}">Delete</button>`;
+      const edit = article.status === 'deleted'
+        ? ''
+        : `<button class="btn btn--ghost btn--sm" type="button" data-edit="${article.id}">Edit</button>`;
+      return `<tr><td>${escapeHtml(article.article_on)}</td><td data-title-for="${article.id}">${escapeHtml(article.title)}</td><td>${escapeHtml(placeLabel[article.status])}</td><td class="actions">${edit}${approve}${archive}${restore}${remove}</td></tr>${article.status === 'deleted' ? '' : editor(article)}`;
     }).join('') || '<tr><td colspan="4">No articles yet.</td></tr>';
   }
 

@@ -48,6 +48,40 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       return match?.[1] ?? '';
     }
 
+    function removeCard(link: HTMLAnchorElement) {
+      const card = link.closest('article.news-card');
+      const wrap = card?.parentElement?.matches('[data-category]') ? card.parentElement : null;
+      (wrap ?? card)?.remove();
+    }
+
+    function applyPlaces(places: { slug: string; place: string }[]) {
+      const history = new Set(places.filter((row) => row.place === 'history' && row.slug).map((row) => row.slug));
+      const gone = new Set(places.filter((row) => row.place === 'gone' && row.slug).map((row) => row.slug));
+      if (!history.size && !gone.size) return;
+      document.querySelectorAll<HTMLAnchorElement>('a[href*="/news/"]').forEach((link) => {
+        const slug = slugFrom(link.getAttribute('href') ?? '');
+        if (!slug) return;
+        const ticker = link.closest<HTMLElement>('[data-now-item]');
+        if (history.has(slug) && (link.closest('[data-home-news]') || ticker)) {
+          if (ticker) ticker.remove();
+          else removeCard(link);
+          return;
+        }
+        if (gone.has(slug)) {
+          if (ticker) ticker.remove();
+          else removeCard(link);
+        }
+      });
+      const page = document.querySelector<HTMLElement>('[data-article-slug]');
+      if (page && gone.has(page.dataset.articleSlug ?? '')) {
+        const body = page.querySelector('[data-article-body]');
+        if (body) body.innerHTML = '<p>This match article has been taken off the site.</p>';
+        const summary = page.querySelector<HTMLElement>('[data-article-summary]');
+        if (summary) summary.hidden = true;
+      }
+      document.dispatchEvent(new Event('beds-match-places'));
+    }
+
     function apply(rows: Row[]) {
       const bySlug = new Map(rows.filter((row) => row.slug && row.title && row.body).map((row) => [row.slug, row]));
       if (!bySlug.size) return;
@@ -73,7 +107,11 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       document.title = `${row.title} · Bedfordshire Squash`;
     }
 
-    const { data, error } = await supabase.rpc('published_match_articles');
+    const [{ data, error }, places] = await Promise.all([
+      supabase.rpc('published_match_articles'),
+      supabase.rpc('match_article_places'),
+    ]);
     if (!error && Array.isArray(data)) apply(data as Row[]);
+    if (!places.error && Array.isArray(places.data)) applyPlaces(places.data as { slug: string; place: string }[]);
   }
 </script>
