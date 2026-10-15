@@ -39,11 +39,13 @@ const categories = [...new Set(reports.map((p) => p.data.category))];
       </div>
       {reports.length === 0 && <p class="notice">No news yet.</p>}
       <div class="match-history" data-match-history hidden>
-        <div class="section-head">
-          <h2>Match history</h2>
-        </div>
-        <p class="updates-lede">Earlier match reports, kept here after they leave the home page.</p>
-        <div class="grid grid--3" data-match-history-grid></div>
+        <details class="match-history__fold">
+          <summary>
+            <span class="match-history__title">Match history</span>
+          </summary>
+          <p class="updates-lede">Earlier match reports, kept here after they leave the home page.</p>
+          <div class="grid grid--3" data-match-history-grid></div>
+        </details>
       </div>
       {
         updates.length > 0 && (
@@ -145,6 +147,56 @@ const categories = [...new Set(reports.map((p) => p.data.category))];
   }
   .match-history[hidden] {
     display: none;
+  }
+  .match-history__fold {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-card);
+  }
+  .match-history__fold summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 0.85rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .match-history__fold summary::-webkit-details-marker {
+    display: none;
+  }
+  .match-history__title {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.35rem;
+    position: relative;
+    padding-left: 0.9rem;
+  }
+  .match-history__title::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.15em;
+    bottom: 0.1em;
+    width: 4px;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+  .match-history__fold summary::after {
+    content: 'Show';
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--ink-200);
+  }
+  .match-history__fold[open] summary::after {
+    content: 'Hide';
+  }
+  .match-history__fold .updates-lede,
+  .match-history__fold .grid {
+    margin-inline: 1rem;
+  }
+  .match-history__fold .grid {
+    margin-bottom: 1rem;
   }
   .updates-lede {
     margin: -0.4rem 0 1rem;
