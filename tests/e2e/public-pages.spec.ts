@@ -171,7 +171,8 @@ test.describe('Public pages', () => {
     await expect(page.locator('[data-now] a[href*="2026-10-13-jenkins-gibson"]')).toHaveCount(0);
     await expect(page.locator('[data-home-news] a[href*="2026-10-13-jenkins-gibson"]')).toHaveCount(0);
     await open(page, 'news/');
-    await expect(page.getByRole('link', { name: /Charlie Jenkins beat David Gibson/i }).first()).toBeVisible();
+    await expect(page.locator('[data-news-grid] a[href*="2026-10-13-jenkins-gibson"]')).toHaveCount(0);
+    await expect(page.locator('[data-match-history]').getByRole('link', { name: /Charlie Jenkins beat David Gibson/i })).toBeVisible();
     await expect(page.locator('[data-news-grid] a[href*="2026-08-11-league-match"]')).toHaveCount(0);
     await open(page, 'news/2026-08-11-league-match/');
     await expect(page.locator('[data-article-body]')).toHaveText('This match article has been taken off the site.');

@@ -62,9 +62,20 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
         const slug = slugFrom(link.getAttribute('href') ?? '');
         if (!slug) return;
         const ticker = link.closest<HTMLElement>('[data-now-item]');
-        if (history.has(slug) && (link.closest('[data-home-news]') || ticker)) {
+        if (history.has(slug)) {
+          if (link.closest('[data-match-history]')) return;
+          const inNews = link.closest('[data-news-grid]');
+          const historyGrid = document.querySelector('[data-match-history-grid]');
+          const historySection = document.querySelector<HTMLElement>('[data-match-history]');
+          if (inNews && historyGrid && historySection) {
+            const card = link.closest('article.news-card');
+            const wrap = card?.parentElement?.matches('[data-category]') ? card.parentElement : card;
+            if (wrap && !historyGrid.contains(wrap)) historyGrid.appendChild(wrap);
+            historySection.hidden = false;
+            return;
+          }
           if (ticker) ticker.remove();
-          else removeCard(link);
+          else if (link.closest('[data-home-news]') || link.closest('article.news-card')) removeCard(link);
           return;
         }
         if (gone.has(slug)) {

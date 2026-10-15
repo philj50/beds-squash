@@ -38,6 +38,13 @@ const categories = [...new Set(reports.map((p) => p.data.category))];
         }
       </div>
       {reports.length === 0 && <p class="notice">No news yet.</p>}
+      <div class="match-history" data-match-history hidden>
+        <div class="section-head">
+          <h2>Match history</h2>
+        </div>
+        <p class="updates-lede">Earlier match reports, kept here after they leave the home page.</p>
+        <div class="grid grid--3" data-match-history-grid></div>
+      </div>
       {
         updates.length > 0 && (
           <div class="website-updates">
@@ -102,7 +109,10 @@ const categories = [...new Set(reports.map((p) => p.data.category))];
     b.addEventListener('click', () => {
       buttons.forEach((x) => x.classList.toggle('is-active', x === b));
       const f = b.dataset.filter;
-      items.forEach((it) => (it.hidden = f !== 'all' && it.dataset.category !== f));
+      items.forEach((it) => {
+        if (it.closest('[data-match-history]')) return;
+        it.hidden = f !== 'all' && it.dataset.category !== f;
+      });
     }),
   );
 </script>
@@ -127,10 +137,14 @@ const categories = [...new Set(reports.map((p) => p.data.category))];
     color: var(--ink-950);
     border-color: var(--accent);
   }
-  .website-updates {
+  .website-updates,
+  .match-history {
     margin-top: 2.5rem;
     padding-top: 1.5rem;
     border-top: 1px solid var(--border);
+  }
+  .match-history[hidden] {
+    display: none;
   }
   .updates-lede {
     margin: -0.4rem 0 1rem;

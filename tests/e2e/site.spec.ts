@@ -621,8 +621,8 @@ test.describe('Public site', () => {
 
     const savedRow = page.locator('tr', { hasText: nextTitle });
     await savedRow.getByRole('button', { name: 'Archive' }).click();
-    await expect(page.getByRole('status')).toHaveText('Archived. It stays in the news list and is off the home page.');
-    await expect(savedRow.getByRole('cell', { name: 'In the news list' })).toBeVisible();
+    await expect(page.getByRole('status')).toHaveText('Archived. It is off the home page and filed under Match history.');
+    await expect(savedRow.getByRole('cell', { name: 'Match history' })).toBeVisible();
     await expect(savedRow.getByRole('button', { name: 'Show on home' })).toBeVisible();
     page.once('dialog', (dialog) => dialog.accept());
     await savedRow.getByRole('button', { name: 'Delete' }).click();

@@ -11,7 +11,7 @@ import { url } from '@/lib/site';
       <p class="lede">
         One article a day, and only when a league match was played. Automatic publishing is on to start with.
         Switch to manual and a match waits here until you approve it. Open Edit to change the subject, summary and text.
-        Archive takes it off the home page and leaves it in the news list. Delete takes it off the site. Nothing is emailed.
+        Archive takes it off the home page and files it under Match history. Delete takes it off the site. Nothing is emailed.
       </p>
       <p class="status" data-status role="status"></p>
 
@@ -150,7 +150,7 @@ import { url } from '@/lib/site';
     if (place === 'delete' && !window.confirm(`Remove “${title}” from the site? It leaves the home page and the news list.`)) return;
     const waiting = place === 'archive' ? 'Archiving…' : place === 'home' ? 'Putting it back…' : 'Deleting…';
     const done = place === 'archive'
-      ? 'Archived. It stays in the news list and is off the home page.'
+      ? 'Archived. It is off the home page and filed under Match history.'
       : place === 'home'
         ? 'It is back on the home page.'
         : 'Deleted. It is off the site.';
@@ -254,7 +254,7 @@ import { url } from '@/lib/site';
       held: 'Waiting',
       approved: 'Approved',
       published: 'On the home page',
-      archived: 'In the news list',
+      archived: 'Match history',
       deleted: 'Removed',
     };
     rows.innerHTML = (articles as Article[]).map((article) => {
