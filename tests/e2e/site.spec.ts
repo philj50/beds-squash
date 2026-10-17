@@ -218,14 +218,14 @@ test.describe('Public site', () => {
     await open(page, 'leagues/results/');
     await expect(page.getByRole('heading', { level: 1 })).toContainText(/Leagues and fixtures/i);
     await expect(page.getByRole('main').getByRole('link', { name: 'Leagues and fixtures' })).toHaveClass(/btn--primary/);
-    await expect(page.getByRole('main').getByRole('link', { name: 'League rules' })).not.toHaveClass(/btn--primary/);
+    await expect(page.getByRole('main').getByRole('link', { name: 'League rules', exact: true })).not.toHaveClass(/btn--primary/);
     await expect(page.locator('#results-app')).toBeVisible();
     await expect(page.getByRole('main').getByRole('link', { name: 'League Master ↗' })).toHaveAttribute(
       'href',
       /^https:\/\/bedfordshiresquash\.leaguemaster/,
     );
     await open(page, 'leagues/');
-    await expect(page.getByRole('main').getByRole('link', { name: 'League rules' })).toHaveClass(/btn--primary/);
+    await expect(page.getByRole('main').getByRole('link', { name: 'League rules', exact: true })).toHaveClass(/btn--primary/);
     await expect(page.getByRole('main').getByRole('link', { name: 'Leagues and fixtures' })).not.toHaveClass(/btn--primary/);
   });
 
