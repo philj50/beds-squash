@@ -28,6 +28,9 @@ jobs:
       - name: Astro check
         run: npm run check
 
+      - name: League Master comparison tests
+        run: node --test tests/leaguemaster-check.test.mjs
+
       - name: Run Playwright tests
         run: npm test
         env:

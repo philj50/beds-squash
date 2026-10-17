@@ -176,6 +176,8 @@ test.describe('Public site', () => {
     });
 
     await open(page, 'leagues/results/');
+    await expect(page.locator('.standings thead')).toContainText('Total');
+    await expect(page.locator('.standings')).toContainText('17');
     await page.locator('[data-fixture-btn="288"]').click();
     await page.getByRole('button', { name: 'Pat Player' }).click();
     await expect(page.getByRole('heading', { name: 'Pat Player' })).toBeVisible();
@@ -185,6 +187,30 @@ test.describe('Public site', () => {
     await expect(page.locator('#player-matches')).toContainText('Club Towers 1');
     await page.getByRole('button', { name: 'Back to tables' }).click();
     await expect(page.getByRole('heading', { name: 'Division 1' })).toBeVisible();
+  });
+
+  test('league tables open on Winter 2026/27', async ({ page }) => {
+    await page.route('**/rest/v1/**', async (route) => {
+      const url = new URL(route.request().url());
+      const send = (body: unknown) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      if (url.pathname.endsWith('/league_seasons')) {
+        return send([
+          { id: 3, name: 'Summer League 2026', starts_on: '2026-04-01', ends_on: '2026-08-31' },
+          { id: 2, name: 'Winter 2026/27', starts_on: '2026-10-01', ends_on: '2027-03-31' },
+          { id: 1, name: 'Winter 2025/26', starts_on: '2025-10-01', ends_on: '2026-03-31' },
+        ]);
+      }
+      return send([]);
+    });
+
+    await open(page, 'leagues/results/');
+    await expect(page.locator('.kind-btn.is-on')).toContainText('Winter');
+    await expect(page.locator('.season-btn.is-on')).toHaveText('2026/27');
+
+    await open(page, 'leagues/');
+    await open(page, 'leagues/results/#1');
+    await expect(page.locator('.season-btn.is-on')).toHaveText('2025/26');
   });
 
   test('league results shell loads', async ({ page }) => {

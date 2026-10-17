@@ -78,8 +78,9 @@ const crumbs = [
     won: number;
     drawn: number;
     lost: number;
-    gamesFor: number;
-    gamesAgainst: number;
+    pointsFor: number;
+    pointsAgainst: number;
+    penalty: number;
     points: number;
   };
 
@@ -122,9 +123,13 @@ const crumbs = [
     return null;
   }
 
-  function shortName(name: string): string {
-    return name.replace(/^Winter\s+/i, '').replace(/^Summer League\s+/i, '');
-  }
+    function shortName(name: string): string {
+      return name.replace(/^Winter\s+/i, '').replace(/^Summer League\s+/i, '');
+    }
+
+    function preferredSeason(list: Season[]): Season | undefined {
+      return list.find((season) => /^winter\s+2026\/27$/i.test(season.name));
+    }
 
   function escapeHtml(value: string): string {
     return value
@@ -148,8 +153,9 @@ const crumbs = [
         won: 0,
         drawn: 0,
         lost: 0,
-        gamesFor: 0,
-        gamesAgainst: 0,
+        pointsFor: 0,
+        pointsAgainst: 0,
+        penalty: 0,
         points: 0,
       });
     }
@@ -164,10 +170,10 @@ const crumbs = [
       away.played += 1;
       home.points += hp;
       away.points += ap;
-      home.gamesFor += fixture.home_games ?? 0;
-      home.gamesAgainst += fixture.away_games ?? 0;
-      away.gamesFor += fixture.away_games ?? 0;
-      away.gamesAgainst += fixture.home_games ?? 0;
+      home.pointsFor += hp;
+      home.pointsAgainst += ap;
+      away.pointsFor += ap;
+      away.pointsAgainst += hp;
       if (hp > ap) {
         home.won += 1;
         away.lost += 1;
@@ -182,10 +188,10 @@ const crumbs = [
     return [...rows.values()].sort((a, b) => {
       const points = b.points - a.points;
       if (points) return points;
-      const diff = b.gamesFor - b.gamesAgainst - (a.gamesFor - a.gamesAgainst);
+      const diff = b.pointsFor - b.pointsAgainst - (a.pointsFor - a.pointsAgainst);
       if (diff) return diff;
-      const games = b.gamesFor - a.gamesFor;
-      if (games) return games;
+      const scored = b.pointsFor - a.pointsFor;
+      if (scored) return scored;
       return a.name.localeCompare(b.name, 'en-GB');
     });
   }
@@ -334,10 +340,9 @@ const crumbs = [
     const table = standingsFor(teams, fixtures);
     const played = fixtures.filter(hasScore).length;
     const focus = focusTeamId ? teams.find((team) => team.id === focusTeamId) ?? null : null;
-    const head = `<div class="board-head"><h2>${escapeHtml(division.name)}</h2><p>${escapeHtml(division.scoring ?? 'League')} · ${played} result${played === 1 ? '' : 's'} · ordered by points, then game difference · click a team for its matches</p></div>`;
+    const head = `<div class="board-head"><h2>${escapeHtml(division.name)}</h2><p>${escapeHtml(division.scoring ?? 'League')} · ${played} result${played === 1 ? '' : 's'} · ordered by points, then points difference · click a team for its matches</p></div>`;
     const rows = table
       .map((row, index) => {
-        const diff = row.gamesFor - row.gamesAgainst;
         const withdrawn = /withdrawn/i.test(row.name);
         const isFocus = row.id === focusTeamId;
         return `<tr class="team-row ${index === 0 && row.played ? 'is-leader' : ''} ${withdrawn ? 'is-withdrawn' : ''} ${isFocus ? 'is-focus' : ''}" data-team="${row.id}">
@@ -345,10 +350,11 @@ const crumbs = [
           <th scope="row"><button type="button" class="team-btn" data-team-btn="${row.id}" aria-pressed="${isFocus}">${escapeHtml(row.name)}</button></th>
           <td class="num">${row.played}</td>
           <td class="num">${row.won}</td>
-          <td class="num">${row.drawn}</td>
           <td class="num">${row.lost}</td>
-          <td class="num">${row.gamesFor}\u2013${row.gamesAgainst}</td>
-          <td class="num">${diff > 0 ? '+' : ''}${diff}</td>
+          <td class="num">${row.drawn}</td>
+          <td class="num">${row.pointsFor}</td>
+          <td class="num">${row.pointsAgainst}</td>
+          <td class="num">${row.penalty}</td>
           <td class="num pts">${row.points}</td>
         </tr>`;
       })
@@ -418,14 +424,15 @@ const crumbs = [
                   <th>Team</th>
                   <th class="num" title="Played">P</th>
                   <th class="num" title="Won">W</th>
-                  <th class="num" title="Drawn">D</th>
                   <th class="num" title="Lost">L</th>
-                  <th class="num" title="Games for and against">Games</th>
-                  <th class="num" title="Game difference">+/-</th>
-                  <th class="num" title="Points">Pts</th>
+                  <th class="num" title="Drawn">D</th>
+                  <th class="num" title="Points for">F</th>
+                  <th class="num" title="Points against">A</th>
+                  <th class="num" title="Penalty">Pen</th>
+                  <th class="num" title="Total">Total</th>
                 </tr>
               </thead>
-              <tbody>${rows || '<tr><td colspan="9">No teams in this division.</td></tr>'}</tbody>
+              <tbody>${rows || '<tr><td colspan="10">No teams in this division.</td></tr>'}</tbody>
             </table>
           </div>
         </div>
@@ -715,8 +722,9 @@ const crumbs = [
       if (!list.length) return;
       kind = next;
       const today = new Date().toISOString().slice(0, 10);
+      const preferred = next === 'winter' ? preferredSeason(list) : undefined;
       const completed = list.find((season) => season.ends_on.slice(0, 10) < today);
-      void selectSeason((completed ?? list[0]).id);
+      void selectSeason((preferred ?? completed ?? list[0]).id);
     });
 
     seasonsNav.addEventListener('click', (event) => {
@@ -757,7 +765,8 @@ const crumbs = [
       const hashMatch = Number(hashParts.find((part) => /^m\d+$/.test(part))?.slice(1));
       const today = new Date().toISOString().slice(0, 10);
       const completed = seasons.filter((season) => season.ends_on.slice(0, 10) < today);
-      const initial = seasons.find((season) => season.id === hashSeason) ?? completed[0] ?? seasons[0];
+      const initial =
+        seasons.find((season) => season.id === hashSeason) ?? preferredSeason(seasons) ?? completed[0] ?? seasons[0];
       if (!initial) {
         setStatus('No seasons published yet.');
       } else {
