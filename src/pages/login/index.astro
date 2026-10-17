@@ -4,6 +4,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 import { url } from '@/lib/site';
 
 const profileHref = url('/captains/profile/');
+const youHref = url('/captains/you/');
 ---
 
 <Base title="Log in" description="Sign in to your Bedfordshire Squash account." noindex>
@@ -14,6 +15,7 @@ const profileHref = url('/captains/profile/');
       data-url={SUPABASE_URL}
       data-key={SUPABASE_PUBLISHABLE_KEY}
       data-profile={profileHref}
+      data-you={youHref}
     >
       <h1>Log in</h1>
       <p class="lede">Use the email or login and the password you were given. After you sign in, change the password on your profile. Nothing is emailed.</p>
@@ -42,13 +44,14 @@ const profileHref = url('/captains/profile/');
   if (!root) throw new Error('login app missing');
   const supabase = createClient(root.dataset.url!, root.dataset.key!);
   const profileHref = root.dataset.profile!;
+  const youHref = root.dataset.you!;
   const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
   const base = import.meta.env.BASE_URL.replace(/\/+$/, '');
 
   function safeNext(raw: string | null) {
-    if (!raw || raw.includes('://') || raw.includes('\\') || raw.startsWith('//') || raw.includes('/login')) return profileHref;
-    if (base && !raw.startsWith(`${base}/`)) return profileHref;
-    if (!base && !raw.startsWith('/')) return profileHref;
+    if (!raw || raw.includes('://') || raw.includes('\\') || raw.startsWith('//') || raw.includes('/login')) return youHref;
+    if (base && !raw.startsWith(`${base}/`)) return youHref;
+    if (!base && !raw.startsWith('/')) return youHref;
     return raw;
   }
 

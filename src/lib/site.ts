@@ -19,14 +19,14 @@ export const SITE = {
   squashTvYoutube: 'https://www.youtube.com/psasquashtv',
 };
 
-type NavItem = { label: string; href: string; signedIn?: boolean; more?: boolean };
+type NavItem = { label: string; href: string; signedIn?: boolean; more?: boolean; match?: string };
 
 export const NAV: NavItem[] = [
   { label: 'News', href: '/news/' },
   { label: 'My Squash', href: '/captains/you/', signedIn: true },
   { label: 'Clubs', href: '/clubs/' },
   { label: 'Juniors', href: '/juniors/' },
-  { label: 'Leagues', href: '/leagues/' },
+  { label: 'Leagues', href: '/leagues/results/', match: '/leagues/' },
   { label: 'Tournaments', href: '/tournaments/' },
   { label: 'Events', href: '/events/', more: true },
   { label: 'County Teams', href: '/county-teams/', more: true },

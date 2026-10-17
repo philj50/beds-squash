@@ -183,7 +183,8 @@ test.describe('Club captain, team captain, and player', () => {
 
     await page.goto('captains/matches/', { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('button', { name: /This season/ })).toHaveClass(/pill--active/);
-    await expect(page.getByRole('link', { name: 'Your team' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Squad' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Your team' })).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Test Team 1 v Visitors' })).toBeVisible();
     await expect(page.getByText('Who can play, and the team for this match, are not chosen on this site.')).toBeVisible();
     await expect(page.getByRole('cell', { name: 'Pat Player' })).toHaveCount(0);
@@ -194,7 +195,7 @@ test.describe('Club captain, team captain, and player', () => {
 
     await page.goto('captains/profile/', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('[data-places]')).toHaveText(PEOPLE.team_player.place);
-    await expect(page.locator('[data-squad-link]')).toHaveText('Your team');
+    await expect(page.getByRole('link', { name: 'Squad' })).toHaveCount(0);
 
     await page.goto('captains/admin/', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('.admin-tabs .tab-label').filter({ visible: true })).toHaveText(['League Master', 'SquashLevels']);

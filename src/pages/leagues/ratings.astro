@@ -1,8 +1,8 @@
 ---
 import Base from '@/layouts/Base.astro';
+import LeagueSectionNav from '@/components/LeagueSectionNav.astro';
 import PageHero from '@/components/PageHero.astro';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
-import { url } from '@/lib/site';
 
 const crumbs = [
   { name: 'Leagues', path: '/leagues/' },
@@ -20,10 +20,7 @@ const crumbs = [
     title="SquashLevels"
     lede="Levels for league players we track on SquashLevels. Updated when league matches are played. Search by name to see a rating history."
   >
-    <div class="hero-actions">
-      <a class="btn btn--ghost" href={url('/leagues/results/')}>Tables &amp; fixtures</a>
-      <a class="btn btn--ghost" href="https://squashlevels.com/" target="_blank" rel="noopener">SquashLevels ↗</a>
-    </div>
+    <LeagueSectionNav current="levels" />
   </PageHero>
 
   <section class="section">

@@ -29,7 +29,7 @@ test.describe('Public site', () => {
     await expect(nav.getByRole('link', { name: 'News', exact: true })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Clubs', exact: true })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Juniors', exact: true })).toBeVisible();
-    await expect(nav.getByRole('link', { name: 'Leagues', exact: true })).toBeVisible();
+    await expect(nav.getByRole('link', { name: 'Leagues', exact: true })).toHaveAttribute('href', /\/leagues\/results\/?$/);
     await expect(nav.getByRole('link', { name: 'Tournaments', exact: true })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Events', exact: true })).toHaveCount(0);
     await nav.getByRole('button', { name: 'More' }).click();
@@ -58,6 +58,7 @@ test.describe('Public site', () => {
   test('SquashLevels ratings shell loads', async ({ page }) => {
     await open(page, 'leagues/ratings/');
     await expect(page.getByRole('heading', { level: 1 })).toContainText(/SquashLevels/i);
+    await expect(page.getByRole('main').getByRole('link', { name: 'SquashLevels', exact: true })).toHaveClass(/btn--primary/);
     await expect(page.locator('#ratings-app')).toBeVisible();
   });
 
@@ -215,12 +216,17 @@ test.describe('Public site', () => {
 
   test('league results shell loads', async ({ page }) => {
     await open(page, 'leagues/results/');
-    await expect(page.getByRole('heading', { level: 1 })).toContainText(/Tables and fixtures/i);
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(/Leagues and fixtures/i);
+    await expect(page.getByRole('main').getByRole('link', { name: 'Leagues and fixtures' })).toHaveClass(/btn--primary/);
+    await expect(page.getByRole('main').getByRole('link', { name: 'League rules' })).not.toHaveClass(/btn--primary/);
     await expect(page.locator('#results-app')).toBeVisible();
     await expect(page.getByRole('main').getByRole('link', { name: 'League Master ↗' })).toHaveAttribute(
       'href',
       /^https:\/\/bedfordshiresquash\.leaguemaster/,
     );
+    await open(page, 'leagues/');
+    await expect(page.getByRole('main').getByRole('link', { name: 'League rules' })).toHaveClass(/btn--primary/);
+    await expect(page.getByRole('main').getByRole('link', { name: 'Leagues and fixtures' })).not.toHaveClass(/btn--primary/);
   });
 
   test('share page holds a link for an admin and refuses a video over 10 MB', async ({ page }) => {

@@ -40,7 +40,6 @@ import { url } from '@/lib/site';
         </dl>
         <p class="actions">
           <a class="btn btn--ghost btn--sm" href={url('/captains/you/')}>My squash</a>
-          <a class="btn btn--ghost btn--sm" data-squad-link href={url('/captains/')}>Squad</a>
           <a class="btn btn--ghost btn--sm" href={url('/captains/matches/')}>Matches</a>
           <a class="btn btn--ghost btn--sm" data-admin-link hidden href={url('/captains/admin/')}>Administration</a>
           <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
@@ -62,7 +61,6 @@ import { url } from '@/lib/site';
   const signedOut = root.querySelector<HTMLElement>('[data-panel="signed-out"]')!;
   const signedIn = root.querySelector<HTMLElement>('[data-panel="signed-in"]')!;
   const adminLink = root.querySelector<HTMLElement>('[data-admin-link]')!;
-  const squadLink = root.querySelector<HTMLAnchorElement>('[data-squad-link]')!;
   const nameInput = root.querySelector<HTMLInputElement>('[data-name-input]')!;
   const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
   const whoEl = root.querySelector<HTMLElement>('[data-who]')!;
@@ -108,7 +106,6 @@ import { url } from '@/lib/site';
       ? account.places.map((place) => place.label).join('. ')
       : 'No club or team yet. An admin sets that from Administration.';
     adminLink.hidden = !account.isAdmin;
-    squadLink.textContent = account.playerOnly ? 'Your team' : 'Squad';
   }
 
   showSession();

@@ -1,0 +1,26 @@
+---
+import { SITE, url } from '@/lib/site';
+
+interface Props {
+  current: 'fixtures' | 'rules' | 'levels';
+}
+const { current } = Astro.props;
+const tone = (page: Props['current']) => (current === page ? 'btn btn--primary' : 'btn btn--ghost');
+---
+
+<div class="hero-actions">
+  <a class={tone('fixtures')} href={url('/leagues/results/')} aria-current={current === 'fixtures' ? 'page' : undefined}>Leagues and fixtures</a>
+  <a class={tone('rules')} href={url('/leagues/')} aria-current={current === 'rules' ? 'page' : undefined}>League rules</a>
+  <a class={tone('levels')} href={url('/leagues/ratings/')} aria-current={current === 'levels' ? 'page' : undefined}>SquashLevels</a>
+  {current === 'levels' && <a class="btn btn--ghost" href="https://squashlevels.com/" target="_blank" rel="noopener">SquashLevels ↗</a>}
+  <a class="btn btn--ghost" href={SITE.leagueMaster} target="_blank" rel="noopener">League Master ↗</a>
+</div>
+
+<style>
+  .hero-actions {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-top: 1.25rem;
+  }
+</style>

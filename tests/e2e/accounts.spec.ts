@@ -91,8 +91,8 @@ test.describe('Login', () => {
     await expect(page.locator('[data-status]')).toHaveText('Signed in. If Chrome asks to save the password, choose Save.');
     expect(emailed).toBe('county-admin@players.invalid');
     await page.clock.fastForward(4000);
-    await expect(page).toHaveURL(/\/captains\/profile\/$/);
-    await expect(page.locator('[data-email]')).toHaveText('county-admin@players.invalid');
+    await expect(page).toHaveURL(/\/captains\/you\/$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'My squash' })).toBeVisible();
   });
 
   test('a signed-out visit keeps the original page in the address', async ({ page }) => {

@@ -1,6 +1,7 @@
 ---
 import { getEntry, render } from 'astro:content';
 import Base from '@/layouts/Base.astro';
+import LeagueSectionNav from '@/components/LeagueSectionNav.astro';
 import PageHero from '@/components/PageHero.astro';
 import { getClubs, getDocuments } from '@/lib/content';
 import { SITE, url } from '@/lib/site';
@@ -14,12 +15,12 @@ const LM = SITE.leagueMaster.replace(/\/$/, '');
 
 <Base title="Bedfordshire squash leagues" description="Bedfordshire Squash Winter League, Summer League and League Cup — divisions, scoring, fees and links to fixtures and tables." crumbs={[{ name: 'Leagues', path: '/leagues/' }]}>
   <PageHero eyebrow="Team squash" title={page?.data.title ?? 'Leagues'} lede={page?.data.intro}>
-    <div class="hero-actions">
-      <a class="btn btn--primary" href={url('/leagues/results/')}>Tables &amp; fixtures</a>
-      <a class="btn btn--ghost" href={url('/leagues/ratings/')}>SquashLevels</a>
-      {rules[0] && <a class="btn btn--ghost" href={url(`/documents/${rules[0].id}/`)}>League rules</a>}
-      <a class="btn btn--ghost" href={SITE.leagueMaster} target="_blank" rel="noopener">League Master ↗</a>
-    </div>
+    <LeagueSectionNav current="rules" />
+    {rules[0] && (
+      <p class="rules-doc">
+        <a href={url(`/documents/${rules[0].id}/`)}>Full league rules</a>
+      </p>
+    )}
   </PageHero>
 
   <section class="section">
@@ -59,11 +60,8 @@ const LM = SITE.leagueMaster.replace(/\/$/, '');
 </Base>
 
 <style>
-  .hero-actions {
-    display: flex;
-    gap: 0.6rem;
-    flex-wrap: wrap;
-    margin-top: 1.25rem;
+  .rules-doc {
+    margin: 0.8rem 0 0;
   }
   .layout {
     display: grid;

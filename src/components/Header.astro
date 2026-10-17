@@ -4,7 +4,10 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 const base = import.meta.env.BASE_URL.replace(/\/+$/, '');
 const current = Astro.url.pathname.replace(base, '') || '/';
-const isActive = (href: string) => (href === '/' ? current === '/' : current.startsWith(href));
+const isActive = (item: { href: string; match?: string }) => {
+  const prefix = item.match ?? item.href;
+  return prefix === '/' ? current === '/' : current.startsWith(prefix);
+};
 const loginHref = url('/login/');
 const youHref = url('/captains/you/');
 const shareHref = url('/share/');
@@ -26,13 +29,13 @@ const moreNav = NAV.filter((item) => item.more);
             primaryNav.map((item) =>
               item.signedIn ? (
                 <li data-your-squash hidden>
-                  <a href={url(item.href)} aria-current={isActive(item.href) ? 'page' : undefined}>
+                  <a href={url(item.href)} aria-current={isActive(item) ? 'page' : undefined}>
                     {item.label}
                   </a>
                 </li>
               ) : (
                 <li>
-                  <a href={url(item.href)} aria-current={isActive(item.href) ? 'page' : undefined}>
+                  <a href={url(item.href)} aria-current={isActive(item) ? 'page' : undefined}>
                     {item.label}
                   </a>
                 </li>
@@ -46,7 +49,7 @@ const moreNav = NAV.filter((item) => item.more);
             <div id="more-menu" class="more-menu" data-more-menu hidden>
               {
                 moreNav.map((item) => (
-                  <a href={url(item.href)} aria-current={isActive(item.href) ? 'page' : undefined}>
+                  <a href={url(item.href)} aria-current={isActive(item) ? 'page' : undefined}>
                     {item.label}
                   </a>
                 ))
