@@ -9,7 +9,7 @@ import { url } from '@/lib/site';
     <div class="container articles" id="articles-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
       <h1>Match articles</h1>
       <p class="lede">
-        One article a day, and only when a league match was played. Automatic publishing is on to start with.
+        One article for each division that played. Automatic publishing is on to start with.
         Switch to manual and a match waits here until you approve it. Open Edit to change the subject, summary and text.
         Archive takes it off the home page and files it under Match history. Delete takes it off the site. Nothing is emailed.
       </p>
@@ -375,14 +375,28 @@ import { url } from '@/lib/site';
   #articles-app table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
   }
   #articles-app th,
   #articles-app td {
     text-align: left;
     vertical-align: middle;
-    line-height: 1.25;
-    padding: 0.2rem 0.4rem;
+    line-height: 1.2;
+    padding: 0.12rem 0.3rem;
     border-bottom: 1px solid var(--border);
+  }
+  #articles-app td:first-child,
+  #articles-app td:nth-child(3) {
+    white-space: nowrap;
+  }
+  #articles-app td.actions {
+    gap: 0.2rem;
+  }
+  #articles-app td.actions .btn {
+    padding: 0.16rem 0.48rem;
+    border-width: 1px;
+    font-size: 0.74rem;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
   }
 </style>

@@ -1,6 +1,6 @@
 /**
  * Read SquashLevels with the premium account, store rating history, and
- * prepare at most one league match article for a day on which somebody played.
+ * prepare one league match article for each division that played.
  *
  * Usage:
  *   node scripts/squashlevels-daily.mjs            # yesterday in London
@@ -18,7 +18,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { nvidiaArticle } from './lib/nvidia-article.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -69,6 +69,16 @@ function longDate(iso) {
     year: 'numeric',
     timeZone: 'UTC',
   }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
+function divisionSlug(name) {
+  return (
+    String(name || 'league')
+      .toLowerCase()
+      .replace(/&/g, ' and ')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'league'
+  );
 }
 
 function nameKey(name) {
@@ -723,6 +733,21 @@ function chooseRubber(rubbers, names, matches) {
   return ranked[0] ?? null;
 }
 
+/** One rubber from each division: an upset when there is one, otherwise the closest ratings. */
+export function choicesByDivision(rubbers, names, matches) {
+  const groups = new Map();
+  for (const rubber of rubbers) {
+    const division = rubber.division || 'the league';
+    const group = groups.get(division) ?? [];
+    group.push(rubber);
+    groups.set(division, group);
+  }
+  return [...groups.entries()]
+    .sort((left, right) => left[0].localeCompare(right[0], 'en-GB'))
+    .map(([, group]) => chooseRubber(group, names, matches))
+    .filter(Boolean);
+}
+
 function articleFrom(choice) {
   const { rubber, homeBefore, awayBefore, homeAfter, awayAfter, upset } = choice;
   const homeWon = rubber.winner === 'home';
@@ -763,7 +788,7 @@ function articleFrom(choice) {
   return {
     articleOn: rubber.playedOn,
     rubberId: rubber.id,
-    slug: `${rubber.playedOn}-league-match`,
+    slug: `${rubber.playedOn}-${divisionSlug(rubber.division)}`,
     title,
     summary,
     body: lines.join('\n'),
@@ -881,8 +906,16 @@ function matchPicture(article, choice) {
   const pool = MATCH_PICTURES[pictureKind(article, choice)];
   const day = Math.floor(Date.parse(`${article.articleOn}T00:00:00Z`) / 86400000);
   if (Number.isFinite(day) && Math.abs(day) % 10 === 0) return OCCASIONAL_PICTURE;
-  const index = Number.isFinite(day) ? Math.abs(day) % pool.length : 0;
+  const salt = [...String(article.slug ?? '')].reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  const index = Number.isFinite(day) ? Math.abs(day + salt) % pool.length : 0;
   return pool[index];
+}
+
+function divisionArticleExists(playedOn, division) {
+  if (existsSync(join(NEWS_DIR, `${playedOn}-${divisionSlug(division)}.md`))) return true;
+  const legacy = join(NEWS_DIR, `${playedOn}-league-match.md`);
+  if (!existsSync(legacy)) return false;
+  return readFileSync(legacy, 'utf8').includes(division);
 }
 
 function writeNews(article, choice) {
@@ -999,7 +1032,7 @@ async function writeSeasonOpener() {
   const playedOn = londonDate(new Date(fixture.starts_at));
   const path = writeNews(seasonOpenerFrom(fixture, playedOn, seasonId), { upset: false, levelGap: 0, gap: 0 });
   console.error(`season opener ${path}`);
-  return playedOn;
+  return { playedOn, division: fixture.division?.name ?? '' };
 }
 
 function leadingScores(rows) {
@@ -1126,10 +1159,9 @@ function writeSql(payload) {
       `insert into public.squashlevels_names (name_key, player_id, status) values (${quote(name.nameKey)}, ${name.playerId ?? 'null'}, ${quote(name.status)}) on conflict (name_key) do update set player_id = excluded.player_id, status = excluded.status, updated_at = now();`,
     );
   }
-  if (payload.article) {
-    const article = payload.article;
+  for (const article of payload.articles ?? []) {
     push(
-      `insert into public.match_articles (article_on, rubber_id, slug, status, title, summary, body, published_at) values (${quote(article.articleOn)}::date, ${article.rubberId}, ${quote(article.slug)}, ${quote(article.status)}, ${quote(article.title)}, ${quote(article.summary)}, ${quote(article.body)}, ${article.status === 'published' ? 'now()' : 'null'}) on conflict (article_on) do nothing;`,
+      `insert into public.match_articles (article_on, rubber_id, slug, status, title, summary, body, published_at) values (${quote(article.articleOn)}::date, ${article.rubberId}, ${quote(article.slug)}, ${quote(article.status)}, ${quote(article.title)}, ${quote(article.summary)}, ${quote(article.body)}, ${article.status === 'published' ? 'now()' : 'null'}) on conflict (slug) do nothing;`,
     );
   }
   push(
@@ -1201,19 +1233,20 @@ async function save(payload) {
     status: name.status,
     updated_at: new Date().toISOString(),
   })), 'name_key');
-  if (payload.article) {
-    await rest('match_articles?on_conflict=article_on', {
+  for (const article of payload.articles ?? []) {
+    await rest('match_articles?on_conflict=slug', {
       method: 'POST',
       write: true,
+      prefer: 'resolution=ignore-duplicates,return=minimal',
       body: [{
-        article_on: payload.article.articleOn,
-        rubber_id: payload.article.rubberId,
-        slug: payload.article.slug,
-        status: payload.article.status,
-        title: payload.article.title,
-        summary: payload.article.summary,
-        body: payload.article.body,
-        published_at: payload.article.status === 'published' ? new Date().toISOString() : null,
+        article_on: article.articleOn,
+        rubber_id: article.rubberId,
+        slug: article.slug,
+        status: article.status,
+        title: article.title,
+        summary: article.summary,
+        body: article.body,
+        published_at: article.status === 'published' ? new Date().toISOString() : null,
       }],
     });
   }
@@ -1391,9 +1424,9 @@ async function main() {
     return;
   }
   await publishApproved();
-  let openerOn = null;
+  let opener = null;
   try {
-    openerOn = await writeSeasonOpener();
+    opener = await writeSeasonOpener();
   } catch (error) {
     console.error(`season opener skipped: ${error instanceof Error ? error.message : error}`);
   }
@@ -1510,30 +1543,31 @@ async function main() {
     const settings = await rest('article_settings?id=eq.1&select=publication_mode');
     mode = settings?.[0]?.publication_mode ?? 'auto';
   }
-  const existingFile = existsSync(join(NEWS_DIR, `${playedOn}-league-match.md`));
-  const choice = chooseRubber(rubbers, names, [...matches.values()]);
-  let article = null;
-  let articleProse = null;
-  if (!choice) {
+  const articles = [];
+  const choices = choicesByDivision(rubbers, names, [...matches.values()]);
+  if (!choices.length) {
     console.error(`No close match with ratings on ${playedOn}. No article.`);
-  } else {
+  }
+  for (const choice of choices) {
+    const division = choice.rubber.division || 'the league';
+    if (opener?.playedOn === playedOn && opener.division === division) {
+      console.error(`Season opening article covers ${division} on ${playedOn}.`);
+      continue;
+    }
+    if (divisionArticleExists(playedOn, division)) {
+      console.error(`Article already exists for ${division} on ${playedOn}.`);
+      continue;
+    }
     const draft = await buildArticle(choice);
     const { prose, ...articleFields } = draft;
-    articleProse = prose ?? null;
-    article = { ...articleFields, status: mode === 'manual' ? 'held' : 'published' };
+    const article = { ...articleFields, status: mode === 'manual' ? 'held' : 'published', prose };
     const kind = pictureKind(article, choice);
     if (!String(article.body).includes('match-picture:')) {
       article.body = `${String(article.body).trimEnd()}\n\n<!-- match-picture: ${kind} -->`;
     }
-    if (openerOn === playedOn) {
-      console.error(`Season opening article covers ${playedOn}.`);
-    } else if (article.status === 'published' && !existingFile) {
-      console.error(`wrote ${writeNews(article, choice)}`);
-    } else if (article.status === 'published') {
-      console.error(`Article file already exists for ${playedOn}.`);
-    } else {
-      console.error(`held article for ${playedOn}; publishing is manual`);
-    }
+    if (article.status === 'published') console.error(`wrote ${writeNews(article, choice)}`);
+    else console.error(`held article for ${division} on ${playedOn}; publishing is manual`);
+    articles.push(article);
   }
 
   const payload = {
@@ -1545,15 +1579,14 @@ async function main() {
       playerId: value.playerId,
       status: value.status,
     })),
-    article,
+    articles,
     summary: {
       playedOn,
       searches,
       players: players.size,
       matches: matches.size,
       ratings: ratings.length,
-      article: article?.slug ?? null,
-      prose: articleProse,
+      articles: articles.map((article) => article.slug),
       mode,
     },
   };
@@ -1562,7 +1595,9 @@ async function main() {
   if (chunks.length) console.error(chunks.join('\n'));
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : 'SquashLevels sync failed');
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : 'SquashLevels sync failed');
+    process.exit(1);
+  });
+}
