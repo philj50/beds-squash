@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-10-16T13:16:31.120Z",
+  "checkedAt": "2026-10-17T12:12:28.336Z",
   "events": [
     {
       "title": "London Open 2026",
@@ -40,9 +40,21 @@
   ],
   "videos": [
     {
+      "id": "OUqi2RgSu3s",
+      "title": "🇪🇬 Orfi v El Hammamy 🇪🇬 | Egyptian Open 2026 | FINAL HIGHLIGHTS",
+      "published": "2026-10-17T08:45:20+00:00",
+      "url": "https://www.youtube.com/watch?v=OUqi2RgSu3s"
+    },
+    {
+      "id": "i7CODJolt3Y",
+      "title": "🇪🇬 Asal v Elias 🇵🇪 | Egyptian Open 2026 | FINAL HIGHLIGHTS",
+      "published": "2026-10-17T08:45:17+00:00",
+      "url": "https://www.youtube.com/watch?v=i7CODJolt3Y"
+    },
+    {
       "id": "TApihLW63k4",
       "title": "COURTSIDE: Rivalries Renewed 🔥 Orfi V El Hammamy and Elias V Asal 🤯",
-      "published": "2026-10-16T11:30:12+00:00",
+      "published": "2026-10-16T16:03:17+00:00",
       "url": "https://www.youtube.com/watch?v=TApihLW63k4"
     },
     {
@@ -50,18 +62,6 @@
       "title": "Beyond going to the wire 😬 PSA World Championships 2025-26",
       "published": "2026-10-16T11:00:23+00:00",
       "url": "https://www.youtube.com/watch?v=whEsGl72MUw"
-    },
-    {
-      "id": "dsjf2YHa1AM",
-      "title": "🇪🇬 Orfi v Gohar 🇪🇬 | Egyptian Open 2026 | SEMI-FINAL HIGHLIGHTS",
-      "published": "2026-10-16T10:05:57+00:00",
-      "url": "https://www.youtube.com/watch?v=dsjf2YHa1AM"
-    },
-    {
-      "id": "BIfYVbKjPXw",
-      "title": "🇪🇬 Asal v Gawad 🇪🇬 | Egyptian Open 2026 | SEMI-FINAL HIGHLIGHTS",
-      "published": "2026-10-16T10:05:55+00:00",
-      "url": "https://www.youtube.com/watch?v=BIfYVbKjPXw"
     }
   ]
 }
