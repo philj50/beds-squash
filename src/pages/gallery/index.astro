@@ -57,6 +57,13 @@ const galleries = await getGalleries();
       </div>
       <div class="grid grid--3" data-shared></div>
     </div>
+    <dialog class="photo-view" data-photo-view>
+      <button class="photo-view__close" type="button" aria-label="Close" data-photo-close>×</button>
+      <figure>
+        <img alt="" data-photo-img />
+        <figcaption data-photo-cap></figcaption>
+      </figure>
+    </dialog>
   </section>
 </Base>
 
@@ -90,14 +97,32 @@ const galleries = await getGalleries();
         .map((item) => {
           const src = urls.get(item.storage_path);
           if (!src) return '';
+          const label = escapeHtml(item.caption?.trim() || 'Photo');
           const media =
             item.kind === 'video'
               ? `<video class="card__img" src="${escapeHtml(src)}" controls preload="metadata"></video>`
-              : `<img class="card__img" src="${escapeHtml(src)}" alt="${escapeHtml(item.caption ?? '')}" loading="lazy" />`;
-          return `<article class="card"><div>${media}</div><div class="card__body"><h3 class="card__title">${escapeHtml(item.caption ?? 'Photo')}</h3><p class="card__meta">${escapeHtml(item.credit)}</p></div></article>`;
+              : `<button class="photo-open" type="button" data-photo-open><img class="card__img" src="${escapeHtml(src)}" alt="${label}" loading="lazy" /></button>`;
+          return `<article class="card"><div>${media}</div><div class="card__body"><h3 class="card__title">${label}</h3><p class="card__meta">${escapeHtml(item.credit)}</p></div></article>`;
         })
         .join('');
       if (host.innerHTML.trim()) root.hidden = false;
+
+      const view = root.querySelector<HTMLDialogElement>('[data-photo-view]')!;
+      const viewImg = view.querySelector<HTMLImageElement>('[data-photo-img]')!;
+      const viewCap = view.querySelector<HTMLElement>('[data-photo-cap]')!;
+      host.addEventListener('click', (event) => {
+        const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-photo-open]');
+        const image = button?.querySelector('img');
+        if (!button || !image) return;
+        viewImg.src = image.src;
+        viewImg.alt = image.alt;
+        viewCap.textContent = image.alt === 'Photo' ? '' : image.alt;
+        if (!view.open) view.showModal();
+      });
+      view.querySelector('[data-photo-close]')?.addEventListener('click', () => view.close());
+      view.addEventListener('click', (event) => {
+        if (event.target === view) view.close();
+      });
     }
   }
 </script>
@@ -111,5 +136,59 @@ const galleries = await getGalleries();
   }
   #gallery-shared video.card__img {
     background: var(--ink-950);
+  }
+  #gallery-shared :global(.photo-open) {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: zoom-in;
+  }
+  #gallery-shared :global(.photo-open img) {
+    display: block;
+  }
+  .photo-view {
+    border: 0;
+    padding: 0.75rem;
+    background: var(--ink-900);
+    color: var(--text);
+    max-width: min(52rem, 94vw);
+  }
+  .photo-view::backdrop {
+    background: rgba(5, 6, 8, 0.78);
+  }
+  .photo-view figure {
+    margin: 0;
+  }
+  .photo-view img {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: min(50rem, 90vw);
+    max-height: 78vh;
+    object-fit: contain;
+    background: var(--ink-950);
+  }
+  .photo-view figcaption {
+    margin-top: 0.55rem;
+    color: var(--ink-200);
+  }
+  .photo-view figcaption:empty {
+    display: none;
+  }
+  .photo-view__close {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.4rem;
+    width: 2.2rem;
+    height: 2.2rem;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(5, 6, 8, 0.72);
+    color: #fff;
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
   }
 </style>

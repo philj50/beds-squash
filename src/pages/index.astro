@@ -7,6 +7,7 @@ import PsaTour from '@/components/PsaTour.astro';
 import { getNews, getUpcomingEvents, getClubs, onMainNewsList } from '@/lib/content';
 import { toMapClubs } from '@/lib/geo';
 import { CATEGORY_LABEL, SITE, formatShort, url } from '@/lib/site';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 import { ruleFor, SINGLES_RULES_EDITION, SINGLES_RULES_URL } from '@/lib/squash-rules';
 
 const news = (await getNews()).filter(onMainNewsList);
@@ -166,6 +167,23 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
       </section>
     )
   }
+
+  <section class="section" id="home-photos" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} hidden>
+    <div class="container">
+      <div class="section-head">
+        <h2>Photos</h2>
+        <a href={url('/gallery/')}>All photos →</a>
+      </div>
+      <div class="grid grid--4" data-home-photos></div>
+    </div>
+    <dialog class="photo-view" data-photo-view>
+      <button class="photo-view__close" type="button" aria-label="Close" data-photo-close>×</button>
+      <figure>
+        <img alt="" data-photo-img />
+        <figcaption data-photo-cap></figcaption>
+      </figure>
+    </dialog>
+  </section>
 
   <!-- EVENTS -->
   <section class="section events-band">
@@ -605,7 +623,118 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
       grid-template-columns: 1fr;
     }
   }
+  #home-photos[hidden] {
+    display: none;
+  }
+  #home-photos :global(.photo-open) {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: zoom-in;
+  }
+  #home-photos :global(.photo-open img) {
+    display: block;
+  }
+  .photo-view {
+    border: 0;
+    padding: 0.75rem;
+    background: var(--ink-900);
+    color: var(--text);
+    max-width: min(52rem, 94vw);
+  }
+  .photo-view::backdrop {
+    background: rgba(5, 6, 8, 0.78);
+  }
+  .photo-view figure {
+    margin: 0;
+  }
+  .photo-view img {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: min(50rem, 90vw);
+    max-height: 78vh;
+    object-fit: contain;
+    background: var(--ink-950);
+  }
+  .photo-view figcaption {
+    margin-top: 0.55rem;
+    color: var(--ink-200);
+  }
+  .photo-view figcaption:empty {
+    display: none;
+  }
+  .photo-view__close {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.4rem;
+    width: 2.2rem;
+    height: 2.2rem;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(5, 6, 8, 0.72);
+    color: #fff;
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+  }
 </style>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+
+  type HomePhoto = { caption: string | null; storage_path: string };
+
+  const photos = document.getElementById('home-photos');
+  if (photos) {
+    const supabase = createClient(photos.dataset.url!, photos.dataset.key!);
+    const host = photos.querySelector<HTMLElement>('[data-home-photos]')!;
+    const escapeHtml = (value: string) =>
+      value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
+    const { data } = await supabase
+      .from('contributions')
+      .select('caption, storage_path')
+      .eq('kind', 'photo')
+      .eq('status', 'published')
+      .order('published_at', { ascending: false })
+      .limit(4);
+    const items = ((data ?? []) as HomePhoto[]).filter((item) => item.storage_path);
+    if (items.length) {
+      const { data: signed } = await supabase.storage.from('contributions').createSignedUrls(
+        items.map((item) => item.storage_path),
+        3600,
+      );
+      const urls = new Map((signed ?? []).filter((row) => row.path && row.signedUrl).map((row) => [row.path!, row.signedUrl!]));
+      host.innerHTML = items
+        .map((item) => {
+          const src = urls.get(item.storage_path);
+          if (!src) return '';
+          const label = escapeHtml(item.caption?.trim() || 'Photo');
+          return `<button class="photo-open" type="button" data-photo-open><img class="card__img" src="${escapeHtml(src)}" alt="${label}" loading="lazy" /></button>`;
+        })
+        .join('');
+      if (host.innerHTML.trim()) photos.hidden = false;
+      const view = photos.querySelector<HTMLDialogElement>('[data-photo-view]')!;
+      const viewImg = view.querySelector<HTMLImageElement>('[data-photo-img]')!;
+      const viewCap = view.querySelector<HTMLElement>('[data-photo-cap]')!;
+      host.addEventListener('click', (event) => {
+        const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-photo-open]');
+        const image = button?.querySelector('img');
+        if (!button || !image) return;
+        viewImg.src = image.src;
+        viewImg.alt = image.alt;
+        viewCap.textContent = image.alt === 'Photo' ? '' : image.alt;
+        if (!view.open) view.showModal();
+      });
+      view.querySelector('[data-photo-close]')?.addEventListener('click', () => view.close());
+      view.addEventListener('click', (event) => {
+        if (event.target === view) view.close();
+      });
+    }
+  }
+</script>
 
 <script>
   import { ruleFor } from '@/lib/squash-rules';

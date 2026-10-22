@@ -47,6 +47,48 @@ test.describe('Public pages', () => {
     await expect(page.getByRole('link', { name: "What's on" })).toBeVisible();
   });
 
+  test('home shows the latest photos and All photos opens the gallery', async ({ page }) => {
+    await page.route('https://klxyjmwiaivvqjbhxzak.supabase.co/**', async (route) => {
+      const path = new URL(route.request().url()).pathname;
+      if (path.includes('/object/sign/')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([
+            {
+              error: null,
+              path: 'photos/weekend.jpg',
+              signedURL: '/object/sign/contributions/photos/weekend.jpg?token=test',
+            },
+          ]),
+        });
+        return;
+      }
+      if (path.includes('/rest/v1/contributions')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([
+            {
+              caption: 'County weekend',
+              storage_path: 'photos/weekend.jpg',
+            },
+          ]),
+        });
+        return;
+      }
+      await route.fallback();
+    });
+    await open(page);
+    const photos = page.locator('#home-photos');
+    await expect(photos.getByRole('heading', { name: 'Photos' })).toBeVisible();
+    await photos.getByRole('button', { name: 'County weekend' }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await page.getByRole('button', { name: 'Close' }).click();
+    await photos.getByRole('link', { name: 'All photos →' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Gallery' })).toBeVisible();
+  });
+
   test('about, county teams, and tournaments have their headings and a way onward', async ({ page }) => {
     await open(page, 'about/');
     await expect(page.getByRole('heading', { level: 1, name: 'About Beds SRA' })).toBeVisible();
@@ -140,6 +182,52 @@ test.describe('Public pages', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'County Closed 2026' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'tournament report' })).toBeVisible();
     await expect(page.locator('.masonry img')).toHaveCount(0);
+  });
+
+  test('a sent-in gallery photo opens larger', async ({ page }) => {
+    await page.route('https://klxyjmwiaivvqjbhxzak.supabase.co/**', async (route) => {
+      const path = new URL(route.request().url()).pathname;
+      if (path.includes('/object/sign/')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([
+            {
+              error: null,
+              path: 'photos/weekend.jpg',
+              signedURL: '/object/sign/contributions/photos/weekend.jpg?token=test',
+            },
+          ]),
+        });
+        return;
+      }
+      if (path.includes('/rest/v1/contributions')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([
+            {
+              id: 'p1',
+              kind: 'photo',
+              caption: 'County weekend',
+              credit: 'Pat Player',
+              storage_path: 'photos/weekend.jpg',
+            },
+          ]),
+        });
+        return;
+      }
+      await route.fallback();
+    });
+    await open(page, 'gallery/');
+    const photo = page.getByRole('button', { name: 'County weekend' });
+    await expect(photo).toBeVisible();
+    await photo.click();
+    const view = page.getByRole('dialog');
+    await expect(view).toBeVisible();
+    await expect(view.locator('img')).toHaveAttribute('src', /weekend\.jpg/);
+    await view.getByRole('button', { name: 'Close' }).click();
+    await expect(view).toBeHidden();
   });
 
   test('news links to each story, and a story shows its date', async ({ page }) => {
