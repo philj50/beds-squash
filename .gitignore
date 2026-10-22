@@ -21,6 +21,9 @@ pnpm-debug.log*
 .env.production
 scripts/.trial-season.json
 
+# Private copies of entry lists. Never publish these.
+backups/
+
 # Supabase CLI scratch files
 supabase/.temp/
 

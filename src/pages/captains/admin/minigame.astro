@@ -272,8 +272,8 @@ import { url } from '@/lib/site';
         return;
       }
     }
-    const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', session.user.id).maybeSingle();
-    if (!profile?.is_admin) {
+    const inAdmins = Boolean(account?.isAdmin) || Boolean(account?.groups.some((group) => group.slug === 'admins'));
+    if (!inAdmins) {
       denied.hidden = false;
       denied.textContent = 'This account cannot change the minigame board.';
       return;

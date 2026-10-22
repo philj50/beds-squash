@@ -169,7 +169,11 @@ export async function loadAccount(supabase: SupabaseClient): Promise<Account | n
 
   const clubNames = new Map((clubs ?? []).map((club: { slug: string; name: string }) => [club.slug, club.name]));
   const rows = (membershipResult.data ?? []) as MembershipRow[];
-  const isAdmin = Boolean(me?.is_admin);
+  const groups = ((groupResult.error ? [] : groupResult.data) ?? []) as {
+    group_slug: string;
+    groups: { name: string; position: number; roles: { name: string } | { name: string }[] | null } | { name: string; position: number; roles: { name: string } | { name: string }[] | null }[] | null;
+  }[];
+  const isAdmin = Boolean(me?.is_admin) || groups.some((group) => group.group_slug === 'admins');
   const canManageSquad = Boolean(membershipResult.error) || isAdmin || rows.some((row) => row.role !== 'team_player');
   const places: AccountPlace[] = [];
   if (isAdmin) places.push({ role: 'admin', label: 'Admin' });
@@ -181,10 +185,6 @@ export async function loadAccount(supabase: SupabaseClient): Promise<Account | n
     places.push({ role: row.role, label: where ? `${title} · ${where}` : title });
   }
 
-  const groups = ((groupResult.error ? [] : groupResult.data) ?? []) as {
-    group_slug: string;
-    groups: { name: string; position: number; roles: { name: string } | { name: string }[] | null } | { name: string; position: number; roles: { name: string } | { name: string }[] | null }[] | null;
-  }[];
   const catalog = ((catalogResult.error ? [] : catalogResult.data) ?? []) as { slug: string; name: string; position: number }[];
   const catalogBySlug = new Map(catalog.map((group) => [group.slug, group]));
   groups.sort((a, b) => {

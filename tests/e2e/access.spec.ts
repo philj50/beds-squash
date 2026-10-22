@@ -243,6 +243,22 @@ test('a captain page is counted only when someone is signed in', async ({ page }
   await expect.poll(() => views).toBeGreaterThan(0);
 });
 
+test('an Admins group member can open the minigame scores without the profile flag', async ({ page }) => {
+  await signIn(page, {
+    id: '323bbbee-2222-4222-8222-222222222222',
+    email: 'philip.jenkins@example.test',
+    name: 'Philip Jenkins',
+    admin: false,
+    group: 'admins',
+  });
+  await page.goto('captains/admin/', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('[data-scores-link]')).toBeVisible();
+  await page.goto('captains/admin/minigame/', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('heading', { level: 1, name: 'Minigame mk3 scores' })).toBeVisible();
+  await expect(page.getByText('This account cannot change the minigame board.')).toBeHidden();
+  await expect(page.getByText('No scores on the board.')).toBeVisible();
+});
+
 test('an inactive admin cannot open Users', async ({ page }) => {
   await signIn(page, {
     id: '44444444-4444-4444-8444-444444444444',

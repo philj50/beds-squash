@@ -20,7 +20,7 @@ const youHref = url('/captains/you/');
       <h1>Log in</h1>
       <p class="lede">Use the email or login and the password you were given. After you sign in, change the password on your profile. Nothing is emailed.</p>
       <p class="status" data-status role="status"></p>
-      <form id="login" class="card" method="post" action={url('/login/')} data-form="sign-in">
+      <form id="login" class="card" method="post" action={url('/login/')} data-form="sign-in" onsubmit="event.preventDefault()">
         <div class="card__body stack">
           <div class="field">
             <label for="username">Email or login</label>
@@ -69,8 +69,8 @@ const youHref = url('/captains/you/');
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const data = new FormData(form);
-    let email = String(data.get('username') ?? '').trim();
-    if (email.toLowerCase() === 'bsca') email = 'county-admin@players.invalid';
+    let email = String(data.get('username') ?? '').trim().toLowerCase();
+    if (email === 'bsca') email = 'county-admin@players.invalid';
     const password = String(data.get('password') ?? '');
     statusEl.textContent = 'Signing in…';
     const { error } = await supabase.auth.signInWithPassword({ email, password });
