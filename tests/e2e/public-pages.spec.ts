@@ -155,7 +155,7 @@ test.describe('Public pages', () => {
     await expect(mainNews.getByRole('link', { name: 'Entries open for the Junior County Closed' })).toBeVisible();
     await page.getByRole('button', { name: 'All' }).click();
     await expect(mainNews.getByRole('link', { name: 'England dates from the PSA tour' })).toBeVisible();
-    await expect(mainNews.getByRole('link', { name: /SAM leads the Minigame/ })).toBeVisible();
+    await expect(mainNews.getByRole('link', { name: /SAM leads the Minigame/ }).first()).toBeVisible();
     await expect(mainNews.getByRole('link', { name: 'My Squash is coming soon' })).toBeVisible();
     await page.getByRole('button', { name: 'Website' }).click();
     await expect(mainNews.getByRole('link', { name: 'Welcome to the new Bedfordshire Squash website' })).toBeVisible();

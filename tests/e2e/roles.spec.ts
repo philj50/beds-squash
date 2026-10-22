@@ -1209,9 +1209,11 @@ async function signIn(page: Page, role: RoleName) {
       ? [{ role, club_slug: 'test-club', team_id: null, teams: null }]
       : [{ role, club_slug: 'test-club', team_id: 5, teams: { name: 'Test Team 1' } }];
 
+  const upcoming = new Date(Date.now() + 14 * 24 * 3600_000);
+  upcoming.setUTCHours(18, 0, 0, 0);
   const fixture = {
     id: 100,
-    starts_at: '2026-10-20T18:00:00.000Z',
+    starts_at: upcoming.toISOString(),
     status: 'scheduled',
     home_points: null,
     away_points: null,
