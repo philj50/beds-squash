@@ -243,7 +243,7 @@ test.describe('Public pages', () => {
     await expect(mainNews.getByRole('link', { name: 'Entries open for the Junior County Closed' })).toBeVisible();
     await page.getByRole('button', { name: 'All' }).click();
     await expect(mainNews.getByRole('link', { name: 'England dates from the PSA tour' })).toBeVisible();
-    await expect(mainNews.getByRole('link', { name: /SAM leads the Minigame/ }).first()).toBeVisible();
+    await expect(mainNews.getByRole('link', { name: /SAM leads the Minigame/ })).toHaveCount(1);
     await expect(mainNews.getByRole('link', { name: 'My Squash is coming soon' })).toBeVisible();
     await page.getByRole('button', { name: 'Website' }).click();
     await expect(mainNews.getByRole('link', { name: 'Welcome to the new Bedfordshire Squash website' })).toBeVisible();
@@ -277,7 +277,7 @@ test.describe('Public pages', () => {
     await expect(history.getByRole('link', { name: /Charlie Jenkins beat David Gibson/i })).toBeVisible();
     await expect(page.locator('[data-news-grid] a[href*="2026-08-11-league-match"]')).toHaveCount(0);
     await open(page, 'news/2026-08-11-league-match/');
-    await expect(page.locator('[data-article-body]')).toHaveText('This match article has been taken off the site.');
+    await expect(page.locator('[data-article-body]')).toHaveText('This article has been taken off the site.');
   });
 
   test('the juniors page links to the entry form and not the missing codes of conduct', async ({ page }) => {

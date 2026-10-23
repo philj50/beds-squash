@@ -34,7 +34,7 @@ const scoresHref = url('/captains/admin/minigame/');
         <p class="actions">
           <a class="btn btn--ghost btn--sm" href={`${captainsHref}matches/`}>Matches</a>
           <a class="btn btn--ghost btn--sm" data-junior-link hidden href={juniorEntriesHref}>Junior entries</a>
-          <a class="btn btn--ghost btn--sm" href={articlesHref}>Match articles</a>
+          <a class="btn btn--ghost btn--sm" href={articlesHref}>Articles</a>
           <a class="btn btn--ghost btn--sm" data-share-link hidden href={shareHref}>Shared content</a>
           <a class="btn btn--ghost btn--sm" data-scores-link hidden href={scoresHref}>Minigame mk3 scores</a>
           <button class="btn btn--ghost btn--sm" type="button" data-lm-only data-tab-button="traffic" hidden>Traffic</button>
@@ -1374,7 +1374,7 @@ const scoresHref = url('/captains/admin/minigame/');
   };
   const roleCanDo = (slug: string) => {
     const text: Record<string, string> = {
-      admin: 'Users, groups, roles, links, traffic, League Master lists, juniors, Beds Closed, publish content, match articles, minigame scores',
+      admin: 'Users, groups, roles, links, traffic, League Master lists, juniors, Beds Closed, publish content, articles, minigame scores',
       lm_club_captain: 'Their club on League Master, the squad, club matches',
       lm_team_captain: 'Their team, the squad, the match sheet',
       lm_player: 'My squash, mark availability, send something in',

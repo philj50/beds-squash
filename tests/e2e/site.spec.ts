@@ -640,7 +640,10 @@ test.describe('Public site', () => {
     });
 
     await open(page, 'captains/admin/articles/');
-    await expect(page.getByRole('heading', { level: 1, name: 'Match articles' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Articles' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'Other articles' })).toBeVisible();
+    await expect(page.locator('[data-site-rows]')).toContainText('Welcome to the new Bedfordshire Squash website');
+    await expect(page.locator('[data-site-rows]')).not.toContainText('2026-10-14');
     const row = page.locator('tr', { hasText: 'Charlie Jenkins beat James' });
     await row.getByRole('button', { name: 'Edit' }).click();
     const editor = page.locator('[data-editor="6"]');

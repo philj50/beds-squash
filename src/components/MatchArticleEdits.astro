@@ -86,7 +86,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       const page = document.querySelector<HTMLElement>('[data-article-slug]');
       if (page && gone.has(page.dataset.articleSlug ?? '')) {
         const body = page.querySelector('[data-article-body]');
-        if (body) body.innerHTML = '<p>This match article has been taken off the site.</p>';
+        if (body) body.innerHTML = '<p>This article has been taken off the site.</p>';
         const summary = page.querySelector<HTMLElement>('[data-article-summary]');
         if (summary) summary.hidden = true;
       }
@@ -118,11 +118,22 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
       document.title = `${row.title} · Bedfordshire Squash`;
     }
 
-    const [{ data, error }, places] = await Promise.all([
+    const [{ data, error }, places, newsEdits] = await Promise.all([
       supabase.rpc('published_match_articles'),
       supabase.rpc('match_article_places'),
+      supabase.rpc('news_article_edits'),
     ]);
+    const newsRows = !newsEdits.error && Array.isArray(newsEdits.data)
+      ? (newsEdits.data as { slug: string; title: string | null; summary: string | null; body: string | null; status: string }[])
+      : [];
     if (!error && Array.isArray(data)) apply(data as Row[]);
+    apply(newsRows.filter((row) => row.status === 'edited' && row.title && row.body).map((row) => ({
+      slug: row.slug,
+      title: row.title ?? '',
+      summary: row.summary,
+      body: row.body ?? '',
+    })));
     if (!places.error && Array.isArray(places.data)) applyPlaces(places.data as { slug: string; place: string }[]);
+    applyPlaces(newsRows.filter((row) => row.status === 'deleted').map((row) => ({ slug: row.slug, place: 'gone' })));
   }
 </script>

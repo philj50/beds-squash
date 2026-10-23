@@ -1,17 +1,34 @@
 ---
 import Base from '@/layouts/Base.astro';
+import { getNews } from '@/lib/content';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 import { url } from '@/lib/site';
+
+const siteArticles = (await getNews()).map((post) => {
+  const date = post.data.date;
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return {
+    slug: post.id,
+    date: `${date.getFullYear()}-${month}-${day}`,
+    title: post.data.title,
+    summary: post.data.summary ?? '',
+    body: post.body ?? '',
+    category: post.data.category,
+  };
+});
+const siteArticlesJson = JSON.stringify(siteArticles).replaceAll('<', '\\u003c');
 ---
 
-<Base title="Match articles" description="Choose whether the daily league article publishes on its own." noindex>
+<Base title="Articles" description="Edit or remove news articles, and choose whether a league article publishes on its own." noindex>
   <section class="section">
     <div class="container articles" id="articles-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
-      <h1>Match articles</h1>
+      <h1>Articles</h1>
       <p class="lede">
-        One article for each division that played. Automatic publishing is on to start with.
-        Switch to manual and a match waits here until you approve it. Open Edit to change the subject, summary and text.
-        Archive takes it off the home page and files it under Match history. Delete takes it off the site. Nothing is emailed.
+        Match reports are one article for each division that played. Automatic publishing is on to start with.
+        Switch to manual and a match waits here until you approve it.
+        Other news is listed underneath. Edit changes the subject, summary and text.
+        Archive files a match under Match history. Delete takes an article off the site. Nothing is emailed.
       </p>
       <p class="status" data-status role="status"></p>
 
@@ -50,6 +67,23 @@ import { url } from '@/lib/site';
               <tbody data-rows></tbody>
             </table>
           </div>
+          <h2>Other articles</h2>
+          <p class="lede">News that is not a match report. Edit changes the wording. Delete takes it off the news list.</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Article</th>
+                  <th>Section</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody data-site-rows></tbody>
+            </table>
+          </div>
+          <script type="application/json" id="site-articles" is:inline set:html={siteArticlesJson}></script>
         </div>
       </div>
     </div>
@@ -71,6 +105,23 @@ import { url } from '@/lib/site';
     slug: string;
   };
 
+  type SiteArticle = {
+    slug: string;
+    date: string;
+    title: string;
+    summary: string;
+    body: string;
+    category: string;
+  };
+
+  type SiteEdit = {
+    slug: string;
+    title: string | null;
+    summary: string | null;
+    body: string | null;
+    status: 'edited' | 'deleted';
+  };
+
   const root = document.getElementById('articles-app');
   if (!root) throw new Error('articles app missing');
   watchSortableTables(root);
@@ -80,6 +131,15 @@ import { url } from '@/lib/site';
   const denied = root.querySelector<HTMLElement>('[data-denied]')!;
   const admin = root.querySelector<HTMLElement>('[data-admin]')!;
   const rows = root.querySelector<HTMLElement>('[data-rows]')!;
+  const siteRows = root.querySelector<HTMLElement>('[data-site-rows]')!;
+  const siteArticles = JSON.parse(document.getElementById('site-articles')?.textContent || '[]') as SiteArticle[];
+  const sectionLabel: Record<string, string> = {
+    leagues: 'Leagues',
+    juniors: 'Juniors',
+    tournaments: 'Tournaments',
+    wider: 'Wider squash',
+    website: 'Website',
+  };
   const mode = root.querySelector<HTMLSelectElement>('[data-mode]')!;
   const whoEl = root.querySelector<HTMLElement>('[data-who]')!;
 
@@ -163,6 +223,98 @@ import { url } from '@/lib/site';
     });
     statusEl.textContent = error ? error.message : done;
     if (!error) await showSession();
+  });
+
+  function siteEditor(article: SiteArticle) {
+    return `<tr data-editor-row="${escapeHtml(article.slug)}" hidden><td colspan="5"><form class="stack editor" data-site-editor="${escapeHtml(article.slug)}">
+      <p class="editor__lead">Change the subject, summary and text in the boxes below. Save changes updates this article on the site.</p>
+      ${editField('Subject', 'The heading on the news page.', `<input name="title" maxlength="180" value="${escapeHtml(article.title)}" />`)}
+      ${editField('Summary', 'The short line under the heading.', `<input name="summary" maxlength="400" value="${escapeHtml(article.summary)}" />`, 'Optional')}
+      ${editField('Content', 'The article text on the news page.', `<textarea name="body" maxlength="12000" rows="10">${escapeHtml(article.body)}</textarea>`)}
+      <p class="actions"><button class="btn btn--primary btn--sm" type="submit">Save changes</button><button class="btn btn--ghost btn--sm" type="button" data-cancel>Cancel</button></p>
+    </form></td></tr>`;
+  }
+
+  function paintSite(edits: SiteEdit[], matchSlugs: Set<string>) {
+    const bySlug = new Map(edits.map((row) => [row.slug, row]));
+    const list = siteArticles.filter((article) => !matchSlugs.has(article.slug));
+    siteRows.innerHTML = list.map((article) => {
+      const saved = bySlug.get(article.slug);
+      const removed = saved?.status === 'deleted';
+      const current: SiteArticle = {
+        ...article,
+        title: !removed && saved?.title ? saved.title : article.title,
+        summary: !removed && saved ? (saved.summary ?? '') : article.summary,
+        body: !removed && saved?.body ? saved.body : article.body,
+      };
+      const status = removed ? 'Removed' : saved?.status === 'edited' ? 'Edited' : 'On the site';
+      const buttons = removed
+        ? ''
+        : `<button class="btn btn--ghost btn--sm" type="button" data-site-edit="${escapeHtml(article.slug)}">Edit</button><button class="btn btn--ghost btn--sm" type="button" data-site-delete="${escapeHtml(article.slug)}" data-title="${escapeHtml(current.title)}">Delete</button>`;
+      return `<tr><td>${escapeHtml(article.date)}</td><td data-site-title="${escapeHtml(article.slug)}">${escapeHtml(current.title)}</td><td>${escapeHtml(sectionLabel[article.category] ?? article.category)}</td><td>${status}</td><td class="actions">${buttons}</td></tr>${removed ? '' : siteEditor(current)}`;
+    }).join('') || '<tr><td colspan="5">No other articles.</td></tr>';
+  }
+
+  siteRows.addEventListener('click', async (event) => {
+    const target = event.target as HTMLElement;
+    const edit = target.closest<HTMLButtonElement>('[data-site-edit]');
+    if (edit?.dataset.siteEdit) {
+      const formRow = siteRows.querySelector<HTMLElement>(`[data-editor-row="${edit.dataset.siteEdit}"]`);
+      if (formRow) formRow.hidden = false;
+      return;
+    }
+    const cancel = target.closest<HTMLButtonElement>('[data-cancel]');
+    if (cancel) {
+      const formRow = cancel.closest<HTMLElement>('[data-editor-row]');
+      if (formRow) formRow.hidden = true;
+      return;
+    }
+    const remove = target.closest<HTMLButtonElement>('[data-site-delete]');
+    if (!remove?.dataset.siteDelete) return;
+    const title = remove.dataset.title ?? 'this article';
+    if (!window.confirm(`Remove “${title}” from the site? It leaves the news list.`)) return;
+    statusEl.textContent = 'Deleting…';
+    const { error } = await supabase.rpc('delete_news_article', { p_slug: remove.dataset.siteDelete });
+    statusEl.textContent = error ? error.message : 'Deleted. It is off the site.';
+    if (!error) await showSession();
+  });
+
+  siteRows.addEventListener('submit', async (event) => {
+    const form = (event.target as HTMLElement).closest<HTMLFormElement>('[data-site-editor]');
+    if (!form?.dataset.siteEditor) return;
+    event.preventDefault();
+    const data = new FormData(form);
+    const title = String(data.get('title') ?? '').trim().replace(/\s+/g, ' ');
+    const summary = String(data.get('summary') ?? '').trim().replace(/\s+/g, ' ');
+    const body = String(data.get('body') ?? '').trim();
+    if (title.length < 4 || title.length > 180) {
+      statusEl.textContent = 'Add a subject of 4 to 180 characters.';
+      return;
+    }
+    if (summary.length > 400) {
+      statusEl.textContent = 'Keep the summary to 400 characters.';
+      return;
+    }
+    if (body.length < 20 || body.length > 12000) {
+      statusEl.textContent = 'Write the article.';
+      return;
+    }
+    statusEl.textContent = 'Saving…';
+    const { error } = await supabase.rpc('save_news_article', {
+      p_slug: form.dataset.siteEditor,
+      p_title: title,
+      p_summary: summary || null,
+      p_body: body,
+    });
+    if (error) {
+      statusEl.textContent = error.message;
+      return;
+    }
+    const formRow = form.closest<HTMLElement>('[data-editor-row]');
+    if (formRow) formRow.hidden = true;
+    const titleCell = siteRows.querySelector<HTMLElement>(`[data-site-title="${form.dataset.siteEditor}"]`);
+    if (titleCell) titleCell.textContent = title;
+    statusEl.textContent = 'Saved.';
   });
 
   rows.addEventListener('submit', async (event) => {
@@ -251,6 +403,7 @@ import { url } from '@/lib/site';
       archived: 'Match history',
       deleted: 'Removed',
     };
+    const matchSlugs = new Set((articles as Article[]).map((article) => article.slug));
     rows.innerHTML = (articles as Article[]).map((article) => {
       const approve = article.status === 'held'
         ? `<button class="btn btn--ghost btn--sm" type="button" data-approve="${article.id}">Approve</button>`
@@ -269,6 +422,9 @@ import { url } from '@/lib/site';
         : `<button class="btn btn--ghost btn--sm" type="button" data-edit="${article.id}">Edit</button>`;
       return `<tr><td>${escapeHtml(article.article_on)}</td><td data-title-for="${article.id}">${escapeHtml(article.title)}</td><td>${escapeHtml(placeLabel[article.status])}</td><td class="actions">${edit}${approve}${archive}${restore}${remove}</td></tr>${article.status === 'deleted' ? '' : editor(article)}`;
     }).join('') || '<tr><td colspan="4">No articles yet.</td></tr>';
+    const { data: edits, error: editsError } = await supabase.rpc('news_article_edits');
+    if (editsError && !statusEl.textContent) statusEl.textContent = editsError.message;
+    paintSite((Array.isArray(edits) ? edits : []) as SiteEdit[], matchSlugs);
   }
 
   showSession();

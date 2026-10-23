@@ -15,7 +15,7 @@
  * or from .env. Those values are never printed.
  */
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -1047,6 +1047,14 @@ function leadingScores(rows) {
   return names;
 }
 
+function retireOlderMinigameLeaders(keepSlug) {
+  if (!existsSync(NEWS_DIR)) return;
+  for (const name of readdirSync(NEWS_DIR)) {
+    if (!name.endsWith('-minigame-leader.md') || name === `${keepSlug}.md`) continue;
+    unlinkSync(join(NEWS_DIR, name));
+  }
+}
+
 function sameLeaders(left, right) {
   const key = (rows) => (rows ?? []).map((row) => `${row.name}:${row.score}`).sort().join('|');
   return key(left) === key(right);
@@ -1124,7 +1132,9 @@ async function writeMinigameLeader() {
     return null;
   }
   const today = londonDate(new Date());
-  const path = writeNews(minigameArticle(leaders, today));
+  const article = minigameArticle(leaders, today);
+  const path = writeNews(article);
+  retireOlderMinigameLeaders(article.slug);
   writeMinigameTop(leaders);
   console.error(`minigame lead ${path}`);
   return path;
