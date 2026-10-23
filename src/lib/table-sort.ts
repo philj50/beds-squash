@@ -94,10 +94,12 @@ export function watchSortableTables(
     const th = target.closest('th');
     if (!(th instanceof HTMLTableCellElement)) return;
     const table = th.closest('table');
-    if (!table || !root.contains(table) || th.parentElement?.parentElement !== table.tHead) return;
+    const head = table?.tHead;
+    const headerRow = head?.rows[0];
+    if (!table || !head || !headerRow || !root.contains(table) || th.parentElement?.parentElement !== head) return;
     if (!headerLabel(th)) return;
     const direction: 1 | -1 = th.getAttribute('aria-sort') === 'ascending' ? -1 : 1;
-    for (const header of [...table.tHead.rows[0].cells]) header.removeAttribute('aria-sort');
+    for (const header of [...headerRow.cells]) header.removeAttribute('aria-sort');
     th.setAttribute('aria-sort', direction === 1 ? 'ascending' : 'descending');
     if (onSort?.(table, th.cellIndex, direction)) return;
     sortTableElement(table, th.cellIndex, direction);
