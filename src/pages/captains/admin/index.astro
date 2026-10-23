@@ -106,22 +106,18 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="juniors" hidden>
             <h2>Juniors</h2>
             <p class="muted small">Junior County Closed entries submitted on this website. An admin can correct every field. Saving sends a short note to the Junior organisers. It does not send an email.</p>
-            <div class="overview-box">
+            <div class="overview-box juniors-box">
               <table class="overview">
                 <thead>
                   <tr>
                     <th>Player</th>
-                    <th>Date of birth</th>
                     <th>Age group</th>
                     <th>Section</th>
                     <th>Club</th>
                     <th>Parent</th>
-                    <th>Parent email</th>
-                    <th>Parent phone</th>
-                    <th>Emergency</th>
-                    <th>Emergency phone</th>
                     <th>Notes</th>
                     <th>Public name</th>
+                    <th></th>
                     <th></th>
                   </tr>
                 </thead>
@@ -1517,7 +1513,7 @@ const scoresHref = url('/captains/admin/minigame/');
   function juniorEditor(entry: JuniorEntry) {
     const born = (entry.date_of_birth ?? '').slice(0, 10);
     const section = ['Boys', 'Girls', 'Mixed'].map((option) => `<option${entry.draw === option ? ' selected' : ''}>${option}</option>`).join('');
-    return `<tr data-editor-row="${entry.id}" hidden><td colspan="13"><form class="stack junior-editor" data-editor="${entry.id}">
+    return `<tr data-editor-row="${entry.id}" hidden><td colspan="9"><form class="stack junior-editor" data-editor="${entry.id}">
       <p class="editor__lead">Change any field, then save. The age group follows the date of birth. Under 9 is saved as Mixed.</p>
       <div class="pair">
         ${juniorField('First name', 'The junior who is playing.', `<input name="player_first_name" required maxlength="60" value="${escapeHtml(entry.player_first_name)}" autocomplete="off" />`)}
@@ -1544,9 +1540,10 @@ const scoresHref = url('/captains/admin/minigame/');
       <p class="actions"><button class="btn btn--primary btn--sm" type="submit">Save changes</button><button class="btn btn--ghost btn--sm" type="button" data-cancel>Cancel</button></p>
     </form></td></tr>`;
   }
+  const openJuniorMore = new Set<string>();
   function paintJuniorEntries(entries: JuniorEntry[], problem = '') {
     if (problem) {
-      juniorsHost.innerHTML = `<tr><td colspan="13">${escapeHtml(problem)}</td></tr>`;
+      juniorsHost.innerHTML = `<tr><td colspan="9">${escapeHtml(problem)}</td></tr>`;
       return;
     }
     const rows = entries.slice().sort((a, b) => a.player_last_name.localeCompare(b.player_last_name, 'en') || a.player_first_name.localeCompare(b.player_first_name, 'en'));
@@ -1557,13 +1554,29 @@ const scoresHref = url('/captains/admin/minigame/');
             const player = `${entry.player_first_name} ${entry.player_last_name}`.trim();
             const edit = viewerIsAdmin && Number.isFinite(entry.id) ? `<button class="btn btn--ghost btn--sm" type="button" data-edit="${entry.id}">Edit</button>` : '';
             const publicName = entry.show_name ? 'Yes' : 'No';
-            return `<tr><td>${escapeHtml(player)}</td><td>${escapeHtml(born)}</td><td>${escapeHtml(entry.age_category || '—')}</td><td>${escapeHtml(entry.draw || '—')}</td><td>${escapeHtml(entry.club || '—')}</td><td>${escapeHtml(entry.guardian_name || '—')}</td><td>${escapeHtml(entry.guardian_email || '—')}</td><td>${escapeHtml(entry.guardian_phone || '—')}</td><td>${escapeHtml(entry.emergency_name || '—')}</td><td>${escapeHtml(entry.emergency_phone || '—')}</td><td>${escapeHtml(entry.notes || '—')}</td><td>${publicName}</td><td>${edit}</td></tr>${edit ? juniorEditor(entry) : ''}`;
+            const key = String(entry.id);
+            const expanded = openJuniorMore.has(key);
+            const more = `<button type="button" class="row-more" data-junior-more="${escapeHtml(key)}" aria-expanded="${expanded ? 'true' : 'false'}" aria-label="More for ${escapeHtml(player)}">${expanded ? '−' : '+'}</button>`;
+            const detail = `<tr class="junior-more" data-junior-detail="${escapeHtml(key)}" ${expanded ? '' : 'hidden'}><td colspan="9"><div class="more-grid"><p><span>Date of birth</span> ${escapeHtml(born)}</p><p><span>Parent email</span> ${escapeHtml(entry.guardian_email || '—')}</p><p><span>Parent phone</span> ${escapeHtml(entry.guardian_phone || '—')}</p><p><span>Emergency</span> ${escapeHtml(entry.emergency_name || '—')}</p><p><span>Emergency phone</span> ${escapeHtml(entry.emergency_phone || '—')}</p></div></td></tr>`;
+            return `<tr><td>${escapeHtml(player)}</td><td>${escapeHtml(entry.age_category || '—')}</td><td>${escapeHtml(entry.draw || '—')}</td><td>${escapeHtml(entry.club || '—')}</td><td>${escapeHtml(entry.guardian_name || '—')}</td><td>${escapeHtml(entry.notes || '—')}</td><td>${publicName}</td><td class="row-action">${edit}</td><td class="row-action">${more}</td></tr>${detail}${edit ? juniorEditor(entry) : ''}`;
           })
           .join('')
-      : '<tr><td colspan="13">No junior entries yet.</td></tr>';
+      : '<tr><td colspan="9">No junior entries yet.</td></tr>';
   }
   juniorsHost.addEventListener('click', (event) => {
     const target = event.target as HTMLElement;
+    const more = target.closest<HTMLButtonElement>('[data-junior-more]');
+    if (more?.dataset.juniorMore) {
+      const key = more.dataset.juniorMore;
+      const detail = [...juniorsHost.querySelectorAll<HTMLElement>('[data-junior-detail]')].find((row) => row.dataset.juniorDetail === key);
+      const open = Boolean(detail?.hidden);
+      if (detail) detail.hidden = !open;
+      more.setAttribute('aria-expanded', String(open));
+      more.textContent = open ? '−' : '+';
+      if (open) openJuniorMore.add(key);
+      else openJuniorMore.delete(key);
+      return;
+    }
     const edit = target.closest<HTMLButtonElement>('[data-edit]');
     if (edit?.dataset.edit) {
       for (const row of juniorsHost.querySelectorAll<HTMLElement>('[data-editor-row]')) row.hidden = row.dataset.editorRow !== edit.dataset.edit;
@@ -3751,6 +3764,54 @@ const scoresHref = url('/captains/admin/minigame/');
     min-width: 0;
     font-size: 0.72rem;
     padding: 0.18rem 0.28rem;
+  }
+  #setup-app .juniors-box .overview {
+    font-size: 0.74rem;
+  }
+  #setup-app .juniors-box .overview th,
+  #setup-app .juniors-box .overview td {
+    padding: 0.14rem 0.28rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  #setup-app .juniors-box .row-action {
+    width: 1%;
+    white-space: nowrap;
+  }
+  #setup-app .juniors-box .row-more {
+    width: 1.6rem;
+    height: 1.6rem;
+    padding: 0;
+    border: 1px solid var(--gold-500);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: #fff;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  #setup-app .juniors-box tr[hidden] {
+    display: none;
+  }
+  #setup-app .juniors-box .junior-more td {
+    background: rgba(255, 255, 255, 0.04);
+  }
+  #setup-app .juniors-box .more-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 0.45rem 0.75rem;
+    padding: 0.35rem 0.15rem;
+  }
+  #setup-app .juniors-box .more-grid p {
+    display: grid;
+    gap: 0.2rem;
+    margin: 0;
+    font-size: 0.72rem;
+    font-weight: 700;
+  }
+  #setup-app .juniors-box .more-grid p span {
+    color: var(--gold-400);
+    font-size: 0.68rem;
   }
   #setup-app .users-box .overview .btn--sm {
     max-width: 100%;

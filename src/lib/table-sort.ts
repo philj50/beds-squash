@@ -42,7 +42,7 @@ function headerLabel(th: HTMLTableCellElement) {
 }
 
 function isCompanion(row: HTMLTableRowElement) {
-  return row.hasAttribute('data-traffic-detail') || row.hasAttribute('data-member-detail') || row.hasAttribute('data-editor-row');
+  return row.hasAttribute('data-traffic-detail') || row.hasAttribute('data-member-detail') || row.hasAttribute('data-junior-detail') || row.hasAttribute('data-editor-row');
 }
 
 function rowGroups(tbody: HTMLTableSectionElement) {
