@@ -738,6 +738,16 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(junior).toContainText('Pat Guardian');
     await expect(junior).toContainText('Needs a spare racket');
     await expect(junior.getByRole('cell', { name: 'No', exact: true })).toBeVisible();
+    const editButton = junior.getByRole('button', { name: 'Edit' });
+    await expect(editButton).toBeVisible();
+    const editFit = await editButton.evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      const text = document.createRange();
+      text.selectNodeContents(el);
+      const letters = text.getBoundingClientRect();
+      return letters.height <= box.height && letters.width + 8 <= box.width && getComputedStyle(el).whiteSpace === 'nowrap';
+    });
+    expect(editFit).toBe(true);
     await expect(page.getByRole('columnheader', { name: 'Date of birth' })).toHaveCount(0);
     await junior.getByRole('button', { name: 'More for Jamie Junior' }).click();
     const juniorMore = page.locator('[data-junior-detail="4"]');
