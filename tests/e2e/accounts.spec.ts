@@ -497,7 +497,9 @@ test.describe('Junior County Closed', () => {
       await send(route, []);
     });
     await page.goto('juniors/closed/entries/', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('columnheader', { name: 'Public name' })).toBeVisible();
     const row = page.locator('tr', { hasText: 'Pat Guardian' }).first();
+    await expect(row.getByRole('cell', { name: 'No', exact: true })).toBeVisible();
     await row.getByRole('button', { name: 'Edit' }).click();
     const editor = page.locator('form[data-editor="4"]');
     await expect(editor).toBeVisible();

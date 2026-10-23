@@ -121,6 +121,7 @@ const scoresHref = url('/captains/admin/minigame/');
                     <th>Emergency</th>
                     <th>Emergency phone</th>
                     <th>Notes</th>
+                    <th>Public name</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -1516,7 +1517,7 @@ const scoresHref = url('/captains/admin/minigame/');
   function juniorEditor(entry: JuniorEntry) {
     const born = (entry.date_of_birth ?? '').slice(0, 10);
     const section = ['Boys', 'Girls', 'Mixed'].map((option) => `<option${entry.draw === option ? ' selected' : ''}>${option}</option>`).join('');
-    return `<tr data-editor-row="${entry.id}" hidden><td colspan="12"><form class="stack junior-editor" data-editor="${entry.id}">
+    return `<tr data-editor-row="${entry.id}" hidden><td colspan="13"><form class="stack junior-editor" data-editor="${entry.id}">
       <p class="editor__lead">Change any field, then save. The age group follows the date of birth. Under 9 is saved as Mixed.</p>
       <div class="pair">
         ${juniorField('First name', 'The junior who is playing.', `<input name="player_first_name" required maxlength="60" value="${escapeHtml(entry.player_first_name)}" autocomplete="off" />`)}
@@ -1539,13 +1540,13 @@ const scoresHref = url('/captains/admin/minigame/');
         ${juniorField('Emergency phone', 'A number for that contact.', `<input name="emergency_phone" type="tel" required minlength="8" maxlength="20" value="${escapeHtml(entry.emergency_phone)}" autocomplete="off" />`)}
       </div>
       ${juniorField('Notes', 'Anything the organiser should know. Leave this blank if there is nothing to add.', `<textarea name="notes" maxlength="500" rows="3">${escapeHtml(entry.notes ?? '')}</textarea>`, 'Optional')}
-      <label class="check"><input name="show_name" type="checkbox"${entry.show_name ? ' checked' : ''} /> <span>Show the first name and surname initial on the public page.</span></label>
+      ${juniorField('Public name', 'Tick this to show the first name and surname initial on the public junior page.', `<input name="show_name" type="checkbox"${entry.show_name ? ' checked' : ''} />`, 'Optional')}
       <p class="actions"><button class="btn btn--primary btn--sm" type="submit">Save changes</button><button class="btn btn--ghost btn--sm" type="button" data-cancel>Cancel</button></p>
     </form></td></tr>`;
   }
   function paintJuniorEntries(entries: JuniorEntry[], problem = '') {
     if (problem) {
-      juniorsHost.innerHTML = `<tr><td colspan="12">${escapeHtml(problem)}</td></tr>`;
+      juniorsHost.innerHTML = `<tr><td colspan="13">${escapeHtml(problem)}</td></tr>`;
       return;
     }
     const rows = entries.slice().sort((a, b) => a.player_last_name.localeCompare(b.player_last_name, 'en') || a.player_first_name.localeCompare(b.player_first_name, 'en'));
@@ -1555,10 +1556,11 @@ const scoresHref = url('/captains/admin/minigame/');
             const born = entry.date_of_birth ? formatDay(entry.date_of_birth.slice(0, 10)) : '—';
             const player = `${entry.player_first_name} ${entry.player_last_name}`.trim();
             const edit = viewerIsAdmin && Number.isFinite(entry.id) ? `<button class="btn btn--ghost btn--sm" type="button" data-edit="${entry.id}">Edit</button>` : '';
-            return `<tr><td>${escapeHtml(player)}</td><td>${escapeHtml(born)}</td><td>${escapeHtml(entry.age_category || '—')}</td><td>${escapeHtml(entry.draw || '—')}</td><td>${escapeHtml(entry.club || '—')}</td><td>${escapeHtml(entry.guardian_name || '—')}</td><td>${escapeHtml(entry.guardian_email || '—')}</td><td>${escapeHtml(entry.guardian_phone || '—')}</td><td>${escapeHtml(entry.emergency_name || '—')}</td><td>${escapeHtml(entry.emergency_phone || '—')}</td><td>${escapeHtml(entry.notes || '—')}</td><td>${edit}</td></tr>${edit ? juniorEditor(entry) : ''}`;
+            const publicName = entry.show_name ? 'Yes' : 'No';
+            return `<tr><td>${escapeHtml(player)}</td><td>${escapeHtml(born)}</td><td>${escapeHtml(entry.age_category || '—')}</td><td>${escapeHtml(entry.draw || '—')}</td><td>${escapeHtml(entry.club || '—')}</td><td>${escapeHtml(entry.guardian_name || '—')}</td><td>${escapeHtml(entry.guardian_email || '—')}</td><td>${escapeHtml(entry.guardian_phone || '—')}</td><td>${escapeHtml(entry.emergency_name || '—')}</td><td>${escapeHtml(entry.emergency_phone || '—')}</td><td>${escapeHtml(entry.notes || '—')}</td><td>${publicName}</td><td>${edit}</td></tr>${edit ? juniorEditor(entry) : ''}`;
           })
           .join('')
-      : '<tr><td colspan="12">No junior entries yet.</td></tr>';
+      : '<tr><td colspan="13">No junior entries yet.</td></tr>';
   }
   juniorsHost.addEventListener('click', (event) => {
     const target = event.target as HTMLElement;
@@ -3988,9 +3990,12 @@ const scoresHref = url('/captains/admin/minigame/');
   }
   #setup-app .junior-editor input[type='checkbox'],
   #setup-app .overview td .junior-editor input[type='checkbox'] {
-    width: auto;
-    margin-top: 0.2rem;
+    width: 1.1rem;
+    min-width: 1.1rem;
+    height: 1.1rem;
+    margin-top: 0.15rem;
     padding: 0;
+    justify-self: start;
   }
   #setup-app .junior-editor .actions {
     display: flex;

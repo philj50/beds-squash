@@ -99,7 +99,7 @@ import { url } from '@/lib/site';
         ${editField('Emergency phone', 'A number for that contact.', `<input name="emergency_phone" type="tel" required minlength="8" maxlength="20" value="${escapeHtml(entry.emergency_phone)}" autocomplete="off" />`)}
       </div>
       ${editField('Notes', 'Anything the organiser should know. Leave this blank if there is nothing to add.', `<textarea name="notes" maxlength="500" rows="3">${escapeHtml(entry.notes ?? '')}</textarea>`, 'Optional')}
-      <label class="check"><input name="show_name" type="checkbox"${entry.show_name ? ' checked' : ''} /> <span>Show the first name and surname initial on the public page.</span></label>
+      ${editField('Public name', 'Tick this to show the first name and surname initial on the public junior page.', `<input name="show_name" type="checkbox"${entry.show_name ? ' checked' : ''} />`, 'Optional')}
       <p class="actions"><button class="btn btn--primary btn--sm" type="submit">Save changes</button><button class="btn btn--ghost btn--sm" type="button" data-cancel>Cancel</button></p>
     </form></td></tr>`;
   }
@@ -246,11 +246,12 @@ import { url } from '@/lib/site';
             ${
               group.length
                 ? `<div class="table-wrap"><table>
-                    <thead><tr><th>Player</th><th>Born</th><th>Club</th><th>Parent</th><th>Emergency</th><th>Notes</th><th></th></tr></thead>
+                    <thead><tr><th>Player</th><th>Born</th><th>Club</th><th>Parent</th><th>Emergency</th><th>Notes</th><th>Public name</th><th></th></tr></thead>
                     <tbody>${group
                       .map((entry) => {
                         const player = `${entry.player_first_name} ${entry.player_last_name}`;
                         const edit = canEdit ? `<button class="btn btn--ghost btn--sm" type="button" data-edit="${entry.id}">Edit</button>` : '';
+                        const publicName = entry.show_name ? 'Yes' : 'No';
                         return `<tr>
                           <td>${escapeHtml(player)}</td>
                           <td>${escapeHtml(when.format(new Date(`${entry.date_of_birth}T12:00:00`)))}</td>
@@ -258,8 +259,9 @@ import { url } from '@/lib/site';
                           <td>${escapeHtml(entry.guardian_name)}<br><span class="muted">${escapeHtml(entry.guardian_email)}</span><br><span class="muted">${escapeHtml(entry.guardian_phone)}</span></td>
                           <td>${escapeHtml(entry.emergency_name)}<br><span class="muted">${escapeHtml(entry.emergency_phone)}</span></td>
                           <td>${escapeHtml(entry.notes ?? '')}</td>
+                          <td>${publicName}</td>
                           <td class="row-actions">${edit}<button class="btn btn--ghost btn--sm" type="button" data-remove="${entry.id}" data-name="${escapeHtml(player)}">Remove</button></td>
-                        </tr>${canEdit ? editor(entry, 7) : ''}`;
+                        </tr>${canEdit ? editor(entry, 8) : ''}`;
                       })
                       .join('')}</tbody>
                   </table></div>`
@@ -273,11 +275,12 @@ import { url } from '@/lib/site';
       section.innerHTML = `
         <h2>Other <span class="muted">(${leftover.length})</span></h2>
         <div class="table-wrap"><table>
-          <thead><tr><th>Player</th><th>Born</th><th>Category</th><th>Club</th><th>Parent</th><th>Emergency</th><th>Notes</th><th></th></tr></thead>
+          <thead><tr><th>Player</th><th>Born</th><th>Category</th><th>Club</th><th>Parent</th><th>Emergency</th><th>Notes</th><th>Public name</th><th></th></tr></thead>
           <tbody>${leftover
             .map((entry) => {
               const player = `${entry.player_first_name} ${entry.player_last_name}`;
               const edit = canEdit ? `<button class="btn btn--ghost btn--sm" type="button" data-edit="${entry.id}">Edit</button>` : '';
+              const publicName = entry.show_name ? 'Yes' : 'No';
               return `<tr>
                 <td>${escapeHtml(player)}</td>
                 <td>${escapeHtml(when.format(new Date(`${entry.date_of_birth}T12:00:00`)))}</td>
@@ -286,8 +289,9 @@ import { url } from '@/lib/site';
                 <td>${escapeHtml(entry.guardian_name)}<br><span class="muted">${escapeHtml(entry.guardian_email)}</span><br><span class="muted">${escapeHtml(entry.guardian_phone)}</span></td>
                 <td>${escapeHtml(entry.emergency_name)}<br><span class="muted">${escapeHtml(entry.emergency_phone)}</span></td>
                 <td>${escapeHtml(entry.notes ?? '')}</td>
+                <td>${publicName}</td>
                 <td class="row-actions">${edit}<button class="btn btn--ghost btn--sm" type="button" data-remove="${entry.id}" data-name="${escapeHtml(player)}">Remove</button></td>
-              </tr>${canEdit ? editor(entry, 8) : ''}`;
+              </tr>${canEdit ? editor(entry, 9) : ''}`;
             })
             .join('')}</tbody>
         </table></div>`;
@@ -389,9 +393,12 @@ import { url } from '@/lib/site';
   #entries-app .editor input[type='checkbox'],
   html[data-theme='navy'] #entries-app .editor input[type='checkbox'],
   html[data-theme='light'] #entries-app .editor input[type='checkbox'] {
-    width: auto;
-    margin-top: 0.2rem;
+    width: 1.1rem;
+    min-width: 1.1rem;
+    height: 1.1rem;
+    margin-top: 0.15rem;
     padding: 0;
+    justify-self: start;
   }
   #entries-app .row-actions {
     display: flex;

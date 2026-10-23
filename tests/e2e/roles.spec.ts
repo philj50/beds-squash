@@ -730,6 +730,7 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.getByRole('button', { name: 'Change password' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Juniors', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Juniors', exact: true })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Public name' })).toBeVisible();
     const junior = page.locator('[data-juniors-people] tr', { hasText: 'Jamie Junior' });
     await expect(junior).toContainText('2 Apr 2015');
     await expect(junior).toContainText('Under 11');
@@ -741,9 +742,11 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(junior).toContainText('Sam Emergency');
     await expect(junior).toContainText('07000000001');
     await expect(junior).toContainText('Needs a spare racket');
+    await expect(junior.getByRole('cell', { name: 'No', exact: true })).toBeVisible();
     await junior.getByRole('button', { name: 'Edit' }).click();
     const juniorEditor = page.locator('form[data-editor="4"]');
     await expect(juniorEditor).toBeVisible();
+    await expect(juniorEditor.getByText('Tick this to show the first name and surname initial on the public junior page.')).toBeVisible();
     await juniorEditor.locator('[name="player_first_name"]').fill('Alex');
     await juniorEditor.getByRole('button', { name: 'Save changes' }).click();
     await expect(juniorEditor).toBeHidden();
