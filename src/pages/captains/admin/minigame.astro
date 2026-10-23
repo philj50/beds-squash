@@ -27,7 +27,7 @@ import { url } from '@/lib/site';
               <thead>
                 <tr>
                   <th>Name</th>
-                  <th>Score</th>
+                  <th aria-sort="descending">Score</th>
                   <th>When</th>
                   <th></th>
                 </tr>
@@ -69,6 +69,7 @@ import { url } from '@/lib/site';
 <script>
   import { createClient } from '@supabase/supabase-js';
   import { loadAccount, noteActivity, privateStop, sendToLogin, stopMessage } from '@/lib/account';
+  import { watchSortableTables } from '@/lib/table-sort';
 
   type Score = { id: number; player_name: string; score: number; created_at: string };
 
@@ -91,8 +92,19 @@ import { url } from '@/lib/site';
   const confirmLine = root.querySelector<HTMLElement>('[data-confirm-line]')!;
   const PAGE_SIZE = 15;
   let page = 0;
+  let scoreColumn: 'player_name' | 'score' | 'created_at' = 'score';
+  let scoreAscending = false;
   let total = 0;
   let pendingId: number | null = null;
+  watchSortableTables(root, (_table, column, direction) => {
+    const columnName = (['player_name', 'score', 'created_at'] as const)[column];
+    if (!columnName) return true;
+    scoreColumn = columnName;
+    scoreAscending = direction === 1;
+    page = 0;
+    void loadScores();
+    return true;
+  });
 
   const escapeHtml = (value: string) =>
     value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
@@ -168,7 +180,7 @@ import { url } from '@/lib/site';
     const { data, error, count } = await supabase
       .from('minigame_scores')
       .select('id, player_name, score, created_at', { count: 'exact' })
-      .order('score', { ascending: false })
+      .order(scoreColumn, { ascending: scoreAscending })
       .order('created_at', { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
     if (error) {

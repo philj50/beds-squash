@@ -466,6 +466,23 @@ html[data-theme='light'] .prose code {
   text-align: left;
   vertical-align: middle;
 }
+#setup-app thead th,
+#articles-app thead th,
+#minigame-admin thead th {
+  cursor: pointer;
+}
+#setup-app thead th[aria-sort]::after,
+#articles-app thead th[aria-sort]::after,
+#minigame-admin thead th[aria-sort]::after {
+  content: ' \2191';
+  color: var(--accent);
+}
+#setup-app thead th[aria-sort='descending']::after,
+#articles-app thead th[aria-sort='descending']::after,
+#minigame-admin thead th[aria-sort='descending']::after {
+  content: ' \2193';
+}
+
 .prose th {
   font-family: var(--font-display);
   text-transform: uppercase;

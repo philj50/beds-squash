@@ -105,6 +105,18 @@ async function openUsers(page: Page) {
 }
 
 test.describe('Users', () => {
+  test('the name header sorts the list', async ({ page }) => {
+    await openUsers(page);
+    const names = () => page.locator('[data-users] tr[data-member-key] td:first-child').allTextContents();
+    await expect.poll(names).not.toHaveLength(0);
+    const before = await names();
+    const ascending = [...before].sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
+    await page.locator('.users-box').getByRole('columnheader', { name: 'Name' }).click();
+    await expect.poll(names).toEqual(ascending);
+    await page.locator('.users-box').getByRole('columnheader', { name: 'Name' }).click();
+    await expect.poll(names).toEqual([...ascending].reverse());
+  });
+
   test('an email that is not a real address is marked and is not saved', async ({ page }) => {
     await openUsers(page);
     const email = page.getByRole('textbox', { name: 'Email for Pat Player' });

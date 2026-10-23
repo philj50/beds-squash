@@ -142,10 +142,7 @@ import { url } from '@/lib/site';
     'rb_players',
   ]);
 
-  const maySend = (account: Account) =>
-    account.isAdmin ||
-    account.places.some((place) => place.role === 'club_captain' || place.role === 'team_captain' || place.role === 'team_player') ||
-    account.groups.some((group) => playerGroups.has(group.slug));
+  const maySend = (account: Account) => account.isAdmin || account.groups.some((group) => playerGroups.has(group.slug));
 
   async function senderName(account: Account) {
     const { data } = await supabase.from('group_members').select('group_slug, person_name').eq('profile_id', account.userId);

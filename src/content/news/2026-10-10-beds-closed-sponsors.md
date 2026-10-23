@@ -10,7 +10,7 @@ featured: true
 
 From **Sam Morris**.
 
-A first look at the confirmed sponsors — at least so far — for the [Bedfordshire County Closed](/events/2027-01-beds-closed/), back at Club Towers on 9 and 10 January 2027.
+A first look at the confirmed sponsors — at least so far — for the [Bedfordshire County Closed](/events/2027-01-beds-closed/), back at Club Towers from Thursday 7 to Sunday 10 January 2027.
 
 ## Main sponsor
 

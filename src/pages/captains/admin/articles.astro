@@ -59,6 +59,7 @@ import { url } from '@/lib/site';
 <script>
   import { createClient } from '@supabase/supabase-js';
   import { loadAccount, noteActivity, privateStop, sendToLogin, stopMessage } from '@/lib/account';
+  import { watchSortableTables } from '@/lib/table-sort';
 
   type Article = {
     id: number;
@@ -72,6 +73,7 @@ import { url } from '@/lib/site';
 
   const root = document.getElementById('articles-app');
   if (!root) throw new Error('articles app missing');
+  watchSortableTables(root);
   const supabase = createClient(root.dataset.url!, root.dataset.key!);
   const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
   const signedIn = root.querySelector<HTMLElement>('[data-panel="signed-in"]')!;
@@ -223,15 +225,7 @@ import { url } from '@/lib/site';
         return;
       }
     }
-    const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', session.user.id).maybeSingle();
-    const { data: membership } = await supabase
-      .from('memberships')
-      .select('role')
-      .eq('profile_id', session.user.id)
-      .eq('role', 'admin')
-      .limit(1);
-    const isAdmin = Boolean(profile?.is_admin) || Boolean(membership?.length);
-    if (!isAdmin) {
+    if (!account?.isAdmin) {
       denied.hidden = false;
       denied.textContent = 'This account cannot change articles.';
       return;

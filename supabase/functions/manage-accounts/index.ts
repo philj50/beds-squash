@@ -69,7 +69,14 @@ Deno.serve(async (req) => {
     .eq('id', userData.user.id)
     .maybeSingle();
   if (meError) return json({ error: meError.message }, 500);
-  if (!me?.is_admin) return json({ error: 'Only an admin can do that.' }, 403);
+  const { data: adminSeat, error: seatError } = await admin
+    .from('group_members')
+    .select('id')
+    .eq('profile_id', userData.user.id)
+    .eq('group_slug', 'admins')
+    .maybeSingle();
+  if (seatError) return json({ error: seatError.message }, 500);
+  if (!me?.is_admin && !adminSeat) return json({ error: 'Only an admin can do that.' }, 403);
 
   let body: {
     action?: string;
@@ -248,11 +255,19 @@ Deno.serve(async (req) => {
     const { error } = await admin.from('profiles').update({ is_admin: isAdmin }).eq('id', userId);
     if (error) return json({ error: error.message }, 400);
     if (isAdmin) {
-      const { error: roleError } = await admin.from('memberships').insert({ profile_id: userId, role: 'admin' });
-      if (roleError && roleError.code !== '23505') return json({ error: roleError.message }, 400);
+      const { data: person } = await admin.from('profiles').select('display_name').eq('id', userId).maybeSingle();
+      const { data: already } = await admin.from('group_members').select('id').eq('profile_id', userId).eq('group_slug', 'admins').maybeSingle();
+      if (!already) {
+        const { error: groupError } = await admin.from('group_members').insert({
+          group_slug: 'admins',
+          profile_id: userId,
+          person_name: String(person?.display_name ?? '').trim() || 'Unnamed',
+        });
+        if (groupError && groupError.code !== '23505') return json({ error: groupError.message }, 400);
+      }
     } else {
-      const { error: roleError } = await admin.from('memberships').delete().eq('profile_id', userId).eq('role', 'admin');
-      if (roleError) return json({ error: roleError.message }, 400);
+      const { error: groupError } = await admin.from('group_members').delete().eq('profile_id', userId).eq('group_slug', 'admins');
+      if (groupError) return json({ error: groupError.message }, 400);
     }
     return json({ ok: true });
   }

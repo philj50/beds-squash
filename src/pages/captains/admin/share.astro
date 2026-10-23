@@ -464,8 +464,7 @@ import { url } from '@/lib/site';
         return;
       }
     }
-    const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', session.user.id).maybeSingle();
-    if (!profile?.is_admin) {
+    if (!account?.isAdmin) {
       denied.hidden = false;
       denied.textContent = 'This account cannot publish shared content.';
       return;

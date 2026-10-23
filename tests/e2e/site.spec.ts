@@ -276,6 +276,17 @@ test.describe('Public site', () => {
         await send([{ role: 'team_player', club_slug: null, teams: { name: 'Test Team 1' } }]);
         return;
       }
+      if (url.pathname.endsWith('/group_members')) {
+        await send([
+          {
+            profile_id: playerId,
+            person_name: 'Pat Player',
+            group_slug: 'lm_players',
+            groups: { name: 'LM Players', position: 4, roles: { name: 'LM Player' } },
+          },
+        ]);
+        return;
+      }
       if (url.pathname.endsWith('/clubs')) {
         await send([]);
         return;

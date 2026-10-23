@@ -529,6 +529,7 @@ const scoresHref = url('/captains/admin/minigame/');
   import { createClient } from '@supabase/supabase-js';
   import { bindPasswordRules, bindPasswordToggles, callManageAccounts, fetchAccountStates, fillSuggestedPassword, passwordIssue, suggestPassword } from '@/lib/passwords';
   import { loadAccount, noteActivity, privateStop, sendToLogin, stopMessage, type Account } from '@/lib/account';
+  import { compareCellText, sortMarkupRows, watchSortableTables } from '@/lib/table-sort';
 
   type Person = { id: string; display_name: string; email: string | null; is_admin: boolean };
   type Club = { slug: string; name: string; contact_name: string | null; contact_email: string | null; leaguemaster_club_id?: string | null };
@@ -624,6 +625,7 @@ const scoresHref = url('/captains/admin/minigame/');
   let signedInIds = new Set<string>();
   let accountStatesReady = false;
   const USER_PAGE = 25;
+  let memberSort: { col: number; dir: 1 | -1 } | null = null;
   let memberPage = 0;
   let pinMember = false;
   const usersPager = root.querySelector<HTMLElement>('[data-users-pager]')!;
@@ -674,7 +676,10 @@ const scoresHref = url('/captains/admin/minigame/');
   const trafficVisitors = root.querySelector<HTMLElement>('[data-traffic-visitors]')!;
   const TRAFFIC_PAGE = 10;
   const trafficListPage: Record<string, number> = { visitors: 0, 'by-day': 0, pages: 0, top: 0, members: 0, 'sign-ins': 0 };
+  const trafficSort: Record<string, { col: number; dir: 1 | -1 } | undefined> = {};
   const paintTrafficList = (key: string, rows: string[], body: HTMLElement, empty: string) => {
+    const sort = trafficSort[key];
+    rows = sort ? sortMarkupRows(rows, sort.col, sort.dir) : rows;
     const pager = root.querySelector<HTMLElement>(`[data-traffic-pager="${key}"]`)!;
     const range = pager.querySelector<HTMLElement>('[data-traffic-range]')!;
     const prev = pager.querySelector<HTMLButtonElement>('[data-traffic-prev]')!;
@@ -1789,6 +1794,23 @@ const scoresHref = url('/captains/admin/minigame/');
       return `<input data-row-field="${field}" data-row-key="${escapeHtml(card.key)}" name="${contactFieldName(`${card.key}:${field}`)}" aria-label="${label} for ${escapeHtml(card.name)}" type="${emailField ? 'text' : type}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" autocomplete="${emailField ? 'one-time-code' : 'off'}"${emailField ? ' inputmode="email" autocapitalize="none" spellcheck="false"' : ''} />`;
     };
     const actionButton = (label: string, attrs: string) => `<button class="btn btn--ghost btn--sm" type="button" ${attrs}>${label}</button>`;
+    if (memberSort) {
+      const { col, dir } = memberSort;
+      const text = (card: MemberCard) => {
+        if (col === 0) return card.label;
+        if (col === 1) return card.teams;
+        if (col === 2) return card.email;
+        if (col === 3) return card.roleNames || card.groupNames;
+        if (col === 4) return card.active ? 'Active' : 'Inactive';
+        return '';
+      };
+      shown.sort((left, right) => {
+        const a = text(left).trim();
+        const b = text(right).trim();
+        if (!a || !b) return !a === !b ? 0 : a ? -1 : 1;
+        return dir * compareCellText(a, b);
+      });
+    }
     const pageCount = Math.max(1, Math.ceil(shown.length / USER_PAGE));
     if (pinMember && selectedMemberKey) {
       const index = shown.findIndex((card) => card.key === selectedMemberKey);
@@ -3287,6 +3309,37 @@ const scoresHref = url('/captains/admin/minigame/');
     }
     paintDifferences();
     setStatus(takeLm ? `League Master ${label} saved for ${player.display_name}.` : `Website ${label} kept for ${player.display_name}.`);
+  }
+  if (setupApp) {
+    watchSortableTables(setupApp, (table, column, direction) => {
+      const body = table.tBodies[0];
+      const trafficKey = body?.hasAttribute('data-traffic-visitors')
+        ? 'visitors'
+        : body?.hasAttribute('data-traffic-by-day')
+          ? 'by-day'
+          : body?.hasAttribute('data-traffic-pages')
+            ? 'pages'
+            : body?.hasAttribute('data-traffic-top')
+              ? 'top'
+              : body?.hasAttribute('data-traffic-members')
+                ? 'members'
+                : body?.hasAttribute('data-traffic-sign-ins')
+                  ? 'sign-ins'
+                  : '';
+      if (trafficKey) {
+        trafficSort[trafficKey] = { col: column, dir: direction };
+        trafficListPage[trafficKey] = 0;
+        paintTrafficLists();
+        return true;
+      }
+      if (body === membersHost) {
+        memberSort = { col: column, dir: direction };
+        memberPage = 0;
+        paintMembers();
+        return true;
+      }
+      return false;
+    });
   }
   differenceRows.addEventListener('click', (event) => {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-keep-difference], [data-take-difference]');

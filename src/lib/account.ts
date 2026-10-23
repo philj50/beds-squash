@@ -141,17 +141,16 @@ export async function noteActivity(supabase: SupabaseClient) {
   }
 }
 
-/** True when this login organises a website group, or is an admin. */
+/** True when this login is in that group, or in the Admins group. The profile flag still counts until the group is filled. */
 export async function organisesGroup(supabase: SupabaseClient, userId: string, slug: string) {
-  const { data: me } = await supabase.from('profiles').select('is_admin').eq('id', userId).maybeSingle();
-  if (me?.is_admin) return true;
   const { data, error } = await supabase
     .from('group_members')
     .select('group_slug')
     .eq('profile_id', userId)
-    .eq('group_slug', slug)
-    .maybeSingle();
-  return !error && Boolean(data);
+    .in('group_slug', [slug, 'admins']);
+  if (!error && (data ?? []).some((row) => row.group_slug === slug || row.group_slug === 'admins')) return true;
+  const { data: me } = await supabase.from('profiles').select('is_admin').eq('id', userId).maybeSingle();
+  return Boolean(me?.is_admin);
 }
 
 export async function loadAccount(supabase: SupabaseClient): Promise<Account | null> {
