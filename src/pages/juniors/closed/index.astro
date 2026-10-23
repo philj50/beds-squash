@@ -3,6 +3,7 @@ import Base from '@/layouts/Base.astro';
 import JuniorAdminMenu from '@/components/JuniorAdminMenu.astro';
 import JuniorClosedPoster from '@/components/JuniorClosedPoster.astro';
 import JuniorClosedQr from '@/components/JuniorClosedQr.astro';
+import JuniorEntryBoard from '@/components/JuniorEntryBoard.astro';
 import { getClubs } from '@/lib/content';
 import { AGE_REFERENCE, ENTRY_CLOSES, TOURNAMENT_ON } from '@/lib/junior-age';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
@@ -30,20 +31,7 @@ const clubs = (await getClubs()).map((club) => club.data.name);
             Sunday 8th November, 10am–5pm at Towers Health &amp; Racquets Club. Entry is free. Entries close on Wednesday 28th October. A parent or guardian enters the player here. The age group is worked out from the date of birth, using age on {AGE_REFERENCE}.
           </p>
           <JuniorClosedPoster />
-          <ul class="categories">
-            <li>Mixed U9</li>
-            <li>Girls U11</li>
-            <li>Girls U13</li>
-            <li>Girls U15</li>
-            <li>Girls U17</li>
-            <li>Girls U19</li>
-            <li>Boys U11</li>
-            <li>Boys U13</li>
-            <li>Boys U15</li>
-            <li>Boys U17</li>
-            <li>Boys U19</li>
-          </ul>
-          <p class="note">*actual categories we run and format will depend on entry number</p>
+          <JuniorEntryBoard heading="Entries" />
           <p class="lede">Any queries please email <a href="mailto:bsrajunior@gmail.com">bsrajunior@gmail.com</a>.</p>
           <p class="status" data-status role="status"></p>
           <p class="thanks" data-thanks hidden>Entry received. The organiser has these details. Nothing has been emailed.</p>
@@ -86,6 +74,10 @@ const clubs = (await getClubs()).map((club) => club.data.name);
                 <label>Phone <input name="emergency_phone" type="tel" required minlength="8" maxlength="20" autocomplete="off" /></label>
               </div>
               <label>Anything the organiser should know <textarea name="notes" maxlength="500" rows="3"></textarea></label>
+              <label class="check">
+                <input name="show_name" type="checkbox" />
+                <span>Show this player's first name and surname initial on the public junior page.</span>
+              </label>
               <label class="check">
                 <input name="guardian_confirmed" type="checkbox" required />
                 <span>I am the parent or guardian of this player.</span>
@@ -185,11 +177,13 @@ const clubs = (await getClubs()).map((club) => club.data.name);
       emergency_phone: String(data.get('emergency_phone')).trim(),
       notes: String(data.get('notes') ?? '').trim() || null,
       guardian_confirmed: true,
+      show_name: form.querySelector<HTMLInputElement>('[name="show_name"]')?.checked === true,
     });
     if (error) {
       statusEl.textContent = error.code === '23505' ? 'This player is already entered.' : error.message;
       return;
     }
+    document.dispatchEvent(new CustomEvent('junior-entries-changed'));
     statusEl.textContent = '';
     form.hidden = true;
     thanks.hidden = false;
@@ -205,18 +199,6 @@ const clubs = (await getClubs()).map((club) => club.data.name);
   }
   .lede {
     color: var(--ink-200);
-  }
-  .categories {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
-    gap: 0.2rem 1rem;
-    margin: 0.75rem 0;
-    padding-left: 1.1rem;
-  }
-  .note {
-    margin: 0 0 0.75rem;
-    color: var(--ink-200);
-    font-size: 0.9rem;
   }
   .stack {
     display: grid;

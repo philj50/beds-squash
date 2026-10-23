@@ -294,7 +294,7 @@ test.describe('Public pages', () => {
     await expect(page.getByRole('link', { name: 'Code of Conduct for Juniors' })).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'Code of Conduct for Parents' })).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'Child Protection Policy Statement' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'bsrajunior@gmail.com' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'bsrajunior@gmail.com' })).toHaveCount(2);
 
     await open(page, 'documents/');
     await expect(page.getByRole('heading', { name: 'Codes of Conduct' })).toHaveCount(0);

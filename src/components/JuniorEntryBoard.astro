@@ -1,0 +1,133 @@
+---
+import { ENTRY_GROUPS } from '@/lib/junior-age';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
+
+interface Props {
+  heading?: string;
+}
+
+const { heading = 'Junior County Closed entries' } = Astro.props;
+---
+
+<section
+  class="entry-board"
+  data-entry-board
+  data-url={SUPABASE_URL}
+  data-key={SUPABASE_PUBLISHABLE_KEY}
+>
+  <h2>{heading}</h2>
+  <p class="entry-board__status" data-entry-status hidden></p>
+  <div class="entry-board__grid">
+    {
+      ENTRY_GROUPS.map((group) => (
+        <article class="entry-board__group" data-entry-group={group.label}>
+          <h3>{group.label}</h3>
+          <p class="entry-board__count" data-count>—</p>
+          <ul class="entry-board__names" data-names hidden />
+        </article>
+      ))
+    }
+  </div>
+  <p class="entry-board__note">*actual categories we run and format will depend on entry number</p>
+  <p class="entry-board__consent">
+    A parent can take a name off this list at any time by contacting the Junior organisers at
+    <a href="mailto:bsrajunior@gmail.com">bsrajunior@gmail.com</a>.
+  </p>
+</section>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+
+  type PublicGroup = { label?: string; count?: number; names?: string[] };
+
+  const escapeHtml = (value: string) =>
+    value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
+
+  const countLabel = (count: number) => (count === 1 ? '1 entry' : `${count} entries`);
+
+  const paint = (board: HTMLElement, groups: PublicGroup[]) => {
+    const byLabel = new Map(groups.map((group) => [group.label ?? '', group]));
+    for (const card of board.querySelectorAll<HTMLElement>('[data-entry-group]')) {
+      const group = byLabel.get(card.dataset.entryGroup ?? '');
+      const countEl = card.querySelector<HTMLElement>('[data-count]');
+      const namesEl = card.querySelector<HTMLElement>('[data-names]');
+      if (!countEl || !namesEl) continue;
+      const count = Number(group?.count);
+      countEl.textContent = Number.isFinite(count) ? countLabel(count) : '—';
+      const names = Array.isArray(group?.names) ? group.names.filter((name) => typeof name === 'string' && name.trim()) : [];
+      namesEl.innerHTML = names.map((name) => `<li>${escapeHtml(name.trim())}</li>`).join('');
+      namesEl.hidden = names.length === 0;
+    }
+  };
+
+  const loadBoard = async (board: HTMLElement) => {
+    const status = board.querySelector<HTMLElement>('[data-entry-status]');
+    const url = board.dataset.url;
+    const key = board.dataset.key;
+    if (!url || !key) return;
+    const supabase = createClient(url, key);
+    const { data, error } = await supabase.rpc('junior_public_entries');
+    if (error || !Array.isArray(data)) {
+      if (status) {
+        status.hidden = false;
+        status.textContent = 'The entry numbers are not available just now.';
+      }
+      return;
+    }
+    if (status) status.hidden = true;
+    paint(board, data as PublicGroup[]);
+  };
+
+  const boards = () => document.querySelectorAll<HTMLElement>('[data-entry-board]');
+  for (const board of boards()) void loadBoard(board);
+  document.addEventListener('junior-entries-changed', () => {
+    for (const board of boards()) void loadBoard(board);
+  });
+</script>
+
+<style>
+  .entry-board {
+    margin: 0.5rem 0 1rem;
+  }
+  .entry-board h2 {
+    margin: 0 0 0.75rem;
+  }
+  .entry-board__status {
+    margin: 0 0 0.75rem;
+    color: var(--ink-200);
+  }
+  .entry-board__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 0.75rem;
+  }
+  .entry-board__group {
+    margin: 0;
+    padding: 0.75rem 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+  }
+  .entry-board__group h3 {
+    margin: 0;
+    font-size: 1rem;
+  }
+  .entry-board__count {
+    margin: 0.25rem 0 0;
+    color: var(--gold-600);
+    font-weight: 700;
+  }
+  .entry-board__names {
+    margin: 0.45rem 0 0;
+    padding-left: 1.1rem;
+  }
+  .entry-board__names[hidden] {
+    display: none;
+  }
+  .entry-board__note,
+  .entry-board__consent {
+    margin: 0.75rem 0 0;
+    color: var(--ink-200);
+    font-size: 0.9rem;
+  }
+</style>

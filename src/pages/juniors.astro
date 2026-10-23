@@ -5,6 +5,7 @@ import EventCard from '@/components/EventCard.astro';
 import JuniorAdminMenu from '@/components/JuniorAdminMenu.astro';
 import JuniorClosedPoster from '@/components/JuniorClosedPoster.astro';
 import JuniorClosedQr from '@/components/JuniorClosedQr.astro';
+import JuniorEntryBoard from '@/components/JuniorEntryBoard.astro';
 import { getClubs, getDocuments, getUpcomingEvents } from '@/lib/content';
 import { url } from '@/lib/site';
 
@@ -38,6 +39,11 @@ const safeguarding = (await getDocuments()).filter((d) => d.data.category === 's
       </div></div>
     </div>
   </ContentPage>
+  <section class="section">
+    <div class="container">
+      <JuniorEntryBoard />
+    </div>
+  </section>
 </Base>
 
 <style>

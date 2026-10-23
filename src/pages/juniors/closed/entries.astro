@@ -8,7 +8,7 @@ import { url } from '@/lib/site';
   <section class="section">
     <div class="container entries" id="entries-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
       <h1>Junior County Closed entries</h1>
-      <p class="lede">Player details stay on this page. An admin can correct every field on an entry. Saving or removing an entry does not send an email.</p>
+      <p class="lede">Player details stay on this page. An admin can correct every field on an entry. Saving or removing an entry sends a short note to the Junior organisers. It does not send an email.</p>
       <p class="status" data-status role="status"></p>
 
       <div data-panel="signed-in" hidden>
@@ -45,6 +45,7 @@ import { url } from '@/lib/site';
     emergency_name: string;
     emergency_phone: string;
     notes: string | null;
+    show_name?: boolean;
     created_at: string;
   };
 
@@ -98,6 +99,7 @@ import { url } from '@/lib/site';
         ${editField('Emergency phone', 'A number for that contact.', `<input name="emergency_phone" type="tel" required minlength="8" maxlength="20" value="${escapeHtml(entry.emergency_phone)}" autocomplete="off" />`)}
       </div>
       ${editField('Notes', 'Anything the organiser should know. Leave this blank if there is nothing to add.', `<textarea name="notes" maxlength="500" rows="3">${escapeHtml(entry.notes ?? '')}</textarea>`, 'Optional')}
+      <label class="check"><input name="show_name" type="checkbox"${entry.show_name ? ' checked' : ''} /> <span>Show the first name and surname initial on the public page.</span></label>
       <p class="actions"><button class="btn btn--primary btn--sm" type="submit">Save changes</button><button class="btn btn--ghost btn--sm" type="button" data-cancel>Cancel</button></p>
     </form></td></tr>`;
   }
@@ -184,6 +186,7 @@ import { url } from '@/lib/site';
       p_emergency_name: emergency,
       p_emergency_phone: emergencyPhone,
       p_notes: notes || null,
+      p_show_name: form.querySelector<HTMLInputElement>('[name="show_name"]')?.checked === true,
     });
     if (error) {
       statusEl.textContent = error.message;
@@ -224,7 +227,7 @@ import { url } from '@/lib/site';
     void noteActivity(supabase);
     const { data: rows, error } = await supabase
       .from('junior_entries')
-      .select('id, player_first_name, player_last_name, date_of_birth, age_category, draw, club, guardian_name, guardian_email, guardian_phone, emergency_name, emergency_phone, notes, created_at')
+      .select('id, player_first_name, player_last_name, date_of_birth, age_category, draw, club, guardian_name, guardian_email, guardian_phone, emergency_name, emergency_phone, notes, show_name, created_at')
       .order('player_last_name');
     if (error) {
       statusEl.textContent = error.message;
@@ -312,6 +315,11 @@ import { url } from '@/lib/site';
     gap: 0.3rem;
     font-size: 0.9rem;
   }
+  #entries-app label.check {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+  }
   #entries-app input,
   #entries-app select,
   #entries-app textarea {
@@ -377,6 +385,13 @@ import { url } from '@/lib/site';
     color: #163556;
     color-scheme: light;
     border: 2px solid var(--accent);
+  }
+  #entries-app .editor input[type='checkbox'],
+  html[data-theme='navy'] #entries-app .editor input[type='checkbox'],
+  html[data-theme='light'] #entries-app .editor input[type='checkbox'] {
+    width: auto;
+    margin-top: 0.2rem;
+    padding: 0;
   }
   #entries-app .row-actions {
     display: flex;

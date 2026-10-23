@@ -282,6 +282,7 @@ test.describe('Junior County Closed', () => {
       await send(route, { id: 1 }, 201);
     });
     await page.goto('juniors/closed/', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('checkbox', { name: /first name and surname initial/i })).not.toBeChecked();
     await fillEntry(page, '2016-03-01');
     await page.getByRole('button', { name: 'Enter' }).click();
     await expect(page.locator('[data-thanks]')).toHaveText('Entry received. The organiser has these details. Nothing has been emailed.');
@@ -292,7 +293,48 @@ test.describe('Junior County Closed', () => {
       age_category: 'Under 11',
       draw: 'Girls',
       guardian_email: 'guardian@example.test',
+      show_name: false,
     });
+  });
+
+  test('ticking the name box sends consent, and the public list shows only those names', async ({ page }) => {
+    let posted: Record<string, unknown> | null = null;
+    const groups = [
+      { label: 'Mixed U9', count: 0, names: [] },
+      { label: 'Girls U11', count: 2, names: ['Jamie J.'] },
+      { label: 'Girls U13', count: 1, names: [] },
+      { label: 'Girls U15', count: 0, names: [] },
+      { label: 'Girls U17', count: 0, names: [] },
+      { label: 'Girls U19', count: 0, names: [] },
+      { label: 'Boys U11', count: 0, names: [] },
+      { label: 'Boys U13', count: 0, names: [] },
+      { label: 'Boys U15', count: 0, names: [] },
+      { label: 'Boys U17', count: 0, names: [] },
+      { label: 'Boys U19', count: 0, names: [] },
+    ];
+    await page.route(`${SUPABASE}/rest/v1/rpc/junior_public_entries**`, async (route) => {
+      await send(route, groups);
+    });
+    await page.route(`${SUPABASE}/rest/v1/junior_entries**`, async (route) => {
+      if (route.request().method() === 'POST') posted = route.request().postDataJSON() as Record<string, unknown>;
+      await send(route, { id: 1 }, 201);
+    });
+    await page.goto('juniors/', { waitUntil: 'domcontentloaded' });
+    const girls = page.locator('[data-entry-group="Girls U11"]');
+    await expect(girls).toContainText('2 entries');
+    await expect(girls.getByRole('listitem')).toHaveText('Jamie J.');
+    await expect(page.locator('[data-entry-group="Mixed U9"]')).toContainText('0 entries');
+    await expect(page.locator('[data-entry-group="Mixed U9"] li')).toHaveCount(0);
+    await expect(page.locator('[data-entry-group="Girls U13"] li')).toHaveCount(0);
+    await expect(page.getByText('A parent can take a name off this list at any time')).toBeVisible();
+
+    await page.goto('juniors/closed/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-entry-group="Girls U11"]')).toContainText('Jamie J.');
+    await fillEntry(page, '2016-03-01');
+    await page.getByRole('checkbox', { name: /first name and surname initial/i }).check();
+    await page.getByRole('button', { name: 'Enter' }).click();
+    await expect(page.locator('[data-thanks]')).toBeVisible();
+    expect(posted).toMatchObject({ show_name: true });
   });
 
   test('the same player entered twice is refused', async ({ page }) => {
@@ -412,6 +454,7 @@ test.describe('Junior County Closed', () => {
         emergency_name: 'Sam Emergency',
         emergency_phone: '07000000001',
         notes: 'Needs a spare racket',
+        show_name: false,
         created_at: '2026-10-01T12:00:00Z',
       },
     ];
@@ -442,6 +485,7 @@ test.describe('Junior County Closed', () => {
         entry.emergency_name = String(saved.p_emergency_name);
         entry.emergency_phone = String(saved.p_emergency_phone);
         entry.notes = String(saved.p_notes ?? '');
+        entry.show_name = Boolean(saved.p_show_name);
         entry.age_category = 'Under 13';
         await send(route, null);
         return;
@@ -457,7 +501,7 @@ test.describe('Junior County Closed', () => {
     await row.getByRole('button', { name: 'Edit' }).click();
     const editor = page.locator('form[data-editor="4"]');
     await expect(editor).toBeVisible();
-    await editor.getByLabel('First name').fill('Alex');
+    await editor.locator('[name="player_first_name"]').fill('Alex');
     await editor.getByLabel('Last name').fill('Player');
     await editor.getByLabel('Date of birth').fill('2014-06-01');
     await editor.getByLabel('Section').selectOption('Boys');
@@ -468,6 +512,9 @@ test.describe('Junior County Closed', () => {
     await editor.getByLabel('Emergency name').fill('Sam Contact');
     await editor.getByLabel('Emergency phone').fill('07222222222');
     await editor.getByLabel('Notes').fill('Bring kit');
+    const consent = editor.getByRole('checkbox', { name: /first name and surname initial/i });
+    await expect(consent).not.toBeChecked();
+    await consent.check();
     await editor.getByRole('button', { name: 'Save changes' }).click();
     await expect(editor).toBeHidden();
     await expect(page.locator('[data-status]')).toHaveText('Saved.');
@@ -486,6 +533,7 @@ test.describe('Junior County Closed', () => {
       p_emergency_name: 'Sam Contact',
       p_emergency_phone: '07222222222',
       p_notes: 'Bring kit',
+      p_show_name: true,
     });
   });
 

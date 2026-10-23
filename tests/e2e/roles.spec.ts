@@ -283,6 +283,7 @@ test.describe('Club captain, team captain, and player', () => {
         emergency_name: 'Sam Emergency',
         emergency_phone: '07000000001',
         notes: 'Needs a spare racket',
+        show_name: false,
       },
     ];
     await page.route(`${SUPABASE}/**`, async (route) => {
@@ -594,6 +595,7 @@ test.describe('Club captain, team captain, and player', () => {
           entry.emergency_name = String(saved.p_emergency_name);
           entry.emergency_phone = String(saved.p_emergency_phone);
           entry.notes = String(saved.p_notes ?? '');
+          entry.show_name = Boolean(saved.p_show_name);
         }
         return send(null);
       }
@@ -742,7 +744,7 @@ test.describe('Club captain, team captain, and player', () => {
     await junior.getByRole('button', { name: 'Edit' }).click();
     const juniorEditor = page.locator('form[data-editor="4"]');
     await expect(juniorEditor).toBeVisible();
-    await juniorEditor.getByLabel('First name').fill('Alex');
+    await juniorEditor.locator('[name="player_first_name"]').fill('Alex');
     await juniorEditor.getByRole('button', { name: 'Save changes' }).click();
     await expect(juniorEditor).toBeHidden();
     await expect(page.locator('[data-status]')).toHaveText('Saved.');
