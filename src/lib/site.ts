@@ -34,7 +34,7 @@ export const NAV: NavItem[] = [
   { label: 'Documents', href: '/documents/', more: true },
   { label: 'About', href: '/about/', more: true },
   { label: 'Contact', href: '/contact/', more: true },
-  { label: 'Minigame mk3', href: '/minigame/', more: true },
+  { label: 'Minigame mk4', href: '/minigame/', more: true },
   { label: 'Administration', href: '/captains/admin/', more: true },
 ];
 

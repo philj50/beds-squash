@@ -1,15 +1,13 @@
 ---
-title: "SAM leads the Minigame mk3 board"
+title: "Minigame mk4 starts from a clear board"
 date: 2026-10-18
-summary: "SAM scored 1167 on Minigame mk3 and leads the board."
-image: /uploads/news/minigame-mk3.jpg
-imageAlt: "A top-down Halloween squash court with orange lines, cobwebs, lanterns, a purple racket, and a ball in the air above its shadow."
+summary: "The mk3 high scores have come off the board. Mk4 lists the match, you against the court."
 category: website
-main: true
+main: false
 featured: false
 draft: false
 ---
 
-SAM has the top score on [Minigame mk3](/minigame/), with 1167.
+The [Minigame mk4](/minigame/) board starts empty. The mk3 scores are still stored, and they are not on the list.
 
-The board beside the court shows the ten highest scores. A higher score takes the lead.
+Mk4 is a match to 11. The board shows that result, such as 11–4. A win comes before a loss, and 11–0 beats 11–9.

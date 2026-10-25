@@ -38,7 +38,7 @@ const hooks = [
 const rule = ruleFor(new Date());
 const clubs = await getClubs();
 const mapClubs = await toMapClubs(clubs);
-const leagueClubs = clubs.filter((c) => c.data.leagueClub);
+const leagueClubs = clubs.filter((c) => c.data.leagueClub && !c.data.associate);
 const totalCourts = clubs.reduce((n, c) => n + (c.data.courts ?? 0), 0);
 const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
 ---

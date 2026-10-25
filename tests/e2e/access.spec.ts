@@ -254,7 +254,7 @@ test('an Admins group member can open the minigame scores without the profile fl
   await page.goto('captains/admin/', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('[data-scores-link]')).toBeVisible();
   await page.goto('captains/admin/minigame/', { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { level: 1, name: 'Minigame mk3 scores' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Minigame mk4 results' })).toBeVisible();
   await expect(page.getByText('This account cannot change the minigame board.')).toBeHidden();
   await expect(page.getByText('No scores on the board.')).toBeVisible();
 });

@@ -8,12 +8,13 @@ import { url } from '@/lib/site';
 
 const clubs = await getClubs();
 const mapClubs = await toMapClubs(clubs);
-const leagueClubs = clubs.filter((c) => c.data.leagueClub);
-const venues = clubs.filter((c) => !c.data.leagueClub);
+const leagueClubs = clubs.filter((c) => c.data.leagueClub && !c.data.associate);
+const associates = clubs.filter((c) => c.data.associate);
+const venues = clubs.filter((c) => !c.data.leagueClub && !c.data.associate);
 ---
 
-<Base title="Squash clubs in Bedfordshire" description="Every squash club and pay-and-play court in Bedfordshire and Milton Keynes, with an interactive map, teams, court counts and contact details." crumbs={[{ name: 'Clubs', path: '/clubs/' }]}>
-  <PageHero eyebrow="Where to play" title="Clubs & courts" lede="Every club in the Bedfordshire leagues plus pay-and-play courts across the county. Click a marker for details." />
+<Base title="Squash clubs in Bedfordshire" description="Squash clubs and pay-and-play courts in Bedfordshire and Milton Keynes, plus Carlton as an associate club, with a map, teams, court counts and contact details." crumbs={[{ name: 'Clubs', path: '/clubs/' }]}>
+  <PageHero eyebrow="Where to play" title="Clubs & courts" lede="Every club in the Bedfordshire leagues, Carlton as an associate club, and pay-and-play courts across the county. Click a marker for details." />
 
   <section class="section section--tight">
     <div class="container">
@@ -68,6 +69,48 @@ const venues = clubs.filter((c) => !c.data.leagueClub);
   </section>
 
   {
+    associates.length > 0 && (
+      <section class="section" style="border-top:1px solid var(--border)">
+        <div class="container">
+          <div class="section-head">
+            <h2>Associate clubs</h2>
+          </div>
+          <p class="muted" style="max-width:70ch">
+            Carlton is in the north of the county, beside the Northamptonshire border. Its teams play in the Northants leagues, and a lot of Bedfordshire players are members.
+          </p>
+          <div class="grid grid--3">
+            {associates.map((c) => (
+              <article class="card club">
+                <div class="club__band club__band--associate">
+                  <span>{c.data.town ?? 'Associate'}</span>
+                </div>
+                <div class="card__body">
+                  <h3 class="card__title">
+                    <a href={url(`/clubs/${c.id}/`)}>{c.data.name}</a>
+                  </h3>
+                  <p class="club__venue">
+                    {c.data.venue}
+                    <br />
+                    <span class="muted">
+                      {c.data.address}, {c.data.postcode}
+                    </span>
+                  </p>
+                  <div class="card__meta">
+                    {c.data.courts && <span class="pill pill--muted">{c.data.courts} courts</span>}
+                    <span class="pill pill--associate">Associate</span>
+                    {c.data.tags.includes('juniors') && <span class="pill pill--muted">Juniors</span>}
+                    {c.data.tags.includes('racketball') && <span class="pill pill--muted">Racketball</span>}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  {
     venues.length > 0 && (
       <section class="section" style="border-top:1px solid var(--border)">
         <div class="container">
@@ -116,6 +159,11 @@ const venues = clubs.filter((c) => !c.data.leagueClub);
     letter-spacing: 0.1em;
     font-weight: 700;
     color: var(--text);
+  }
+  .club__band--associate {
+    background:
+      linear-gradient(135deg, rgba(244, 196, 48, 0.32), rgba(14, 39, 68, 0.08)),
+      repeating-linear-gradient(-55deg, transparent 0 14px, rgba(255, 255, 255, 0.04) 14px 16px);
   }
   .club__venue {
     font-size: 0.95rem;

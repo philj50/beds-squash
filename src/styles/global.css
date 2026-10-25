@@ -385,6 +385,15 @@ html[data-theme='light'] .pill--red {
   color: var(--ink-200);
   border-color: var(--border);
 }
+.pill--associate {
+  background: rgba(244, 196, 48, 0.16);
+  color: #f4c430;
+  border-color: rgba(244, 196, 48, 0.45);
+}
+html[data-theme='navy'] .pill--associate,
+html[data-theme='light'] .pill--associate {
+  color: #8a6508;
+}
 
 /* Grid helpers */
 .grid {

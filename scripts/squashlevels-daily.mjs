@@ -1035,14 +1035,22 @@ async function writeSeasonOpener() {
   return { playedOn, division: fixture.division?.name ?? '' };
 }
 
+function resultRank(row) {
+  const you = Number(row.you);
+  const court = Number(row.court);
+  if (you >= 11 && you >= court + 2) return 1000 - court;
+  return you;
+}
+
 function leadingScores(rows) {
-  const top = rows.find((row) => Number.isFinite(Number(row.score)) && row.name);
+  const top = rows.find((row) => row.name && Number.isFinite(Number(row.you)) && Number.isFinite(Number(row.court)));
   if (!top) return [];
-  const score = Number(top.score);
+  const you = Number(top.you);
+  const court = Number(top.court);
   const names = [];
   for (const row of rows) {
-    if (Number(row.score) !== score) break;
-    if (!names.some((leader) => leader.name === row.name)) names.push({ name: row.name, score });
+    if (Number(row.you) !== you || Number(row.court) !== court) break;
+    if (!names.some((leader) => leader.name === row.name)) names.push({ name: row.name, you, court });
   }
   return names;
 }
@@ -1056,7 +1064,7 @@ function retireOlderMinigameLeaders(keepSlug) {
 }
 
 function sameLeaders(left, right) {
-  const key = (rows) => (rows ?? []).map((row) => `${row.name}:${row.score}`).sort().join('|');
+  const key = (rows) => (rows ?? []).map((row) => `${row.name}:${row.you}:${row.court}`).sort().join('|');
   return key(left) === key(right);
 }
 
@@ -1091,28 +1099,34 @@ async function minigameLeaders() {
 }
 
 function minigameArticle(leaders, today) {
-  const score = leaders[0].score;
+  const you = leaders[0].you;
+  const court = leaders[0].court;
+  const result = `${you}–${court}`;
+  const won = you >= 11 && you >= court + 2;
   const names = leaders.map((row) => row.name);
   const who = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
   const plural = names.length > 1;
-  const title = plural ? `${who} lead the Minigame mk3 board` : `${who} leads the Minigame mk3 board`;
-  const summary = plural
-    ? `${who} are level on ${score}, at the top of the Minigame mk3 board.`
-    : `${who} scored ${score} on Minigame mk3 and leads the board.`;
+  const verb = won ? (plural ? 'lead' : 'leads') : plural ? 'are' : 'is';
+  const title = won
+    ? plural
+      ? `${who} lead the Minigame mk4 board`
+      : `${who} leads the Minigame mk4 board`
+    : `${who} ${verb} on the Minigame mk4 board`;
+  const summary = won
+    ? `${who} ${plural ? 'lead' : 'leads'} Minigame mk4, winning ${result}.`
+    : `${who} ${plural ? 'are' : 'is'} top of Minigame mk4 at ${result}.`;
   return {
     slug: `${today}-minigame-leader`,
     title,
-    summary: summary.length > 280 ? `${who} ${plural ? 'lead' : 'leads'} Minigame mk3 with ${score}.` : summary,
+    summary: summary.length > 280 ? `${who} ${plural ? 'lead' : 'leads'} Minigame mk4 at ${result}.` : summary,
     body: [
-      `${who} ${plural ? 'have' : 'has'} the top score on [Minigame mk3](/minigame/), with ${score}.`,
+      `${who} ${plural ? 'have' : 'has'} the best result on [Minigame mk4](/minigame/), at ${result}.`,
       '',
-      'The board beside the court shows the ten highest scores. A higher score takes the lead.',
+      'The board beside the court shows the ten best matches. A win comes first. 11–0 beats 11–9.',
     ].join('\n'),
     articleOn: today,
     category: 'website',
     main: true,
-    image: '/uploads/news/minigame-mk3.jpg',
-    imageAlt: 'A top-down Halloween squash court with orange lines, cobwebs, lanterns, a purple racket, and a ball in the air above its shadow.',
   };
 }
 
@@ -1122,12 +1136,12 @@ async function writeMinigameLeader() {
   const previous = readMinigameTop();
   if (!previous) {
     writeMinigameTop(leaders);
-    console.error(`minigame lead noted: ${leaders.map((row) => `${row.name} ${row.score}`).join(', ')}`);
+    console.error(`minigame lead noted: ${leaders.map((row) => `${row.name} ${row.you}-${row.court}`).join(', ')}`);
     return null;
   }
   if (sameLeaders(previous, leaders)) return null;
-  const previousScore = Math.max(...previous.map((row) => Number(row.score) || 0));
-  if (leaders[0].score < previousScore) {
+  const previousRank = previous.length ? Math.max(...previous.map((row) => resultRank(row))) : -1;
+  if (resultRank(leaders[0]) < previousRank) {
     writeMinigameTop(leaders);
     return null;
   }

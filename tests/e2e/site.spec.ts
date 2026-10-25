@@ -35,9 +35,9 @@ test.describe('Public site', () => {
     await nav.getByRole('button', { name: 'More' }).click();
     await expect(nav.getByRole('link', { name: 'Events', exact: true })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Contact', exact: true })).toBeVisible();
-    await expect(nav.getByRole('link', { name: 'Minigame mk3' })).toBeVisible();
+    await expect(nav.getByRole('link', { name: 'Minigame mk4' })).toBeVisible();
     const labels = (await nav.getByRole('link').allTextContents()).map((label) => label.trim());
-    expect(labels.indexOf('Minigame mk3')).toBe(labels.indexOf('Contact') + 1);
+    expect(labels.indexOf('Minigame mk4')).toBe(labels.indexOf('Contact') + 1);
     expect(labels[labels.indexOf('News') + 1]).toBe('Clubs');
     await expect(nav.locator('[data-your-squash]')).toBeHidden();
     await expect(nav.getByRole('link', { name: 'My Squash', exact: true })).toHaveCount(0);
@@ -729,10 +729,10 @@ test.describe('Public site', () => {
 
   test('minigame asks for initials and serves from the court', async ({ page }) => {
     await open(page, 'minigame/');
-    await expect(page.getByRole('heading', { level: 1, name: 'Minigame mk3' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Minigame mk4' })).toBeVisible();
     await expect(page.getByLabel('Your initials')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'High scores' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Results' })).toBeVisible();
     const court = page.locator('canvas');
     await expect(court).toBeVisible();
     await expect(page.getByRole('button', { name: 'Serve' })).toBeHidden();
@@ -777,13 +777,17 @@ test.describe('Public site', () => {
           const r = data[i] ?? 0;
           const g = data[i + 1] ?? 0;
           const b = data[i + 2] ?? 0;
-          if (b > 230 && r > 160 && r < 220 && g > 100 && g < 170 && b > r && b > g) return y;
+          if (r > 210 && g > 160 && g < 220 && b < 90) return y;
         }
       }
       return height;
     });
     expect(racketTop).toBeGreaterThanOrEqual(360);
     expect(racketTop).toBeLessThanOrEqual(420);
+    await serve.click();
+    await expect(page.locator('[data-hud]')).toBeVisible();
+    await expect(page.locator('[data-score]')).toContainText('0–0');
+    await expect(page.locator('[data-call]')).toHaveText(/Straight|Cross court|Boast/);
   });
 
   test('junior closed signup form', async ({ page }) => {

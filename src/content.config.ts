@@ -74,6 +74,8 @@ const clubs = defineCollection({
     image: uploadPath.optional(),
     // Show in the league clubs list (vs. a venue that just has courts)
     leagueClub: z.boolean().default(true),
+    // A club people play at that does not field a Bedfordshire league team
+    associate: z.boolean().default(false),
     order: z.number().default(100),
   }),
 });

@@ -15,6 +15,7 @@ export interface MapClub {
   lng: number;
   courts?: number;
   leagueClub: boolean;
+  associate?: boolean;
 }
 
 interface Props {
@@ -24,14 +25,18 @@ interface Props {
 }
 const { clubs, height = '520px', focus } = Astro.props;
 const payload = clubs.map((c) => ({ ...c, href: url(`/clubs/${c.id}/`) }));
+const showLeague = clubs.some((c) => c.leagueClub && !c.associate);
+const showVenue = clubs.some((c) => !c.leagueClub && !c.associate);
+const showAssociate = clubs.some((c) => c.associate);
 ---
 
 <div class="club-map" style={`--h:${height}`}>
   <div class="club-map__canvas" data-club-map data-focus={focus ?? ''}></div>
   <script type="application/json" data-clubs set:html={JSON.stringify(payload)} />
   <div class="club-map__legend">
-    <span><i class="dot dot--league"></i> League club</span>
-    <span><i class="dot dot--venue"></i> Pay &amp; play courts</span>
+    {showLeague && <span><i class="dot dot--league"></i> League club</span>}
+    {showAssociate && <span><i class="dot dot--associate"></i> Associate</span>}
+    {showVenue && <span><i class="dot dot--venue"></i> Pay &amp; play courts</span>}
   </div>
 </div>
 
@@ -55,6 +60,7 @@ const payload = clubs.map((c) => ({ ...c, href: url(`/clubs/${c.id}/`) }));
     lng: number;
     courts?: number;
     leagueClub: boolean;
+    associate?: boolean;
     href: string;
   };
 
@@ -81,10 +87,10 @@ const payload = clubs.map((c) => ({ ...c, href: url(`/clubs/${c.id}/`) }));
         className: 'osm-dark',
       }).addTo(map);
 
-      const icon = (league: boolean) =>
+      const icon = (club: Club) =>
         L.divIcon({
           className: '',
-          html: `<span class="pin ${league ? 'pin--league' : 'pin--venue'}"></span>`,
+          html: `<span class="pin ${club.associate ? 'pin--associate' : club.leagueClub ? 'pin--league' : 'pin--venue'}"></span>`,
           iconSize: [22, 22],
           iconAnchor: [11, 11],
           popupAnchor: [0, -12],
@@ -92,10 +98,11 @@ const payload = clubs.map((c) => ({ ...c, href: url(`/clubs/${c.id}/`) }));
 
       const bounds = L.latLngBounds([]);
       clubs.forEach((c) => {
-        const m = L.marker([c.lat, c.lng], { icon: icon(c.leagueClub), title: c.name }).addTo(map);
+        const m = L.marker([c.lat, c.lng], { icon: icon(c), title: c.name }).addTo(map);
         m.bindPopup(
           `<strong>${c.name}</strong><br>${c.venue}${c.town ? `, ${c.town}` : ''} ${c.postcode}` +
             (c.courts ? `<br>${c.courts} court${c.courts === 1 ? '' : 's'}` : '') +
+            (c.associate ? `<br>Associate club` : '') +
             `<br><a href="${c.href}">Club details →</a>`,
         );
         bounds.extend([c.lat, c.lng]);
@@ -194,7 +201,8 @@ const payload = clubs.map((c) => ({ ...c, href: url(`/clubs/${c.id}/`) }));
     bottom: 12px;
     z-index: 500;
     display: flex;
-    gap: 1rem;
+    flex-wrap: wrap;
+    gap: 0.45rem 1rem;
     background: color-mix(in srgb, var(--ink-900) 88%, transparent);
     border: 1px solid var(--border-strong);
     border-radius: 999px;
@@ -223,6 +231,11 @@ const payload = clubs.map((c) => ({ ...c, href: url(`/clubs/${c.id}/`) }));
   .pin--venue {
     background: #e11d48;
     box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.5);
+  }
+  .dot--associate,
+  .pin--associate {
+    background: #f4c430;
+    box-shadow: 0 0 0 3px rgba(244, 196, 48, 0.55);
   }
   .pin {
     display: block;

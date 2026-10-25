@@ -11,6 +11,7 @@ async function open(page: import('@playwright/test').Page, path = '') {
 const clubs = [
   'Bedford Bulls',
   'Biggleswade Squash Club',
+  'Carlton Squash Club',
   'Club Towers',
   'David Lloyd Squash',
   'Flitwick Squash Club',
@@ -106,6 +107,11 @@ test.describe('Public pages', () => {
   test('the clubs index lists every club and a card opens that club', async ({ page }) => {
     await open(page, 'clubs/');
     await expect(page.getByRole('heading', { level: 1, name: 'Clubs & courts' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Associate clubs' })).toBeVisible();
+    const carlton = page.locator('article.club', { has: page.getByRole('link', { name: 'Carlton Squash Club', exact: true }) });
+    await expect(carlton.getByText('Associate', { exact: true })).toBeVisible();
+    const league = page.locator('section').filter({ has: page.getByRole('heading', { name: 'League clubs' }) });
+    await expect(league.getByRole('link', { name: 'Carlton Squash Club' })).toHaveCount(0);
     for (const name of clubs) {
       await expect(page.getByRole('link', { name, exact: true }).first()).toBeVisible();
     }
@@ -243,7 +249,8 @@ test.describe('Public pages', () => {
     await expect(mainNews.getByRole('link', { name: 'Entries open for the Junior County Closed' })).toBeVisible();
     await page.getByRole('button', { name: 'All' }).click();
     await expect(mainNews.getByRole('link', { name: 'England dates from the PSA tour' })).toBeVisible();
-    await expect(mainNews.getByRole('link', { name: /SAM leads the Minigame/ })).toHaveCount(1);
+    await expect(mainNews.getByRole('link', { name: 'Minigame mk4 starts from a clear board' })).toHaveCount(1);
+    await expect(mainNews.getByRole('link', { name: 'Minigame mk4 is played on the floor' })).toBeVisible();
     await expect(mainNews.getByRole('link', { name: 'My Squash is coming soon' })).toBeVisible();
     await page.getByRole('button', { name: 'Website' }).click();
     await expect(mainNews.getByRole('link', { name: 'Welcome to the new Bedfordshire Squash website' })).toBeVisible();

@@ -8,7 +8,7 @@ import { SITE, url } from '@/lib/site';
 
 const page = await getEntry('pages', 'leagues');
 const Content = page ? (await render(page)).Content : null;
-const clubs = (await getClubs()).filter((c) => c.data.leagueClub);
+const clubs = (await getClubs()).filter((c) => c.data.leagueClub && !c.data.associate);
 const rules = (await getDocuments()).filter((d) => d.data.category === 'league-rules');
 const LM = SITE.leagueMaster.replace(/\/$/, '');
 ---

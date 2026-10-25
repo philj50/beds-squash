@@ -58,7 +58,7 @@ const TAG_LABEL: Record<string, string> = {
   <header class="page-hero">
     <div class="container">
       <a class="back" href={url('/clubs/')}>← All clubs</a>
-      <span class="eyebrow">{d.leagueClub ? 'League club' : 'Pay & play courts'}{d.town && ` · ${d.town}`}</span>
+      <span class="eyebrow">{d.associate ? 'Associate club' : d.leagueClub ? 'League club' : 'Pay & play courts'}{d.town && ` · ${d.town}`}</span>
       <h1>{d.name}</h1>
       <p class="lede">{d.venue} · {d.address}, {d.postcode}</p>
       <div class="tags">{d.tags.map((t) => <span class="pill pill--muted">{TAG_LABEL[t] ?? t}</span>)}</div>

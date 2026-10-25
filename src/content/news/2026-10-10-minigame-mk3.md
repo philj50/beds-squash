@@ -8,7 +8,7 @@ category: website
 featured: false
 ---
 
-[Minigame mk3](/minigame/) is the new one-player game, looking down the court.
+This was Minigame mk3. [Minigame mk4](/minigame/) has replaced it. The notes below are what mk3 did.
 
 The ball no longer comes straight down the middle. It leaves the front wall at an angle, and it often runs to a side wall on the way back. Hit it before it bounces twice. The racket still stays behind the service line.
 

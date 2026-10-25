@@ -4,20 +4,20 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 import { url } from '@/lib/site';
 ---
 
-<Base title="Minigame mk3 scores" description="Remove a name from the Minigame mk3 high-score board." noindex>
+<Base title="Minigame mk4 results" description="Remove a result from the Minigame mk4 board." noindex>
   <section class="section">
     <div class="container scores-admin" id="minigame-admin" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
-      <h1>Minigame mk3 scores</h1>
+      <h1>Minigame mk4 results</h1>
       <p class="lede">
-        These names are on the <a href={url('/minigame/')}>Minigame mk3</a> high-score board.
-        Remove a row to take that name and score off the board.
+        These results are on the <a href={url('/minigame/')}>Minigame mk4</a> board.
+        A win is listed before a loss. Remove a row to take that result off the board. Mk3 scores stay stored and are not listed.
       </p>
       <p class="status" data-status role="status"></p>
       <div data-panel="signed-in" hidden>
         <p class="who" data-who></p>
         <p class="actions">
           <a class="btn btn--ghost btn--sm" href={url('/captains/admin/')}>Admin</a>
-          <a class="btn btn--ghost btn--sm" href={url('/minigame/')}>Minigame mk3</a>
+          <a class="btn btn--ghost btn--sm" href={url('/minigame/')}>Minigame mk4</a>
           <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
         </p>
         <p data-denied hidden>This account cannot change the minigame board.</p>
@@ -27,7 +27,7 @@ import { url } from '@/lib/site';
               <thead>
                 <tr>
                   <th>Name</th>
-                  <th aria-sort="descending">Score</th>
+                  <th aria-sort="descending">Result</th>
                   <th>When</th>
                   <th></th>
                 </tr>
@@ -71,7 +71,7 @@ import { url } from '@/lib/site';
   import { loadAccount, noteActivity, privateStop, sendToLogin, stopMessage } from '@/lib/account';
   import { watchSortableTables } from '@/lib/table-sort';
 
-  type Score = { id: number; player_name: string; score: number; created_at: string };
+  type Score = { id: number; player_name: string; score: number; court_score: number | null; created_at: string };
 
   const root = document.getElementById('minigame-admin');
   if (!root) throw new Error('minigame admin missing');
@@ -125,14 +125,15 @@ import { url } from '@/lib/site';
       return;
     }
     rowsEl.innerHTML = scores
-      .map(
-        (row) => `<tr>
+      .map((row) => {
+        const result = `${row.score}–${row.court_score ?? 0}`;
+        return `<tr>
           <td>${escapeHtml(row.player_name)}</td>
-          <td class="num">${row.score}</td>
+          <td class="num">${result}</td>
           <td>${escapeHtml(when(row.created_at))}</td>
-          <td><button class="btn btn--ghost btn--sm" type="button" data-remove="${row.id}" data-name="${escapeHtml(row.player_name)}" data-score="${row.score}">Remove</button></td>
-        </tr>`,
-      )
+          <td><button class="btn btn--ghost btn--sm" type="button" data-remove="${row.id}" data-name="${escapeHtml(row.player_name)}" data-score="${result}">Remove</button></td>
+        </tr>`;
+      })
       .join('');
   }
 
@@ -179,7 +180,8 @@ import { url } from '@/lib/site';
     const from = page * PAGE_SIZE;
     const { data, error, count } = await supabase
       .from('minigame_scores')
-      .select('id, player_name, score, created_at', { count: 'exact' })
+      .select('id, player_name, score, court_score, created_at', { count: 'exact' })
+      .eq('edition', 'mk4')
       .order(scoreColumn, { ascending: scoreAscending })
       .order('created_at', { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
@@ -214,7 +216,7 @@ import { url } from '@/lib/site';
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-remove]');
     if (!button?.dataset.remove) return;
     pendingId = Number(button.dataset.remove);
-    confirmLine.textContent = `Remove ${button.dataset.name} and the score of ${button.dataset.score} from the board?`;
+    confirmLine.textContent = `Remove ${button.dataset.name} and the result ${button.dataset.score} from the board?`;
     if (!confirmDialog.open) confirmDialog.showModal();
   });
 

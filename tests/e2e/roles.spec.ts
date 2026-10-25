@@ -874,7 +874,7 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(adminMenu.getByRole('menuitem', { name: 'County Closed entries' })).toBeVisible();
 
     await page.goto('captains/admin/minigame/', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('heading', { level: 1, name: 'Minigame mk3 scores' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Minigame mk4 results' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Disallowed initials' })).toBeVisible();
     await expect(page.locator('[data-pager]')).toContainText('1–15 of 16');
     await expect(page.getByRole('cell', { name: 'Philip Jenkins' })).toBeVisible();

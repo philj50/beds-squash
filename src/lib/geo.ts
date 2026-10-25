@@ -45,6 +45,7 @@ export async function toMapClubs(clubs: CollectionEntry<'clubs'>[]): Promise<Map
       lng,
       courts: c.data.courts,
       leagueClub: c.data.leagueClub,
+      associate: c.data.associate,
     });
   }
   return out;
