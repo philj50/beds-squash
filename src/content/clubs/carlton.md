@@ -11,12 +11,12 @@ website: https://carltonsquashclub.co.uk/
 bookingUrl: https://www.fastcourts.com/clubs/CarltonSquashClub/
 email: carltonsquashclub@gmail.com
 facebook: https://www.facebook.com/carltonsquash
-tags: [squash, racketball, juniors, members-club]
+tags: [squash, racketball, members-club]
 leagueClub: false
 associate: true
 order: 300
 ---
 
-Carlton Squash Club is a small members' club on School Lane in Carlton, in the north of the county beside the Northamptonshire border. There are two heated courts, Monday evening squash, Wednesday racketball, and junior coaching on Sunday mornings.
+Carlton Squash Club is a small members' club on School Lane in Carlton, in the north of the county beside the Northamptonshire border. The two courts have modern LED lighting, and the changing rooms were renovated recently. Monday evening is squash, and the ladies' racketball session is on Thursdays.
 
-The club runs three teams in the Northamptonshire leagues, plus its own box leagues. A lot of Bedfordshire players are members.
+The club runs four teams in the Northamptonshire leagues this season, plus its own box leagues. A lot of Bedfordshire players are members.
