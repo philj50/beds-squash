@@ -15,7 +15,7 @@ const RIGHT = 412;
 const FRONT = 48;
 const BACK = 633;
 const MID = (LEFT + RIGHT) / 2;
-const RACKET_W = 74;
+const RACKET_W = 126;
 const RACKET_Y = BACK - 16;
 /** Short line, the service line: 5.49 m from the front wall on a 9.75 m court. */
 const SERVICE_Y = FRONT + (BACK - FRONT) * (5.49 / 9.75);
@@ -27,7 +27,7 @@ const LAUNCH_Y = FRONT + 18;
 const SECOND_BOUNCE_Y = BACK + 36;
 const T_X = MID;
 const T_Y = SERVICE_Y + 34;
-const T_R = 52;
+const T_R = 68;
 const BOX_W = 86;
 const BOX_H = 118;
 
@@ -37,6 +37,12 @@ export const PLAY = { left: LEFT, right: RIGHT, front: FRONT, back: BACK };
 export const SERVE_SPOT = {
   x: (MID / COURT.width) * 100,
   y: (((FRONT + BACK) / 2) / COURT.height) * 100,
+};
+
+/** Racket starts on the T, as fractions of the floor. */
+export const T_SPOT = {
+  x: (T_X - LEFT) / (RIGHT - LEFT),
+  y: (T_Y - FRONT) / (BACK - FRONT),
 };
 
 export type Phase = 'idle' | 'serve' | 'rally' | 'point' | 'over';
@@ -64,6 +70,8 @@ type Ball = {
   pitchX: number;
   pitchY: number;
   yStart: number;
+  /** Wait at the front so the call can be read. */
+  delay: number;
 };
 
 type Box = { x0: number; y0: number; x1: number; y1: number; side: Side };
@@ -79,6 +87,7 @@ export type Arcade = {
   balls: Ball[];
   age: number;
   wait: number;
+  note: string;
   flash: { side: Side; until: number } | null;
 };
 
@@ -112,6 +121,7 @@ function stillBall(): Ball {
     pitchX: MID,
     pitchY: SERVICE_Y,
     yStart: LAUNCH_Y,
+    delay: 0,
   };
 }
 
@@ -134,13 +144,15 @@ export function createArcade(): Arcade {
     balls: [stillBall()],
     age: 0,
     wait: 0,
+    note: '',
     flash: null,
   };
 }
 
 export function beginServe(game: Arcade) {
   game.phase = 'serve';
-  game.wait = 0.45;
+  game.wait = 0.35;
+  game.note = 'Stand in the circle';
   game.balls = [stillBall()];
 }
 
@@ -160,7 +172,7 @@ export function setRacket(game: Arcade, fractionX: number, fractionY?: number) {
 }
 
 function pace(game: Arcade) {
-  return Math.min(320, 200 + game.age * 0.45 + (game.you + game.court) * 3.2);
+  return Math.min(220, 118 + game.age * 0.18 + (game.you + game.court) * 1.6);
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -175,20 +187,24 @@ function aimAt(ball: Ball, x: number, y: number, speed: number) {
   ball.vy = (dy / dist) * speed;
 }
 
-function sideOf(x: number): -1 | 1 {
-  return x < MID ? -1 : 1;
-}
-
+/** The racket is three equal bands. Outside is a boast, the middle is straight, the inside is a cross. */
 function classify(ball: Ball, game: Arcade): Call {
+  const side: -1 | 1 = ball.pitchX < MID ? -1 : 1;
   const along = (ball.x - game.racketX) / (RACKET_W / 2);
-  if (Math.abs(along) >= 0.72) return 'boast';
-  const side = sideOf(ball.x);
-  if (along * side < -0.12) return 'cross';
+  const onLeft = along <= -1 / 3;
+  const onRight = along >= 1 / 3;
+  if (side < 0) {
+    if (onLeft) return 'boast';
+    if (onRight) return 'cross';
+    return 'straight';
+  }
+  if (onRight) return 'boast';
+  if (onLeft) return 'cross';
   return 'straight';
 }
 
 function playShot(ball: Ball, game: Arcade, speed: number) {
-  const side = sideOf(ball.x);
+  const side: -1 | 1 = ball.pitchX < MID ? -1 : 1;
   ball.shot = classify(ball, game);
   ball.asked = game.call;
   ball.fromSide = side;
@@ -201,10 +217,10 @@ function playShot(ball: Ball, game: Arcade, speed: number) {
   ball.z = 36;
   if (ball.shot === 'boast') {
     const wallX = side < 0 ? LEFT + BALL : RIGHT - BALL;
-    aimAt(ball, wallX, ball.y - 90, speed);
+    aimAt(ball, wallX, FRONT + 90, speed);
     return;
   }
-  const aimX = ball.shot === 'cross' ? (side < 0 ? MID + 78 : MID - 78) : side < 0 ? MID - 72 : MID + 72;
+  const aimX = ball.shot === 'cross' ? (side < 0 ? MID + 96 : MID - 96) : side < 0 ? MID - 96 : MID + 96;
   aimAt(ball, aimX, FRONT + BALL, speed);
 }
 
@@ -235,21 +251,24 @@ function sendBack(ball: Ball, game: Arcade, speed: number) {
   ball.checkedT = false;
   ball.pitched = false;
   ball.yStart = LAUNCH_Y;
-  aimAt(ball, ball.pitchX, ball.pitchY, speed * 0.9);
-  game.call = pickCall();
+  ball.delay = 0;
+  aimAt(ball, ball.pitchX, ball.pitchY, speed * 0.86);
+  game.note = 'Back to the circle';
 }
 
 function feed(game: Arcade) {
   const side: Side = Math.random() < 0.5 ? 'left' : 'right';
   const box = corner(side);
   const ball = stillBall();
-  ball.x = MID + (Math.random() - 0.5) * 40;
+  ball.x = side === 'left' ? MID - 70 : MID + 70;
   ball.y = LAUNCH_Y;
-  ball.pitchX = (box.x0 + box.x1) / 2;
-  ball.pitchY = box.y0 + 22;
+  const inset = 36;
+  ball.pitchX = side === 'left' ? (box.x0 + box.x1) / 2 + inset : (box.x0 + box.x1) / 2 - inset;
+  ball.pitchY = box.y0 + 28;
   ball.fromShot = false;
-  aimAt(ball, ball.pitchX, ball.pitchY, pace(game) * 0.88);
+  ball.delay = 1.2;
   game.call = pickCall();
+  game.note = 'Stand in the circle';
   game.balls = [ball];
   game.phase = 'rally';
 }
@@ -259,8 +278,9 @@ function stopBall(ball: Ball) {
   ball.vy = 0;
 }
 
-function awardCourt(game: Arcade): TickEvent {
+function awardCourt(game: Arcade, note: string): TickEvent {
   game.court += 1;
+  game.note = note;
   game.flash = null;
   const winner = matchWinner(game.you, game.court);
   for (const ball of game.balls) stopBall(ball);
@@ -270,13 +290,14 @@ function awardCourt(game: Arcade): TickEvent {
     return 'over';
   }
   game.phase = 'point';
-  game.wait = 0.7;
+  game.wait = 1.15;
   game.balls = [stillBall()];
   return 'court';
 }
 
 function awardYou(game: Arcade, side: Side): TickEvent {
   game.you += 1;
+  game.note = 'Good length';
   game.flash = { side, until: game.age + 0.7 };
   const winner = matchWinner(game.you, game.court);
   for (const ball of game.balls) stopBall(ball);
@@ -286,7 +307,7 @@ function awardYou(game: Arcade, side: Side): TickEvent {
     return 'over';
   }
   game.phase = 'point';
-  game.wait = 0.55;
+  game.wait = 0.85;
   game.balls = [stillBall()];
   return 'you';
 }
@@ -295,10 +316,6 @@ function onTheT(game: Arcade) {
   const dx = game.racketX - T_X;
   const dy = game.racketY - T_Y;
   return dx * dx + dy * dy <= T_R * T_R;
-}
-
-function inBox(x: number, y: number, box: Box) {
-  return x >= box.x0 && x <= box.x1 && y >= box.y0 && y <= box.y1;
 }
 
 export function tick(game: Arcade, dt: number): TickEvent[] {
@@ -320,6 +337,12 @@ export function tick(game: Arcade, dt: number): TickEvent[] {
     for (const ball of game.balls) {
       const prevX = ball.x;
       const prevDraw = ball.y - ball.z * LIFT;
+      if (ball.delay > 0) {
+        ball.delay -= piece;
+        if (ball.delay > 0) continue;
+        aimAt(ball, ball.pitchX, ball.pitchY, speed * 0.82);
+      }
+
       ball.x += ball.vx * piece;
       ball.y += ball.vy * piece;
       ball.z = heightOf(ball);
@@ -338,7 +361,8 @@ export function tick(game: Arcade, dt: number): TickEvent[] {
       if (ball.returned && ball.y <= FRONT + BALL) {
         ball.y = FRONT + BALL;
         if (!shotStands(ball)) {
-          events.push(awardCourt(game));
+          const played = ball.shot === 'cross' ? 'a cross' : ball.shot === 'boast' ? 'a boast' : 'a straight';
+          events.push(awardCourt(game, `That was ${played}`));
           stopped = true;
           break;
         }
@@ -349,18 +373,18 @@ export function tick(game: Arcade, dt: number): TickEvent[] {
       if (!ball.returned && !ball.checkedT && ball.y >= SERVICE_Y) {
         ball.checkedT = true;
         if (!onTheT(game)) {
-          events.push(awardCourt(game));
+          events.push(awardCourt(game, 'Off the circle'));
           stopped = true;
           break;
         }
+        if (!ball.fromShot) game.note = 'Hit the gold band';
       }
 
       if (!ball.returned && !ball.pitched && ball.y >= ball.pitchY) {
         ball.pitched = true;
         if (ball.fromShot) {
           const side = ball.pitchX < MID ? 'left' : 'right';
-          const box = corner(side);
-          events.push(inBox(ball.x, ball.pitchY, box) ? awardYou(game, side) : awardCourt(game));
+          events.push(awardYou(game, side));
           stopped = true;
           break;
         }
@@ -373,7 +397,7 @@ export function tick(game: Arcade, dt: number): TickEvent[] {
       }
 
       if (!ball.returned && ball.y > BACK + 8) {
-        events.push(awardCourt(game));
+        events.push(awardCourt(game, 'Missed the ball'));
         stopped = true;
         break;
       }
@@ -400,8 +424,8 @@ function heightOf(ball: Ball) {
 }
 
 function meetsRacket(x0: number, draw0: number, x1: number, draw1: number, game: Arcade) {
-  const top = game.racketY - RACKET_HEAD - BALL;
-  const bottom = game.racketY + 8 + BALL;
+  const top = game.racketY - 16 - BALL;
+  const bottom = game.racketY + 16 + BALL;
   const left = game.racketX - RACKET_W / 2 - BALL;
   const right = game.racketX + RACKET_W / 2 + BALL;
   const yLo = Math.min(draw0, draw1);
@@ -449,20 +473,27 @@ export function drawCourt(ctx: CanvasRenderingContext2D, game: Arcade) {
   ctx.strokeRect(LEFT, shortY, boxWidth, boxDepth);
   ctx.strokeRect(RIGHT - boxWidth, shortY, boxWidth, boxDepth);
 
+  const live = game.balls[0];
+  const coming =
+    game.phase === 'rally' && live && !live.returned && !live.fromShot ? (live.pitchX < MID ? 'left' : 'right') : null;
   for (const side of ['left', 'right'] as const) {
     const box = corner(side);
     const lit = game.flash?.side === side && game.age < game.flash.until;
-    ctx.fillStyle = lit ? 'rgba(244, 196, 48, 0.55)' : 'rgba(255, 255, 255, 0.08)';
+    const aimed = coming === side;
+    ctx.fillStyle = lit ? 'rgba(244, 196, 48, 0.55)' : aimed ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.08)';
     ctx.strokeStyle = lit ? '#f4c430' : 'rgba(255, 255, 255, 0.9)';
-    ctx.lineWidth = lit ? 3 : 2;
+    ctx.lineWidth = lit || aimed ? 3 : 2;
     ctx.fillRect(box.x0, box.y0, BOX_W, BOX_H);
     ctx.strokeRect(box.x0, box.y0, BOX_W, BOX_H);
   }
 
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
-  ctx.lineWidth = 2;
+  const home = onTheT(game);
+  ctx.fillStyle = home ? 'rgba(255, 255, 255, 0.28)' : 'rgba(255, 255, 255, 0.06)';
+  ctx.strokeStyle = home ? '#ffffff' : 'rgba(255, 255, 255, 0.55)';
+  ctx.lineWidth = home ? 3 : 2;
   ctx.beginPath();
   ctx.arc(T_X, T_Y, T_R, 0, Math.PI * 2);
+  ctx.fill();
   ctx.stroke();
 
   ctx.strokeStyle = '#e23b2f';
@@ -478,6 +509,10 @@ export function drawCourt(ctx: CanvasRenderingContext2D, game: Arcade) {
   ctx.textBaseline = 'middle';
   const label = game.call === 'boast' ? 'BOAST' : game.call === 'cross' ? 'CROSS' : 'STRAIGHT';
   ctx.fillText(label, MID, FRONT + 54);
+  if (game.note && game.phase !== 'idle') {
+    ctx.font = '700 20px Barlow Condensed, Arial Narrow, sans-serif';
+    ctx.fillText(game.note.toUpperCase(), width / 2, 24);
+  }
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
 
@@ -498,14 +533,33 @@ export function drawCourt(ctx: CanvasRenderingContext2D, game: Arcade) {
     }
   }
 
-  ctx.strokeStyle = '#f4c430';
-  ctx.fillStyle = '#f4c430';
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(game.racketX - RACKET_W / 2, game.racketY);
-  ctx.lineTo(game.racketX + RACKET_W / 2, game.racketY);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.ellipse(game.racketX, game.racketY - 10, 16, 12, 0, 0, Math.PI * 2);
-  ctx.fill();
+  const showBands = game.note === 'Hit the gold band' && !!live && !live.returned && !live.fromShot;
+  if (!showBands) {
+    ctx.strokeStyle = '#f4c430';
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(game.racketX - RACKET_W / 2, game.racketY);
+    ctx.lineTo(game.racketX + RACKET_W / 2, game.racketY);
+    ctx.stroke();
+    return;
+  }
+  const side: -1 | 1 = live.pitchX < MID ? -1 : 1;
+  const thirds: Call[] = side < 0 ? ['boast', 'straight', 'cross'] : ['cross', 'straight', 'boast'];
+  const band = RACKET_W / 3;
+  const names: Record<Call, string> = { straight: 'STRAIGHT', cross: 'CROSS', boast: 'BOAST' };
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '700 13px Barlow Condensed, Arial Narrow, sans-serif';
+  thirds.forEach((call, index) => {
+    const x = game.racketX - RACKET_W / 2 + index * band;
+    const gold = call === game.call;
+    ctx.fillStyle = gold ? '#f4c430' : 'rgba(246, 241, 228, 0.28)';
+    ctx.fillRect(x + 2, game.racketY - 11, band - 4, 22);
+    if (!gold) return;
+    ctx.fillStyle = '#f6f1e4';
+    ctx.font = '700 16px Barlow Condensed, Arial Narrow, sans-serif';
+    ctx.fillText(names[call], x + band / 2, game.racketY - 26);
+  });
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
 }

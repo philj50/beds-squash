@@ -8,13 +8,13 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 <Base
   title="Minigame mk4"
-  description="A top-down squash drill. Play the called shot into the back corner, get back to the T, and play to 11."
+  description="Stand in the circle, cover the ball with the gold band, then get back in the circle. First to 11."
   crumbs={[{ name: 'Minigame mk4', path: '/minigame/' }]}
 >
   <PageHero
     eyebrow="On the floor"
     title="Minigame mk4"
-    lede="The call says straight, cross or boast. Hit that shot so the ball pitches in the back corner, and be on the T when it crosses the short line. First to 11. At 10-all you need two clear."
+    lede="Stand in the circle when the ball crosses the short line. Cover the ball with the gold band, then get back in the circle. First to 11. At 10-all you need two clear."
   />
   <section class="section">
     <div class="container arcade" id="minigame" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
@@ -30,6 +30,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
         </form>
         <p class="hud" data-hud hidden>
           <span data-score>0–0</span>
+          <span data-note>Stand in the circle</span>
           <span data-call>Straight</span>
         </p>
         <div class="court" style={`--serve-x: ${SERVE_SPOT.x}%; --serve-y: ${SERVE_SPOT.y}%;`}>
@@ -58,7 +59,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 <script>
   import { createClient } from '@supabase/supabase-js';
   import { rudeName } from '@/lib/name-check';
-  import { PLAY, beginServe, createArcade, drawCourt, setRacket, tick, type Arcade } from '@/lib/squash-arcade';
+  import { PLAY, T_SPOT, beginServe, createArcade, drawCourt, setRacket, tick, type Arcade } from '@/lib/squash-arcade';
 
   type Row = { name: string; you: number; court: number };
 
@@ -70,6 +71,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   const serveBtn = root.querySelector<HTMLButtonElement>('[data-serve-btn]')!;
   const hud = root.querySelector<HTMLElement>('[data-hud]')!;
   const scoreEl = root.querySelector<HTMLElement>('[data-score]')!;
+  const noteEl = root.querySelector<HTMLElement>('[data-note]')!;
   const callEl = root.querySelector<HTMLElement>('[data-call]')!;
   const canvas = root.querySelector<HTMLCanvasElement>('[data-court]')!;
   const resultEl = root.querySelector<HTMLElement>('[data-result]')!;
@@ -88,8 +90,8 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   let game: Arcade | null = null;
   let playId = 0;
   let last = 0;
-  let pointer = 0.5;
-  let pointerY = (PLAY.back - 16 - PLAY.front) / (PLAY.back - PLAY.front);
+  let pointer = T_SPOT.x;
+  let pointerY = T_SPOT.y;
   let saved = false;
   let blockedInitials: string[] = [];
   let audioCtx: AudioContext | null = null;
@@ -255,6 +257,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     drawCourt(ctx!, game);
     const note = marker(game.you, game.court);
     scoreEl.textContent = note ? `${game.you}–${game.court} · ${note}` : `${game.you}–${game.court}`;
+    noteEl.textContent = game.note;
     callEl.textContent = callLabel(game.call);
   }
 
@@ -446,22 +449,22 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   window.addEventListener('keydown', (event) => {
     if (!game || game.phase === 'over') return;
     if (event.key === 'ArrowLeft' || event.key === 'a' || event.key === 'A') {
-      pointer = Math.max(0, pointer - 0.06);
+      pointer = Math.max(0, pointer - 0.09);
       event.preventDefault();
       paint();
     }
     if (event.key === 'ArrowRight' || event.key === 'd' || event.key === 'D') {
-      pointer = Math.min(1, pointer + 0.06);
+      pointer = Math.min(1, pointer + 0.09);
       event.preventDefault();
       paint();
     }
     if (event.key === 'ArrowUp' || event.key === 'w' || event.key === 'W') {
-      pointerY = Math.max(0, pointerY - 0.05);
+      pointerY = Math.max(0, pointerY - 0.08);
       event.preventDefault();
       paint();
     }
     if (event.key === 'ArrowDown' || event.key === 's' || event.key === 'S') {
-      pointerY = Math.min(1, pointerY + 0.05);
+      pointerY = Math.min(1, pointerY + 0.08);
       event.preventDefault();
       paint();
     }
@@ -541,10 +544,16 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   .hud {
     display: flex;
     justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.6rem;
     margin: 0 0 0.4rem;
     font-family: var(--font-display);
     font-weight: 700;
     letter-spacing: 0.04em;
+  }
+  .hud [data-note] {
+    color: var(--accent);
+    text-align: center;
   }
   .result {
     color: var(--text-muted);
