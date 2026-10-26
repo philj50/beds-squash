@@ -1,14 +1,14 @@
 ---
 title: Graded tournaments on the CM Stringers diary
-date: 2026-10-19
-summary: CM Stringers has added the Harrogate Squash Open on 12 December. Harrow is on 8 November and Radlett on 21 November. Online entry is not open yet.
+date: 2026-10-26
+summary: CM Stringers has added the TWC Junior Graded on 13 December and the Hazelwood Xmas Open on 20 December. Harrow is on 8 November and Radlett on 21 November. Online entry is not open yet.
 image: /uploads/news/cm-stringers-tournament-entry.png
 imageAlt: CM Stringers tournament entry banner showing squash players and spectators.
 category: tournaments
 featured: false
 ---
 
-[CM Stringers](https://www.cmstringers.com/entry/) last updated its tournament diary on Sunday 18 October 2026, at 6:13 pm. The new listing is the Harrogate Squash Open on 12 December. Every event is marked entry not open, so the closing dates below are the ones published on the page. Check that page before trying to enter.
+[CM Stringers](https://www.cmstringers.com/entry/) last updated its tournament diary on Sunday 25 October 2026, at 11:23 pm. New listings are the TWC Junior Graded on 13 December and the Hazelwood Xmas Open on 20 December. Every event is marked entry not open, so the closing dates below are the ones published on the page. Check that page before trying to enter.
 
 The nearest events for Bedfordshire players are Harrow and Radlett.
 
@@ -17,9 +17,8 @@ The nearest events for Bedfordshire players are Harrow and Radlett.
 
 ## October
 
-The 17 October Uxbridge Oktober Classic is no longer on the diary.
+The 24 October Purley Open is no longer on the diary.
 
-- **Saturday 24 October** — The Purley Open, Purley Sports Club, The Ridge, Purley, CR8 3PF. Entries close on Sunday 18 October.
 - **Sunday 25 October** — The CM Coolhurst Junior Graded, Coolhurst Tennis & Squash Club, Coolhurst Road, Crouch End, N8 8EY. SquashLevels 0–2,000. Entries close on Sunday 18 October. The fee is £20, and free for MJS members.
 - **Saturday 31 October to Sunday 1 November** — The Cumberland Classic, Cumberland Lawn Tennis Club, 25 Alvanley Gardens, London, NW6 1JD. Entries close on Sunday 25 October. SquashLevels 0–20,000.
 
@@ -35,7 +34,9 @@ The 17 October Uxbridge Oktober Classic is no longer on the diary.
 - **Friday 4 to Saturday 5 December** — The Kent County Closed Championships, Bexley Lawn Tennis, Squash & Rball Club. Squash and racketball. Entries close on Sunday 29 November.
 - **Saturday 12 December** — The Canterbury Xmas Doubles, Canterbury Squash Rackets Club. Entries close on Sunday 5 December.
 - **Saturday 12 December** — The Harrogate Squash Open, a Pro-Am graded event at Harrogate Sports & Fitness Club, Hookstone Wood Rd, Harrogate, HG2 8PN. Categories are Pro Grade and grades A to E, for SquashLevels 0–45,000. The diary lists £2000 prize money for the Pro Grade. Entries close on Sunday 5 December. The fee is £32.50 and includes an event shirt. The club website is printed as hwww.harrogatesfc.co.uk, with an extra h at the start.
+- **Sunday 13 December** — TWC Junior Graded, a one-day junior event for grades A to E, SquashLevels 0–2,000. Entries close on Sunday 6 December. The fee is £22.50, or £30 with an event shirt. The diary names the venue as The Wimbledon Club and gives the website www.twcsport.co.uk, but the address it prints is Coolhurst Road, Crouch End, London, N8 8EY, the same address as Coolhurst Tennis & Squash Club.
 - **Saturday 19 December** — The Lindgate Classic, Lincoln, at Lindum Sports Association and Eastgate Tennis, Bowls and Squash Club. This one adds an F grade. Entries close on Sunday 13 December. The fee is £40.
+- **Sunday 20 December** — The Hazelwood Xmas Open, Hazelwood Sports Club, Ridge Ave, London N21 2AJ. Squash and racketball, grades A to D plus racketball, for SquashLevels 0–15,000. Entries close on Sunday 13 December. The fee is £32.50 and includes an event shirt.
 
 ## May 2027
 
