@@ -1,4 +1,10 @@
 {
-  "leaders": [],
-  "recordedOn": "2026-10-24"
+  "leaders": [
+    {
+      "name": "SM",
+      "you": 11,
+      "court": 1
+    }
+  ],
+  "recordedOn": "2026-10-27"
 }
