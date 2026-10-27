@@ -13,4 +13,4 @@ leagueClub: false
 order: 200
 ---
 
-Four pay-and-play squash courts with a spectator gallery in south Bedford, run by Better (GLL). Racket hire available at reception. Free parking; buses 9/9A/9B from Bedford bus station.
+Four pay-and-play squash courts with a spectator gallery in south Bedford, run by Better (GLL). Racket hire available at reception. Free parking; buses 9/9A/9B from Bedford bus station. Internal box leagues are available for competitive matches (recorded on [SquashLevels](https://squashlevels.com/)).

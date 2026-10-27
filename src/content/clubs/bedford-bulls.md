@@ -16,6 +16,6 @@ tags: [squash, juniors, pay-and-play]
 order: 20
 ---
 
-The three league teams play home matches at Bedford School, on De Parys Avenue. The Recreation Centre has four squash courts, and they are open to the public as pay-and-play. Kick-off is 7pm on Monday nights and 7:15pm on Tuesday nights.
+Bedford Bulls has three teams playing in the Bedfordshire County League with home matches at Bedford School, on De Parys Avenue. The Recreation Centre has four squash courts, and they are open to the public as pay-and-play. Kick-off is 7pm for Division 1 on Monday nights and 7:15pm for Division 2 on Tuesday nights.
 
-Juniors also play at [Mowsbury Golf & Squash Club](/clubs/mowsbury/). Three glass-backed courts with a spectator area, on Kimbolton Road. Courts there are pay-and-play through Better (GLL).
+Instagram: [@bedford_bulls_squash](https://www.instagram.com/bedford_bulls_squash/)
