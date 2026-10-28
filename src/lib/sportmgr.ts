@@ -124,24 +124,13 @@ function parseGames(score: string) {
   return { games, walkover };
 }
 
-/** The score is stored from the first player's side. The line is rewritten from the winner's side. */
-export function describeMatch(match: TournamentMatch) {
-  const pending = !match.score;
-  if (pending) {
-    return {
-      players: `${esc(match.home)} <span class="v">v</span> ${esc(match.away)}`,
-      score: '',
-      pending: true,
-    };
-  }
+type MatchCall = { winner: string | null; loser: string | null; score: string; pending: boolean };
+
+/** The score is stored from the first player's side. The winner is the player who took more games. */
+export function matchCall(match: TournamentMatch): MatchCall {
+  if (!match.score) return { winner: null, loser: null, score: '', pending: true };
   const parsed = parseGames(match.score);
-  if (!parsed) {
-    return {
-      players: `${esc(match.home)} <span class="v">v</span> ${esc(match.away)}`,
-      score: esc(match.score),
-      pending: false,
-    };
-  }
+  if (!parsed) return { winner: null, loser: null, score: match.score, pending: false };
   let homeGames = 0;
   let awayGames = 0;
   for (const [home, away] of parsed.games) {
@@ -149,19 +138,26 @@ export function describeMatch(match: TournamentMatch) {
     else if (away > home) awayGames += 1;
   }
   if (parsed.games.length === 0 || homeGames === awayGames) {
-    return {
-      players: `${esc(match.home)} <span class="v">v</span> ${esc(match.away)}`,
-      score: parsed.walkover ? 'Walkover' : esc(match.score),
-      pending: false,
-    };
+    return { winner: null, loser: null, score: parsed.walkover ? 'Walkover' : match.score, pending: false };
   }
   const awayWon = awayGames > homeGames;
-  const winner = awayWon ? match.away : match.home;
-  const loser = awayWon ? match.home : match.away;
   const line = parsed.games.map(([home, away]) => (awayWon ? `${away}-${home}` : `${home}-${away}`)).join(', ');
   return {
-    players: `<span class="winner">${esc(winner)}</span> beat ${esc(loser)}`,
+    winner: awayWon ? match.away : match.home,
+    loser: awayWon ? match.home : match.away,
     score: parsed.walkover ? `Walkover, ${line}` : line,
+    pending: false,
+  };
+}
+
+/** The score is stored from the first player's side. The line is rewritten from the winner's side. */
+export function describeMatch(match: TournamentMatch) {
+  const call = matchCall(match);
+  const pending = `${esc(match.home)} <span class="v">v</span> ${esc(match.away)}`;
+  if (!call.winner) return { players: pending, score: esc(call.score), pending: call.pending };
+  return {
+    players: `<span class="winner">${esc(call.winner)}</span> beat ${esc(call.loser ?? '')}`,
+    score: esc(call.score),
     pending: false,
   };
 }
@@ -195,9 +191,91 @@ function courtNow(matches: TournamentMatch[], nowMinutes: number) {
   });
 }
 
+function roundNumber(round: string) {
+  const match = round.match(/R(\d+)/i);
+  return match ? Number(match[1]) : 0;
+}
+
+type DrawTie = { match: TournamentMatch; homeFeed: DrawTie | null; awayFeed: DrawTie | null };
+
+function buildTie(match: TournamentMatch, matches: TournamentMatch[], used: Set<number>): DrawTie {
+  used.add(match.id);
+  const before = roundNumber(match.round);
+  const feed = (player: string) => {
+    const earlier = matches
+      .filter((item) => !used.has(item.id) && roundNumber(item.round) < before && (item.home === player || item.away === player))
+      .sort((a, b) => roundNumber(b.round) - roundNumber(a.round) || a.id - b.id);
+    const found = earlier.find((item) => {
+      const winner = matchCall(item).winner;
+      return !winner || winner === player;
+    });
+    return found ? buildTie(found, matches, used) : null;
+  };
+  return { match, homeFeed: feed(match.home), awayFeed: feed(match.away) };
+}
+
+function drawSeeds(entries: TournamentEntry[], grade: string) {
+  const seeds = new Map<string, string>();
+  for (const entry of entries) if (entry.grade === grade && entry.seed) seeds.set(entry.name, entry.seed);
+  return seeds;
+}
+
+function drawSlot(name: string, seed: string, winner: string | null) {
+  const mark = winner === name ? ' is-winner' : '';
+  return `<span class="slot${mark}">${seed ? `<span class="seed">${esc(seed)}</span>` : ''}<span class="name">${esc(name)}</span></span>`;
+}
+
+function drawLeaf(name: string, seed: string) {
+  return `<div class="tie"><div class="tie__box">${drawSlot(name, seed, null)}</div></div>`;
+}
+
+function drawBranch(tie: DrawTie, seeds: Map<string, string>): string {
+  const call = matchCall(tie.match);
+  if (!tie.homeFeed && !tie.awayFeed) {
+    return `<div class="tie"><div class="tie__box">${drawSlot(tie.match.home, seeds.get(tie.match.home) ?? '', call.winner)}${drawSlot(tie.match.away, seeds.get(tie.match.away) ?? '', call.winner)}<span class="tie__score">${esc(call.score)}</span></div></div>`;
+  }
+  const home = tie.homeFeed ? drawBranch(tie.homeFeed, seeds) : drawLeaf(tie.match.home, seeds.get(tie.match.home) ?? '');
+  const away = tie.awayFeed ? drawBranch(tie.awayFeed, seeds) : drawLeaf(tie.match.away, seeds.get(tie.match.away) ?? '');
+  const name = call.winner ?? `${tie.match.home} v ${tie.match.away}`;
+  return `<div class="tie"><div class="tie__feeds">${home}${away}</div><div class="tie__out${call.winner ? ' is-winner' : ''}"><span class="name">${esc(name)}</span><span class="score">${esc(call.score)}</span></div></div>`;
+}
+
+function blankDraw() {
+  const box = '<div class="tie"><div class="tie__box tie__box--blank"><span class="slot"></span><span class="slot"></span></div></div>';
+  return `<div class="tie"><div class="tie__feeds">${box}${box}</div><div class="tie__out tie__out--blank"></div></div>`;
+}
+
+/** The two sides of one grade, in the shape of the Sport Manager draw. */
+export function renderDraw(data: TournamentData, grade: string) {
+  const grades = data.grades
+    .map((name) => `<button type="button" class="pill${name === grade ? ' is-active' : ''}" data-draw-grade="${esc(name)}">${esc(name)}</button>`)
+    .join('');
+  const filters = grades ? `<div class="filters draw-filters" role="group" aria-label="Draw">${grades}</div>` : '';
+  const matches = data.matches.filter((match) => match.grade === grade);
+  if (matches.length === 0) {
+    return `<div class="section-head"><h2>The draw</h2></div>${filters}<p class="notice">The two sides of the draw will appear here once it is made.</p><div class="sides sides--blank" aria-hidden="true"><section class="side"><h3><span>Top half</span></h3>${blankDraw()}</section><section class="side"><h3><span>Bottom half</span></h3>${blankDraw()}</section></div>`;
+  }
+
+  const final = [...matches].sort((a, b) => roundNumber(b.round) - roundNumber(a.round) || a.id - b.id)[0];
+  const used = new Set<number>();
+  const tree = buildTie(final, matches, used);
+  const call = matchCall(final);
+  const seeds = drawSeeds(data.entries, grade);
+  const champion = call.winner
+    ? `<div class="champion"><span class="eyebrow">Champion</span><strong>${esc(call.winner)}</strong><p>beat ${esc(call.loser ?? '')} <span>${esc(call.score)}</span></p></div>`
+    : `<div class="champion champion--open"><span class="eyebrow">Final</span><strong>${esc(final.home)} <span class="v">v</span> ${esc(final.away)}</strong></div>`;
+  const side = (label: string, player: string, feed: DrawTie | null) =>
+    `<section class="side"><h3><span>${label}</span><strong>${esc(player)}</strong></h3>${feed ? drawBranch(feed, seeds) : '<p class="muted">Bye to the final.</p>'}</section>`;
+  const orphans = matches.filter((match) => !used.has(match.id));
+  const extra = orphans.length
+    ? `<section class="side side--extra"><h3><span>Also played</span></h3>${orphans.map((match) => drawBranch({ match, homeFeed: null, awayFeed: null }, seeds)).join('')}</section>`
+    : '';
+  return `<div class="section-head"><h2>The draw</h2></div>${filters}${champion}<div class="sides">${side('Top half', final.home, tree.homeFeed)}${side('Bottom half', final.away, tree.awayFeed)}</div>${extra}`;
+}
+
 export function renderBoard(data: TournamentData, state: BoardState) {
   if (data.matches.length === 0 && data.entries.length === 0) {
-    return `<div class="section-head"><h2>Order of play</h2></div><p class="notice">The order of play will appear here once the draw is made. Times, courts and results will be updated from Sport Manager.</p>`;
+    return `<div class="section-head"><h2>Order of play</h2></div><p class="notice">Times, courts and results will appear here once the draw is made.</p>`;
   }
 
   const days = data.dates

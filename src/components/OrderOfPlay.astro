@@ -1,5 +1,5 @@
 ---
-import { defaultState, renderBoard, type TournamentData } from '@/lib/sportmgr';
+import { defaultState, renderBoard, renderDraw, type TournamentData } from '@/lib/sportmgr';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 
 interface Props {
@@ -9,6 +9,8 @@ interface Props {
 const { data, live = false } = Astro.props;
 const state = defaultState(data);
 const html = renderBoard(data, state);
+const drawGrade = data.grades[0] ?? '';
+const draw = renderDraw(data, drawGrade);
 ---
 
 <div
@@ -19,6 +21,7 @@ const html = renderBoard(data, state);
   data-url={SUPABASE_URL}
   data-key={SUPABASE_PUBLISHABLE_KEY}
 >
+  <div data-draw data-grade={drawGrade} set:html={draw} />
   <div data-view set:html={html} />
 </div>
 
@@ -29,6 +32,7 @@ const html = renderBoard(data, state);
     londonMinutes,
     londonToday,
     renderBoard,
+    renderDraw,
     type BoardState,
     type TournamentData,
     type TournamentEntry,
@@ -73,23 +77,37 @@ const html = renderBoard(data, state);
   function setup(root: HTMLElement) {
     const id = root.dataset.id;
     const view = root.querySelector<HTMLElement>('[data-view]');
+    const draw = root.querySelector<HTMLElement>('[data-draw]');
     const base = id ? snapshot(id) : null;
-    if (!id || !view || !base) return;
+    if (!id || !view || !draw || !base) return;
 
     let data = base;
+    let drawGrade = draw.dataset.grade || data.grades[0] || '';
     let state: BoardState = { ...defaultState(data), today: root.dataset.today || londonToday() };
-    if (data.dates.includes(londonToday())) {
-      state = { ...state, day: londonToday(), today: londonToday(), nowMinutes: londonMinutes() };
-      view.innerHTML = renderBoard(data, state);
-    }
 
+    const paintDraw = () => {
+      if (!data.grades.includes(drawGrade)) drawGrade = data.grades[0] || '';
+      draw.dataset.grade = drawGrade;
+      draw.innerHTML = renderDraw(data, drawGrade);
+    };
     const paint = () => {
       view.innerHTML = renderBoard(data, state);
     };
 
+    if (data.dates.includes(londonToday())) {
+      state = { ...state, day: londonToday(), today: londonToday(), nowMinutes: londonMinutes() };
+      paint();
+    }
+
     root.addEventListener('click', (event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
+      const drawButton = target.closest<HTMLElement>('[data-draw-grade]');
+      if (drawButton?.dataset.drawGrade) {
+        drawGrade = drawButton.dataset.drawGrade;
+        paintDraw();
+        return;
+      }
       const day = target.closest<HTMLElement>('[data-day]');
       const grade = target.closest<HTMLElement>('[data-grade-filter]');
       if (day?.dataset.day) state = { ...state, day: day.dataset.day };
@@ -111,6 +129,7 @@ const html = renderBoard(data, state);
       data = fromRows(base, remoteMatches as Record<string, string>[], (entries.data ?? []) as Record<string, string>[], tournament.data?.synced_at ?? '');
       state = { ...state, showUpdated: true };
       if (data.dates.includes(state.day) === false && data.dates[0]) state = { ...state, day: data.dates[0] };
+      paintDraw();
       paint();
       return true;
     };
@@ -278,6 +297,181 @@ const html = renderBoard(data, state);
     margin-right: 0.35rem;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
+  }
+  .order-root :global(.draw-filters) {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+  }
+  .order-root :global(.draw-filters .pill) {
+    flex: none;
+  }
+  .order-root :global(.champion) {
+    background: var(--ink-950);
+    color: #fff;
+    border-radius: var(--radius);
+    padding: 0.75rem 0.95rem 0.85rem;
+    margin: 0 0 0.75rem;
+    box-shadow: var(--shadow);
+  }
+  .order-root :global(.champion .eyebrow) {
+    color: var(--accent);
+  }
+  .order-root :global(.champion strong) {
+    display: block;
+    font-family: var(--font-display);
+    font-size: clamp(1.7rem, 6vw, 2.3rem);
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    line-height: 0.95;
+    text-transform: uppercase;
+  }
+  .order-root :global(.champion p) {
+    margin: 0.3rem 0 0;
+    color: rgba(255, 255, 255, 0.82);
+  }
+  .order-root :global(.champion p span) {
+    color: #fff;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .order-root :global(.champion .v) {
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 600;
+  }
+  .order-root :global(.sides) {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.7rem;
+  }
+  .order-root :global(.side) {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 0.65rem 0.65rem 0.45rem;
+    min-width: 0;
+  }
+  .order-root :global(.side h3) {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin: 0 0 0.35rem;
+  }
+  .order-root :global(.side h3 span) {
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .order-root :global(.side h3 strong) {
+    color: var(--link);
+    font-family: var(--font-display);
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    text-align: right;
+    text-transform: uppercase;
+  }
+  .order-root :global(.tie__feeds) {
+    margin-left: 0.35rem;
+    padding-left: 0.4rem;
+    border-left: 2px solid var(--accent);
+  }
+  .order-root :global(.tie__box) {
+    display: grid;
+    margin: 0.18rem 0;
+    padding: 0.18rem 0.4rem 0.22rem;
+    background: color-mix(in srgb, var(--bg) 55%, var(--bg-card));
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .order-root :global(.slot) {
+    display: flex;
+    gap: 0.28rem;
+    align-items: baseline;
+    min-width: 0;
+  }
+  .order-root :global(.slot .seed) {
+    flex: none;
+    min-width: 0;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.62rem;
+    font-weight: 700;
+  }
+  .order-root :global(.slot .name) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.82rem;
+  }
+  .order-root :global(.slot.is-winner .name),
+  .order-root :global(.tie__out.is-winner .name) {
+    color: var(--link);
+    font-weight: 700;
+  }
+  .order-root :global(.tie__score),
+  .order-root :global(.tie__out .score) {
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.25;
+  }
+  .order-root :global(.tie__out .score) {
+    text-align: right;
+  }
+  .order-root :global(.tie__score) {
+    grid-column: 1;
+  }
+  .order-root :global(.tie__out) {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.4rem;
+    margin: 0.12rem 0 0.28rem;
+    padding: 0.16rem 0.4rem;
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    border-radius: 6px;
+  }
+  .order-root :global(.tie__out .name) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.82rem;
+  }
+  .order-root :global(.tie__out .score) {
+    flex: none;
+  }
+  .order-root :global(.tie__box--blank .slot) {
+    display: block;
+    height: 0.5rem;
+    margin: 0.16rem 0;
+    border-radius: 99px;
+    background: var(--border-strong);
+  }
+  .order-root :global(.tie__out--blank) {
+    height: 0.65rem;
+    background: var(--border);
+  }
+  .order-root :global(.sides--blank) {
+    opacity: 0.72;
+  }
+  .order-root :global(.side--extra) {
+    margin-top: 0.7rem;
+  }
+  .order-root :global(.side .muted) {
+    margin: 0.2rem 0 0.4rem;
+  }
+  @media (min-width: 800px) {
+    .order-root :global(.sides) {
+      grid-template-columns: 1fr 1fr;
+      align-items: start;
+    }
   }
   @media (max-width: 720px) {
     .order-root :global(.match) {
