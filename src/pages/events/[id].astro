@@ -2,7 +2,9 @@
 import { getEntry, render } from 'astro:content';
 import Base from '@/layouts/Base.astro';
 import EventCard from '@/components/EventCard.astro';
+import OrderOfPlay from '@/components/OrderOfPlay.astro';
 import { getEvents, getUpcomingEvents } from '@/lib/content';
+import type { TournamentData } from '@/lib/sportmgr';
 import { CATEGORY_LABEL, SOURCE_LABEL, formatRange, formatTime, isoDate, url } from '@/lib/site';
 import { abs, organizationId } from '@/lib/seo';
 
@@ -13,7 +15,11 @@ export async function getStaticPaths() {
 
 const { event } = Astro.props;
 const { Content } = await render(event);
-const { title, start, end, allDay, venue, club, source, category, link, entryForm, image, cancelled } = event.data;
+const { title, start, end, allDay, venue, club, source, category, link, entryUrl, sportmgr, entryForm, image, cancelled } = event.data;
+const snapshots = import.meta.glob<TournamentData>('../../data/sportmgr/*.json', { eager: true, import: 'default' });
+const tournament = sportmgr ? snapshots[`../../data/sportmgr/${sportmgr}.json`] : undefined;
+const tournamentLive = Boolean(tournament) && (end ?? start).getTime() >= Date.now() - 86400000;
+const externalLabel = link?.includes('sportmgr.co.uk') ? 'Sport Manager' : 'More details';
 const clubEntry = club ? await getEntry('clubs', club) : undefined;
 const others = (await getUpcomingEvents()).filter((e) => e.id !== event.id).slice(0, 3);
 
@@ -61,12 +67,27 @@ const gcal = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=$
           {venue && <span> · {venue}</span>}
         </p>
         <div class="actions">
+          {entryUrl && (
+            <a class="btn btn--primary btn--sm" href={entryUrl} target="_blank" rel="noopener">Enter now</a>
+          )}
           {entryForm && <a class="btn btn--primary btn--sm" href={url(entryForm)}>Entry form</a>}
-          {link && <a class="btn btn--ghost btn--sm" href={link} target="_blank" rel="noopener">More details ↗</a>}
+          {link && (
+            <a class="btn btn--ghost btn--sm" href={link} target="_blank" rel="noopener">{externalLabel} ↗</a>
+          )}
           <a class="btn btn--ghost btn--sm" href={gcal} target="_blank" rel="noopener">Add to Google Calendar</a>
         </div>
       </div>
     </header>
+
+    {
+      tournament && tournament.matches.length > 0 && (
+        <section class="section">
+          <div class="container">
+            <OrderOfPlay data={tournament} live={tournamentLive} />
+          </div>
+        </section>
+      )
+    }
 
     <div class="container narrow section">
       {image && <img class="hero-img" src={url(image)} alt="" style="margin-bottom:2rem" />}
@@ -86,6 +107,16 @@ const gcal = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=$
         )
       }
     </div>
+
+    {
+      tournament && tournament.matches.length === 0 && (
+        <section class="section" style="padding-top:0">
+          <div class="container">
+            <OrderOfPlay data={tournament} live={tournamentLive} />
+          </div>
+        </section>
+      )
+    }
   </article>
 
   {

@@ -1,0 +1,275 @@
+---
+import { defaultState, renderBoard, type TournamentData } from '@/lib/sportmgr';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
+
+interface Props {
+  data: TournamentData;
+  live?: boolean;
+}
+const { data, live = false } = Astro.props;
+const state = defaultState(data);
+const html = renderBoard(data, state);
+---
+
+<div
+  class="order-root"
+  data-id={data.id}
+  data-live={live ? 'true' : 'false'}
+  data-today={state.today}
+  data-url={SUPABASE_URL}
+  data-key={SUPABASE_PUBLISHABLE_KEY}
+>
+  <div data-view set:html={html} />
+</div>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+  import {
+    defaultState,
+    londonMinutes,
+    londonToday,
+    renderBoard,
+    type BoardState,
+    type TournamentData,
+    type TournamentEntry,
+    type TournamentMatch,
+  } from '@/lib/sportmgr';
+
+  const files = import.meta.glob('../data/sportmgr/*.json', { eager: true });
+
+  function snapshot(id: string): TournamentData | null {
+    const key = Object.keys(files).find((path) => path.endsWith(`/${id}.json`));
+    if (!key) return null;
+    return (files[key] as { default: TournamentData }).default;
+  }
+
+  function fromRows(base: TournamentData, matchRows: Record<string, string>[], entryRows: Record<string, string>[], syncedAt: string): TournamentData {
+    const matches: TournamentMatch[] = matchRows.map((row) => ({
+      id: Number(row.id),
+      date: row.played_on,
+      start: row.start_time ?? '',
+      end: row.end_time ?? '',
+      court: row.court ?? '',
+      grade: row.grade,
+      round: row.round_label ?? '',
+      home: row.home_name,
+      away: row.away_name,
+      score: row.score ?? '',
+    }));
+    const entries: TournamentEntry[] = entryRows.map((row) => ({
+      grade: row.grade,
+      name: row.player_name,
+      seed: row.seed ?? '',
+      club: row.club ?? '',
+    }));
+    const grades = [...base.grades];
+    for (const grade of [...matches.map((match) => match.grade), ...entries.map((entry) => entry.grade)]) {
+      if (!grades.includes(grade)) grades.push(grade);
+    }
+    const dates = [...new Set([...base.dates, ...matches.map((match) => match.date)])].sort();
+    return { ...base, grades, dates, matches, entries, syncedAt: syncedAt || base.syncedAt };
+  }
+
+  function setup(root: HTMLElement) {
+    const id = root.dataset.id;
+    const view = root.querySelector<HTMLElement>('[data-view]');
+    const base = id ? snapshot(id) : null;
+    if (!id || !view || !base) return;
+
+    let data = base;
+    let state: BoardState = { ...defaultState(data), today: root.dataset.today || londonToday() };
+    if (data.dates.includes(londonToday())) {
+      state = { ...state, day: londonToday(), today: londonToday(), nowMinutes: londonMinutes() };
+      view.innerHTML = renderBoard(data, state);
+    }
+
+    const paint = () => {
+      view.innerHTML = renderBoard(data, state);
+    };
+
+    root.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const day = target.closest<HTMLElement>('[data-day]');
+      const grade = target.closest<HTMLElement>('[data-grade-filter]');
+      if (day?.dataset.day) state = { ...state, day: day.dataset.day };
+      if (grade?.dataset.gradeFilter) state = { ...state, grade: grade.dataset.gradeFilter };
+      if (day || grade) paint();
+    });
+
+    if (root.dataset.live !== 'true' || !root.dataset.url || !root.dataset.key) return;
+    const supabase = createClient(root.dataset.url, root.dataset.key);
+    const refresh = async () => {
+      const [matches, entries, tournament] = await Promise.all([
+        supabase.from('sportmgr_matches').select('id,played_on,start_time,end_time,court,grade,round_label,home_name,away_name,score').eq('tournament_id', Number(id)),
+        supabase.from('sportmgr_entries').select('grade,player_name,club,seed').eq('tournament_id', Number(id)),
+        supabase.from('sportmgr_tournaments').select('synced_at').eq('id', Number(id)).maybeSingle(),
+      ]);
+      if (matches.error || entries.error || tournament.error) return false;
+      const remoteMatches = matches.data ?? [];
+      if (remoteMatches.length === 0 && base.matches.length > 0) return true;
+      data = fromRows(base, remoteMatches as Record<string, string>[], (entries.data ?? []) as Record<string, string>[], tournament.data?.synced_at ?? '');
+      state = { ...state, showUpdated: true };
+      if (data.dates.includes(state.day) === false && data.dates[0]) state = { ...state, day: data.dates[0] };
+      paint();
+      return true;
+    };
+    void refresh().then((ok) => {
+      if (!ok) return;
+      window.setInterval(() => void refresh(), 60_000);
+    });
+  }
+
+  for (const root of document.querySelectorAll<HTMLElement>('.order-root')) setup(root);
+</script>
+
+<style>
+  .order-root :global(.filters) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0 0 0.7rem;
+  }
+  .order-root :global(.filters .pill) {
+    cursor: pointer;
+    background: transparent;
+    color: var(--ink-200);
+    border: 1px solid var(--border-strong);
+    padding: 0.35rem 0.8rem;
+    font-size: 0.85rem;
+  }
+  .order-root :global(.filters .pill.is-active) {
+    background: var(--accent);
+    color: var(--ink-950);
+    border-color: var(--accent);
+  }
+  .order-root :global(.day-heading) {
+    margin: 0.2rem 0 0.4rem;
+  }
+  .order-root :global(.courts) {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+  }
+  .order-root :global(.court-card) {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.7rem 0.85rem;
+  }
+  .order-root :global(.court-card strong) {
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+  .order-root :global(.court-card p) {
+    margin: 0;
+  }
+  .order-root :global(.programme) {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .order-root :global(.match) {
+    display: grid;
+    grid-template-columns: 7.2rem minmax(0, 1fr) auto;
+    gap: 0.2rem 1rem;
+    align-items: center;
+    padding: 0.55rem 0;
+    border-top: 1px solid var(--border);
+  }
+  .order-root :global(.match__time) {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.15rem;
+    letter-spacing: 0.03em;
+  }
+  .order-root :global(.match__court),
+  .order-root :global(.match__grade) {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+  }
+  .order-root :global(.match__players) {
+    display: block;
+  }
+  .order-root :global(.winner) {
+    color: var(--link);
+    font-weight: 700;
+  }
+  .order-root :global(.v) {
+    color: var(--text-muted);
+    font-weight: 600;
+    padding-inline: 0.2rem;
+  }
+  .order-root :global(.match__score) {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    font-weight: 600;
+  }
+  .order-root :global(.match--pending .match__score) {
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+  .order-root :global(.match-note) {
+    list-style: none;
+    margin-top: 0.8rem;
+    padding-top: 0.6rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .order-root :global(.player-list) {
+    margin-top: 1.25rem;
+    border-top: 1px solid var(--border);
+    padding-top: 0.8rem;
+  }
+  .order-root :global(.player-list summary) {
+    cursor: pointer;
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+  .order-root :global(.player-list summary span) {
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+  .order-root :global(.player-grades) {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.8rem 1.5rem;
+    margin-top: 0.8rem;
+  }
+  .order-root :global(.player-grades h3) {
+    font-size: 1rem;
+    margin-bottom: 0.3rem;
+  }
+  .order-root :global(.player-grades ol) {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .order-root :global(.player-grades li) {
+    padding: 0.15rem 0;
+  }
+  .order-root :global(.seed) {
+    display: inline-block;
+    min-width: 1.6rem;
+    margin-right: 0.35rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  @media (max-width: 640px) {
+    .order-root :global(.match) {
+      grid-template-columns: 1fr auto;
+    }
+    .order-root :global(.match__when) {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: 0.6rem;
+      align-items: baseline;
+    }
+  }
+</style>

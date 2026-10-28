@@ -1,0 +1,28 @@
+name: Sync Sport Manager
+
+on:
+  schedule:
+    # Twice a day while entries are open and the draw is being filled in.
+    - cron: '15 8,20 * * *'
+    # Every five minutes on 7–10 January, the County Closed weekend.
+    - cron: '*/5 * 7-10 1 *'
+  workflow_dispatch:
+
+concurrency:
+  group: sync-sportmgr
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Copy entries, order of play and scores
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/sync-sportmgr.mjs

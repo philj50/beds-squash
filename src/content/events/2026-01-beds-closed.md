@@ -7,6 +7,8 @@ venue: Club Towers, Bedford
 club: club-towers
 source: county
 category: tournament
+sportmgr: 945811
+link: https://sportmgr.co.uk/t/945811/info
 ---
 
 Over 100 players and 140 matches across four days at Club Towers. Gbenga Adeyi won a fourth straight A Grade title, Ashleigh Kemp took the first ever Ladies A Grade crown. See the [Honours Board](/tournaments/#honours) for full results.

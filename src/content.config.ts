@@ -44,6 +44,9 @@ const events = defineCollection({
       .enum(['tournament', 'league', 'juniors', 'masters', 'meeting', 'coaching', 'social', 'racketball', 'other'])
       .default('other'),
     link: z.url().optional(),
+    entryUrl: z.url().optional(),
+    // Sport Manager tournament id. The order of play is shown when this is set.
+    sportmgr: z.number().int().positive().optional(),
     entryForm: uploadPath.optional(),
     image: uploadPath.optional(),
     cancelled: z.boolean().default(false),
