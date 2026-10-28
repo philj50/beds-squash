@@ -46,6 +46,16 @@ function esc(value: string) {
     .replace(/"/g, '&quot;');
 }
 
+function playerHref(name: string) {
+  const base = String(import.meta.env?.BASE_URL ?? '/').replace(/\/+$/, '');
+  return `${base}/players/#${encodeURIComponent(name)}`;
+}
+
+function linkedName(name: string) {
+  if (!name) return '';
+  return `<a class="player-link" href="${playerHref(name)}">${esc(name)}</a>`;
+}
+
 export function londonToday(now = new Date()) {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Europe/London',
@@ -153,10 +163,10 @@ export function matchCall(match: TournamentMatch): MatchCall {
 /** The score is stored from the first player's side. The line is rewritten from the winner's side. */
 export function describeMatch(match: TournamentMatch) {
   const call = matchCall(match);
-  const pending = `${esc(match.home)} <span class="v">v</span> ${esc(match.away)}`;
+  const pending = `${linkedName(match.home)} <span class="v">v</span> ${linkedName(match.away)}`;
   if (!call.winner) return { players: pending, score: esc(call.score), pending: call.pending };
   return {
-    players: `<span class="winner">${esc(call.winner)}</span> beat ${esc(call.loser ?? '')}`,
+    players: `<span class="winner">${linkedName(call.winner)}</span> beat ${linkedName(call.loser ?? '')}`,
     score: esc(call.score),
     pending: false,
   };
@@ -220,29 +230,128 @@ function drawSeeds(entries: TournamentEntry[], grade: string) {
   return seeds;
 }
 
-function drawSlot(name: string, seed: string, winner: string | null) {
-  const mark = winner === name ? ' is-winner' : '';
-  return `<span class="slot${mark}">${seed ? `<span class="seed">${esc(seed)}</span>` : ''}<span class="name">${esc(name)}</span></span>`;
-}
+const CELL_W = 172;
+const CELL_H = 54;
+const COL_GAP = 36;
+const UNIT = 64;
+const LABEL = 22;
 
-function drawLeaf(name: string, seed: string) {
-  return `<div class="tie"><div class="tie__box">${drawSlot(name, seed, null)}</div></div>`;
-}
+type DrawCell = {
+  home: string;
+  away: string;
+  seedHome: string;
+  seedAway: string;
+  winner: string | null;
+  score: string;
+  round: string;
+  onPath: boolean;
+  bye: boolean;
+};
 
-function drawBranch(tie: DrawTie, seeds: Map<string, string>): string {
+type DrawNode = { cell: DrawCell; span: number; children: [DrawNode, DrawNode] | null };
+type DrawBox = { cell: DrawCell; top: number; span: number; depth: number; key: number; parent: number | null };
+
+function cellFrom(tie: DrawTie, seeds: Map<string, string>, finalist: string): DrawCell {
   const call = matchCall(tie.match);
-  if (!tie.homeFeed && !tie.awayFeed) {
-    return `<div class="tie"><div class="tie__box">${drawSlot(tie.match.home, seeds.get(tie.match.home) ?? '', call.winner)}${drawSlot(tie.match.away, seeds.get(tie.match.away) ?? '', call.winner)}<span class="tie__score">${esc(call.score)}</span></div></div>`;
+  return {
+    home: tie.match.home,
+    away: tie.match.away,
+    seedHome: seeds.get(tie.match.home) ?? '',
+    seedAway: seeds.get(tie.match.away) ?? '',
+    winner: call.winner,
+    score: call.score,
+    round: roundLabel(tie.match.round),
+    onPath: call.winner === finalist,
+    bye: false,
+  };
+}
+
+function nodeFrom(tie: DrawTie | null, byeName: string, seeds: Map<string, string>, finalist: string): DrawNode {
+  if (!tie) {
+    return {
+      cell: { home: byeName, away: '', seedHome: seeds.get(byeName) ?? '', seedAway: '', winner: byeName, score: '', round: '', onPath: byeName === finalist, bye: true },
+      span: 1,
+      children: null,
+    };
   }
-  const home = tie.homeFeed ? drawBranch(tie.homeFeed, seeds) : drawLeaf(tie.match.home, seeds.get(tie.match.home) ?? '');
-  const away = tie.awayFeed ? drawBranch(tie.awayFeed, seeds) : drawLeaf(tie.match.away, seeds.get(tie.match.away) ?? '');
-  const name = call.winner ?? `${tie.match.home} v ${tie.match.away}`;
-  return `<div class="tie"><div class="tie__feeds">${home}${away}</div><div class="tie__out${call.winner ? ' is-winner' : ''}"><span class="name">${esc(name)}</span><span class="score">${esc(call.score)}</span></div></div>`;
+  if (!tie.homeFeed && !tie.awayFeed) return { cell: cellFrom(tie, seeds, finalist), span: 1, children: null };
+  const home = nodeFrom(tie.homeFeed, tie.match.home, seeds, finalist);
+  const away = nodeFrom(tie.awayFeed, tie.match.away, seeds, finalist);
+  return { cell: cellFrom(tie, seeds, finalist), span: home.span + away.span, children: [home, away] };
+}
+
+function placeDraw(node: DrawNode, top: number, boxes: DrawBox[], parent: number | null): number {
+  const key = boxes.length;
+  boxes.push({ cell: node.cell, top, span: node.span, depth: 0, key, parent });
+  if (!node.children) return 0;
+  const [home, away] = node.children;
+  const homeDepth = home.cell.bye && !home.children ? -1 : placeDraw(home, top, boxes, key);
+  const awayDepth = away.cell.bye && !away.children ? -1 : placeDraw(away, top + home.span, boxes, key);
+  const depth = Math.max(homeDepth, awayDepth) + 1;
+  boxes[key].depth = depth;
+  return depth;
+}
+
+function cellBody(cell: DrawCell) {
+  if (!cell.home && !cell.away) return '<span class="line"></span><span class="line"></span>';
+  const row = (name: string, seed: string, winner: boolean) => {
+    if (!name) return '<span class="line is-bye"><span class="who">Bye</span></span>';
+    const shown = /^\d+$/.test(seed) ? seed : '';
+    return `<a class="line${winner ? ' is-winner' : ''}" href="${playerHref(name)}">${shown ? `<span class="seed">${esc(shown)}</span>` : ''}<span class="who">${esc(name)}</span></a>`;
+  };
+  const score = cell.score ? `<span class="pts" title="${esc(cell.score)}">${esc(cell.score)}</span>` : '';
+  return `${row(cell.home, cell.seedHome, cell.winner === cell.home)}${row(cell.away, cell.seedAway, cell.winner === cell.away)}${score}`;
+}
+
+function sheetHtml(boxes: DrawBox[]) {
+  const drawn = boxes.filter((box) => !box.cell.bye);
+  if (!drawn.length) return '';
+  const columns = Math.max(...drawn.map((box) => box.depth)) + 1;
+  const span = Math.max(...drawn.map((box) => box.top + box.span));
+  const width = columns * (CELL_W + COL_GAP) - COL_GAP;
+  const height = LABEL + span * UNIT;
+  const xOf = (depth: number) => depth * (CELL_W + COL_GAP);
+  const yOf = (box: DrawBox) => LABEL + box.top * UNIT + (box.span * UNIT - CELL_H) / 2;
+  const byKey = new Map(boxes.map((box) => [box.key, box]));
+  const wires = drawn
+    .filter((box) => box.parent != null)
+    .map((box) => {
+      const parent = byKey.get(box.parent ?? -1);
+      if (!parent || parent.cell.bye) return '';
+      const y1 = yOf(box) + CELL_H / 2;
+      const y2 = yOf(parent) + CELL_H / 2;
+      const x1 = xOf(box.depth) + CELL_W;
+      const mid = x1 + COL_GAP / 2;
+      const hot = box.cell.onPath && parent.cell.onPath ? ' is-path' : '';
+      return `<path d="M${x1} ${y1.toFixed(1)} H${mid} V${y2.toFixed(1)} H${xOf(parent.depth)}" class="${hot.trim()}" />`;
+    })
+    .join('');
+  const labels = [...new Set(drawn.map((box) => box.depth))]
+    .map((depth) => {
+      const round = drawn.find((box) => box.depth === depth && box.cell.round)?.cell.round ?? '';
+      return `<span class="col-label" style="left:${xOf(depth)}px">${esc(round)}</span>`;
+    })
+    .join('');
+  const cells = drawn
+    .map((box) => {
+      const blank = !box.cell.home && !box.cell.away ? ' is-blank' : '';
+      const path = box.cell.onPath ? ' is-path' : '';
+      return `<div class="cell${path}${blank}" style="left:${xOf(box.depth)}px;top:${yOf(box).toFixed(1)}px">${cellBody(box.cell)}</div>`;
+    })
+    .join('');
+  return `<div class="bracket-scroll"><div class="sheet" style="width:${width}px;height:${height}px"><svg class="wires" width="${width}" height="${height}" aria-hidden="true">${wires}</svg>${labels}${cells}</div></div>`;
 }
 
 function blankDraw() {
-  const box = '<div class="tie"><div class="tie__box tie__box--blank"><span class="slot"></span><span class="slot"></span></div></div>';
-  return `<div class="tie"><div class="tie__feeds">${box}${box}</div><div class="tie__out tie__out--blank"></div></div>`;
+  const empty = (top: number, span: number, depth: number, key: number, parent: number | null): DrawBox => ({
+    cell: { home: '', away: '', seedHome: '', seedAway: '', winner: null, score: '', round: depth === 0 ? 'Round 1' : 'Final', onPath: false, bye: false },
+    top,
+    span,
+    depth,
+    key,
+    parent,
+  });
+  return sheetHtml([empty(0, 1, 0, 1, 0), empty(1, 1, 0, 2, 0), empty(0, 2, 1, 0, null)]);
 }
 
 /** The two sides of one grade, in the shape of the Sport Manager draw. */
@@ -253,7 +362,7 @@ export function renderDraw(data: TournamentData, grade: string) {
   const filters = grades ? `<div class="filters draw-filters" role="group" aria-label="Draw">${grades}</div>` : '';
   const matches = data.matches.filter((match) => match.grade === grade);
   if (matches.length === 0) {
-    return `<div class="section-head"><h2>The draw</h2></div>${filters}<p class="notice">The two sides of the draw will appear here once it is made.</p><div class="sides sides--blank" aria-hidden="true"><section class="side"><h3><span>Top half</span></h3>${blankDraw()}</section><section class="side"><h3><span>Bottom half</span></h3>${blankDraw()}</section></div>`;
+    return `<div class="section-head"><h2>The draw</h2></div>${filters}<p class="draw-note"><sub>Sign in to open a player's profile.</sub></p><p class="notice">The two sides of the draw will appear here once it is made.</p><div class="sides sides--blank" aria-hidden="true"><section class="side"><h3><span>Top half</span></h3>${blankDraw()}</section><section class="side"><h3><span>Bottom half</span></h3>${blankDraw()}</section></div>`;
   }
 
   const final = [...matches].sort((a, b) => roundNumber(b.round) - roundNumber(a.round) || a.id - b.id)[0];
@@ -261,16 +370,24 @@ export function renderDraw(data: TournamentData, grade: string) {
   const tree = buildTie(final, matches, used);
   const call = matchCall(final);
   const seeds = drawSeeds(data.entries, grade);
+  const finalist = call.winner ?? '';
+  const sideSheet = (feed: DrawTie | null, player: string) => {
+    if (!feed) return '<p class="muted">Bye to the final.</p>';
+    const boxes: DrawBox[] = [];
+    placeDraw(nodeFrom(feed, player, seeds, finalist), 0, boxes, null);
+    return sheetHtml(boxes);
+  };
   const champion = call.winner
-    ? `<div class="champion"><span class="eyebrow">Champion</span><strong>${esc(call.winner)}</strong><p>beat ${esc(call.loser ?? '')} <span>${esc(call.score)}</span></p></div>`
-    : `<div class="champion champion--open"><span class="eyebrow">Final</span><strong>${esc(final.home)} <span class="v">v</span> ${esc(final.away)}</strong></div>`;
+    ? `<div class="champion"><span class="eyebrow">Champion</span><strong>${linkedName(call.winner)}</strong><p>beat ${linkedName(call.loser ?? '')} <span>${esc(call.score)}</span></p></div>`
+    : `<div class="champion champion--open"><span class="eyebrow">Final</span><strong>${linkedName(final.home)} <span class="v">v</span> ${linkedName(final.away)}</strong></div>`;
   const side = (label: string, player: string, feed: DrawTie | null) =>
-    `<section class="side"><h3><span>${label}</span><strong>${esc(player)}</strong></h3>${feed ? drawBranch(feed, seeds) : '<p class="muted">Bye to the final.</p>'}</section>`;
+    `<section class="side"><h3><span>${label}</span><strong>${linkedName(player)}</strong></h3>${sideSheet(feed, player)}</section>`;
   const orphans = matches.filter((match) => !used.has(match.id));
   const extra = orphans.length
-    ? `<section class="side side--extra"><h3><span>Also played</span></h3>${orphans.map((match) => drawBranch({ match, homeFeed: null, awayFeed: null }, seeds)).join('')}</section>`
+    ? `<section class="side side--extra"><h3><span>Also played</span></h3><div class="also">${orphans.map((match) => cellBody(cellFrom({ match, homeFeed: null, awayFeed: null }, seeds, finalist))).map((body) => `<div class="cell">${body}</div>`).join('')}</div></section>`
     : '';
-  return `<div class="section-head"><h2>The draw</h2></div>${filters}${champion}<div class="sides">${side('Top half', final.home, tree.homeFeed)}${side('Bottom half', final.away, tree.awayFeed)}</div>${extra}`;
+  const note = `<p class="draw-note"><sub>Sign in to open a player's profile.</sub></p>`;
+  return `<div class="section-head"><h2>The draw</h2></div>${filters}${note}${champion}<div class="sides">${side('Top half', final.home, tree.homeFeed)}${side('Bottom half', final.away, tree.awayFeed)}</div>${extra}`;
 }
 
 export function renderBoard(data: TournamentData, state: BoardState) {

@@ -85,10 +85,12 @@ const draw = renderDraw(data, drawGrade);
     let drawGrade = draw.dataset.grade || data.grades[0] || '';
     let state: BoardState = { ...defaultState(data), today: root.dataset.today || londonToday() };
 
+    let signedIn = false;
     const paintDraw = () => {
       if (!data.grades.includes(drawGrade)) drawGrade = data.grades[0] || '';
       draw.dataset.grade = drawGrade;
       draw.innerHTML = renderDraw(data, drawGrade);
+      if (signedIn) draw.querySelectorAll<HTMLElement>('.draw-note').forEach((note) => { note.hidden = true; });
     };
     const paint = () => {
       view.innerHTML = renderBoard(data, state);
@@ -115,8 +117,13 @@ const draw = renderDraw(data, drawGrade);
       if (day || grade) paint();
     });
 
-    if (root.dataset.live !== 'true' || !root.dataset.url || !root.dataset.key) return;
+    if (!root.dataset.url || !root.dataset.key) return;
     const supabase = createClient(root.dataset.url, root.dataset.key);
+    void supabase.auth.getSession().then(({ data: session }) => {
+      signedIn = Boolean(session.session);
+      if (signedIn) draw.querySelectorAll<HTMLElement>('.draw-note').forEach((note) => { note.hidden = true; });
+    });
+    if (root.dataset.live !== 'true') return;
     const refresh = async () => {
       const [matches, entries, tournament] = await Promise.all([
         supabase.from('sportmgr_matches').select('id,played_on,start_time,end_time,court,grade,round_label,home_name,away_name,score').eq('tournament_id', Number(id)),
@@ -229,6 +236,10 @@ const draw = renderDraw(data, drawGrade);
   .order-root :global(.match__players) {
     display: block;
   }
+  .order-root :global(.match__players a) {
+    color: var(--link);
+    text-decoration: none;
+  }
   .order-root :global(.winner) {
     color: var(--link);
     font-weight: 700;
@@ -306,6 +317,22 @@ const draw = renderDraw(data, drawGrade);
   .order-root :global(.draw-filters .pill) {
     flex: none;
   }
+  .order-root :global(.draw-note) {
+    margin: -0.15rem 0 0.65rem;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-style: italic;
+  }
+  .order-root :global(.draw-note[hidden]) {
+    display: none;
+  }
+  .order-root :global(a.player-link) {
+    color: inherit;
+    text-decoration: none;
+  }
+  .order-root :global(a.player-link:hover) {
+    text-decoration: underline;
+  }
   .order-root :global(.champion) {
     background: var(--ink-950);
     color: #fff;
@@ -330,6 +357,11 @@ const draw = renderDraw(data, drawGrade);
     margin: 0.3rem 0 0;
     color: rgba(255, 255, 255, 0.82);
   }
+  .order-root :global(.champion a) {
+    color: #fff;
+    text-decoration: underline;
+    text-underline-offset: 0.12em;
+  }
   .order-root :global(.champion p span) {
     color: #fff;
     font-weight: 700;
@@ -341,16 +373,7 @@ const draw = renderDraw(data, drawGrade);
   }
   .order-root :global(.sides) {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: 0.7rem;
-  }
-  .order-root :global(.side) {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-top: 3px solid var(--accent);
-    border-radius: var(--radius);
-    padding: 0.65rem 0.65rem 0.45rem;
-    min-width: 0;
+    gap: 0.8rem;
   }
   .order-root :global(.side h3) {
     display: flex;
@@ -376,26 +399,79 @@ const draw = renderDraw(data, drawGrade);
     text-align: right;
     text-transform: uppercase;
   }
-  .order-root :global(.tie__feeds) {
-    margin-left: 0.35rem;
-    padding-left: 0.4rem;
-    border-left: 2px solid var(--accent);
+  .order-root :global(.bracket-scroll) {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding-bottom: 0.2rem;
   }
-  .order-root :global(.tie__box) {
-    display: grid;
-    margin: 0.18rem 0;
-    padding: 0.18rem 0.4rem 0.22rem;
-    background: color-mix(in srgb, var(--bg) 55%, var(--bg-card));
-    border: 1px solid var(--border);
-    border-radius: 8px;
+  .order-root :global(.sheet) {
+    position: relative;
   }
-  .order-root :global(.slot) {
+  .order-root :global(.wires) {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .order-root :global(.wires path) {
+    fill: none;
+    stroke: var(--ink-300);
+    stroke-width: 1.5;
+  }
+  .order-root :global(.wires path.is-path) {
+    stroke: var(--accent);
+    stroke-width: 2.5;
+  }
+  .order-root :global(.col-label) {
+    position: absolute;
+    top: 0;
+    width: 172px;
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .order-root :global(.cell) {
+    position: absolute;
+    width: 172px;
+    height: 54px;
     display: flex;
-    gap: 0.28rem;
-    align-items: baseline;
-    min-width: 0;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0.15rem 0.4rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    box-shadow: 0 1px 0 color-mix(in srgb, var(--ink-950) 8%, transparent);
   }
-  .order-root :global(.slot .seed) {
+  .order-root :global(.cell.is-path) {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, var(--bg-card));
+  }
+  .order-root :global(.cell.is-blank) {
+    background: transparent;
+    box-shadow: none;
+  }
+  .order-root :global(.cell.is-blank .line) {
+    height: 0.45rem;
+    margin: 0.16rem 0;
+    border-radius: 99px;
+    background: var(--border-strong);
+  }
+  .order-root :global(.line) {
+    display: flex;
+    align-items: baseline;
+    gap: 0.28rem;
+    min-width: 0;
+    color: var(--text);
+    font-size: 0.78rem;
+    line-height: 1.15;
+    text-decoration: none;
+  }
+  .order-root :global(a.line:not(.is-winner)) {
+    color: var(--link);
+  }
+  .order-root :global(.line .seed) {
     flex: none;
     min-width: 0;
     margin: 0;
@@ -403,75 +479,45 @@ const draw = renderDraw(data, drawGrade);
     font-size: 0.62rem;
     font-weight: 700;
   }
-  .order-root :global(.slot .name) {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 0.82rem;
-  }
-  .order-root :global(.slot.is-winner .name),
-  .order-root :global(.tie__out.is-winner .name) {
-    color: var(--link);
-    font-weight: 700;
-  }
-  .order-root :global(.tie__score),
-  .order-root :global(.tie__out .score) {
-    color: var(--text-muted);
-    font-size: 0.68rem;
-    font-variant-numeric: tabular-nums;
-    line-height: 1.25;
-  }
-  .order-root :global(.tie__out .score) {
-    text-align: right;
-  }
-  .order-root :global(.tie__score) {
-    grid-column: 1;
-  }
-  .order-root :global(.tie__out) {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 0.4rem;
-    margin: 0.12rem 0 0.28rem;
-    padding: 0.16rem 0.4rem;
-    background: color-mix(in srgb, var(--accent) 14%, transparent);
-    border-radius: 6px;
-  }
-  .order-root :global(.tie__out .name) {
+  .order-root :global(.line .who) {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.82rem;
   }
-  .order-root :global(.tie__out .score) {
-    flex: none;
+  .order-root :global(.line.is-winner) {
+    color: var(--ink-950);
+    font-weight: 700;
   }
-  .order-root :global(.tie__box--blank .slot) {
-    display: block;
-    height: 0.5rem;
-    margin: 0.16rem 0;
-    border-radius: 99px;
-    background: var(--border-strong);
+  .order-root :global(.cell.is-path .line.is-winner) {
+    color: var(--link);
   }
-  .order-root :global(.tie__out--blank) {
-    height: 0.65rem;
-    background: var(--border);
+  .order-root :global(.line.is-bye) {
+    color: var(--text-muted);
+    font-style: italic;
   }
-  .order-root :global(.sides--blank) {
-    opacity: 0.72;
+  .order-root :global(.pts) {
+    color: var(--text-muted);
+    font-size: 0.62rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .order-root :global(.also) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .order-root :global(.also .cell) {
+    position: static;
   }
   .order-root :global(.side--extra) {
-    margin-top: 0.7rem;
+    margin-top: 0.35rem;
   }
   .order-root :global(.side .muted) {
     margin: 0.2rem 0 0.4rem;
-  }
-  @media (min-width: 800px) {
-    .order-root :global(.sides) {
-      grid-template-columns: 1fr 1fr;
-      align-items: start;
-    }
   }
   @media (max-width: 720px) {
     .order-root :global(.match) {

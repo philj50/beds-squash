@@ -1,0 +1,198 @@
+---
+import Base from '@/layouts/Base.astro';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
+import { url } from '@/lib/site';
+
+const loginHref = url('/login/');
+---
+
+<Base title="Player profile" description="A Bedfordshire squash player, for people who are signed in." noindex>
+  <section class="section">
+    <div class="container player" id="player-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} data-login={loginHref}>
+      <p><a class="back" href={url('/tournaments/')}>← Tournaments</a></p>
+      <h1 data-title>Player</h1>
+      <div data-locked>
+        <p class="lede">Sign in to see this player's profile.</p>
+        <a class="btn btn--primary btn--sm" data-login-link href={loginHref}>Log in</a>
+      </div>
+      <div data-open hidden>
+        <p class="status" data-status role="status"></p>
+        <div data-level></div>
+        <h2>County Closed</h2>
+        <div data-closed></div>
+        <h2>League matches</h2>
+        <div data-league></div>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+  import type { TournamentData } from '@/lib/sportmgr';
+
+  const root = document.getElementById('player-app');
+  if (!root) throw new Error('player app missing');
+  const supabase = createClient(root.dataset.url!, root.dataset.key!);
+  const title = root.querySelector<HTMLElement>('[data-title]')!;
+  const locked = root.querySelector<HTMLElement>('[data-locked]')!;
+  const open = root.querySelector<HTMLElement>('[data-open]')!;
+  const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
+  const levelEl = root.querySelector<HTMLElement>('[data-level]')!;
+  const closedEl = root.querySelector<HTMLElement>('[data-closed]')!;
+  const leagueEl = root.querySelector<HTMLElement>('[data-league]')!;
+  const loginLink = root.querySelector<HTMLAnchorElement>('[data-login-link]')!;
+
+  const files = import.meta.glob<TournamentData>('../../data/sportmgr/*.json', { eager: true, import: 'default' });
+  const snapshots = Object.values(files);
+  const same = (left: string, right: string) => left.trim().toLowerCase() === right.trim().toLowerCase();
+  const esc = (value: string) => value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
+  const day = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+  function nameFromHash() {
+    const raw = location.hash.replace(/^#/, '');
+    if (!raw) return '';
+    try {
+      return decodeURIComponent(raw).trim();
+    } catch {
+      return raw.trim();
+    }
+  }
+
+  function profileHref(name: string) {
+    const base = import.meta.env.BASE_URL.replace(/\/+$/, '');
+    return `${base}/players/#${encodeURIComponent(name)}`;
+  }
+
+  function closedMatches(name: string) {
+    const rows: { title: string; when: string; line: string }[] = [];
+    for (const data of snapshots) {
+      for (const match of data.matches) {
+        const home = same(match.home, name);
+        const away = same(match.away, name);
+        if (!home && !away) continue;
+        const opponent = home ? match.away : match.home;
+        const score = match.score ? ` · ${match.score}` : '';
+        rows.push({
+          title: data.title,
+          when: match.date,
+          line: `${match.grade}${match.round ? ` · ${match.round}` : ''} · <a href="${profileHref(opponent)}">${esc(opponent)}</a>${esc(score)}`,
+        });
+      }
+    }
+    return rows.sort((a, b) => b.when.localeCompare(a.when));
+  }
+
+  async function show(name: string) {
+    title.textContent = name;
+    statusEl.textContent = 'Loading…';
+    const closed = closedMatches(name);
+    closedEl.innerHTML = closed.length
+      ? `<ul class="plain">${closed.map((row) => `<li><span class="muted">${esc(day.format(new Date(`${row.when}T12:00:00`)))}</span> ${esc(row.title)}<br>${row.line}</li>`).join('')}</ul>`
+      : '<p class="muted">No County Closed matches under this name.</p>';
+
+    const { data: levels, error: levelError } = await supabase
+      .from('squashlevels_players')
+      .select('id, display_name, current_level, updated_at')
+      .ilike('display_name', name);
+    if (levelError || (levels ?? []).length !== 1) {
+      levelEl.innerHTML = (levels ?? []).length > 1 ? '<p class="muted">More than one SquashLevels record uses this name.</p>' : '';
+    } else {
+      const player = levels![0];
+      const level = player.current_level == null ? '—' : Number(player.current_level).toLocaleString('en-GB');
+      const { data: ratings } = await supabase
+        .from('squashlevels_ratings')
+        .select('recorded_on, level')
+        .eq('player_id', player.id)
+        .order('recorded_on', { ascending: false })
+        .limit(6);
+      const history = (ratings ?? [])
+        .map((row) => `<li><span class="muted">${esc(day.format(new Date(`${row.recorded_on}T12:00:00`)))}</span> ${esc(Number(row.level).toLocaleString('en-GB'))}</li>`)
+        .join('');
+      levelEl.innerHTML = `<p class="level">SquashLevels <strong>${esc(level)}</strong></p>${history ? `<ul class="plain">${history}</ul>` : ''}`;
+    }
+
+    const quoted = `"${name.replace(/["\\]/g, '')}"`;
+    const { data, error } = await supabase
+      .from('rubbers')
+      .select('home_player, away_player, score, fixtures!inner(starts_at)')
+      .or(`home_player.ilike.${quoted},away_player.ilike.${quoted}`)
+      .limit(20);
+    if (error) {
+      leagueEl.innerHTML = `<p class="muted">${esc(error.message)}</p>`;
+    } else {
+      const matches = ((data ?? []) as { home_player: string; away_player: string; score: string | null; fixtures: { starts_at: string } | { starts_at: string }[] }[])
+        .map((row) => {
+          const fixture = Array.isArray(row.fixtures) ? row.fixtures[0] : row.fixtures;
+          const opponent = same(row.home_player, name) ? row.away_player : row.home_player;
+          return { when: fixture?.starts_at ?? '', opponent, score: row.score ?? '' };
+        })
+        .sort((a, b) => b.when.localeCompare(a.when));
+      leagueEl.innerHTML = matches.length
+        ? `<ul class="plain">${matches
+            .map((row) => {
+              const when = row.when ? day.format(new Date(row.when)) : '';
+              return `<li><span class="muted">${esc(when)}</span> <a href="${profileHref(row.opponent)}">${esc(row.opponent)}</a> ${esc(row.score)}</li>`;
+            })
+            .join('')}</ul>`
+        : '<p class="muted">No league matches under this name.</p>';
+    }
+    statusEl.textContent = '';
+  }
+
+  const name = nameFromHash();
+  title.textContent = name || 'Player';
+  const next = encodeURIComponent(location.pathname + location.search + location.hash);
+  loginLink.href = `${loginLink.getAttribute('href')?.split('?')[0]}?next=${next}`;
+
+  const { data } = await supabase.auth.getSession();
+  if (!data.session) {
+    locked.hidden = false;
+    open.hidden = true;
+  } else if (!name) {
+    locked.hidden = true;
+    open.hidden = false;
+    statusEl.textContent = 'Open a player from the draw.';
+    closedEl.innerHTML = '';
+    leagueEl.innerHTML = '';
+  } else {
+    locked.hidden = true;
+    open.hidden = false;
+    await show(name);
+  }
+</script>
+
+<style>
+  .player {
+    max-width: 40rem;
+  }
+  .back {
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .lede {
+    color: var(--ink-200);
+  }
+  .level {
+    font-size: 1.15rem;
+  }
+  .status:empty {
+    display: none;
+  }
+  .plain {
+    list-style: none;
+    margin: 0 0 1.2rem;
+    padding: 0;
+  }
+  .plain li {
+    padding: 0.35rem 0;
+    border-top: 1px solid var(--border);
+  }
+  .plain a {
+    font-weight: 700;
+  }
+  [data-locked][hidden],
+  [data-open][hidden] {
+    display: none;
+  }
+</style>
