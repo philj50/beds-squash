@@ -16,7 +16,11 @@ for (const h of honours) byEvent.set(h.data.event, [...(byEvent.get(h.data.event
 ---
 
 <Base title="Bedfordshire County Closed" description="Bedfordshire County Closed Championships, the League Cup and the honours board of county champions." crumbs={[{ name: 'Tournaments', path: '/tournaments/' }]}>
-  <PageHero eyebrow="Compete" title="Tournaments" lede="The County Closed, League Cup, Over 50s Cup and junior opens — plus the honours board of past champions." />
+  <PageHero eyebrow="Compete" title="Tournaments" lede="The County Closed, League Cup, Over 50s Cup and junior opens — plus the honours board of past champions.">
+    <div class="hero-actions">
+      <a class="btn btn--ghost btn--sm" href={url('/events/2026-01-beds-closed/')}>2026 history</a>
+    </div>
+  </PageHero>
 
   <section class="section">
     <div class="container">
@@ -108,6 +112,9 @@ for (const h of honours) byEvent.set(h.data.event, [...(byEvent.get(h.data.event
                       ))}
                     </tbody>
                   </table>
+                  {h.data.year === 2026 && h.data.event === 'Beds Closed' && (
+                    <a href={url('/events/2026-01-beds-closed/')}>Order of play</a>
+                  )}
                   {h.data.report && (
                     <a href={url(h.data.report)}>Full report / results (PDF)</a>
                   )}
@@ -122,6 +129,12 @@ for (const h of honours) byEvent.set(h.data.event, [...(byEvent.get(h.data.event
 </Base>
 
 <style>
+  .hero-actions {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-top: 1.25rem;
+  }
   .comps h3 {
     margin-bottom: 0.4rem;
   }
