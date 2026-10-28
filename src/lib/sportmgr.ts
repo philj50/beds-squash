@@ -187,18 +187,40 @@ export function defaultState(data: TournamentData, now = new Date()): BoardState
   return { day, grade: 'all', today, nowMinutes: data.dates.includes(today) ? londonMinutes(now) : null };
 }
 
-function courtNow(matches: TournamentMatch[], nowMinutes: number) {
-  const courts = [...new Set(matches.filter((match) => !offCourt(match)).map((match) => match.court))];
-  courts.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-  return courts.map((court) => {
-    const onCourt = matches
-      .filter((match) => match.court === court)
-      .sort((a, b) => a.start.localeCompare(b.start));
-    const current = onCourt.find((match) => minutes(match.start) <= nowMinutes && nowMinutes < minutes(match.end || match.start));
-    const next = onCourt.find((match) => minutes(match.start) > nowMinutes);
-    const match = current ?? next;
-    return { court, label: current ? 'On court' : 'Next', match };
-  });
+function slotEnd(match: TournamentMatch) {
+  const start = minutes(match.start);
+  const end = minutes(match.end || '');
+  return end > start ? end : start + 40;
+}
+
+function byCourt(left: string, right: string) {
+  return left.localeCompare(right, undefined, { numeric: true });
+}
+
+/** Matches in their scheduled slot, or the next wave if play has not started. */
+function courtsNow(matches: TournamentMatch[], nowMinutes: number) {
+  const assigned = matches.filter((match) => !offCourt(match)).sort((a, b) => a.start.localeCompare(b.start) || byCourt(a.court, b.court));
+  if (!assigned.length) return null;
+  const live = [...assigned].reverse().filter((match) => minutes(match.start) <= nowMinutes && nowMinutes < slotEnd(match));
+  const onCourt = new Map<string, TournamentMatch>();
+  for (const match of live) if (!onCourt.has(match.court)) onCourt.set(match.court, match);
+  if (onCourt.size) {
+    return {
+      heading: 'Who is on court now?',
+      note: '',
+      cards: [...onCourt.entries()]
+        .sort(([a], [b]) => byCourt(a, b))
+        .map(([court, match]) => ({ court, match })),
+    };
+  }
+  const upcoming = assigned.filter((match) => minutes(match.start) > nowMinutes);
+  if (!upcoming.length) return { heading: 'Who is on court now?', note: 'Courts are clear.', cards: [] as { court: string; match: TournamentMatch }[] };
+  const nextStart = upcoming[0].start;
+  return {
+    heading: 'Next on court',
+    note: '',
+    cards: upcoming.filter((match) => match.start === nextStart).map((match) => ({ court: match.court, match })),
+  };
 }
 
 function roundNumber(round: string) {
@@ -413,23 +435,22 @@ export function renderBoard(data: TournamentData, state: BoardState) {
     .filter((match) => match.date === state.day && (state.grade === 'all' || match.grade === state.grade))
     .sort((a, b) => Number(offCourt(a)) - Number(offCourt(b)) || a.start.localeCompare(b.start) || a.court.localeCompare(b.court, undefined, { numeric: true }));
 
-  const live =
-    state.nowMinutes != null && state.day === state.today
-      ? courtNow(
-          data.matches.filter((match) => match.date === state.day),
-          state.nowMinutes,
-        )
-      : [];
-  const liveHtml =
-    live.length > 0
-      ? `<div class="courts">${live
-          .map(({ court, label, match }) => {
-            if (!match) return `<article class="court-card"><span class="eyebrow">${esc(court)}</span><p class="muted">Free</p></article>`;
-            const described = describeMatch(match);
-            return `<article class="court-card"><span class="eyebrow">${esc(court)}</span><strong>${esc(label)} · ${esc(match.start)}</strong><p>${described.players}</p><p class="muted">${esc(match.grade)}${match.round ? ` · ${esc(roundLabel(match.round))}` : ''}</p></article>`;
-          })
-          .join('')}</div>`
-      : '';
+  const live = state.nowMinutes != null && state.day === state.today ? courtsNow(data.matches.filter((match) => match.date === state.day), state.nowMinutes) : null;
+  const clock = state.nowMinutes == null ? '' : `${String(Math.floor(state.nowMinutes / 60)).padStart(2, '0')}:${String(state.nowMinutes % 60).padStart(2, '0')}`;
+  const liveHtml = live
+    ? `<section class="on-now"><div class="on-now__head"><h3>${esc(live.heading)}</h3>${clock ? `<span class="muted">${esc(clock)}</span>` : ''}</div>${
+        live.note
+          ? `<p class="notice">${esc(live.note)}</p>`
+          : `<div class="courts">${live.cards
+              .map(({ court, match }) => {
+                const players = `${linkedName(match.home)} <span class="v">v</span> ${linkedName(match.away)}`;
+                const until = slotEnd(match);
+                const finish = `${String(Math.floor(until / 60)).padStart(2, '0')}:${String(until % 60).padStart(2, '0')}`;
+                return `<article class="court-card${live.heading.startsWith('Who') ? ' court-card--live' : ''}"><span class="eyebrow">${esc(court)}</span><strong>${esc(match.start)}–${esc(finish)}</strong><p>${players}</p><p class="muted">${esc(match.grade)}${match.round ? ` · ${esc(roundLabel(match.round))}` : ''}</p></article>`;
+              })
+              .join('')}</div>`
+      }</section>`
+    : '';
 
   let seenOffCourt = false;
   const rows = dayMatches
@@ -470,9 +491,9 @@ export function renderBoard(data: TournamentData, state: BoardState) {
   const updated = state.showUpdated ? updatedLabel(data.syncedAt) : '';
   const heading = data.matches.length > 0 ? 'Order of play' : 'Players';
   return `<div class="section-head"><h2>${heading}</h2>${updated ? `<span class="muted">Updated ${esc(updated)}</span>` : ''}</div>
+    ${liveHtml}
     ${days ? `<div class="filters" role="group" aria-label="Day">${days}</div>` : ''}
     ${data.grades.length > 1 ? `<div class="filters" role="group" aria-label="Grade">${grades}</div>` : ''}
-    ${liveHtml}
     ${data.matches.length > 0 && state.day ? `<h3 class="day-heading">${esc(dayHeading(state.day))}</h3>${list}` : ''}
     ${players}`;
 }

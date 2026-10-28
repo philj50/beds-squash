@@ -96,10 +96,15 @@ const draw = renderDraw(data, drawGrade);
       view.innerHTML = renderBoard(data, state);
     };
 
-    if (data.dates.includes(londonToday())) {
-      state = { ...state, day: londonToday(), today: londonToday(), nowMinutes: londonMinutes() };
+    const followClock = () => {
+      const today = londonToday();
+      if (!data.dates.includes(today)) return;
+      const viewingToday = state.day === state.today || state.day === today;
+      state = { ...state, today, nowMinutes: londonMinutes(), day: viewingToday ? today : state.day };
       paint();
-    }
+    };
+    followClock();
+    window.setInterval(followClock, 30_000);
 
     root.addEventListener('click', (event) => {
       const target = event.target;
@@ -172,11 +177,23 @@ const draw = renderDraw(data, drawGrade);
   .order-root :global(.day-heading) {
     margin: 0.2rem 0 0.4rem;
   }
+  .order-root :global(.on-now) {
+    margin: 0 0 1rem;
+  }
+  .order-root :global(.on-now__head) {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.6rem;
+    margin-bottom: 0.45rem;
+  }
+  .order-root :global(.on-now h3) {
+    margin: 0;
+  }
   .order-root :global(.courts) {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 0.6rem;
-    margin-bottom: 1rem;
   }
   .order-root :global(.court-card) {
     background: var(--bg-card);
@@ -184,9 +201,17 @@ const draw = renderDraw(data, drawGrade);
     border-radius: var(--radius);
     padding: 0.7rem 0.85rem;
   }
+  .order-root :global(.court-card--live) {
+    border-color: var(--accent);
+    border-top: 3px solid var(--accent);
+  }
+  .order-root :global(.court-card .eyebrow) {
+    color: var(--accent);
+  }
   .order-root :global(.court-card strong) {
     display: block;
     margin-bottom: 0.25rem;
+    font-variant-numeric: tabular-nums;
   }
   .order-root :global(.court-card p) {
     margin: 0;
