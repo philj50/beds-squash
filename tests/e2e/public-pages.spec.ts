@@ -249,7 +249,7 @@ test.describe('Public pages', () => {
     await expect(mainNews.getByRole('link', { name: 'Entries open for the Junior County Closed' })).toBeVisible();
     await page.getByRole('button', { name: 'All' }).click();
     await expect(mainNews.getByRole('link', { name: 'England dates from the PSA tour' })).toBeVisible();
-    await expect(mainNews.getByRole('link', { name: 'Minigame mk4 starts from a clear board' })).toHaveCount(1);
+    await expect(mainNews.getByRole('link', { name: /Minigame mk4 board/ })).toHaveCount(1);
     await expect(mainNews.getByRole('link', { name: 'Minigame mk4 is played on the floor' })).toBeVisible();
     await expect(mainNews.getByRole('link', { name: 'My Squash is coming soon' })).toBeVisible();
     await page.getByRole('button', { name: 'Website' }).click();

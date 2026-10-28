@@ -172,19 +172,37 @@ const html = renderBoard(data, state);
   }
   .order-root :global(.match) {
     display: grid;
-    grid-template-columns: 7.2rem minmax(0, 1fr) auto;
-    gap: 0.2rem 1rem;
-    align-items: center;
-    padding: 0.55rem 0;
+    grid-template-columns: 5.4rem minmax(0, 1fr) auto;
+    gap: 0.35rem 1rem;
+    align-items: start;
+    padding: 0.7rem 0;
     border-top: 1px solid var(--border);
+  }
+  .order-root :global(.match__when) {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.28rem;
   }
   .order-root :global(.match__time) {
     font-family: var(--font-display);
     font-weight: 700;
-    font-size: 1.15rem;
+    font-size: 1.25rem;
+    line-height: 1;
     letter-spacing: 0.03em;
   }
-  .order-root :global(.match__court),
+  .order-root :global(.match__court) {
+    display: inline-block;
+    padding: 0.08rem 0.4rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    line-height: 1.3;
+    text-transform: uppercase;
+  }
   .order-root :global(.match__grade) {
     color: var(--text-muted);
     font-size: 0.82rem;
@@ -261,15 +279,13 @@ const html = renderBoard(data, state);
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
   }
-  @media (max-width: 640px) {
+  @media (max-width: 720px) {
     .order-root :global(.match) {
-      grid-template-columns: 1fr auto;
+      grid-template-columns: 5.4rem minmax(0, 1fr);
     }
-    .order-root :global(.match__when) {
-      grid-column: 1 / -1;
-      display: flex;
-      gap: 0.6rem;
-      align-items: baseline;
+    .order-root :global(.match__score) {
+      grid-column: 2;
+      text-align: left;
     }
   }
 </style>
