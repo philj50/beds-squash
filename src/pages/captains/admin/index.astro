@@ -1371,16 +1371,16 @@ const scoresHref = url('/captains/admin/minigame/');
   };
   const roleCanDo = (slug: string) => {
     const text: Record<string, string> = {
-      admin: 'Users, groups, roles, links, traffic, League Master lists, juniors, Beds Closed, publish content, articles, minigame scores',
-      lm_club_captain: 'Their club on League Master, the squad, club matches',
-      lm_team_captain: 'Their team, the squad, the match sheet',
-      lm_player: 'My squash, mark availability, send something in',
-      sl_player: 'Listed on SquashLevels',
-      jc_player: 'Listed from a junior entry',
-      jc_parent: 'Listed as the parent on a junior entry',
-      junior_organiser: 'Junior admin menu, County Closed entries',
-      bc_player: 'Beds Closed section',
-      rb_player: 'Racketball group',
+      admin: 'Users, groups, roles, links, traffic, League Master lists, juniors, Beds Closed, publish content, articles, minigame scores, the squad and the match sheet',
+      lm_club_captain: 'Their club on League Master, squad emails, club matches, My squash',
+      lm_team_captain: 'Their team on League Master, the match list, My squash',
+      lm_player: 'My squash, their fixture, send something in',
+      sl_player: 'Listed on SquashLevels, send something in',
+      jc_player: 'Listed from a junior entry, send something in',
+      jc_parent: 'Listed as the parent on a junior entry, send something in',
+      junior_organiser: 'Junior admin menu, County Closed entries, send something in',
+      bc_player: 'Beds Closed section, send something in',
+      rb_player: 'Racketball group, send something in',
     };
     return text[slug] ?? '';
   };

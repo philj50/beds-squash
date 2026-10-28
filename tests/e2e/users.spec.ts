@@ -685,10 +685,12 @@ async function installAdmin(page: Page) {
         { slug: 'lm_club_captain', name: 'LM Club Captain', position: 2 },
         { slug: 'lm_team_captain', name: 'LM Team Captain', position: 3 },
         { slug: 'lm_player', name: 'LM Player', position: 4 },
+        { slug: 'sl_player', name: 'SL Player', position: 5 },
         { slug: 'jc_player', name: 'JC Player', position: 6 },
-        { slug: 'junior_organiser', name: 'Junior Organiser', position: 7 },
-        { slug: 'bc_player', name: 'BC Player', position: 8 },
-        { slug: 'rb_player', name: 'RB Player', position: 9 },
+        { slug: 'jc_parent', name: 'JC Parent', position: 7 },
+        { slug: 'junior_organiser', name: 'Junior Organiser', position: 8 },
+        { slug: 'bc_player', name: 'BC Player', position: 9 },
+        { slug: 'rb_player', name: 'RB Player', position: 10 },
       ]);
       return;
     }
@@ -698,10 +700,12 @@ async function installAdmin(page: Page) {
         { slug: 'lm_club_captains', name: 'LM Club Captains', role_slug: 'lm_club_captain', source: 'leaguemaster', managed: true, position: 2 },
         { slug: 'lm_team_captains', name: 'LM Team Captains', role_slug: 'lm_team_captain', source: 'leaguemaster', managed: true, position: 3 },
         { slug: 'lm_players', name: 'LM Players', role_slug: 'lm_player', source: 'leaguemaster', managed: true, position: 4 },
+        { slug: 'sl_players', name: 'SL Players', role_slug: 'sl_player', source: 'squashlevels', managed: true, position: 5 },
         { slug: 'jc_players', name: 'JC Players', role_slug: 'jc_player', source: 'website', managed: false, position: 6 },
-        { slug: 'junior_organisers', name: 'Junior Organisers', role_slug: 'junior_organiser', source: 'website', managed: false, position: 7 },
-        { slug: 'bc_players', name: 'BC Players', role_slug: 'bc_player', source: 'website', managed: false, position: 8 },
-        { slug: 'rb_players', name: 'RB Players', role_slug: 'rb_player', source: 'website', managed: false, position: 9 },
+        { slug: 'jc_parents', name: 'JC Parents', role_slug: 'jc_parent', source: 'website', managed: false, position: 7 },
+        { slug: 'junior_organisers', name: 'Junior Organisers', role_slug: 'junior_organiser', source: 'website', managed: false, position: 8 },
+        { slug: 'bc_players', name: 'BC Players', role_slug: 'bc_player', source: 'website', managed: false, position: 9 },
+        { slug: 'rb_players', name: 'RB Players', role_slug: 'rb_player', source: 'website', managed: false, position: 10 },
       ]);
       return;
     }
