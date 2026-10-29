@@ -2,7 +2,7 @@
 title: Confirmed sponsors for the Beds County Closed
 date: 2026-10-10T16:00:00
 summary: The Dental Centre Bedford is the main sponsor, with a strong list of additional sponsors already confirmed for the County Closed.
-image: /uploads/news/beds-closed-sponsors-v3.jpg
+image: /uploads/news/beds-closed-sponsors-v4.jpg
 imageAlt: The Dental Centre Bedford reception, with logos for the Dental Centre, JR Builders, Decant, Brook Harris, Open House, the Bedford Cheese Company, My Next Car, Specsavers, Samo Sports and J.A.J Electrical Services.
 category: tournaments
 featured: true
@@ -54,7 +54,7 @@ A first look at the confirmed sponsors — at least so far — for the [Bedfords
 
 - [J.A.J Electrical Services](https://www.instagram.com/j.a.jelectricalservices/)
 
-  ![J.A.J Electrical Services](/uploads/news/jaj-electrical.png)
+  ![J.A.J Electrical Services](/uploads/news/jaj-electrical-v2.png)
 
 Thanks to everyone who has come on board. More names may still be added before the event.
 
