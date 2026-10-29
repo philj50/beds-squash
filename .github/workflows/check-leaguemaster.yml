@@ -57,24 +57,10 @@ jobs:
           echo "summary=$summary" >> "$GITHUB_OUTPUT"
 
       - name: Notify via ntfy
-        if: always()
+        if: success() && steps.check.outputs.ok == 'false'
+        continue-on-error: true
         env:
-          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-          NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
-          NTFY_SERVER: ${{ vars.NTFY_SERVER }}
-          JOB_STATUS: ${{ job.status }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          FIRST_OK: ${{ steps.check.outputs.ok }}
-          FIRST_SUMMARY: ${{ steps.check.outputs.summary }}
-          AGAIN_SUMMARY: ${{ steps.again.outputs.summary }}
         run: |
-          if [ "$FIRST_OK" = "true" ]; then
-            echo "No difference, so no notification."
-            exit 0
-          fi
-          if [ "$JOB_STATUS" = "success" ]; then
-            body="Division 1 and 2 had drifted from League Master. The import ran again and they match now."
-          else
-            body="Division 1 and 2 still differ from League Master. ${AGAIN_SUMMARY:-$FIRST_SUMMARY}"
-          fi
-          bash .github/scripts/ntfy-notify.sh "Beds Squash · League Master check" "$body"
+          body="Division 1 and 2 had drifted from League Master. The import ran again and they match now."
+          bash .github/scripts/ntfy-notify.sh "Beds Squash · League Master" "$body" "beds_lm_1234"

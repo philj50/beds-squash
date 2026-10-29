@@ -441,7 +441,7 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="integrations" data-lm-only hidden>
             <h2>Integrations</h2>
             <p class="muted small">
-              Each outside service, the account it signs in with, and how much it has stored here. Passwords stay in GitHub. Job results use the topic kept in GitHub. Juniors and County Closed scores each have their own public topic.
+              Each outside service, the account it signs in with, and how much it has stored here. Passwords stay in GitHub. Each ntfy topic is public. League Master, SquashLevels, other job notes, failures, juniors and County Closed scores each have their own.
             </p>
             <p class="muted small" data-integrations-status hidden role="status"></p>
             <div class="overview-box" data-integrations hidden>
@@ -1124,13 +1124,40 @@ const scoresHref = url('/captains/admin/minigame/');
       when: 'Paused until a new mailbox is ready',
     },
     {
-      slug: 'ntfy',
-      name: 'ntfy jobs',
-      accountSecret: 'NTFY_TOPIC',
+      slug: 'ntfy-config',
+      name: 'ntfy config',
+      accountSecret: '',
       passwordSecret: '',
       tables: [],
-      when: 'After League Master, SquashLevels and the PSA check',
-      passwordNote: 'Only if that topic is private',
+      when: 'When the PSA tour list changes',
+      fixedAccount: 'beds_config_1234',
+    },
+    {
+      slug: 'ntfy-lm',
+      name: 'ntfy League Master',
+      accountSecret: '',
+      passwordSecret: '',
+      tables: [],
+      when: 'After the League Master import',
+      fixedAccount: 'beds_lm_1234',
+    },
+    {
+      slug: 'ntfy-sl',
+      name: 'ntfy SquashLevels',
+      accountSecret: '',
+      passwordSecret: '',
+      tables: [],
+      when: 'After the SquashLevels daily run',
+      fixedAccount: 'beds_sl_1234',
+    },
+    {
+      slug: 'ntfy-errors',
+      name: 'ntfy errors',
+      accountSecret: '',
+      passwordSecret: '',
+      tables: [],
+      when: 'When a GitHub job fails',
+      fixedAccount: 'beds_errors_1234',
     },
     {
       slug: 'ntfy-juniors',

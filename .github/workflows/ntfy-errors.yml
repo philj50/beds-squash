@@ -1,0 +1,35 @@
+name: ntfy errors
+
+on:
+  workflow_run:
+    workflows:
+      - Deploy to GitHub Pages
+      - Site tests
+      - Sync League Master
+      - Check League Master
+      - SquashLevels and match article
+      - PSA tour and SquashTV highlights
+      - Sync Sport Manager
+      - Link County Closed entries
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    if: github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Post the failure
+        env:
+          JOB_STATUS: failure
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          WORKFLOW: ${{ github.event.workflow_run.name }}
+          SUMMARY: ${{ github.event.workflow_run.display_title }}
+        run: |
+          bash .github/scripts/ntfy-notify.sh \
+            "Beds Squash · ${WORKFLOW}" \
+            "${WORKFLOW} failed. ${SUMMARY}" \
+            "beds_errors_1234"

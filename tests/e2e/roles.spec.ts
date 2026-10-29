@@ -522,7 +522,6 @@ test.describe('Club captain, team captain, and player', () => {
       if (path.endsWith('/rpc/admin_integration_accounts')) {
         return send([
           { slug: 'squashlevels', account: 'levels@example.test' },
-          { slug: 'ntfy', account: 'beds-jobs-topic' },
         ]);
       }
       if (path.endsWith('/rpc/admin_database_report')) {
@@ -995,10 +994,13 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(integrations).toContainText('GitHub secret SQUASHLEVELS_PASSWORD');
     await expect(integrations).toContainText('CM Stringers');
     await expect(integrations).toContainText('No login');
-    await expect(integrations).toContainText('beds-jobs-topic');
+    await expect(integrations).toContainText('beds_config_1234');
+    await expect(integrations).toContainText('beds_lm_1234');
+    await expect(integrations).toContainText('beds_sl_1234');
+    await expect(integrations).toContainText('beds_errors_1234');
     await expect(integrations).toContainText('beds_juniors_1234');
     await expect(integrations).toContainText('beds_closed_1234');
-    await expect(integrations).toContainText('Only if that topic is private');
+    await expect(integrations).not.toContainText('NTFY_TOPIC');
 
     await page.goto('juniors/', { waitUntil: 'domcontentloaded' });
     const adminMenu = page.locator('[data-junior-admin]');

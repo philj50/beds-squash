@@ -154,17 +154,19 @@ Download the PDFs from the old Weebly site while it is still up and attach them 
 | `SUPABASE_URL` | League import & SquashLevels sync |
 | `SUPABASE_SERVICE_ROLE_KEY` | League import & SquashLevels sync — use the **Secret key** named `default` (`sb_secret_…`) from Supabase **Settings → API Keys** (not the publishable key) |
 | `NVIDIA_API_KEY` | Optional — [NVIDIA NIM](https://build.nvidia.com) API key for richer match articles (template fallback if unset or on error) |
-| `NTFY_TOPIC` | Optional — [ntfy](https://ntfy.sh) topic name for daily OK/fail push (see below) |
-| `NTFY_TOKEN` | Optional — only if your ntfy topic is private (Bearer token) |
 
 ### Daily push notification (ntfy)
 
-1. Install the **ntfy** app on your phone ([ntfy.sh](https://ntfy.sh)) or use the web UI.
-2. Pick a **private, unguessable topic** (e.g. `beds-squash-yourname-a1b2c3`) and subscribe to it in the app.
-3. GitHub → **Settings → Secrets → Actions** → add `NTFY_TOPIC` with that exact topic name (not the full URL).
-4. Optional: self-hosted server → add repository **Variable** `NTFY_SERVER` (e.g. `https://ntfy.example.com`). Optional private topic → secret `NTFY_TOKEN`.
+Install the **ntfy** app ([ntfy.sh](https://ntfy.sh)) and subscribe to the topic you want. The names are public and fixed in the workflows. `NTFY_TOPIC` and `NTFY_TOKEN` are no longer used.
 
-You get one notification after **League Master** (~06:00 UTC) and one after **SquashLevels** (~07:30 UTC). Failures use high priority. If `NTFY_TOPIC` is unset, workflows skip notify silently.
+| Topic | When a note is sent |
+| --- | --- |
+| `beds_lm_1234` | After the League Master import, and when a Monday or Thursday check finds drift and the import puts it back |
+| `beds_sl_1234` | After the SquashLevels daily run |
+| `beds_config_1234` | When the PSA tour list changes |
+| `beds_errors_1234` | When a GitHub job fails |
+| `beds_juniors_1234` | When a junior entry is added, changed or removed |
+| `beds_closed_1234` | When a County Closed score comes in |
 
 Workflows: **Deploy to GitHub Pages** (build + post-deploy smoke tests), **Site tests** (`npm run check` + Playwright), **SquashLevels daily**, **Sync League Master**.
 

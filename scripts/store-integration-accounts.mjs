@@ -16,7 +16,6 @@ const ACCOUNTS = [
   ['leaguemaster', 'LEAGUEMASTER_USERNAME'],
   ['sportmanager', 'SPORTS_MANAGER_USERNAME'],
   ['gmail', 'GMAIL_USERNAME'],
-  ['ntfy', 'NTFY_TOPIC'],
   ['englandsquash', 'ENGLANDSQUASH_USERNAME'],
   ['squashtv', 'SQUASH_TV_USERNAME'],
 ];
