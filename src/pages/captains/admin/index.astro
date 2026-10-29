@@ -175,7 +175,7 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="members" data-lm-only hidden>
             <h2>Users</h2>
             <p class="muted small">
-              League Master players are listed, and so is anyone with an admin or organiser login. A junior entry adds the player as a JC Player and the parent as a JC Parent. The entry email and phone stay on the parent. Filter by group or place. LM Club Captain, LM Team Captain, LM Player, JC Player and JC Parent are ticked in Roles and stay as they are. Password opens the login details so you can copy them. Nothing is emailed.
+              League Master players are listed, and so is anyone with an admin or organiser login. A junior entry adds the player as a JC Player and the parent as a JC Parent. The entry email and phone stay on the parent. The coloured letters show where an email or phone came from. Press a coloured address or number to use the Beds Closed one, or the League Master one. Filter by group or place. LM Club Captain, LM Team Captain, LM Player, JC Player and JC Parent are ticked in Roles and stay as they are. Password opens the login details so you can copy them. Nothing is emailed.
             </p>
             <p class="muted small" data-group-note>Filled from League Master. Each LM Player is listed. Junior entries add a JC Player and a JC Parent.</p>
             <div data-differences hidden>
@@ -691,6 +691,7 @@ const scoresHref = url('/captains/admin/minigame/');
   let directoryRows: DirectoryRow[] = [];
   type PersonContact = { playerId: number; teamId: number | null; name: string; email: string; es: string; phone: string };
   let personContacts: PersonContact[] = [];
+  type ContactOffer = { source: string; value: string };
   type MemberCard = {
     key: string;
     name: string;
@@ -699,8 +700,11 @@ const scoresHref = url('/captains/admin/minigame/');
     profileId: string | null;
     email: string;
     emailSource: string;
+    emailOffers: ContactOffer[];
     es: string;
     phone: string;
+    phoneSource: string;
+    phoneOffers: ContactOffer[];
     place: string;
     teams: string;
     groupSlugs: string[];
@@ -1750,6 +1754,24 @@ const scoresHref = url('/captains/admin/minigame/');
       else openMore.delete(key);
       return;
     }
+    const useContact = target.closest<HTMLButtonElement>('[data-use-contact]');
+    if (useContact) {
+      const key = useContact.dataset.rowKey ?? '';
+      const field = useContact.dataset.useContact ?? '';
+      const card = memberCards.find((item) => item.key === key);
+      if (!card || !viewerIsAdmin || card.protectedAccount) return;
+      const fieldInput = (name: string) =>
+        [...membersHost.querySelectorAll<HTMLInputElement>('[data-row-field]')].find((item) => item.dataset.rowField === name && item.dataset.rowKey === key);
+      const chosen = useContact.dataset.useValue ?? '';
+      const current = (name: string) => fieldInput(name)?.value ?? '';
+      const email = (field === 'email' ? chosen : current('email')).trim().toLowerCase();
+      const es = current('es').trim();
+      const phone = (field === 'phone' ? chosen : current('phone')).trim();
+      const input = field === 'email' || field === 'phone' ? fieldInput(field) : undefined;
+      if (input) input.value = field === 'email' ? email : phone;
+      void saveMemberDetails(card, email, es, phone, false);
+      return;
+    }
     if (target.closest('[data-open-role-pop], [data-set-active], [data-delete-person], [data-reset-password]')) {
       void onAccountAction(event);
       return;
@@ -2385,12 +2407,29 @@ const scoresHref = url('/captains/admin/minigame/');
       ? pageRows
           .map((card) => {
             const selected = card.key === selectedMemberKey ? ' class="is-selected"' : '';
+            const withSource = (field: 'email' | 'phone', input: string) => {
+              if (!viewerIsAdmin || card.protectedAccount) return input;
+              const source = field === 'email' ? card.emailSource : card.phoneSource;
+              const offers = field === 'email' ? card.emailOffers : card.phoneOffers;
+              const marks = source
+                .split(' ')
+                .filter(Boolean)
+                .map((tag) => `<sub class="source-tag source-tag--${tag.toLowerCase()}" title="${escapeHtml(sourceTitle(tag))}">${escapeHtml(tag)}</sub>`)
+                .join('');
+              const buttons = offers
+                .map((offer) => {
+                  const kind = field === 'email' ? 'email' : 'phone';
+                  const label = `Use ${sourceTitle(offer.source)} ${kind} ${offer.value} for ${card.name}`;
+                  return `<button type="button" class="source-offer source-tag source-tag--${offer.source.toLowerCase()}" data-use-contact="${field}" data-use-value="${escapeHtml(offer.value)}" data-row-key="${escapeHtml(card.key)}" title="${escapeHtml(sourceTitle(offer.source))}" aria-label="${escapeHtml(label)}"><span>${escapeHtml(offer.source)}</span> ${escapeHtml(offer.value)}</button>`;
+                })
+                .join('');
+              if (!marks && !buttons) return input;
+              return `<span class="contact-with-source">${input}${marks}${buttons}</span>`;
+            };
             const emailInput = contactCell(card, 'email', card.protectedAccount ? '' : card.email, 'Email', 'email', 'Add an email');
-            const email = card.emailSource
-              ? `<span class="email-with-source">${emailInput}<sub title="${escapeHtml(sourceTitle(card.emailSource))}">${escapeHtml(card.emailSource)}</sub></span>`
-              : emailInput;
+            const email = withSource('email', emailInput);
             const es = contactCell(card, 'es', card.es, 'ES number', 'text', 'Add an ES number');
-            const mobile = contactCell(card, 'phone', card.phone, 'Mobile', 'tel', 'Add a mobile number');
+            const mobile = withSource('phone', contactCell(card, 'phone', card.phone, 'Mobile', 'tel', 'Add a mobile number'));
             const bits = roleBits(card);
             const roles = `<button type="button" class="count-button role-label" data-open-role-pop="${escapeHtml(card.key)}" aria-label="Roles for ${escapeHtml(card.name)}">${bits.length ? bits.map((bit) => roleMark(bit.slug, bit.name)).join(', ') : 'Roles'}</button>`;
             const activeLabel = card.active ? 'Active' : 'Inactive';
@@ -3138,7 +3177,7 @@ const scoresHref = url('/captains/admin/minigame/');
       supabase.from('roles').select('slug, name, position').order('position'),
       supabase.from('junior_entries').select('id, player_first_name, player_last_name, date_of_birth, age_category, draw, club, guardian_name, guardian_email, guardian_phone, emergency_name, emergency_phone, notes, show_name').order('player_last_name'),
       supabase.from('site_sign_ins').select('user_id, signed_in_at').order('signed_in_at', { ascending: false }).limit(1000),
-      supabase.from('beds_closed_entries').select('forename, surname, email'),
+      supabase.from('beds_closed_entries').select('forename, surname, email, telephone'),
     ]);
     if (peopleError || clubError || orgError || roleError) {
       setStatus(peopleError?.message || clubError?.message || orgError?.message || roleError?.message || 'Could not load the lists.');
@@ -3325,21 +3364,24 @@ const scoresHref = url('/captains/admin/minigame/');
       return names;
     };
     const contactFor = (name: string) => personContacts.filter((contact) => nameKey(contact.name) === nameKey(name));
-    const closedByName = new Map<string, Set<string>>();
+    const closedByName = new Map<string, { emails: Map<string, string>; phones: Map<string, string> }>();
+    const contactKey = (value: string, kind: 'email' | 'phone') => (kind === 'email' ? value.trim().toLowerCase() : value.replace(/\D/g, ''));
+    const rememberClosed = (bucket: Map<string, string>, value: string, kind: 'email' | 'phone') => {
+      const display = value.trim();
+      const key = contactKey(display, kind);
+      if (!key || bucket.has(key)) return;
+      bucket.set(key, display);
+    };
     if (!closedError) {
-      for (const row of (closedRows ?? []) as { forename: string | null; surname: string | null; email: string | null }[]) {
+      for (const row of (closedRows ?? []) as { forename: string | null; surname: string | null; email: string | null; telephone: string | null }[]) {
         const key = nameKey(`${row.forename ?? ''} ${row.surname ?? ''}`);
-        const address = (row.email ?? '').trim().toLowerCase();
-        if (!key || !address) continue;
-        const set = closedByName.get(key) ?? new Set<string>();
-        set.add(address);
-        closedByName.set(key, set);
+        if (!key) continue;
+        const person = closedByName.get(key) ?? { emails: new Map<string, string>(), phones: new Map<string, string>() };
+        rememberClosed(person.emails, row.email ?? '', 'email');
+        rememberClosed(person.phones, row.telephone ?? '', 'phone');
+        if (person.emails.size || person.phones.size) closedByName.set(key, person);
       }
     }
-    const sameMail = (left: string | null | undefined, right: string) => {
-      const value = (left ?? '').trim().toLowerCase();
-      return Boolean(value) && value === right;
-    };
     const emailFor = (name: string, profile: Person | null) => {
       if (profile?.id === protectedAdminId) return 'BSCA';
       if (profile?.email) return profile.email;
@@ -3352,25 +3394,50 @@ const scoresHref = url('/captains/admin/minigame/');
       const team = orgTeams.find((item) => nameKey(item.captain_name || '') === nameKey(name) && item.captain_email);
       return team?.captain_email || '';
     };
-    const emailSourceFor = (names: Set<string>, email: string, profile: Person | null) => {
-      const address = email.trim().toLowerCase();
-      if (!address || address === 'bsca') return '';
-      const tags: string[] = [];
-      const hasLm =
-        personContacts.some((contact) => names.has(nameKey(contact.name)) && sameMail(contact.email, address)) ||
-        directoryRows.some((row) => names.has(nameKey(row.name)) && sameMail(row.email, address));
-      if (hasLm) tags.push('LM');
-      let hasBc = false;
-      for (const name of names) {
-        if (closedByName.get(name)?.has(address)) hasBc = true;
+    const knownFor = (names: Set<string>, profile: Person | null, kind: 'email' | 'phone') => {
+      const found: ContactOffer[] = [];
+      const add = (source: string, value: string | null | undefined) => {
+        const display = (value ?? '').trim();
+        if (!contactKey(display, kind) || contactKey(display, kind) === 'bsca') return;
+        found.push({ source, value: display });
+      };
+      if (kind === 'email') {
+        for (const contact of personContacts) if (names.has(nameKey(contact.name))) add('LM', contact.email);
+        for (const row of directoryRows) if (names.has(nameKey(row.name))) add('LM', row.email);
+        for (const name of names) for (const email of closedByName.get(name)?.emails.values() ?? []) add('BC', email);
+        for (const club of clubs) if (names.has(nameKey(club.contact_name || ''))) add('Club', club.contact_email);
+        for (const team of orgTeams) if (names.has(nameKey(team.captain_name || ''))) add('Team', team.captain_email);
+        for (const parent of parents.values()) if (names.has(nameKey(parent.name))) add('Juniors', parent.email);
+        if (profile?.email) add('Login', profile.email);
+      } else {
+        for (const contact of personContacts) if (names.has(nameKey(contact.name))) add('LM', contact.phone);
+        for (const name of names) for (const phone of closedByName.get(name)?.phones.values() ?? []) add('BC', phone);
+        for (const parent of parents.values()) if (names.has(nameKey(parent.name))) add('Juniors', parent.phone);
       }
-      if (hasBc) tags.push('BC');
-      if (clubs.some((club) => names.has(nameKey(club.contact_name || '')) && sameMail(club.contact_email, address))) tags.push('Club');
-      if (orgTeams.some((team) => names.has(nameKey(team.captain_name || '')) && sameMail(team.captain_email, address))) tags.push('Team');
-      if ([...parents.values()].some((parent) => names.has(nameKey(parent.name)) && sameMail(parent.email, address))) tags.push('Juniors');
-      if (!tags.length && profile?.email && sameMail(profile.email, address)) tags.push('Login');
-      if (!tags.length) tags.push('Website');
+      return found;
+    };
+    const sourceOrder = ['LM', 'BC', 'Club', 'Team', 'Juniors', 'Login', 'Website'];
+    const sourceOf = (value: string, known: ContactOffer[], kind: 'email' | 'phone') => {
+      const key = contactKey(value, kind);
+      if (!key || key === 'bsca') return '';
+      const tags = sourceOrder.filter((source) => source !== 'Login' && source !== 'Website' && known.some((item) => item.source === source && contactKey(item.value, kind) === key));
+      if (!tags.length && known.some((item) => item.source === 'Login' && contactKey(item.value, kind) === key)) return 'Login';
+      if (!tags.length) return 'Website';
       return tags.join(' ');
+    };
+    const offersOf = (value: string, known: ContactOffer[], kind: 'email' | 'phone') => {
+      const key = contactKey(value, kind);
+      const seen = new Set<string>();
+      const offers: ContactOffer[] = [];
+      for (const item of known) {
+        const itemKey = contactKey(item.value, kind);
+        if (!itemKey || itemKey === key) continue;
+        const id = `${item.source}:${itemKey}`;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        offers.push(item);
+      }
+      return offers.sort((a, b) => sourceOrder.indexOf(a.source) - sourceOrder.indexOf(b.source) || a.value.localeCompare(b.value, 'en'));
     };
     const placeFor = (name: string, profile: Person | null, groups: GroupMember[]) => {
       const fromGroups = [...new Set(groups.map((group) => group.place).filter((place): place is string => Boolean(place)))];
@@ -3428,6 +3495,9 @@ const scoresHref = url('/captains/admin/minigame/');
       const teamNameOnly = (label: string) => label.split(' · ')[0].trim();
       const teams = [...new Set((listed.length ? listed.map((row) => row.team) : fromPlaces).map(teamNameOnly).filter(Boolean))];
       const email = emailFor(display, profile);
+      const phone = contacts.find((contact) => contact.phone)?.phone || '';
+      const knownEmails = knownFor(contactNames, profile, 'email');
+      const knownPhones = knownFor(contactNames, profile, 'phone');
       cards.set(key, {
         key,
         name: display,
@@ -3435,9 +3505,12 @@ const scoresHref = url('/captains/admin/minigame/');
         label: `${display}${profile?.id === selfId ? ' (you)' : ''}${isDefault ? ' Default admin' : ''}`,
         profileId: profile?.id ?? null,
         email,
-        emailSource: emailSourceFor(contactNames, email, profile),
+        emailSource: sourceOf(email, knownEmails, 'email'),
+        emailOffers: offersOf(email, knownEmails, 'email'),
         es: contacts.find((contact) => contact.es)?.es || '',
-        phone: contacts.find((contact) => contact.phone)?.phone || '',
+        phone,
+        phoneSource: sourceOf(phone, knownPhones, 'phone'),
+        phoneOffers: offersOf(phone, knownPhones, 'phone'),
         place: placeFor(display, profile, groups),
         teams: teams.join('; '),
         groupSlugs: slugs,
@@ -3470,11 +3543,19 @@ const scoresHref = url('/captains/admin/minigame/');
     for (const parent of parents.values()) {
       const card = [...cards.values()].find((item) => nameKey(item.name) === nameKey(parent.name) || nameKey(item.profileName) === nameKey(parent.name));
       if (!card) continue;
+      const names = new Set([nameKey(card.name), nameKey(card.profileName)].filter(Boolean));
       if (!card.email.trim() && parent.email) {
         card.email = parent.email;
-        card.emailSource = 'Juniors';
+        const known = knownFor(names, null, 'email');
+        card.emailSource = sourceOf(parent.email, known, 'email');
+        card.emailOffers = offersOf(parent.email, known, 'email');
       }
-      if (!card.phone.trim() && parent.phone) card.phone = parent.phone;
+      if (!card.phone.trim() && parent.phone) {
+        card.phone = parent.phone;
+        const known = knownFor(names, null, 'phone');
+        card.phoneSource = sourceOf(parent.phone, known, 'phone');
+        card.phoneOffers = offersOf(parent.phone, known, 'phone');
+      }
     }
     const merged = new Map<string, MemberCard>();
     for (const card of cards.values()) {
@@ -3491,8 +3572,13 @@ const scoresHref = url('/captains/admin/minigame/');
       if (!keep.email.trim() && other.email.trim()) {
         keep.email = other.email;
         keep.emailSource = other.emailSource;
+        keep.emailOffers = other.emailOffers;
       }
-      if (!keep.phone.trim() && other.phone.trim()) keep.phone = other.phone;
+      if (!keep.phone.trim() && other.phone.trim()) {
+        keep.phone = other.phone;
+        keep.phoneSource = other.phoneSource;
+        keep.phoneOffers = other.phoneOffers;
+      }
       if (!keep.es.trim() && other.es.trim()) keep.es = other.es;
       keep.roleNames = [...new Set(`${keep.roleNames}, ${other.roleNames}`.split(',').map((part) => part.trim()).filter(Boolean))].join(', ');
       merged.set(key, keep);
@@ -4447,21 +4533,51 @@ const scoresHref = url('/captains/admin/minigame/');
     font-size: 0.72rem;
     padding: 0.18rem 0.28rem;
   }
-  #setup-app .users-box .email-with-source {
+  #setup-app .users-box .contact-with-source {
     display: flex;
+    flex-wrap: wrap;
     align-items: baseline;
-    gap: 0.28rem;
+    gap: 0.28rem 0.4rem;
   }
-  #setup-app .users-box .email-with-source input {
+  #setup-app .users-box .contact-with-source input {
     width: auto;
-    flex: 1;
+    flex: 1 1 8rem;
+    min-width: 6rem;
   }
-  #setup-app .users-box .email-with-source sub {
+  #setup-app .users-box .source-tag {
     flex: none;
-    color: var(--gold-500);
     font-size: 0.62rem;
     letter-spacing: 0.01em;
+    font-weight: 700;
   }
+  #setup-app .users-box .source-offer {
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 0.12em;
+  }
+  #setup-app .users-box .source-tag--lm { color: #8eb6ef; }
+  #setup-app .users-box .source-tag--bc { color: #7dcea0; }
+  #setup-app .users-box .source-tag--club { color: #c4b5fd; }
+  #setup-app .users-box .source-tag--team { color: #e6c35c; }
+  #setup-app .users-box .source-tag--juniors { color: #f5a3c7; }
+  #setup-app .users-box .source-tag--login,
+  #setup-app .users-box .source-tag--website { color: var(--ink-300); }
+  html[data-theme='navy'] #setup-app .users-box .source-tag--lm,
+  html[data-theme='light'] #setup-app .users-box .source-tag--lm { color: #1d4f91; }
+  html[data-theme='navy'] #setup-app .users-box .source-tag--bc,
+  html[data-theme='light'] #setup-app .users-box .source-tag--bc { color: #0b7a43; }
+  html[data-theme='navy'] #setup-app .users-box .source-tag--club,
+  html[data-theme='light'] #setup-app .users-box .source-tag--club { color: #6d28d9; }
+  html[data-theme='navy'] #setup-app .users-box .source-tag--team,
+  html[data-theme='light'] #setup-app .users-box .source-tag--team { color: #8a5a00; }
+  html[data-theme='navy'] #setup-app .users-box .source-tag--juniors,
+  html[data-theme='light'] #setup-app .users-box .source-tag--juniors { color: #9d174d; }
   #setup-app .juniors-box .overview {
     font-size: 0.74rem;
   }

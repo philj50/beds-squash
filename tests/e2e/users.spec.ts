@@ -160,10 +160,28 @@ test.describe('Users', () => {
   test('an email is marked with where it came from', async ({ page }) => {
     await openUsers(page);
     const source = (name: string) => page.locator('[data-users] tr', { hasText: name }).locator('sub');
-    await expect(source('Sam Morris')).toHaveText('LM BC');
-    await expect(source('Sam Morris')).toHaveAttribute('title', 'League Master, Beds Closed');
+    await expect(source('Sam Morris')).toHaveText(['LM', 'BC']);
+    await expect(source('Sam Morris').nth(0)).toHaveAttribute('title', 'League Master');
+    await expect(source('Sam Morris').nth(1)).toHaveAttribute('title', 'Beds Closed');
     await expect(source('Pat Player')).toHaveText('LM');
     await expect(source('Ada Admin')).toHaveText('Login');
+  });
+
+  test('a Beds Closed email or phone can be used instead', async ({ page }) => {
+    await openUsers(page);
+    const pat = page.locator('[data-users] tr', { hasText: 'Pat Player' });
+    await pat.getByRole('button', { name: 'Use Beds Closed email pat.closed@example.test for Pat Player' }).click();
+    await expect(page.locator('[data-users-status]')).toContainText('Details saved for Pat Player.');
+    await expect(page.getByRole('textbox', { name: 'Email for Pat Player' })).toHaveValue('pat.closed@example.test');
+    await expect(pat.getByRole('button', { name: /Use Beds Closed email/ })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'More for Sam Morris' }).click();
+    const mobile = page.getByRole('textbox', { name: 'Mobile for Sam Morris' });
+    await expect(mobile).toHaveValue('07000111111');
+    await page.getByRole('button', { name: 'Use Beds Closed phone 07000222222 for Sam Morris' }).click();
+    await expect(page.locator('[data-users-status]')).toContainText('Details saved for Sam Morris.');
+    await expect(page.getByRole('textbox', { name: 'Mobile for Sam Morris' })).toHaveValue('07000222222');
+    await expect(page.locator('[data-member-detail]', { has: page.getByRole('textbox', { name: 'Mobile for Sam Morris' }) }).locator('sub')).toHaveText(['LM', 'BC']);
   });
 
   test('an email, ES number and mobile can be cleared', async ({ page }) => {
@@ -823,8 +841,8 @@ async function installAdmin(page: Page) {
     }
     if (path.endsWith('/beds_closed_entries')) {
       await respond([
-        { forename: 'Sam', surname: 'Morris', email: 'sam.morris@example.test' },
-        { forename: 'Pat', surname: 'Player', email: 'pat.closed@example.test' },
+        { forename: 'Sam', surname: 'Morris', email: 'sam.morris@example.test', telephone: '07000222222' },
+        { forename: 'Pat', surname: 'Player', email: 'pat.closed@example.test', telephone: '07000333333' },
       ]);
       return;
     }
