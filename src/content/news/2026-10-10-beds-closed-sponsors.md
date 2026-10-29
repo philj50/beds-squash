@@ -20,41 +20,41 @@ A first look at the confirmed sponsors — at least so far — for the [Bedfords
 
 ## Additional sponsors
 
-- [JR Builders Ltd](https://jrbuilders-ltd.co.uk/)
+[JR Builders Ltd](https://jrbuilders-ltd.co.uk/)
 
-  ![JR Builders](/uploads/news/jr-builders.png)
+![JR Builders](/uploads/news/jr-builders.png)
 
-- [Decant Wine & Cheese Bar](https://decantbar.co.uk/)
+[Decant Wine & Cheese Bar](https://decantbar.co.uk/)
 
-  ![Decant Wine & Cheese Bar](/uploads/news/decant.png)
+![Decant Wine & Cheese Bar](/uploads/news/decant.png)
 
-- [The Bedford Cheese Company](https://bedfordcheesecompany.co.uk/)
+[The Bedford Cheese Company](https://bedfordcheesecompany.co.uk/)
 
-  ![The Bedford Cheese Company](/uploads/news/bedford-cheese-company.png)
+![The Bedford Cheese Company](/uploads/news/bedford-cheese-company.png)
 
-- [My Next Car](https://www.my-next-car.co.uk/)
+[My Next Car](https://www.my-next-car.co.uk/)
 
-  ![My Next Car](/uploads/news/my-next-car.png)
+![My Next Car](/uploads/news/my-next-car.png)
 
-- [Brook Harris Bespoke Tailors](https://www.brookharris.co.uk/)
+[Brook Harris Bespoke Tailors](https://www.brookharris.co.uk/)
 
-  ![Brook Harris](/uploads/news/brook-harris-v2.png)
+![Brook Harris](/uploads/news/brook-harris-v2.png)
 
-- [Open House](https://www.openhousebedford.co.uk/)
+[Open House](https://www.openhousebedford.co.uk/)
 
-  ![Open House](/uploads/news/open-house.png)
+![Open House](/uploads/news/open-house.png)
 
-- [Specsavers](https://www.specsavers.co.uk/stores/bedford)
+[Specsavers](https://www.specsavers.co.uk/stores/bedford)
 
-  ![Specsavers](/uploads/news/specsavers.png)
+![Specsavers](/uploads/news/specsavers.png)
 
-- [Samo Sports](https://www.instagram.com/samo.sports/)
+[Samo Sports](https://www.instagram.com/samo.sports/)
 
-  ![Samo Sports](/uploads/news/samo-sports.png)
+![Samo Sports](/uploads/news/samo-sports.png)
 
-- [J.A.J Electrical Services](https://www.instagram.com/j.a.jelectricalservices/)
+[J.A.J Electrical Services](https://www.instagram.com/j.a.jelectricalservices/)
 
-  ![J.A.J Electrical Services](/uploads/news/jaj-electrical-v2.png)
+![J.A.J Electrical Services](/uploads/news/jaj-electrical-v2.png)
 
 Thanks to everyone who has come on board. More names may still be added before the event.
 
