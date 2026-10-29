@@ -114,6 +114,14 @@ const more = (await getNews()).filter((p) => p.id !== post.id).slice(0, 3);
 </script>
 
 <style>
+  [data-article-slug="2026-10-10-beds-closed-sponsors"] [data-article-body] :global(img) {
+    display: block;
+    width: 15rem;
+    max-width: 100%;
+    height: auto;
+    margin-block: .75rem 1.5rem;
+  }
+
   .hero-expand {
     display: block;
     width: fit-content;
