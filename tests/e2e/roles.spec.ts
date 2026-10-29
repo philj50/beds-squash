@@ -653,6 +653,26 @@ test.describe('Club captain, team captain, and player', () => {
           { slug: 'rb_players', name: 'RB Players', role_slug: 'rb_player', source: 'website', managed: false, position: 10 },
         ]);
       }
+      if (path.endsWith('/rpc/add_junior_entry') && route.request().method() === 'POST') {
+        const saved = route.request().postDataJSON() as Record<string, string | boolean | null>;
+        juniorEntries.push({
+          id: 8,
+          player_first_name: String(saved.p_first_name),
+          player_last_name: String(saved.p_last_name),
+          date_of_birth: String(saved.p_date_of_birth),
+          age_category: 'Under 13',
+          draw: String(saved.p_draw),
+          club: String(saved.p_club),
+          guardian_name: String(saved.p_guardian_name),
+          guardian_email: String(saved.p_guardian_email),
+          guardian_phone: String(saved.p_guardian_phone),
+          emergency_name: String(saved.p_emergency_name),
+          emergency_phone: String(saved.p_emergency_phone),
+          notes: String(saved.p_notes ?? ''),
+          show_name: Boolean(saved.p_show_name),
+        });
+        return send(null);
+      }
       if (path.endsWith('/rpc/edit_junior_entry') && route.request().method() === 'POST') {
         const saved = route.request().postDataJSON() as Record<string, unknown>;
         const entry = juniorEntries.find((row) => row.id === saved.p_id);
@@ -851,6 +871,23 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(juniorEditor).toBeHidden();
     await expect(page.locator('[data-status]')).toHaveText('Saved.');
     await expect(page.locator('[data-juniors-people]')).toContainText('Alex Junior');
+    await page.getByRole('button', { name: 'Add an entry' }).click();
+    const newJunior = page.locator('form[data-editor="new"]');
+    await expect(newJunior).toBeVisible();
+    await newJunior.locator('[name="player_first_name"]').fill('Robin');
+    await newJunior.locator('[name="player_last_name"]').fill('New');
+    await newJunior.locator('[name="date_of_birth"]').fill('2014-06-01');
+    await newJunior.locator('[name="draw"]').selectOption('Boys');
+    await newJunior.locator('[name="club"]').fill('Test Club');
+    await newJunior.locator('[name="guardian_name"]').fill('Pat Guardian');
+    await newJunior.locator('[name="guardian_email"]').fill('guardian@example.test');
+    await newJunior.locator('[name="guardian_phone"]').fill('07000000000');
+    await newJunior.locator('[name="emergency_name"]').fill('Sam Emergency');
+    await newJunior.locator('[name="emergency_phone"]').fill('07000000001');
+    await newJunior.getByRole('button', { name: 'Add entry' }).click();
+    await expect(newJunior).toBeHidden();
+    await expect(page.locator('[data-status]')).toHaveText('Entry added.');
+    await expect(page.locator('[data-juniors-people]')).toContainText('Robin New');
     await page.getByRole('button', { name: 'Players', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Beds Closed', exact: true })).toBeVisible();
     await expect(page.getByText('The entry list is copied from Sport Manager. Each person is tagged with the year, so they can be picked out and linked.')).toBeVisible();

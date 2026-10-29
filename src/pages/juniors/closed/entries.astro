@@ -8,7 +8,7 @@ import { url } from '@/lib/site';
   <section class="section">
     <div class="container entries" id="entries-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
       <h1>Junior County Closed entries</h1>
-      <p class="lede">Player details stay on this page. An admin can correct every field on an entry. Saving or removing an entry sends a short note to the Junior organisers. It does not send an email.</p>
+      <p class="lede">Player details stay on this page. An admin can correct every field, and add an entry after the public form has closed. Saving, adding or removing an entry sends a short note to the Junior organisers. It does not send an email.</p>
       <p class="status" data-status role="status"></p>
 
       <div data-panel="signed-in" hidden>
@@ -20,6 +20,8 @@ import { url } from '@/lib/site';
           <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
         </p>
         <p data-denied hidden>This account cannot see entries.</p>
+        <p class="actions"><button class="btn btn--primary btn--sm" type="button" data-add-junior hidden>Add an entry</button></p>
+        <div data-new-junior hidden></div>
         <div data-list hidden></div>
       </div>
     </div>
@@ -72,12 +74,13 @@ import { url } from '@/lib/site';
     return `<label class="field"><span class="field__name">${label} <span class="field__tag">${tag}</span></span>${control}<span class="field__hint">${hint}</span></label>`;
   }
 
-  function editor(entry: Entry, columns: number) {
+  function entryForm(entry: Entry, editorId: string) {
     const section = ['Boys', 'Girls', 'Mixed']
       .map((option) => `<option${entry.draw === option ? ' selected' : ''}>${option}</option>`)
       .join('');
-    return `<tr data-editor-row="${entry.id}" hidden><td colspan="${columns}"><form class="stack editor" data-editor="${entry.id}">
-      <p class="editor__lead">Change any field, then save. The age group follows the date of birth. Under 9 is saved as Mixed.</p>
+    const adding = editorId === 'new';
+    return `<form class="stack editor" data-editor="${editorId}">
+      <p class="editor__lead">${adding ? 'Add the junior, then save.' : 'Change any field, then save.'} The age group follows the date of birth. Under 9 is saved as Mixed.</p>
       <div class="pair">
         ${editField('First name', 'The junior who is playing.', `<input name="player_first_name" required maxlength="60" value="${escapeHtml(entry.player_first_name)}" autocomplete="off" />`)}
         ${editField('Last name', 'The family name of the junior.', `<input name="player_last_name" required maxlength="60" value="${escapeHtml(entry.player_last_name)}" autocomplete="off" />`)}
@@ -100,9 +103,43 @@ import { url } from '@/lib/site';
       </div>
       ${editField('Notes', 'Anything the organiser should know. Leave this blank if there is nothing to add.', `<textarea name="notes" maxlength="500" rows="3">${escapeHtml(entry.notes ?? '')}</textarea>`, 'Optional')}
       ${editField('Public name', 'Tick this to show the first name and surname initial on the public junior page.', `<input name="show_name" type="checkbox"${entry.show_name ? ' checked' : ''} />`, 'Optional')}
-      <p class="actions"><button class="btn btn--primary btn--sm" type="submit">Save changes</button><button class="btn btn--ghost btn--sm" type="button" data-cancel>Cancel</button></p>
-    </form></td></tr>`;
+      <p class="actions"><button class="btn btn--primary btn--sm" type="submit">${adding ? 'Add entry' : 'Save changes'}</button><button class="btn btn--ghost btn--sm" type="button" data-cancel>Cancel</button></p>
+    </form>`;
   }
+  function editor(entry: Entry, columns: number) {
+    return `<tr data-editor-row="${entry.id}" hidden><td colspan="${columns}">${entryForm(entry, String(entry.id))}</td></tr>`;
+  }
+  const newJuniorHost = root.querySelector<HTMLElement>('[data-new-junior]')!;
+  const addJuniorButton = root.querySelector<HTMLButtonElement>('[data-add-junior]')!;
+  const blankEntry = (): Entry => ({
+    id: 0,
+    player_first_name: '',
+    player_last_name: '',
+    date_of_birth: '',
+    age_category: '',
+    draw: 'Boys',
+    club: '',
+    guardian_name: '',
+    guardian_email: '',
+    guardian_phone: '',
+    emergency_name: '',
+    emergency_phone: '',
+    notes: '',
+    show_name: false,
+    created_at: '',
+  });
+
+  addJuniorButton.addEventListener('click', () => {
+    newJuniorHost.hidden = false;
+    newJuniorHost.innerHTML = entryForm(blankEntry(), 'new');
+    newJuniorHost.querySelector<HTMLInputElement>('input')?.focus();
+  });
+  newJuniorHost.addEventListener('click', (event) => {
+    const cancel = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-cancel]');
+    if (!cancel) return;
+    newJuniorHost.hidden = true;
+    newJuniorHost.innerHTML = '';
+  });
 
   list.addEventListener('click', async (event) => {
     const target = event.target as HTMLElement;
@@ -127,7 +164,7 @@ import { url } from '@/lib/site';
     else await showSession();
   });
 
-  list.addEventListener('submit', async (event) => {
+  root.addEventListener('submit', async (event) => {
     const form = (event.target as HTMLElement).closest<HTMLFormElement>('[data-editor]');
     if (!form?.dataset.editor) return;
     event.preventDefault();
@@ -173,8 +210,7 @@ import { url } from '@/lib/site';
       return;
     }
     statusEl.textContent = 'Saving…';
-    const { error } = await supabase.rpc('edit_junior_entry', {
-      p_id: Number(form.dataset.editor),
+    const fields = {
       p_first_name: first,
       p_last_name: last,
       p_date_of_birth: dateOfBirth,
@@ -187,12 +223,20 @@ import { url } from '@/lib/site';
       p_emergency_phone: emergencyPhone,
       p_notes: notes || null,
       p_show_name: form.querySelector<HTMLInputElement>('[name="show_name"]')?.checked === true,
-    });
+    };
+    const adding = form.dataset.editor === 'new';
+    const { error } = adding
+      ? await supabase.rpc('add_junior_entry', fields)
+      : await supabase.rpc('edit_junior_entry', { p_id: Number(form.dataset.editor), ...fields });
     if (error) {
       statusEl.textContent = error.message;
       return;
     }
-    statusEl.textContent = 'Saved.';
+    if (adding) {
+      newJuniorHost.hidden = true;
+      newJuniorHost.innerHTML = '';
+    }
+    statusEl.textContent = adding ? 'Entry added.' : 'Saved.';
     await showSession();
   });
 
@@ -214,14 +258,16 @@ import { url } from '@/lib/site';
         denied.hidden = false;
         denied.textContent = stopMessage(stop);
         list.hidden = true;
+        addJuniorButton.hidden = true;
         return;
       }
     }
     if (account?.playerOnly || !(await organisesGroup(supabase, session.user.id, 'junior_organisers'))) {
-      denied.hidden = false;
-      denied.textContent = 'This account cannot see entries.';
-      list.hidden = true;
-      return;
+        denied.hidden = false;
+        denied.textContent = 'This account cannot see entries.';
+        list.hidden = true;
+        addJuniorButton.hidden = true;
+        return;
     }
     denied.hidden = true;
     void noteActivity(supabase);
@@ -235,6 +281,7 @@ import { url } from '@/lib/site';
     }
     const entries = (rows ?? []) as Entry[];
     const canEdit = Boolean(account?.isAdmin);
+    addJuniorButton.hidden = !canEdit;
     list.hidden = false;
     const placed = new Set<number>();
     const sections = ENTRY_GROUPS.map((category) => {

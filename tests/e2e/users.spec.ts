@@ -157,6 +157,15 @@ test.describe('Users', () => {
     expect(hooks.squadWrites).toBe(0);
   });
 
+  test('an email is marked with where it came from', async ({ page }) => {
+    await openUsers(page);
+    const source = (name: string) => page.locator('[data-users] tr', { hasText: name }).locator('sub');
+    await expect(source('Sam Morris')).toHaveText('LM BC');
+    await expect(source('Sam Morris')).toHaveAttribute('title', 'League Master, Beds Closed');
+    await expect(source('Pat Player')).toHaveText('LM');
+    await expect(source('Ada Admin')).toHaveText('Login');
+  });
+
   test('an email, ES number and mobile can be cleared', async ({ page }) => {
     await openUsers(page);
     await page.getByRole('searchbox', { name: 'Search' }).fill('Sam Morris');
@@ -811,6 +820,13 @@ async function installAdmin(page: Page) {
           }
         }
       }
+    }
+    if (path.endsWith('/beds_closed_entries')) {
+      await respond([
+        { forename: 'Sam', surname: 'Morris', email: 'sam.morris@example.test' },
+        { forename: 'Pat', surname: 'Player', email: 'pat.closed@example.test' },
+      ]);
+      return;
     }
     if (path.endsWith('/site_sign_ins')) {
       await respond(hooks.activityAt ? [{ user_id: adminId, signed_in_at: hooks.activityAt }] : []);

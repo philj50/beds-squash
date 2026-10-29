@@ -113,7 +113,9 @@ const scoresHref = url('/captains/admin/minigame/');
 
           <section class="admin-panel" data-tab="juniors" hidden>
             <h2>Juniors</h2>
-            <p class="muted small">Junior County Closed entries submitted on this website. An admin can correct every field. Saving sends a short note to the Junior organisers. It does not send an email.</p>
+            <p class="muted small">Junior County Closed entries submitted on this website. An admin can correct every field, and add an entry after the public form has closed. Saving sends a short note to the Junior organisers. It does not send an email.</p>
+            <p class="actions"><button class="btn btn--primary btn--sm" type="button" data-add-junior hidden>Add an entry</button></p>
+            <div data-new-junior hidden></div>
             <div class="overview-box juniors-box">
               <table class="overview">
                 <thead>
@@ -696,6 +698,7 @@ const scoresHref = url('/captains/admin/minigame/');
     label: string;
     profileId: string | null;
     email: string;
+    emailSource: string;
     es: string;
     phone: string;
     place: string;
@@ -1991,11 +1994,12 @@ const scoresHref = url('/captains/admin/minigame/');
   function juniorField(label: string, hint: string, control: string, tag = 'Editable') {
     return `<label class="field"><span class="field__name">${label} <span class="field__tag">${tag}</span></span>${control}<span class="field__hint">${hint}</span></label>`;
   }
-  function juniorEditor(entry: JuniorEntry) {
+  function juniorForm(entry: JuniorEntry, editorId: string) {
     const born = (entry.date_of_birth ?? '').slice(0, 10);
     const section = ['Boys', 'Girls', 'Mixed'].map((option) => `<option${entry.draw === option ? ' selected' : ''}>${option}</option>`).join('');
-    return `<tr data-editor-row="${entry.id}" hidden><td colspan="9"><form class="stack junior-editor" data-editor="${entry.id}">
-      <p class="editor__lead">Change any field, then save. The age group follows the date of birth. Under 9 is saved as Mixed.</p>
+    const adding = editorId === 'new';
+    return `<form class="stack junior-editor" data-editor="${editorId}">
+      <p class="editor__lead">${adding ? 'Add the junior, then save.' : 'Change any field, then save.'} The age group follows the date of birth. Under 9 is saved as Mixed.</p>
       <div class="pair">
         ${juniorField('First name', 'The junior who is playing.', `<input name="player_first_name" required maxlength="60" value="${escapeHtml(entry.player_first_name)}" autocomplete="off" />`)}
         ${juniorField('Last name', 'The family name of the junior.', `<input name="player_last_name" required maxlength="60" value="${escapeHtml(entry.player_last_name)}" autocomplete="off" />`)}
@@ -2018,11 +2022,34 @@ const scoresHref = url('/captains/admin/minigame/');
       </div>
       ${juniorField('Notes', 'Anything the organiser should know. Leave this blank if there is nothing to add.', `<textarea name="notes" maxlength="500" rows="3">${escapeHtml(entry.notes ?? '')}</textarea>`, 'Optional')}
       ${juniorField('Public name', 'Tick this to show the first name and surname initial on the public junior page.', `<input name="show_name" type="checkbox"${entry.show_name ? ' checked' : ''} />`, 'Optional')}
-      <p class="actions"><button class="btn btn--primary btn--sm" type="submit">Save changes</button><button class="btn btn--ghost btn--sm" type="button" data-cancel>Cancel</button></p>
-    </form></td></tr>`;
+      <p class="actions"><button class="btn btn--primary btn--sm" type="submit">${adding ? 'Add entry' : 'Save changes'}</button><button class="btn btn--ghost btn--sm" type="button" data-cancel>Cancel</button></p>
+    </form>`;
+  }
+  function juniorEditor(entry: JuniorEntry) {
+    return `<tr data-editor-row="${entry.id}" hidden><td colspan="9">${juniorForm(entry, String(entry.id))}</td></tr>`;
   }
   const openJuniorMore = new Set<string>();
+  const juniorPanel = root.querySelector<HTMLElement>('[data-tab="juniors"]')!;
+  const newJuniorHost = root.querySelector<HTMLElement>('[data-new-junior]')!;
+  const addJuniorButton = root.querySelector<HTMLButtonElement>('[data-add-junior]')!;
+  const blankJunior = (): JuniorEntry => ({
+    id: 0,
+    player_first_name: '',
+    player_last_name: '',
+    date_of_birth: '',
+    age_category: '',
+    draw: 'Boys',
+    club: '',
+    guardian_name: '',
+    guardian_email: '',
+    guardian_phone: '',
+    emergency_name: '',
+    emergency_phone: '',
+    notes: '',
+    show_name: false,
+  });
   function paintJuniorEntries(entries: JuniorEntry[], problem = '') {
+    addJuniorButton.hidden = !viewerIsAdmin;
     if (problem) {
       juniorsHost.innerHTML = `<tr><td colspan="9">${escapeHtml(problem)}</td></tr>`;
       return;
@@ -2044,8 +2071,14 @@ const scoresHref = url('/captains/admin/minigame/');
           .join('')
       : '<tr><td colspan="9">No junior entries yet.</td></tr>';
   }
-  juniorsHost.addEventListener('click', (event) => {
+  juniorPanel.addEventListener('click', (event) => {
     const target = event.target as HTMLElement;
+    if (target.closest('[data-add-junior]')) {
+      newJuniorHost.hidden = false;
+      newJuniorHost.innerHTML = juniorForm(blankJunior(), 'new');
+      newJuniorHost.querySelector<HTMLInputElement>('input')?.focus();
+      return;
+    }
     const more = target.closest<HTMLButtonElement>('[data-junior-more]');
     if (more?.dataset.juniorMore) {
       const key = more.dataset.juniorMore;
@@ -2067,8 +2100,12 @@ const scoresHref = url('/captains/admin/minigame/');
     if (!cancel) return;
     const formRow = cancel.closest<HTMLElement>('[data-editor-row]');
     if (formRow) formRow.hidden = true;
+    if (cancel.closest('[data-new-junior]')) {
+      newJuniorHost.hidden = true;
+      newJuniorHost.innerHTML = '';
+    }
   });
-  juniorsHost.addEventListener('submit', async (event) => {
+  juniorPanel.addEventListener('submit', async (event) => {
     const form = (event.target as HTMLElement).closest<HTMLFormElement>('[data-editor]');
     if (!form?.dataset.editor) return;
     event.preventDefault();
@@ -2114,8 +2151,7 @@ const scoresHref = url('/captains/admin/minigame/');
       return;
     }
     setStatus('Saving…');
-    const { error } = await supabase.rpc('edit_junior_entry', {
-      p_id: Number(form.dataset.editor),
+    const fields = {
       p_first_name: first,
       p_last_name: last,
       p_date_of_birth: dateOfBirth,
@@ -2128,13 +2164,21 @@ const scoresHref = url('/captains/admin/minigame/');
       p_emergency_phone: emergencyPhone,
       p_notes: notes || null,
       p_show_name: form.querySelector<HTMLInputElement>('[name="show_name"]')?.checked === true,
-    });
+    };
+    const { error } =
+      form.dataset.editor === 'new'
+        ? await supabase.rpc('add_junior_entry', fields)
+        : await supabase.rpc('edit_junior_entry', { p_id: Number(form.dataset.editor), ...fields });
     if (error) {
       setStatus(error.message);
       return;
     }
+    if (form.dataset.editor === 'new') {
+      newJuniorHost.hidden = true;
+      newJuniorHost.innerHTML = '';
+    }
     await showSession();
-    setStatus('Saved.');
+    setStatus(form.dataset.editor === 'new' ? 'Entry added.' : 'Saved.');
   });
   const LOCKED_ROLE_SLUGS = new Set(['lm_club_captains', 'lm_team_captains', 'lm_players', 'jc_players', 'jc_parents']);
   function fillFilter(select: HTMLSelectElement, choices: { value: string; label: string }[], allLabel: string) {
@@ -2244,6 +2288,12 @@ const scoresHref = url('/captains/admin/minigame/');
     watchEmails();
   });
 
+  const sourceTitle = (source: string) =>
+    source
+      .split(' ')
+      .map((bit) => ({ LM: 'League Master', BC: 'Beds Closed', Club: 'Club', Team: 'Team', Juniors: 'Juniors', Login: 'Login', Website: 'Typed on this website' })[bit] ?? bit)
+      .join(', ');
+
   function paintMembers() {
     const query = memberSearch.value.trim().toLowerCase();
     groupNote.textContent = 'Filled from League Master. Each LM Player is listed, and so is a sign-in for an admin or organiser. Junior entries add a JC Player and a JC Parent.';
@@ -2335,7 +2385,10 @@ const scoresHref = url('/captains/admin/minigame/');
       ? pageRows
           .map((card) => {
             const selected = card.key === selectedMemberKey ? ' class="is-selected"' : '';
-            const email = contactCell(card, 'email', card.protectedAccount ? '' : card.email, 'Email', 'email', 'Add an email');
+            const emailInput = contactCell(card, 'email', card.protectedAccount ? '' : card.email, 'Email', 'email', 'Add an email');
+            const email = card.emailSource
+              ? `<span class="email-with-source">${emailInput}<sub title="${escapeHtml(sourceTitle(card.emailSource))}">${escapeHtml(card.emailSource)}</sub></span>`
+              : emailInput;
             const es = contactCell(card, 'es', card.es, 'ES number', 'text', 'Add an ES number');
             const mobile = contactCell(card, 'phone', card.phone, 'Mobile', 'tel', 'Add a mobile number');
             const bits = roleBits(card);
@@ -3071,6 +3124,7 @@ const scoresHref = url('/captains/admin/minigame/');
       { data: permissionRows, error: permissionError },
       { data: juniorRows, error: juniorError },
       { data: signInRows },
+      { data: closedRows, error: closedError },
     ] = await Promise.all([
       supabase.from('profiles').select('id, display_name, email, is_admin').order('display_name', { ascending: true }),
       fetchAccountStates(supabase),
@@ -3084,6 +3138,7 @@ const scoresHref = url('/captains/admin/minigame/');
       supabase.from('roles').select('slug, name, position').order('position'),
       supabase.from('junior_entries').select('id, player_first_name, player_last_name, date_of_birth, age_category, draw, club, guardian_name, guardian_email, guardian_phone, emergency_name, emergency_phone, notes, show_name').order('player_last_name'),
       supabase.from('site_sign_ins').select('user_id, signed_in_at').order('signed_in_at', { ascending: false }).limit(1000),
+      supabase.from('beds_closed_entries').select('forename, surname, email'),
     ]);
     if (peopleError || clubError || orgError || roleError) {
       setStatus(peopleError?.message || clubError?.message || orgError?.message || roleError?.message || 'Could not load the lists.');
@@ -3270,6 +3325,21 @@ const scoresHref = url('/captains/admin/minigame/');
       return names;
     };
     const contactFor = (name: string) => personContacts.filter((contact) => nameKey(contact.name) === nameKey(name));
+    const closedByName = new Map<string, Set<string>>();
+    if (!closedError) {
+      for (const row of (closedRows ?? []) as { forename: string | null; surname: string | null; email: string | null }[]) {
+        const key = nameKey(`${row.forename ?? ''} ${row.surname ?? ''}`);
+        const address = (row.email ?? '').trim().toLowerCase();
+        if (!key || !address) continue;
+        const set = closedByName.get(key) ?? new Set<string>();
+        set.add(address);
+        closedByName.set(key, set);
+      }
+    }
+    const sameMail = (left: string | null | undefined, right: string) => {
+      const value = (left ?? '').trim().toLowerCase();
+      return Boolean(value) && value === right;
+    };
     const emailFor = (name: string, profile: Person | null) => {
       if (profile?.id === protectedAdminId) return 'BSCA';
       if (profile?.email) return profile.email;
@@ -3281,6 +3351,26 @@ const scoresHref = url('/captains/admin/minigame/');
       if (club?.contact_email) return club.contact_email;
       const team = orgTeams.find((item) => nameKey(item.captain_name || '') === nameKey(name) && item.captain_email);
       return team?.captain_email || '';
+    };
+    const emailSourceFor = (names: Set<string>, email: string, profile: Person | null) => {
+      const address = email.trim().toLowerCase();
+      if (!address || address === 'bsca') return '';
+      const tags: string[] = [];
+      const hasLm =
+        personContacts.some((contact) => names.has(nameKey(contact.name)) && sameMail(contact.email, address)) ||
+        directoryRows.some((row) => names.has(nameKey(row.name)) && sameMail(row.email, address));
+      if (hasLm) tags.push('LM');
+      let hasBc = false;
+      for (const name of names) {
+        if (closedByName.get(name)?.has(address)) hasBc = true;
+      }
+      if (hasBc) tags.push('BC');
+      if (clubs.some((club) => names.has(nameKey(club.contact_name || '')) && sameMail(club.contact_email, address))) tags.push('Club');
+      if (orgTeams.some((team) => names.has(nameKey(team.captain_name || '')) && sameMail(team.captain_email, address))) tags.push('Team');
+      if ([...parents.values()].some((parent) => names.has(nameKey(parent.name)) && sameMail(parent.email, address))) tags.push('Juniors');
+      if (!tags.length && profile?.email && sameMail(profile.email, address)) tags.push('Login');
+      if (!tags.length) tags.push('Website');
+      return tags.join(' ');
     };
     const placeFor = (name: string, profile: Person | null, groups: GroupMember[]) => {
       const fromGroups = [...new Set(groups.map((group) => group.place).filter((place): place is string => Boolean(place)))];
@@ -3337,13 +3427,15 @@ const scoresHref = url('/captains/admin/minigame/');
       );
       const teamNameOnly = (label: string) => label.split(' · ')[0].trim();
       const teams = [...new Set((listed.length ? listed.map((row) => row.team) : fromPlaces).map(teamNameOnly).filter(Boolean))];
+      const email = emailFor(display, profile);
       cards.set(key, {
         key,
         name: display,
         profileName,
         label: `${display}${profile?.id === selfId ? ' (you)' : ''}${isDefault ? ' Default admin' : ''}`,
         profileId: profile?.id ?? null,
-        email: emailFor(display, profile),
+        email,
+        emailSource: emailSourceFor(contactNames, email, profile),
         es: contacts.find((contact) => contact.es)?.es || '',
         phone: contacts.find((contact) => contact.phone)?.phone || '',
         place: placeFor(display, profile, groups),
@@ -3378,7 +3470,10 @@ const scoresHref = url('/captains/admin/minigame/');
     for (const parent of parents.values()) {
       const card = [...cards.values()].find((item) => nameKey(item.name) === nameKey(parent.name) || nameKey(item.profileName) === nameKey(parent.name));
       if (!card) continue;
-      if (!card.email.trim() && parent.email) card.email = parent.email;
+      if (!card.email.trim() && parent.email) {
+        card.email = parent.email;
+        card.emailSource = 'Juniors';
+      }
       if (!card.phone.trim() && parent.phone) card.phone = parent.phone;
     }
     const merged = new Map<string, MemberCard>();
@@ -3393,7 +3488,10 @@ const scoresHref = url('/captains/admin/minigame/');
       const other = keep === previous ? card : previous;
       keep.groupSlugs = [...new Set([...keep.groupSlugs, ...other.groupSlugs])];
       keep.teams = [...new Set(`${keep.teams}; ${other.teams}`.split(';').map((part) => part.trim()).filter(Boolean))].join('; ');
-      if (!keep.email.trim() && other.email.trim()) keep.email = other.email;
+      if (!keep.email.trim() && other.email.trim()) {
+        keep.email = other.email;
+        keep.emailSource = other.emailSource;
+      }
       if (!keep.phone.trim() && other.phone.trim()) keep.phone = other.phone;
       if (!keep.es.trim() && other.es.trim()) keep.es = other.es;
       keep.roleNames = [...new Set(`${keep.roleNames}, ${other.roleNames}`.split(',').map((part) => part.trim()).filter(Boolean))].join(', ');
@@ -4348,6 +4446,21 @@ const scoresHref = url('/captains/admin/minigame/');
     min-width: 0;
     font-size: 0.72rem;
     padding: 0.18rem 0.28rem;
+  }
+  #setup-app .users-box .email-with-source {
+    display: flex;
+    align-items: baseline;
+    gap: 0.28rem;
+  }
+  #setup-app .users-box .email-with-source input {
+    width: auto;
+    flex: 1;
+  }
+  #setup-app .users-box .email-with-source sub {
+    flex: none;
+    color: var(--gold-500);
+    font-size: 0.62rem;
+    letter-spacing: 0.01em;
   }
   #setup-app .juniors-box .overview {
     font-size: 0.74rem;
