@@ -122,6 +122,7 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.getByRole('button', { name: 'Delete' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Activities' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Traffic' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Database' })).toHaveCount(0);
     await expect(page.locator('[data-junior-link]')).toBeHidden();
     await expect(page.locator('[data-share-link]')).toBeHidden();
     await expect(page.locator('[data-scores-link]')).toBeHidden();
@@ -473,6 +474,26 @@ test.describe('Club captain, team captain, and player', () => {
           body: JSON.stringify(slice),
         });
       }
+      if (path.endsWith('/rpc/admin_database_report')) {
+        return send({
+          database_bytes: 2_400_000,
+          tables: [
+            { name: 'site_page_views', rows: 1200, bytes: 1_800_000, newest: '2026-10-28T18:00:00.000Z' },
+            { name: 'profiles', rows: 40, bytes: 65_536, newest: '2026-10-01T09:00:00.000Z' },
+          ],
+          series: [
+            {
+              label: 'Page views',
+              points: [
+                { week: '2026-10-05', n: 10 },
+                { week: '2026-10-12', n: 18 },
+                { week: '2026-10-19', n: 24 },
+                { week: '2026-10-26', n: 7 },
+              ],
+            },
+          ],
+        });
+      }
       if (path.endsWith('/rpc/get_site_traffic_stats')) {
         return send({
           total_7d: 3,
@@ -633,7 +654,7 @@ test.describe('Club captain, team captain, and player', () => {
 
     await page.goto('captains/admin/#users', { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: 'Users', exact: true })).toBeVisible();
-    await expect(page.locator('.admin-tabs .tab-label')).toHaveText(['League Master', 'Juniors', 'Beds Closed', 'SquashLevels', 'Permissions', 'Links']);
+    await expect(page.locator('.admin-tabs .tab-label')).toHaveText(['League Master', 'Juniors', 'Beds Closed', 'SquashLevels', 'Permissions', 'Links', 'Config']);
     await expect(page.locator('[data-junior-link]')).toBeVisible();
     await expect(page.locator('[data-share-link]')).toBeVisible();
     await expect(page.locator('[data-scores-link]')).toBeVisible();
@@ -880,6 +901,19 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.getByRole('searchbox', { name: 'Search' })).toHaveValue('Pat Player');
     await expect(page.locator('[data-users]')).toContainText('Pat Player');
     await expect(page.locator('[data-users]')).not.toContainText('Zoe Player');
+
+    await page.getByRole('button', { name: 'Database' }).click();
+    await expect(page.getByRole('heading', { name: 'Database' })).toBeVisible();
+    await expect(page.locator('[data-kpi="db-tables"]')).toHaveText('2');
+    await expect(page.locator('[data-kpi="db-rows"]')).toHaveText('1,240');
+    await expect(page.locator('[data-kpi="db-size"]')).toHaveText('2.3 MB');
+    await expect(page.locator('[data-database-tables]')).toContainText('site_page_views');
+    await expect(page.locator('[data-database-tables]')).toContainText('1,200');
+    await expect(page.locator('[data-database-tables]')).toContainText('1.7 MB');
+    await expect(page.locator('[data-database-tables]')).toContainText('28 Oct 2026');
+    await expect(page.locator('[data-database-charts] svg')).toHaveCount(1);
+    await expect(page.locator('[data-database-charts]')).toContainText('Page views');
+    await expect(page.locator('[data-database-charts]')).toContainText('7 this week');
 
     await page.goto('juniors/', { waitUntil: 'domcontentloaded' });
     const adminMenu = page.locator('[data-junior-admin]');

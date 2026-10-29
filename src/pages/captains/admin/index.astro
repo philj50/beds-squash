@@ -13,7 +13,7 @@ const scoresHref = url('/captains/admin/minigame/');
 
 <Base
   title="Administration"
-  description="League Master lists, SquashLevels, website groups, and the club, team and player details."
+  description="League Master lists, SquashLevels, website groups, the database, and the club, team and player details."
   noindex
 >
   <section class="section section--tight">
@@ -25,6 +25,7 @@ const scoresHref = url('/captains/admin/minigame/');
         <strong>SquashLevels</strong> shows each player’s level.
         <strong>Permissions</strong> is Users, Groups, and Roles, and only an admin sees it. Users is every League Master player. Update the email, ES number, and phone there, and change the password, turn the account off, or delete it when a login exists. A group gives one role. League Master fills the club, team, and player groups. Someone in those groups who is on SquashLevels also receives SL Player.
         <strong>Links</strong> joins a League Master player to their SquashLevels name when the names differ.
+        <strong>Config</strong> shows each database table, how many rows it holds, how much space it uses, and a weekly graph of new rows. Only an admin sees it.
         A club captain sees their club. A team captain sees their team. A player sees their own row. Nothing is emailed.
       </p>
       <p class="status" data-status role="status"></p>
@@ -81,6 +82,12 @@ const scoresHref = url('/captains/admin/minigame/');
               <span class="tab-label">Links</span>
               <span class="tab-buttons">
                 <button type="button" data-tab-button="links">Links</button>
+              </span>
+            </span>
+            <span class="tab-group" data-lm-only>
+              <span class="tab-label">Config</span>
+              <span class="tab-buttons">
+                <button type="button" data-tab-button="database">Database</button>
               </span>
             </span>
           </nav>
@@ -366,6 +373,45 @@ const scoresHref = url('/captains/admin/minigame/');
             </div>
           </section>
 
+          <section class="admin-panel" data-tab="database" data-lm-only hidden>
+            <h2>Database</h2>
+            <p class="muted small">
+              Every public table, with its rows, the space it uses (indexes included), and the newest time stored on it. On disk is the whole database. Each graph is new rows per week for the last six months. A quiet week is a flat line. Only an admin can see this.
+            </p>
+            <p class="muted small" data-database-status hidden role="status"></p>
+            <div data-database hidden>
+              <dl class="traffic-kpis">
+                <div>
+                  <dt>Tables</dt>
+                  <dd data-kpi="db-tables">—</dd>
+                </div>
+                <div>
+                  <dt>Rows</dt>
+                  <dd data-kpi="db-rows">—</dd>
+                </div>
+                <div>
+                  <dt>On disk</dt>
+                  <dd data-kpi="db-size">—</dd>
+                </div>
+              </dl>
+              <div class="db-charts" data-database-charts></div>
+              <h3>Tables</h3>
+              <div class="overview-box">
+                <table class="overview db-table">
+                  <thead>
+                    <tr>
+                      <th>Table</th>
+                      <th>Rows</th>
+                      <th>Size</th>
+                      <th>Newest</th>
+                    </tr>
+                  </thead>
+                  <tbody data-database-tables></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
           <section class="admin-panel" data-tab="traffic" data-lm-only hidden>
             <h2>Site traffic</h2>
             <p class="muted small">
@@ -637,7 +683,7 @@ const scoresHref = url('/captains/admin/minigame/');
   let roleCatalogLive: RoleCatalog[] = [];
   let protectedAdminId = '';
   const siteTabs = ['site-club', 'site-team', 'site-player', 'site-sl'] as const;
-  const tabs = [...siteTabs, 'juniors', 'beds-closed', 'members', 'permissions-groups', 'permissions-roles', 'links', 'traffic'] as const;
+  const tabs = [...siteTabs, 'juniors', 'beds-closed', 'members', 'permissions-groups', 'permissions-roles', 'links', 'traffic', 'database'] as const;
   type Tab = (typeof tabs)[number];
   const tabAlias: Record<string, Tab> = {
     overview: 'members',
@@ -653,6 +699,8 @@ const scoresHref = url('/captains/admin/minigame/');
     groups: 'permissions-groups',
     roles: 'permissions-roles',
     users: 'members',
+    config: 'database',
+    database: 'database',
   };
   const groupFromHash: Record<string, string> = {
     'lm-clubs': 'lm_club_captains',
@@ -663,6 +711,11 @@ const scoresHref = url('/captains/admin/minigame/');
   };
   let openingGroup = groupFromHash[location.hash.slice(1)] ?? '';
   let trafficLoaded = false;
+  let databaseLoaded = false;
+  const databaseStatus = root.querySelector<HTMLElement>('[data-database-status]')!;
+  const databasePanel = root.querySelector<HTMLElement>('[data-database]')!;
+  const databaseCharts = root.querySelector<HTMLElement>('[data-database-charts]')!;
+  const databaseTables = root.querySelector<HTMLElement>('[data-database-tables]')!;
   const trafficStatus = root.querySelector<HTMLElement>('[data-traffic-status]')!;
   const trafficStats = root.querySelector<HTMLElement>('[data-traffic-stats]')!;
   const trafficByDay = root.querySelector<HTMLElement>('[data-traffic-by-day]')!;
@@ -893,6 +946,80 @@ const scoresHref = url('/captains/admin/minigame/');
     trafficLoaded = true;
   };
 
+  const loadDatabase = async () => {
+    databaseStatus.hidden = false;
+    databaseStatus.textContent = 'Loading the database…';
+    databasePanel.hidden = true;
+    const { data, error } = await supabase.rpc('admin_database_report');
+    const report = data as {
+      database_bytes?: number;
+      tables?: { name: string; rows: number; bytes: number; newest: string | null }[];
+      series?: { label: string; points: { week: string; n: number }[] }[];
+    } | null;
+    const missing = Boolean(
+      error && (error.code === 'PGRST202' || /schema cache|Could not find the function|admin_database_report/i.test(error.message)),
+    );
+    if (error || !report || !Array.isArray(report.tables)) {
+      databaseStatus.textContent = missing
+        ? 'The database report is not on the database yet. Apply the latest migration, then reload.'
+        : error?.message || 'The database report did not come back.';
+      return;
+    }
+    const tables = report.tables;
+    const rowCount = tables.reduce((sum, table) => sum + Number(table.rows || 0), 0);
+    const bytes = Number(report.database_bytes ?? tables.reduce((sum, table) => sum + Number(table.bytes || 0), 0));
+    const formatBytes = (value: number) => {
+      if (!Number.isFinite(value) || value < 0) return '—';
+      if (value < 1024) return `${Math.round(value)} B`;
+      if (value < 1024 * 1024) {
+        const kb = value / 1024;
+        return `${kb.toFixed(kb < 10 ? 1 : 0)} KB`;
+      }
+      const mb = value / (1024 * 1024);
+      return `${mb.toFixed(mb < 10 ? 1 : 0)} MB`;
+    };
+    const formatCount = (value: number) => Number(value || 0).toLocaleString('en-GB');
+    const setKpi = (name: string, value: string) => {
+      const el = root.querySelector<HTMLElement>(`[data-kpi="${name}"]`);
+      if (el) el.textContent = value;
+    };
+    setKpi('db-tables', formatCount(tables.length));
+    setKpi('db-rows', formatCount(rowCount));
+    setKpi('db-size', formatBytes(bytes));
+    const growthChart = (series: { label: string; points: { week: string; n: number }[] }) => {
+      const points = (series.points ?? []).map((point) => ({ week: String(point.week), n: Number(point.n) || 0 }));
+      if (points.length < 2 || points.every((point) => point.n === 0)) return '';
+      const width = 640;
+      const height = 180;
+      const pad = { l: 40, r: 12, t: 12, b: 28 };
+      const max = Math.max(...points.map((point) => point.n), 1);
+      const innerW = width - pad.l - pad.r;
+      const innerH = height - pad.t - pad.b;
+      const xAt = (index: number) => pad.l + (index / (points.length - 1)) * innerW;
+      const yAt = (value: number) => pad.t + ((max - value) / max) * innerH;
+      const line = points.map((point, index) => `${index === 0 ? 'M' : 'L'}${xAt(index).toFixed(1)},${yAt(point.n).toFixed(1)}`).join(' ');
+      const area = `${line} L${xAt(points.length - 1).toFixed(1)},${(pad.t + innerH).toFixed(1)} L${xAt(0).toFixed(1)},${(pad.t + innerH).toFixed(1)} Z`;
+      const weekLabel = (iso: string) => {
+        const date = new Date(`${iso.slice(0, 10)}T12:00:00`);
+        if (Number.isNaN(date.getTime())) return iso;
+        return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      };
+      const label = escapeHtml(series.label);
+      return `<figure class="db-chart"><figcaption>${label} <span>${formatCount(points[points.length - 1].n)} this week</span></figcaption><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${label} each week"><line x1="${pad.l}" y1="${(pad.t + innerH).toFixed(1)}" x2="${width - pad.r}" y2="${(pad.t + innerH).toFixed(1)}" stroke="#c5d6e8" stroke-opacity="0.35" /><text x="${pad.l - 6}" y="${(pad.t + 10).toFixed(1)}" text-anchor="end" fill="#c5d6e8" font-size="11">${formatCount(max)}</text><path d="${area}" fill="#f15a22" fill-opacity="0.18" /><path d="${line}" fill="none" stroke="#f15a22" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" /><text x="${xAt(0).toFixed(1)}" y="${height - 8}" text-anchor="start" fill="#c5d6e8" font-size="11">${weekLabel(points[0].week)}</text><text x="${xAt(points.length - 1).toFixed(1)}" y="${height - 8}" text-anchor="end" fill="#c5d6e8" font-size="11">${weekLabel(points[points.length - 1].week)}</text></svg></figure>`;
+    };
+    const charts = (report.series ?? []).map(growthChart).filter(Boolean).join('');
+    databaseCharts.innerHTML = charts || '<p class="muted small">No new rows in the last six months.</p>';
+    databaseTables.innerHTML = tables
+      .map(
+        (table) =>
+          `<tr><td><code>${escapeHtml(table.name)}</code></td><td>${formatCount(Number(table.rows) || 0)}</td><td>${formatBytes(Number(table.bytes) || 0)}</td><td>${escapeHtml(formatWhen(table.newest))}</td></tr>`,
+      )
+      .join('');
+    databaseStatus.hidden = true;
+    databasePanel.hidden = false;
+    databaseLoaded = true;
+  };
+
   let viewerIsAdmin = false;
   let viewerSeesJuniors = false;
   let viewerSeesBeds = false;
@@ -901,7 +1028,7 @@ const scoresHref = url('/captains/admin/minigame/');
     const next = [...siteTabs] as Tab[];
     if (viewerSeesJuniors) next.push('juniors');
     if (viewerSeesBeds) next.push('beds-closed');
-    if (viewerIsAdmin) next.push('members', 'permissions-groups', 'permissions-roles', 'links', 'traffic');
+    if (viewerIsAdmin) next.push('members', 'permissions-groups', 'permissions-roles', 'links', 'traffic', 'database');
     return next;
   };
 
@@ -913,6 +1040,7 @@ const scoresHref = url('/captains/admin/minigame/');
     }
     history.replaceState(null, '', `#${next}`);
     if (next === 'traffic' && !trafficLoaded) void loadTraffic();
+    if (next === 'database' && !databaseLoaded) void loadDatabase();
   };
 
   root.addEventListener('click', (event) => {
@@ -3582,6 +3710,36 @@ const scoresHref = url('/captains/admin/minigame/');
     font-size: 1.75rem;
     font-weight: 700;
     color: var(--ink-950);
+  }
+  #setup-app .db-charts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+    gap: 1rem 1.25rem;
+    margin: 0 0 1.5rem;
+  }
+  #setup-app .db-chart {
+    margin: 0;
+  }
+  #setup-app .db-chart figcaption {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    font-weight: 700;
+    margin: 0 0 0.2rem;
+  }
+  #setup-app .db-chart figcaption span {
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+  #setup-app .db-chart svg {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  #setup-app .db-table td:nth-child(n + 2),
+  #setup-app .db-table th:nth-child(n + 2) {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
   }
   #setup-app .traffic-table code {
     font-size: 0.85rem;
