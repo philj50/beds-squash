@@ -136,7 +136,7 @@ const scoresHref = url('/captains/admin/minigame/');
             </div>
             <div class="junior-draw" data-junior-draw hidden>
               <h3>The draw</h3>
-              <p class="muted small">Press a name as it comes out of the hat. The first names fill the top half, then the bottom half. Put a name back if it was drawn in the wrong place. Publish the draw when it is ready. The Juniors page then shows each placed player as a first name and surname initial.</p>
+              <p class="muted small">Press a name as it comes out of the hat. A draw can be one category, or several categories played together. Knockout fills the top half, then the bottom half. Round robin keeps one list, and each player plays every other player. Add the court and the time at Towers. Publish the draw when it is ready. The Juniors page then shows each placed player as a first name and surname initial.</p>
               <ul class="tag-list" data-junior-draw-pills aria-label="Draw"></ul>
               <div data-junior-draw-sheet></div>
             </div>
@@ -2078,8 +2078,39 @@ const scoresHref = url('/captains/admin/minigame/');
     notes: '',
     show_name: false,
   });
+  type JuniorDrawMember = { age: string; section: string };
+  type JuniorDrawPlan = { format: 'knockout' | 'round_robin'; court: string; start: string; members: JuniorDrawMember[] };
   let juniorDrawKey = '';
   let juniorDrawPublished = false;
+  let juniorDrawPlans: JuniorDrawPlan[] = [];
+  const memberKey = (member: JuniorDrawMember) => `${member.age}|${member.section}`;
+  function planFor(age: string, section: string): JuniorDrawPlan {
+    return (
+      juniorDrawPlans.find((plan) => plan.members.some((member) => member.age === age && member.section === section)) ?? {
+        format: 'knockout',
+        court: '',
+        start: '',
+        members: [{ age, section }],
+      }
+    );
+  }
+  function rememberPlan(plan: JuniorDrawPlan) {
+    const keys = new Set(plan.members.map(memberKey));
+    const kept = juniorDrawPlans.flatMap((existing) => {
+      const rest = existing.members.filter((member) => !keys.has(memberKey(member)));
+      if (rest.length === existing.members.length) return [existing];
+      return rest.length ? [{ ...existing, members: rest }] : [];
+    });
+    juniorDrawPlans = [...kept, plan];
+  }
+  function packPositions(rows: JuniorEntry[]) {
+    rows
+      .filter((entry) => entry.draw_position != null)
+      .sort((a, b) => (a.draw_position ?? 0) - (b.draw_position ?? 0) || a.id - b.id)
+      .forEach((entry, index) => {
+        entry.draw_position = index + 1;
+      });
+  }
   function paintJuniorPublish() {
     const publishHost = root.querySelector<HTMLElement>('[data-junior-draw-publish]')!;
     publishHost.innerHTML = viewerSeesJuniors
@@ -2117,13 +2148,18 @@ const scoresHref = url('/captains/admin/minigame/');
       )
       .join('');
     const group = groups.find((item) => item.key === juniorDrawKey) ?? groups[0];
+    const category = ENTRY_GROUPS.find((item) => item.label === group.key);
+    const plan = category ? planFor(category.age, category.draw) : null;
+    const poolPlayers = plan
+      ? entries.filter((entry) => plan.members.some((member) => member.age === entry.age_category && member.section === entry.draw))
+      : group.players;
     const byName = (a: JuniorEntry, b: JuniorEntry) =>
       a.player_last_name.localeCompare(b.player_last_name, 'en') || a.player_first_name.localeCompare(b.player_first_name, 'en') || a.id - b.id;
-    const waiting = group.players.filter((entry) => entry.draw_position == null).sort(byName);
-    const drawn = group.players
+    const waiting = poolPlayers.filter((entry) => entry.draw_position == null).sort(byName);
+    const drawn = poolPlayers
       .filter((entry) => entry.draw_position != null)
       .sort((a, b) => (a.draw_position ?? 0) - (b.draw_position ?? 0) || a.id - b.id);
-    const split = Math.ceil(group.players.length / 2);
+    const split = Math.ceil(poolPlayers.length / 2);
     const top = drawn.filter((entry) => (entry.draw_position ?? 0) <= split);
     const bottom = drawn.filter((entry) => (entry.draw_position ?? 0) > split);
     const line = (entry: JuniorEntry) => {
@@ -2149,7 +2185,48 @@ const scoresHref = url('/captains/admin/minigame/');
             : '<p class="muted small">Everyone in this draw has been placed.</p>'
         }</div>`
       : '';
-    sheet.innerHTML = `${hat}<div class="junior-halves">${half('Top half', top, split)}${half('Bottom half', bottom, group.players.length - split)}</div>`;
+    const combineName = plan && plan.members.length > 1
+      ? ENTRY_GROUPS.filter((item) => plan.members.some((member) => member.age === item.age && member.section === item.draw))
+          .map((item) => item.label)
+          .join(' and ')
+      : '';
+    const categoryBoxes = plan
+      ? ENTRY_GROUPS.map((item) => {
+          const checked = plan.members.some((member) => member.age === item.age && member.section === item.draw);
+          const current = item.label === group.key;
+          return `<label><input type="checkbox" data-draw-member="${escapeHtml(item.label)}"${checked ? ' checked' : ''}${current ? ' disabled' : ''} /> ${escapeHtml(item.label)}</label>`;
+        }).join('')
+      : '';
+    const planBar = plan && viewerSeesJuniors
+      ? `<div class="junior-plan">
+          <div class="tag-list" role="group" aria-label="Draw type">
+            <button type="button" class="btn btn--ghost btn--sm" aria-pressed="${plan.format === 'knockout' ? 'true' : 'false'}" data-draw-format="knockout">Knockout</button>
+            <button type="button" class="btn btn--ghost btn--sm" aria-pressed="${plan.format === 'round_robin' ? 'true' : 'false'}" data-draw-format="round_robin">Round robin</button>
+          </div>
+          <label>Court at Towers <input data-draw-court maxlength="40" value="${escapeHtml(plan.court)}" placeholder="3" /></label>
+          <label>Time at Towers <input type="time" data-draw-time value="${escapeHtml(plan.start)}" /></label>
+        </div>
+        <fieldset class="junior-categories"><legend>Categories in this draw</legend>${categoryBoxes}</fieldset>
+        ${combineName ? `<p class="junior-combine-name">${escapeHtml(combineName)}</p>` : ''}`
+      : '';
+    const ties = drawn.flatMap((entry, index) =>
+      drawn.slice(index + 1).map((other) => {
+        const home = `${entry.player_first_name} ${entry.player_last_name}`.trim();
+        const away = `${other.player_first_name} ${other.player_last_name}`.trim();
+        return `<li>${escapeHtml(home)} v ${escapeHtml(away)}</li>`;
+      }),
+    );
+    const roundRobin = `<section class="junior-half"><h4>Round robin</h4>${
+      drawn.length ? `<ol>${drawn.map((entry) => line(entry)).join('')}</ol>` : '<p class="muted small">Waiting for a name.</p>'
+    }${
+      ties.length
+        ? `<h4>Matches</h4><ol class="junior-ties">${ties.join('')}</ol>`
+        : '<p class="muted small">Matches appear once two names are drawn.</p>'
+    }</section>`;
+    const sheetBody = plan?.format === 'round_robin'
+      ? roundRobin
+      : `<div class="junior-halves">${half('Top half', top, split)}${half('Bottom half', bottom, poolPlayers.length - split)}</div>`;
+    sheet.innerHTML = `${planBar}${hat}${sheetBody}`;
   }
   async function loadJuniorEntries() {
     const columns = 'id, player_first_name, player_last_name, date_of_birth, age_category, draw, club, guardian_name, guardian_email, guardian_phone, emergency_name, emergency_phone, notes, show_name, draw_position';
@@ -2160,7 +2237,50 @@ const scoresHref = url('/captains/admin/minigame/');
     juniorEntriesLive = (result.error ? [] : (result.data ?? [])) as JuniorEntry[];
     const published = await supabase.rpc('junior_draw_is_published');
     juniorDrawPublished = published.data === true;
+    const plans = await supabase.rpc('junior_draw_plans');
+    juniorDrawPlans = Array.isArray(plans.data)
+      ? (plans.data as JuniorDrawPlan[]).filter(
+          (plan) => (plan?.format === 'knockout' || plan?.format === 'round_robin') && Array.isArray(plan.members) && plan.members.length > 0,
+        )
+      : [];
     paintJuniorEntries(juniorEntriesLive, result.error?.message ?? '');
+  }
+  async function saveJuniorDrawPlan(format?: JuniorDrawPlan['format']) {
+    if (!viewerSeesJuniors) return;
+    const category = ENTRY_GROUPS.find((item) => item.label === juniorDrawKey);
+    if (!category) return;
+    const current = planFor(category.age, category.draw);
+    const sheet = root.querySelector<HTMLElement>('[data-junior-draw-sheet]');
+    const court = sheet?.querySelector<HTMLInputElement>('[data-draw-court]')?.value ?? current.court;
+    const start = sheet?.querySelector<HTMLInputElement>('[data-draw-time]')?.value ?? current.start;
+    const picked = new Set(
+      [...(sheet?.querySelectorAll<HTMLInputElement>('[data-draw-member]:checked') ?? [])].map((input) => input.dataset.drawMember ?? ''),
+    );
+    picked.add(category.label);
+    const members = ENTRY_GROUPS.filter((item) => picked.has(item.label)).map((item) => ({ age: item.age, section: item.draw }));
+    const next: JuniorDrawPlan = { format: format ?? current.format, court: court.trim(), start, members };
+    const sameMembers =
+      current.members.length === members.length &&
+      current.members.every((member) => members.some((item) => item.age === member.age && item.section === member.section));
+    if (!sameMembers) {
+      const removed = current.members.filter((member) => !members.some((item) => item.age === member.age && item.section === member.section));
+      packPositions(juniorEntriesLive.filter((entry) => members.some((member) => member.age === entry.age_category && member.section === entry.draw)));
+      for (const member of removed) {
+        packPositions(juniorEntriesLive.filter((entry) => entry.age_category === member.age && entry.draw === member.section));
+      }
+    }
+    rememberPlan(next);
+    if (format || !sameMembers) paintJuniorDraw(juniorEntriesLive);
+    const { error } = await supabase.rpc('set_junior_draw_pool', {
+      p_members: next.members,
+      p_format: next.format,
+      p_court: next.court,
+      p_start: next.start,
+    });
+    if (error) {
+      setStatus(error.message);
+      await loadJuniorEntries();
+    }
   }
   async function publishJuniorDraw(published: boolean) {
     if (!viewerSeesJuniors) return;
@@ -2178,7 +2298,8 @@ const scoresHref = url('/captains/admin/minigame/');
     if (!viewerSeesJuniors) return;
     const entry = juniorEntriesLive.find((item) => item.id === id);
     if (!entry) return;
-    const same = juniorEntriesLive.filter((item) => item.age_category === entry.age_category && item.draw === entry.draw);
+    const mates = planFor(entry.age_category, entry.draw).members;
+    const same = juniorEntriesLive.filter((item) => mates.some((member) => member.age === item.age_category && member.section === item.draw));
     if (back) {
       const removed = entry.draw_position;
       if (removed == null) return;
@@ -2229,6 +2350,11 @@ const scoresHref = url('/captains/admin/minigame/');
       newJuniorHost.querySelector<HTMLInputElement>('input')?.focus();
       return;
     }
+    const formatButton = target.closest<HTMLButtonElement>('[data-draw-format]');
+    if (formatButton?.dataset.drawFormat === 'knockout' || formatButton?.dataset.drawFormat === 'round_robin') {
+      void saveJuniorDrawPlan(formatButton.dataset.drawFormat);
+      return;
+    }
     const publish = target.closest<HTMLButtonElement>('[data-draw-publish]');
     if (publish?.dataset.drawPublish) {
       void publishJuniorDraw(publish.dataset.drawPublish === 'true');
@@ -2275,6 +2401,11 @@ const scoresHref = url('/captains/admin/minigame/');
       newJuniorHost.hidden = true;
       newJuniorHost.innerHTML = '';
     }
+  });
+  juniorPanel.addEventListener('change', (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) return;
+    if (input.matches('[data-draw-court], [data-draw-time], [data-draw-member]')) void saveJuniorDrawPlan();
   });
   juniorPanel.addEventListener('submit', async (event) => {
     const form = (event.target as HTMLElement).closest<HTMLFormElement>('[data-editor]');
@@ -4735,6 +4866,54 @@ const scoresHref = url('/captains/admin/minigame/');
   }
   #setup-app .junior-draw .tag-list {
     margin: 0.75rem 0;
+  }
+  #setup-app .junior-plan {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+    align-items: end;
+    margin: 0 0 0.75rem;
+  }
+  #setup-app .junior-plan .tag-list {
+    margin: 0;
+  }
+  #setup-app .junior-plan label {
+    display: grid;
+    gap: 0.2rem;
+    font-size: 0.82rem;
+  }
+  #setup-app .junior-plan input {
+    font: inherit;
+    padding: 0.35rem 0.5rem;
+  }
+  #setup-app .junior-categories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem 0.9rem;
+    margin: 0 0 0.75rem;
+    border: 0;
+    padding: 0;
+  }
+  #setup-app .junior-categories legend {
+    width: 100%;
+    margin: 0 0 0.35rem;
+    font-size: 0.82rem;
+  }
+  #setup-app .junior-categories label {
+    display: flex;
+    gap: 0.35rem;
+    align-items: center;
+  }
+  #setup-app .junior-combine-name {
+    margin: 0 0 0.75rem;
+    font-weight: 700;
+  }
+  #setup-app .junior-ties {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.3rem;
   }
   #setup-app .junior-hat h4 {
     margin: 0.2rem 0;

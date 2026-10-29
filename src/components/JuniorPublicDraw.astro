@@ -12,19 +12,38 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   import { createClient } from '@supabase/supabase-js';
 
   type Slot = { place?: number; name?: string };
-  type Group = { label?: string; top?: Slot[]; bottom?: Slot[] };
+  type Group = { label?: string; format?: string; court?: string; start?: string; players?: Slot[]; top?: Slot[]; bottom?: Slot[] };
   type Payload = { published?: boolean; groups?: Group[] };
 
   const escapeHtml = (value: string) =>
     value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
 
+  const list = (rows: Slot[]) =>
+    `<ol>${rows
+      .map((row) => `<li><span class="junior-public-draw__slot">${escapeHtml(String(row.place ?? ''))}</span> ${escapeHtml((row.name ?? '').trim())}</li>`)
+      .join('')}</ol>`;
+
   const half = (title: string, rows: Slot[]) => {
-    const body = rows.length
-      ? `<ol>${rows
-          .map((row) => `<li><span class="junior-public-draw__slot">${escapeHtml(String(row.place ?? ''))}</span> ${escapeHtml((row.name ?? '').trim())}</li>`)
-          .join('')}</ol>`
-      : '<p class="muted">Bye.</p>';
+    const body = rows.length ? list(rows) : '<p class="muted">Bye.</p>';
     return `<section class="junior-public-draw__half"><h4>${title}</h4>${body}</section>`;
+  };
+
+  const when = (group: Group) => {
+    const court = (group.court ?? '').trim();
+    const start = (group.start ?? '').trim();
+    if (!court && !start) return '';
+    const place = [court ? `Court ${court}` : '', start].filter(Boolean).join(' · ');
+    return `<p class="junior-public-draw__when">${escapeHtml(place)} at Towers</p>`;
+  };
+
+  const ties = (rows: Slot[]) => {
+    const matches: string[] = [];
+    for (let i = 0; i < rows.length; i += 1) {
+      for (let j = i + 1; j < rows.length; j += 1) {
+        matches.push(`${(rows[i].name ?? '').trim()} v ${(rows[j].name ?? '').trim()}`);
+      }
+    }
+    return matches;
   };
 
   const paint = (root: HTMLElement, groups: Group[]) => {
@@ -32,9 +51,17 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     if (!sheet) return;
     sheet.innerHTML = groups
       .map((group) => {
+        const players = Array.isArray(group.players) ? group.players : [];
         const top = Array.isArray(group.top) ? group.top : [];
         const bottom = Array.isArray(group.bottom) ? group.bottom : [];
-        return `<article class="junior-public-draw__group"><h3>${escapeHtml(group.label ?? '')}</h3><div class="junior-public-draw__halves">${half('Top half', top)}${half('Bottom half', bottom)}</div></article>`;
+        const body = group.format === 'round_robin'
+          ? `<section class="junior-public-draw__half"><h4>Round robin</h4>${players.length ? list(players) : '<p class="muted">Waiting for a name.</p>'}${
+              ties(players).length
+                ? `<h4>Matches</h4><ol class="junior-public-draw__ties">${ties(players).map((match) => `<li>${escapeHtml(match)}</li>`).join('')}</ol>`
+                : '<p class="muted">Matches appear once two names are drawn.</p>'
+            }</section>`
+          : `<div class="junior-public-draw__halves">${half('Top half', top)}${half('Bottom half', bottom)}</div>`;
+        return `<article class="junior-public-draw__group"><h3>${escapeHtml(group.label ?? '')}</h3>${when(group)}${body}</article>`;
       })
       .join('');
   };
@@ -46,7 +73,9 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
     const supabase = createClient(url, key);
     const { data, error } = await supabase.rpc('junior_public_draw');
     const payload = (data ?? null) as Payload | null;
-    const groups = Array.isArray(payload?.groups) ? payload.groups.filter((group) => (group.top?.length ?? 0) + (group.bottom?.length ?? 0) > 0) : [];
+    const groups = Array.isArray(payload?.groups)
+      ? payload.groups.filter((group) => (group.top?.length ?? 0) + (group.bottom?.length ?? 0) + (group.players?.length ?? 0) > 0)
+      : [];
     if (error || payload?.published !== true || !groups.length) {
       root.hidden = true;
       return;
@@ -101,6 +130,16 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
   .junior-public-draw__slot {
     color: var(--gold-600);
     font-weight: 700;
+  }
+  .junior-public-draw__when {
+    margin: 0 0 0.4rem;
+  }
+  .junior-public-draw__ties {
+    margin: 0.4rem 0 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.3rem;
   }
   @media (max-width: 700px) {
     .junior-public-draw__halves {

@@ -854,6 +854,17 @@ test.describe('Club captain, team captain, and player', () => {
     await juniorDraw.getByRole('button', { name: 'Put Jamie Junior back' }).click();
     await expect(juniorDraw.getByRole('button', { name: 'Draw Jamie Junior' })).toBeVisible();
     await juniorDraw.getByRole('button', { name: 'Draw Jamie Junior' }).click();
+    await expect(juniorDraw.getByRole('checkbox', { name: 'Girls U11' })).toBeChecked();
+    await juniorDraw.getByRole('checkbox', { name: 'Girls U13' }).check();
+    await expect(juniorDraw.locator('.junior-combine-name')).toHaveText('Girls U11 and Girls U13');
+    await juniorDraw.getByRole('button', { name: 'Round robin' }).click();
+    await expect(juniorDraw.getByRole('heading', { name: 'Round robin' })).toBeVisible();
+    await expect(juniorDraw.getByRole('heading', { name: 'Top half' })).toHaveCount(0);
+    await expect(juniorDraw.locator('.junior-half', { hasText: 'Round robin' })).toContainText('Jamie Junior');
+    await juniorDraw.getByLabel('Court at Towers').fill('3');
+    await juniorDraw.getByLabel('Time at Towers').fill('10:00');
+    await juniorDraw.getByRole('button', { name: 'Knockout' }).click();
+    await expect(juniorDraw.locator('.junior-half', { hasText: 'Top half' })).toContainText('Jamie Junior');
     const juniorActions = page.locator('[data-tab="juniors"] .actions').first();
     await expect(juniorActions.getByRole('button', { name: 'Add an entry' })).toBeVisible();
     await juniorActions.getByRole('button', { name: 'Publish the draw' }).click();
