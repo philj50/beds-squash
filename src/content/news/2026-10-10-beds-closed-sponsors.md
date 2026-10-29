@@ -52,7 +52,7 @@ A first look at the confirmed sponsors — at least so far — for the [Bedfords
 
   ![Samo Sports](/uploads/news/samo-sports.png)
 
-- J.A.J Electrical Services
+- [J.A.J Electrical Services](https://www.instagram.com/j.a.jelectricalservices/)
 
   ![J.A.J Electrical Services](/uploads/news/jaj-electrical.png)
 
