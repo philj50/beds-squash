@@ -113,7 +113,7 @@ const scoresHref = url('/captains/admin/minigame/');
 
           <section class="admin-panel" data-tab="juniors" hidden>
             <h2>Juniors</h2>
-            <p class="muted small">Junior County Closed entries submitted on this website. An admin can correct every field, and add an entry after the public form has closed. Saving sends a short note to the Junior organisers. It does not send an email.</p>
+            <p class="muted small">Junior County Closed entries submitted on this website. An admin can correct every field, and add an entry after the public form has closed. Saving sends a short note to the Junior organisers. It does not send an email. A junior organiser places each entrant in the draw, in the order the names come out of the hat.</p>
             <p class="actions"><button class="btn btn--primary btn--sm" type="button" data-add-junior hidden>Add an entry</button></p>
             <div data-new-junior hidden></div>
             <div class="overview-box juniors-box">
@@ -133,6 +133,12 @@ const scoresHref = url('/captains/admin/minigame/');
                 </thead>
                 <tbody data-juniors-people></tbody>
               </table>
+            </div>
+            <div class="junior-draw" data-junior-draw hidden>
+              <h3>The draw</h3>
+              <p class="muted small">Press a name as it comes out of the hat. The first names fill the top half, then the bottom half. Put a name back if it was drawn in the wrong place.</p>
+              <ul class="tag-list" data-junior-draw-pills aria-label="Draw"></ul>
+              <div data-junior-draw-sheet></div>
             </div>
           </section>
 
@@ -623,6 +629,7 @@ const scoresHref = url('/captains/admin/minigame/');
   import { createClient } from '@supabase/supabase-js';
   import { bindPasswordRules, bindPasswordToggles, callManageAccounts, fetchAccountStates, fillSuggestedPassword, passwordIssue, suggestPassword } from '@/lib/passwords';
   import { loadAccount, noteActivity, privateStop, sendToLogin, stopMessage, type Account } from '@/lib/account';
+  import { ENTRY_GROUPS } from '@/lib/junior-age';
   import { compareCellText, sortMarkupRows, watchSortableTables } from '@/lib/table-sort';
 
   type Person = { id: string; display_name: string; email: string | null; is_admin: boolean };
@@ -1967,6 +1974,7 @@ const scoresHref = url('/captains/admin/minigame/');
     emergency_phone: string;
     notes: string | null;
     show_name?: boolean;
+    draw_position?: number | null;
   };
   let juniorEntriesLive: JuniorEntry[] = [];
   const placeParts = (value: string | null | undefined) =>
@@ -2070,10 +2078,105 @@ const scoresHref = url('/captains/admin/minigame/');
     notes: '',
     show_name: false,
   });
+  let juniorDrawKey = '';
+  function paintJuniorDraw(entries: JuniorEntry[]) {
+    const host = root.querySelector<HTMLElement>('[data-junior-draw]')!;
+    const pills = root.querySelector<HTMLElement>('[data-junior-draw-pills]')!;
+    const sheet = root.querySelector<HTMLElement>('[data-junior-draw-sheet]')!;
+    const placed = new Set<number>();
+    const groups = ENTRY_GROUPS.map((category) => {
+      const players = entries.filter((entry) => entry.age_category === category.age && entry.draw === category.draw);
+      for (const entry of players) placed.add(entry.id);
+      return { key: category.label, players };
+    }).filter((group) => group.players.length);
+    const leftover = entries.filter((entry) => !placed.has(entry.id));
+    if (leftover.length) groups.push({ key: 'Other', players: leftover });
+    if (!groups.length) {
+      host.hidden = true;
+      juniorDrawKey = '';
+      pills.innerHTML = '';
+      sheet.innerHTML = '';
+      return;
+    }
+    host.hidden = false;
+    if (!groups.some((group) => group.key === juniorDrawKey)) juniorDrawKey = groups[0].key;
+    pills.innerHTML = groups
+      .map(
+        (group) =>
+          `<li><button type="button" aria-pressed="${group.key === juniorDrawKey ? 'true' : 'false'}" data-junior-draw-key="${escapeHtml(group.key)}">${escapeHtml(group.key)} (${group.players.length})</button></li>`,
+      )
+      .join('');
+    const group = groups.find((item) => item.key === juniorDrawKey) ?? groups[0];
+    const byName = (a: JuniorEntry, b: JuniorEntry) =>
+      a.player_last_name.localeCompare(b.player_last_name, 'en') || a.player_first_name.localeCompare(b.player_first_name, 'en') || a.id - b.id;
+    const waiting = group.players.filter((entry) => entry.draw_position == null).sort(byName);
+    const drawn = group.players
+      .filter((entry) => entry.draw_position != null)
+      .sort((a, b) => (a.draw_position ?? 0) - (b.draw_position ?? 0) || a.id - b.id);
+    const split = Math.ceil(group.players.length / 2);
+    const top = drawn.filter((entry) => (entry.draw_position ?? 0) <= split);
+    const bottom = drawn.filter((entry) => (entry.draw_position ?? 0) > split);
+    const line = (entry: JuniorEntry) => {
+      const name = `${entry.player_first_name} ${entry.player_last_name}`.trim();
+      const back = viewerSeesJuniors
+        ? `<button class="btn btn--ghost btn--sm" type="button" data-draw-return="${entry.id}" aria-label="Put ${escapeHtml(name)} back">Put back</button>`
+        : '';
+      return `<li><span class="draw-slot">${entry.draw_position}</span><span>${escapeHtml(name)}</span><span class="muted">${escapeHtml(entry.club || '')}</span>${back}</li>`;
+    };
+    const half = (title: string, rows: JuniorEntry[], slots: number) => {
+      const body = rows.length ? `<ol>${rows.map((entry) => line(entry)).join('')}</ol>` : `<p class="muted small">${slots ? 'Waiting for a name.' : 'Bye.'}</p>`;
+      return `<section class="junior-half"><h4>${title}</h4>${body}</section>`;
+    };
+    const hat = viewerSeesJuniors
+      ? `<div class="junior-hat"><h4>Still to draw</h4>${
+          waiting.length
+            ? `<ul>${waiting
+                .map((entry) => {
+                  const name = `${entry.player_first_name} ${entry.player_last_name}`.trim();
+                  return `<li><button class="btn btn--ghost btn--sm" type="button" data-draw-place="${entry.id}" aria-label="Draw ${escapeHtml(name)}">${escapeHtml(name)}</button></li>`;
+                })
+                .join('')}</ul>`
+            : '<p class="muted small">Everyone in this draw has been placed.</p>'
+        }</div>`
+      : '';
+    sheet.innerHTML = `${hat}<div class="junior-halves">${half('Top half', top, split)}${half('Bottom half', bottom, group.players.length - split)}</div>`;
+  }
+  async function loadJuniorEntries() {
+    const columns = 'id, player_first_name, player_last_name, date_of_birth, age_category, draw, club, guardian_name, guardian_email, guardian_phone, emergency_name, emergency_phone, notes, show_name, draw_position';
+    let result = await supabase.from('junior_entries').select(columns).order('player_last_name');
+    if (result.error && /draw_position|schema cache/i.test(result.error.message)) {
+      result = await supabase.from('junior_entries').select(columns.replace(', draw_position', '')).order('player_last_name');
+    }
+    juniorEntriesLive = (result.error ? [] : (result.data ?? [])) as JuniorEntry[];
+    paintJuniorEntries(juniorEntriesLive, result.error?.message ?? '');
+  }
+  async function placeInDraw(id: number, back: boolean) {
+    if (!viewerSeesJuniors) return;
+    const entry = juniorEntriesLive.find((item) => item.id === id);
+    if (!entry) return;
+    const same = juniorEntriesLive.filter((item) => item.age_category === entry.age_category && item.draw === entry.draw);
+    if (back) {
+      const removed = entry.draw_position;
+      if (removed == null) return;
+      entry.draw_position = null;
+      for (const item of same) {
+        if (item.draw_position != null && item.draw_position > removed) item.draw_position -= 1;
+      }
+    } else if (entry.draw_position == null) {
+      entry.draw_position = same.reduce((max, item) => Math.max(max, item.draw_position ?? 0), 0) + 1;
+    } else return;
+    paintJuniorEntries(juniorEntriesLive);
+    const { error } = await supabase.rpc(back ? 'return_junior_draw' : 'place_junior_draw', { p_id: id });
+    if (error) {
+      setStatus(error.message);
+      await loadJuniorEntries();
+    }
+  }
   function paintJuniorEntries(entries: JuniorEntry[], problem = '') {
     addJuniorButton.hidden = !viewerIsAdmin;
     if (problem) {
       juniorsHost.innerHTML = `<tr><td colspan="9">${escapeHtml(problem)}</td></tr>`;
+      paintJuniorDraw([]);
       return;
     }
     const rows = entries.slice().sort((a, b) => a.player_last_name.localeCompare(b.player_last_name, 'en') || a.player_first_name.localeCompare(b.player_first_name, 'en'));
@@ -2092,6 +2195,7 @@ const scoresHref = url('/captains/admin/minigame/');
           })
           .join('')
       : '<tr><td colspan="9">No junior entries yet.</td></tr>';
+    paintJuniorDraw(rows);
   }
   juniorPanel.addEventListener('click', (event) => {
     const target = event.target as HTMLElement;
@@ -2099,6 +2203,22 @@ const scoresHref = url('/captains/admin/minigame/');
       newJuniorHost.hidden = false;
       newJuniorHost.innerHTML = juniorForm(blankJunior(), 'new');
       newJuniorHost.querySelector<HTMLInputElement>('input')?.focus();
+      return;
+    }
+    const place = target.closest<HTMLButtonElement>('[data-draw-place]');
+    if (place?.dataset.drawPlace) {
+      void placeInDraw(Number(place.dataset.drawPlace), false);
+      return;
+    }
+    const back = target.closest<HTMLButtonElement>('[data-draw-return]');
+    if (back?.dataset.drawReturn) {
+      void placeInDraw(Number(back.dataset.drawReturn), true);
+      return;
+    }
+    const drawPill = target.closest<HTMLButtonElement>('[data-junior-draw-key]');
+    if (drawPill?.dataset.juniorDrawKey) {
+      juniorDrawKey = drawPill.dataset.juniorDrawKey;
+      paintJuniorDraw(juniorEntriesLive);
       return;
     }
     const more = target.closest<HTMLButtonElement>('[data-junior-more]');
@@ -3142,6 +3262,7 @@ const scoresHref = url('/captains/admin/minigame/');
     const fallback: Tab = account.playerOnly ? 'site-player' : 'site-club';
     showTab((allowedTabs() as readonly string[]).includes(requested) ? requested : fallback);
     await loadWebsite(account);
+    if (viewerSeesJuniors || account.isAdmin) await loadJuniorEntries();
     if (!account.isAdmin) return;
 
     if (location.hash.slice(1) === 'traffic' && !trafficLoaded) void loadTraffic();
@@ -3161,7 +3282,6 @@ const scoresHref = url('/captains/admin/minigame/');
       { data: groupRows, error: groupError },
       { data: groupCatalogRows, error: groupCatalogError },
       { data: permissionRows, error: permissionError },
-      { data: juniorRows, error: juniorError },
       { data: signInRows },
       { data: closedRows, error: closedError },
     ] = await Promise.all([
@@ -3175,7 +3295,6 @@ const scoresHref = url('/captains/admin/minigame/');
       supabase.from('group_members').select('profile_id, person_name, place, group_slug'),
       supabase.from('groups').select('slug, name, role_slug, source, managed, position').order('position'),
       supabase.from('roles').select('slug, name, position').order('position'),
-      supabase.from('junior_entries').select('id, player_first_name, player_last_name, date_of_birth, age_category, draw, club, guardian_name, guardian_email, guardian_phone, emergency_name, emergency_phone, notes, show_name').order('player_last_name'),
       supabase.from('site_sign_ins').select('user_id, signed_in_at').order('signed_in_at', { ascending: false }).limit(1000),
       supabase.from('beds_closed_entries').select('forename, surname, email, telephone'),
     ]);
@@ -3206,9 +3325,7 @@ const scoresHref = url('/captains/admin/minigame/');
     groupCatalogLive = groupCatalog;
     roleCatalogLive = roleCatalog;
     paintPermissionCatalog(groupCatalog, roleCatalog, groupMembers);
-    const juniorEntries = (juniorError ? [] : (juniorRows ?? [])) as JuniorEntry[];
-    juniorEntriesLive = juniorEntries;
-    paintJuniorEntries(juniorEntries, juniorError?.message ?? '');
+    const juniorEntries = juniorEntriesLive;
     if (groupError || groupCatalogError || permissionError) groupNote.textContent = 'Groups are not on the database yet. Apply the groups migration, then reload.';
     const clubNames = new Map(clubs.map((club) => [club.slug, club.name]));
     const dash = '—';
@@ -4578,6 +4695,64 @@ const scoresHref = url('/captains/admin/minigame/');
   html[data-theme='light'] #setup-app .users-box .source-tag--team { color: #8a5a00; }
   html[data-theme='navy'] #setup-app .users-box .source-tag--juniors,
   html[data-theme='light'] #setup-app .users-box .source-tag--juniors { color: #9d174d; }
+  #setup-app .junior-draw {
+    margin-top: 1.25rem;
+  }
+  #setup-app .junior-draw h3 {
+    margin: 0 0 0.35rem;
+  }
+  #setup-app .junior-draw .tag-list {
+    margin: 0.75rem 0;
+  }
+  #setup-app .junior-hat h4 {
+    margin: 0.2rem 0;
+    font-size: 0.95rem;
+  }
+  #setup-app .junior-hat ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    list-style: none;
+    margin: 0.35rem 0 0.75rem;
+    padding: 0;
+  }
+  #setup-app .junior-halves {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+  #setup-app .junior-half {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.65rem 0.8rem;
+  }
+  #setup-app .junior-half h4 {
+    margin: 0 0 0.4rem;
+    font-size: 0.95rem;
+  }
+  #setup-app .junior-half ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.35rem;
+  }
+  #setup-app .junior-half li {
+    display: flex;
+    gap: 0.45rem;
+    align-items: baseline;
+  }
+  #setup-app .draw-slot {
+    color: var(--gold-600);
+    font-weight: 700;
+    min-width: 1.1rem;
+  }
+  @media (max-width: 700px) {
+    #setup-app .junior-halves {
+      grid-template-columns: 1fr;
+    }
+  }
   #setup-app .juniors-box .overview {
     font-size: 0.74rem;
   }

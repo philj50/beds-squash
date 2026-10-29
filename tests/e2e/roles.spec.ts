@@ -670,6 +670,7 @@ test.describe('Club captain, team captain, and player', () => {
           emergency_phone: String(saved.p_emergency_phone),
           notes: String(saved.p_notes ?? ''),
           show_name: Boolean(saved.p_show_name),
+          draw_position: null,
         });
         return send(null);
       }
@@ -843,6 +844,16 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(junior).toContainText('Pat Guardian');
     await expect(junior).toContainText('Needs a spare racket');
     await expect(junior.getByRole('cell', { name: 'No', exact: true })).toBeVisible();
+    const juniorDraw = page.locator('[data-junior-draw]');
+    await expect(juniorDraw).toBeVisible();
+    await expect(juniorDraw.getByRole('button', { name: 'Girls U11 (1)' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(juniorDraw.getByRole('heading', { name: 'Still to draw' })).toBeVisible();
+    await juniorDraw.getByRole('button', { name: 'Draw Jamie Junior' }).click();
+    await expect(juniorDraw.locator('.junior-half', { hasText: 'Top half' })).toContainText('Jamie Junior');
+    await expect(juniorDraw.locator('.junior-half', { hasText: 'Bottom half' })).toContainText('Bye');
+    await juniorDraw.getByRole('button', { name: 'Put Jamie Junior back' }).click();
+    await expect(juniorDraw.getByRole('button', { name: 'Draw Jamie Junior' })).toBeVisible();
+    await juniorDraw.getByRole('button', { name: 'Draw Jamie Junior' }).click();
     const editButton = junior.getByRole('button', { name: 'Edit' });
     await expect(editButton).toBeVisible();
     const editFit = await editButton.evaluate((el) => {
@@ -888,6 +899,11 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(newJunior).toBeHidden();
     await expect(page.locator('[data-status]')).toHaveText('Entry added.');
     await expect(page.locator('[data-juniors-people]')).toContainText('Robin New');
+    await expect(juniorDraw.getByRole('button', { name: 'Girls U11 (1)' })).toBeVisible();
+    await juniorDraw.getByRole('button', { name: 'Boys U13 (1)' }).click();
+    await expect(juniorDraw.getByRole('button', { name: 'Boys U13 (1)' })).toHaveAttribute('aria-pressed', 'true');
+    await juniorDraw.getByRole('button', { name: 'Draw Robin New' }).click();
+    await expect(juniorDraw.locator('.junior-half', { hasText: 'Top half' })).toContainText('Robin New');
     await page.getByRole('button', { name: 'Players', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Beds Closed', exact: true })).toBeVisible();
     await expect(page.getByText('The entry list is copied from Sport Manager. Each person is tagged with the year, so they can be picked out and linked.')).toBeVisible();
