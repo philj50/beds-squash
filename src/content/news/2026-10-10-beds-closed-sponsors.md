@@ -2,7 +2,7 @@
 title: Confirmed sponsors for the Beds County Closed
 date: 2026-10-10T16:00:00
 summary: The Dental Centre Bedford is the main sponsor, with a strong list of additional sponsors already confirmed for the County Closed.
-image: /uploads/news/beds-closed-sponsors-v5.jpg
+image: /uploads/news/beds-closed-sponsors-v6.jpg
 imageAlt: The Dental Centre Bedford reception, with logos for the Dental Centre, JR Builders, Decant, Brook Harris, Open House, the Bedford Cheese Company, My Next Car, Specsavers, Samo Sports and J.A.J Electrical Services.
 category: tournaments
 featured: true
@@ -42,7 +42,7 @@ A first look at the confirmed sponsors — at least so far — for the [Bedfords
 
 [Open House](https://www.openhousebedford.co.uk/)
 
-![Open House](/uploads/news/open-house.png)
+![Open House](/uploads/news/open-house-v2.png)
 
 [Specsavers](https://www.specsavers.co.uk/stores/bedford)
 
