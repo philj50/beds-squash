@@ -1,0 +1,33 @@
+name: Link County Closed entries
+
+on:
+  schedule:
+    # Twice a day, after the public Sport Manager refresh. Not on the five-minute match clock.
+    - cron: '45 8,20 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: sync-beds-closed
+  cancel-in-progress: false
+
+jobs:
+  link:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Tag existing logins and open new ones
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SPORTS_MANAGER_USERNAME: ${{ secrets.SPORTS_MANAGER_USERNAME }}
+          SPORTS_MANAGER_PASSWORD: ${{ secrets.SPORTS_MANAGER_PASSWORD }}
+          GMAIL_USERNAME: ${{ secrets.GMAIL_USERNAME }}
+          GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
+        run: node --use-system-ca scripts/sync-beds-closed.mjs --apply

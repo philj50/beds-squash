@@ -123,6 +123,7 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.getByRole('button', { name: 'Activities' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Traffic' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Database' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Integrations' })).toHaveCount(0);
     await expect(page.locator('[data-junior-link]')).toBeHidden();
     await expect(page.locator('[data-share-link]')).toBeHidden();
     await expect(page.locator('[data-scores-link]')).toBeHidden();
@@ -474,6 +475,56 @@ test.describe('Club captain, team captain, and player', () => {
           body: JSON.stringify(slice),
         });
       }
+      if (path.endsWith('/beds_closed_entries')) {
+        return send([
+          {
+            tournament_id: 945811,
+            year: 2026,
+            grade: 'A Grade',
+            forename: 'Pat',
+            surname: 'Player',
+            email: 'pat.closed@example.test',
+            telephone: '07000000002',
+            payment_status: 'Succeeded',
+          },
+          {
+            tournament_id: 945811,
+            year: 2026,
+            grade: 'B Plate',
+            forename: 'Pat',
+            surname: 'Player',
+            email: 'pat.closed@example.test',
+            telephone: '07000000002',
+            payment_status: 'Succeeded',
+          },
+          {
+            tournament_id: 1244761,
+            year: 2027,
+            grade: 'A Grade',
+            forename: 'Pat',
+            surname: 'Player',
+            email: 'pat.closed@example.test',
+            telephone: '07000000002',
+            payment_status: 'Succeeded',
+          },
+          {
+            tournament_id: 945811,
+            year: 2026,
+            grade: 'C Grade',
+            forename: 'Gail',
+            surname: 'Closed',
+            email: 'gail@example.test',
+            telephone: '07000000003',
+            payment_status: 'Succeeded',
+          },
+        ]);
+      }
+      if (path.endsWith('/rpc/admin_integration_accounts')) {
+        return send([
+          { slug: 'squashlevels', account: 'levels@example.test' },
+          { slug: 'ntfy', account: 'beds-jobs-topic' },
+        ]);
+      }
       if (path.endsWith('/rpc/admin_database_report')) {
         return send({
           database_bytes: 2_400_000,
@@ -803,7 +854,28 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.locator('[data-juniors-people]')).toContainText('Alex Junior');
     await page.getByRole('button', { name: 'Players', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Beds Closed', exact: true })).toBeVisible();
-    await expect(page.getByText('Beds Closed will be used later.', { exact: true })).toBeVisible();
+    await expect(page.getByText('The entry list is copied from Sport Manager. Each person is tagged with the year, so they can be picked out and linked.')).toBeVisible();
+    const closedList = page.locator('[data-beds-rows]');
+    const patClosed = closedList.locator('tr', { hasText: 'Pat Player' });
+    await expect(patClosed).toHaveCount(1);
+    await expect(patClosed.locator('.tag-list')).toContainText('2026');
+    await expect(patClosed.locator('.tag-list')).toContainText('2027');
+    await expect(patClosed).toContainText('A Grade');
+    await expect(patClosed).toContainText('B Plate');
+    await expect(patClosed).toContainText('pat.closed@example.test');
+    await expect(patClosed).toContainText('07000000002');
+    await expect(patClosed).toContainText('Paid');
+    await expect(patClosed).toContainText('Not linked');
+    const gailClosed = closedList.locator('tr', { hasText: 'Gail Closed' });
+    await expect(gailClosed.locator('.tag-list')).toContainText('2026');
+    await expect(gailClosed).toContainText('Linked');
+    await expect(gailClosed).toContainText('Gail');
+    await expect(page.locator('[data-beds-count]')).toContainText('2026');
+    await page.getByRole('button', { name: '2027', exact: true }).click();
+    await expect(gailClosed).toHaveCount(0);
+    await expect(patClosed.locator('.tag-list')).toContainText('2027');
+    await expect(patClosed.locator('.tag-list')).not.toContainText('2026');
+    await expect(page.locator('[data-beds-count]')).toContainText('2027: 1 person');
 
     await page.getByRole('button', { name: 'SL', exact: true }).click();
     const slZoe = page.locator('[data-site-sl] tr', { hasText: 'Zoe Player' });
@@ -914,6 +986,18 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(page.locator('[data-database-charts] svg')).toHaveCount(1);
     await expect(page.locator('[data-database-charts]')).toContainText('Page views');
     await expect(page.locator('[data-database-charts]')).toContainText('7 this week');
+
+    await page.getByRole('button', { name: 'Integrations' }).click();
+    await expect(page.getByRole('heading', { name: 'Integrations' })).toBeVisible();
+    const integrations = page.locator('[data-integrations]');
+    await expect(integrations).toContainText('SquashLevels');
+    await expect(integrations).toContainText('levels@example.test');
+    await expect(integrations).toContainText('GitHub secret SQUASHLEVELS_PASSWORD');
+    await expect(integrations).toContainText('CM Stringers');
+    await expect(integrations).toContainText('No login');
+    await expect(integrations).toContainText('beds-jobs-topic');
+    await expect(integrations).toContainText('beds_juniors_1234');
+    await expect(integrations).toContainText('GitHub secret NTFY_TOKEN');
 
     await page.goto('juniors/', { waitUntil: 'domcontentloaded' });
     const adminMenu = page.locator('[data-junior-admin]');

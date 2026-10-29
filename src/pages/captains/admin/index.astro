@@ -21,11 +21,11 @@ const scoresHref = url('/captains/admin/minigame/');
       <h1>Administration</h1>
       <p class="lede">
         <strong>League Master</strong> lists club captains, team captains, and players. Those lists are read only. An email, name, or ES number saved on this website stays. A difference with League Master is listed under Differences. Phone stays on this website.
-        <strong>Juniors</strong> lists the Junior County Closed entries submitted on this website. <strong>Beds Closed</strong> will be used later.
+        <strong>Juniors</strong> lists the Junior County Closed entries submitted on this website. <strong>Beds Closed</strong> lists the County Closed entry list. Each person is tagged with the year, and email and mobile come from Sport Manager.
         <strong>SquashLevels</strong> shows each player’s level.
         <strong>Permissions</strong> is Users, Groups, and Roles, and only an admin sees it. Users is every League Master player. Update the email, ES number, and phone there, and change the password, turn the account off, or delete it when a login exists. A group gives one role. League Master fills the club, team, and player groups. Someone in those groups who is on SquashLevels also receives SL Player.
         <strong>Links</strong> joins a League Master player to their SquashLevels name when the names differ.
-        <strong>Config</strong> shows each database table, how many rows it holds, how much space it uses, and a weekly graph of new rows. Only an admin sees it.
+        <strong>Config</strong> shows each database table, how many rows it holds, how much space it uses, and a weekly graph of new rows. It also lists each outside service, the account name, where the password is kept, and how many rows that service has stored. Only an admin sees it.
         A club captain sees their club. A team captain sees their team. A player sees their own row. Nothing is emailed.
       </p>
       <p class="status" data-status role="status"></p>
@@ -88,6 +88,7 @@ const scoresHref = url('/captains/admin/minigame/');
               <span class="tab-label">Config</span>
               <span class="tab-buttons">
                 <button type="button" data-tab-button="database">Database</button>
+                <button type="button" data-tab-button="integrations">Integrations</button>
               </span>
             </span>
           </nav>
@@ -135,7 +136,32 @@ const scoresHref = url('/captains/admin/minigame/');
 
           <section class="admin-panel" data-tab="beds-closed" hidden>
             <h2>Beds Closed</h2>
-            <p class="muted small">Beds Closed will be used later.</p>
+            <p class="muted small">The entry list is copied from Sport Manager. Each person is tagged with the year, so they can be picked out and linked.</p>
+            <p class="muted small" data-beds-status hidden role="status"></p>
+            <div data-beds-list hidden>
+              <ul class="tag-list" data-beds-years aria-label="Years"></ul>
+              <label class="beds-search">
+                Search
+                <input type="search" data-beds-search placeholder="Name, email or mobile" />
+              </label>
+              <p class="muted small" data-beds-count></p>
+              <div class="overview-box">
+                <table class="overview">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Years</th>
+                      <th>Grade</th>
+                      <th>Email</th>
+                      <th>Mobile</th>
+                      <th>Paid</th>
+                      <th>Login</th>
+                    </tr>
+                  </thead>
+                  <tbody data-beds-rows></tbody>
+                </table>
+              </div>
+            </div>
           </section>
 
           <section class="admin-panel" data-tab="site-sl" hidden>
@@ -412,6 +438,29 @@ const scoresHref = url('/captains/admin/minigame/');
             </div>
           </section>
 
+          <section class="admin-panel" data-tab="integrations" data-lm-only hidden>
+            <h2>Integrations</h2>
+            <p class="muted small">
+              Each outside service, the account it signs in with, and how much it has stored here. Passwords stay in GitHub. The ntfy topic is the pub/sub code the jobs publish to. Juniors publish on their own topic.
+            </p>
+            <p class="muted small" data-integrations-status hidden role="status"></p>
+            <div class="overview-box" data-integrations hidden>
+              <table class="overview db-table">
+                <thead>
+                  <tr>
+                    <th>Service</th>
+                    <th>Account</th>
+                    <th>Password</th>
+                    <th>Rows</th>
+                    <th>Size</th>
+                    <th>When</th>
+                  </tr>
+                </thead>
+                <tbody data-integrations-rows></tbody>
+              </table>
+            </div>
+          </section>
+
           <section class="admin-panel" data-tab="traffic" data-lm-only hidden>
             <h2>Site traffic</h2>
             <p class="muted small">
@@ -683,7 +732,7 @@ const scoresHref = url('/captains/admin/minigame/');
   let roleCatalogLive: RoleCatalog[] = [];
   let protectedAdminId = '';
   const siteTabs = ['site-club', 'site-team', 'site-player', 'site-sl'] as const;
-  const tabs = [...siteTabs, 'juniors', 'beds-closed', 'members', 'permissions-groups', 'permissions-roles', 'links', 'traffic', 'database'] as const;
+  const tabs = [...siteTabs, 'juniors', 'beds-closed', 'members', 'permissions-groups', 'permissions-roles', 'links', 'traffic', 'database', 'integrations'] as const;
   type Tab = (typeof tabs)[number];
   const tabAlias: Record<string, Tab> = {
     overview: 'members',
@@ -701,6 +750,7 @@ const scoresHref = url('/captains/admin/minigame/');
     users: 'members',
     config: 'database',
     database: 'database',
+    integrations: 'integrations',
   };
   const groupFromHash: Record<string, string> = {
     'lm-clubs': 'lm_club_captains',
@@ -712,6 +762,8 @@ const scoresHref = url('/captains/admin/minigame/');
   let openingGroup = groupFromHash[location.hash.slice(1)] ?? '';
   let trafficLoaded = false;
   let databaseLoaded = false;
+  let integrationsLoaded = false;
+  let bedsClosedLoaded = false;
   const databaseStatus = root.querySelector<HTMLElement>('[data-database-status]')!;
   const databasePanel = root.querySelector<HTMLElement>('[data-database]')!;
   const databaseCharts = root.querySelector<HTMLElement>('[data-database-charts]')!;
@@ -1020,6 +1072,267 @@ const scoresHref = url('/captains/admin/minigame/');
     databaseLoaded = true;
   };
 
+  const integrationCatalog: {
+    slug: string;
+    name: string;
+    accountSecret: string;
+    passwordSecret: string;
+    tables: string[];
+    when: string;
+    fixedAccount?: string;
+  }[] = [
+    {
+      slug: 'squashlevels',
+      name: 'SquashLevels',
+      accountSecret: 'SQUASHLEVELS_EMAIL',
+      passwordSecret: 'SQUASHLEVELS_PASSWORD',
+      tables: ['squashlevels_players', 'squashlevels_matches', 'squashlevels_ratings', 'squashlevels_names'],
+      when: 'Daily at 07:30 UTC',
+    },
+    {
+      slug: 'leaguemaster',
+      name: 'League Master',
+      accountSecret: 'LEAGUEMASTER_USERNAME',
+      passwordSecret: 'LEAGUEMASTER_PASSWORD',
+      tables: ['fixtures', 'league_teams', 'league_seasons', 'divisions'],
+      when: 'Daily at 06:00 UTC',
+    },
+    {
+      slug: 'sportmanager',
+      name: 'Sport Manager',
+      accountSecret: 'SPORTS_MANAGER_USERNAME',
+      passwordSecret: 'SPORTS_MANAGER_PASSWORD',
+      tables: ['sportmgr_tournaments', 'sportmgr_entries', 'sportmgr_matches'],
+      when: 'Twice a day, and every five minutes on the Closed weekend',
+    },
+    {
+      slug: 'cmstringers',
+      name: 'CM Stringers',
+      accountSecret: '',
+      passwordSecret: '',
+      tables: [],
+      when: 'Public diary, read by hand',
+      fixedAccount: 'No login',
+    },
+    {
+      slug: 'gmail',
+      name: 'Email',
+      accountSecret: 'GMAIL_USERNAME',
+      passwordSecret: 'GMAIL_PASSWORD',
+      tables: [],
+      when: 'Paused until a new mailbox is ready',
+    },
+    {
+      slug: 'ntfy',
+      name: 'ntfy jobs',
+      accountSecret: 'NTFY_TOPIC',
+      passwordSecret: 'NTFY_TOKEN',
+      tables: [],
+      when: 'After League Master, SquashLevels and the PSA check',
+    },
+    {
+      slug: 'ntfy-juniors',
+      name: 'ntfy juniors',
+      accountSecret: '',
+      passwordSecret: '',
+      tables: ['junior_entries'],
+      when: 'When a junior entry is added or changed',
+      fixedAccount: 'beds_juniors_1234',
+    },
+    {
+      slug: 'englandsquash',
+      name: 'England Squash',
+      accountSecret: 'ENGLANDSQUASH_USERNAME',
+      passwordSecret: 'ENGLANDSQUASH_PASSWORD',
+      tables: ['player_registry'],
+      when: 'Saved for the membership export',
+    },
+    {
+      slug: 'squashtv',
+      name: 'Squash TV',
+      accountSecret: 'SQUASH_TV_USERNAME',
+      passwordSecret: 'SQUASH_TV_PASSWORD',
+      tables: [],
+      when: 'Saved for the channel',
+    },
+    {
+      slug: 'nvidia',
+      name: 'NVIDIA',
+      accountSecret: '',
+      passwordSecret: 'NVIDIA_API_KEY',
+      tables: [],
+      when: 'Optional wording on the SquashLevels article',
+      fixedAccount: 'No username',
+    },
+  ];
+
+  const loadIntegrations = async () => {
+    const status = root.querySelector<HTMLElement>('[data-integrations-status]')!;
+    const table = root.querySelector<HTMLElement>('[data-integrations]')!;
+    const body = root.querySelector<HTMLElement>('[data-integrations-rows]')!;
+    status.hidden = false;
+    status.textContent = 'Loading integrations…';
+    table.hidden = true;
+    const [reportResult, accountResult] = await Promise.all([
+      supabase.rpc('admin_database_report'),
+      supabase.rpc('admin_integration_accounts'),
+    ]);
+    const report = reportResult.data as { tables?: { name: string; rows: number; bytes: number }[] } | null;
+    const tables = Array.isArray(report?.tables) ? report.tables : [];
+    const accounts = new Map<string, string>();
+    const accountRows = accountResult.data as { slug?: string; account?: string }[] | null;
+    if (Array.isArray(accountRows)) {
+      for (const row of accountRows) {
+        if (row.slug && row.account) accounts.set(row.slug, row.account);
+      }
+    }
+    const formatBytes = (value: number) => {
+      if (!Number.isFinite(value) || value <= 0) return '—';
+      if (value < 1024) return `${Math.round(value)} B`;
+      if (value < 1024 * 1024) return `${(value / 1024).toFixed(value < 10 * 1024 ? 1 : 0)} KB`;
+      const mb = value / (1024 * 1024);
+      return `${mb.toFixed(mb < 10 ? 1 : 0)} MB`;
+    };
+    const formatCount = (value: number) => Number(value || 0).toLocaleString('en-GB');
+    body.innerHTML = integrationCatalog
+      .map((item) => {
+        const matched = tables.filter((table) => item.tables.includes(table.name));
+        const rows = matched.reduce((sum, table) => sum + Number(table.rows || 0), 0);
+        const bytes = matched.reduce((sum, table) => sum + Number(table.bytes || 0), 0);
+        const volume = item.tables.length === 0 ? '—' : matched.length === 0 ? 'Not stored yet' : formatCount(rows);
+        const size = item.tables.length === 0 || matched.length === 0 ? '—' : formatBytes(bytes);
+        const account = item.fixedAccount || accounts.get(item.slug) || (item.accountSecret ? `GitHub secret ${item.accountSecret}` : '—');
+        const password = item.passwordSecret ? `GitHub secret ${item.passwordSecret}` : '—';
+        return `<tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(account)}</td><td>${escapeHtml(password)}</td><td>${escapeHtml(volume)}</td><td>${escapeHtml(size)}</td><td>${escapeHtml(item.when)}</td></tr>`;
+      })
+      .join('');
+    status.hidden = true;
+    table.hidden = false;
+    integrationsLoaded = true;
+  };
+
+  type ClosedEntry = {
+    year: number;
+    grade: string;
+    forename: string;
+    surname: string;
+    email: string;
+    telephone: string;
+    payment_status: string;
+  };
+  type ClosedProfile = { id: string; display_name: string | null; email: string | null };
+  let bedsEntries: ClosedEntry[] = [];
+  let bedsProfiles: ClosedProfile[] = [];
+  let bedsYear = 0;
+
+  const paintBedsEntries = () => {
+    const body = root.querySelector<HTMLElement>('[data-beds-rows]')!;
+    const count = root.querySelector<HTMLElement>('[data-beds-count]')!;
+    const yearList = root.querySelector<HTMLElement>('[data-beds-years]')!;
+    const query = (root.querySelector<HTMLInputElement>('[data-beds-search]')?.value || '').trim().toLowerCase();
+    const years = [...new Set(bedsEntries.map((entry) => entry.year).filter(Boolean))].sort((a, b) => b - a);
+    if (bedsYear && !years.includes(bedsYear)) bedsYear = 0;
+    yearList.innerHTML = [
+      `<li><button type="button" data-beds-year="" aria-pressed="${bedsYear ? 'false' : 'true'}">All</button></li>`,
+      ...years.map(
+        (year) =>
+          `<li><button type="button" data-beds-year="${year}" aria-pressed="${bedsYear === year ? 'true' : 'false'}">${year}</button></li>`,
+      ),
+    ].join('');
+    const chosen = bedsYear ? bedsEntries.filter((entry) => entry.year === bedsYear) : bedsEntries;
+    const people = new Map<string, { name: string; email: string; telephone: string; years: number[]; grades: string[]; paid: number; rows: number }>();
+    for (const entry of chosen) {
+      const email = entry.email.trim().toLowerCase();
+      const name = `${entry.forename} ${entry.surname}`.replace(/\s+/g, ' ').trim();
+      const key = email || name.toLowerCase();
+      if (!key) continue;
+      const person = people.get(key) ?? { name, email: entry.email.trim(), telephone: '', years: [], grades: [], paid: 0, rows: 0 };
+      if (!person.name && name) person.name = name;
+      if (!person.telephone && entry.telephone.trim()) person.telephone = entry.telephone.trim();
+      if (entry.year && !person.years.includes(entry.year)) person.years.push(entry.year);
+      const grade = entry.grade.trim();
+      if (grade && !person.grades.includes(grade)) person.grades.push(grade);
+      person.rows += 1;
+      if (entry.payment_status.trim().toLowerCase() === 'succeeded') person.paid += 1;
+      people.set(key, person);
+    }
+    const loginFor = (email: string) => {
+      const profile = bedsProfiles.find((person) => (person.email || '').trim().toLowerCase() === email.trim().toLowerCase());
+      if (!profile) return 'Not linked';
+      const label = (profile.display_name || '').trim() || 'Login';
+      return `<span class="pill">Linked</span> ${escapeHtml(label)}`;
+    };
+    const paidLabel = (person: { paid: number; rows: number }) => {
+      if (!person.rows || person.paid === 0) return 'Not paid';
+      if (person.paid === person.rows) return 'Paid';
+      return 'Part paid';
+    };
+    const shown = [...people.values()].filter((person) => {
+      if (!query) return true;
+      return [person.name, person.email, person.telephone, person.grades.join(' '), person.years.join(' ')].some((value) => value.toLowerCase().includes(query));
+    });
+    body.innerHTML = shown.length
+      ? shown
+          .map((person) => {
+            const tags = person.years.length
+              ? `<ul class="tag-list">${person.years
+                  .slice()
+                  .sort((a, b) => b - a)
+                  .map((year) => `<li>${year}</li>`)
+                  .join('')}</ul>`
+              : '—';
+            return `<tr><td>${escapeHtml(person.name || '—')}</td><td>${tags}</td><td>${escapeHtml(person.grades.join(', ') || '—')}</td><td>${escapeHtml(person.email || '—')}</td><td>${escapeHtml(person.telephone || '—')}</td><td>${paidLabel(person)}</td><td>${loginFor(person.email)}</td></tr>`;
+          })
+          .join('')
+      : `<tr><td colspan="7">${people.size ? 'No entries match that search.' : 'No entries yet.'}</td></tr>`;
+    const noun = (total: number) => (total === 1 ? 'person' : 'people');
+    const yearLabel = bedsYear ? String(bedsYear) : years.length ? years.join(' and ') : 'This';
+    count.textContent = query ? `${shown.length} of ${people.size} ${noun(people.size)}` : `${yearLabel}: ${people.size} ${noun(people.size)}`;
+  };
+
+  const loadBedsClosed = async () => {
+    const status = root.querySelector<HTMLElement>('[data-beds-status]')!;
+    const list = root.querySelector<HTMLElement>('[data-beds-list]')!;
+    status.hidden = false;
+    list.hidden = true;
+    if (!viewerIsAdmin) {
+      status.textContent = 'Only an admin can see the entry list.';
+      bedsClosedLoaded = true;
+      return;
+    }
+    status.textContent = 'Loading the entry list…';
+    const [{ data, error }, profiles] = await Promise.all([
+      supabase
+        .from('beds_closed_entries')
+        .select('year,grade,forename,surname,email,telephone,payment_status')
+        .order('year', { ascending: false })
+        .order('surname')
+        .order('forename')
+        .order('grade'),
+      supabase.from('profiles').select('id, display_name, email'),
+    ]);
+    if (error) {
+      status.textContent = /beds_closed_entries|schema cache/i.test(error.message)
+        ? 'The entry list is not on the database yet.'
+        : error.message;
+      return;
+    }
+    bedsEntries = (data ?? []) as ClosedEntry[];
+    bedsProfiles = (profiles.data ?? []) as ClosedProfile[];
+    paintBedsEntries();
+    status.hidden = true;
+    list.hidden = false;
+    bedsClosedLoaded = true;
+  };
+
+  root.querySelector<HTMLInputElement>('[data-beds-search]')?.addEventListener('input', () => paintBedsEntries());
+  root.querySelector('[data-beds-years]')?.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-beds-year]');
+    if (!button) return;
+    bedsYear = Number(button.dataset.bedsYear || 0);
+    paintBedsEntries();
+  });
+
   let viewerIsAdmin = false;
   let viewerSeesJuniors = false;
   let viewerSeesBeds = false;
@@ -1028,7 +1341,7 @@ const scoresHref = url('/captains/admin/minigame/');
     const next = [...siteTabs] as Tab[];
     if (viewerSeesJuniors) next.push('juniors');
     if (viewerSeesBeds) next.push('beds-closed');
-    if (viewerIsAdmin) next.push('members', 'permissions-groups', 'permissions-roles', 'links', 'traffic', 'database');
+    if (viewerIsAdmin) next.push('members', 'permissions-groups', 'permissions-roles', 'links', 'traffic', 'database', 'integrations');
     return next;
   };
 
@@ -1041,6 +1354,8 @@ const scoresHref = url('/captains/admin/minigame/');
     history.replaceState(null, '', `#${next}`);
     if (next === 'traffic' && !trafficLoaded) void loadTraffic();
     if (next === 'database' && !databaseLoaded) void loadDatabase();
+    if (next === 'integrations' && !integrationsLoaded) void loadIntegrations();
+    if (next === 'beds-closed' && !bedsClosedLoaded) void loadBedsClosed();
   };
 
   root.addEventListener('click', (event) => {
@@ -3710,6 +4025,48 @@ const scoresHref = url('/captains/admin/minigame/');
     font-size: 1.75rem;
     font-weight: 700;
     color: var(--ink-950);
+  }
+  #setup-app .beds-search {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    max-width: 22rem;
+    margin: 0.75rem 0;
+    font-size: 0.9rem;
+  }
+  #setup-app .tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  #setup-app [data-beds-years] {
+    margin: 0.75rem 0;
+  }
+  #setup-app .tag-list button {
+    background: #fff;
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    padding: 0.15rem 0.7rem;
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  #setup-app .tag-list button[aria-pressed='true'] {
+    background: var(--ink-800);
+    color: #fff;
+    border-color: var(--gold-500);
+  }
+  #setup-app td .tag-list li {
+    border: 1px solid var(--gold-500);
+    color: var(--gold-600);
+    border-radius: 999px;
+    padding: 0 0.5rem;
+    font-size: 0.8rem;
+    background: #fff;
   }
   #setup-app .db-charts {
     display: grid;
