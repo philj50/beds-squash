@@ -441,7 +441,7 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="integrations" data-lm-only hidden>
             <h2>Integrations</h2>
             <p class="muted small">
-              Each outside service, the account it signs in with, and how much it has stored here. Passwords stay in GitHub. The ntfy topic is the pub/sub code the jobs publish to. Juniors publish on their own topic.
+              Each outside service, the account it signs in with, and how much it has stored here. Passwords stay in GitHub. Job results use the topic kept in GitHub. Juniors and County Closed scores each have their own public topic.
             </p>
             <p class="muted small" data-integrations-status hidden role="status"></p>
             <div class="overview-box" data-integrations hidden>
@@ -1080,6 +1080,7 @@ const scoresHref = url('/captains/admin/minigame/');
     tables: string[];
     when: string;
     fixedAccount?: string;
+    passwordNote?: string;
   }[] = [
     {
       slug: 'squashlevels',
@@ -1126,9 +1127,10 @@ const scoresHref = url('/captains/admin/minigame/');
       slug: 'ntfy',
       name: 'ntfy jobs',
       accountSecret: 'NTFY_TOPIC',
-      passwordSecret: 'NTFY_TOKEN',
+      passwordSecret: '',
       tables: [],
       when: 'After League Master, SquashLevels and the PSA check',
+      passwordNote: 'Only if that topic is private',
     },
     {
       slug: 'ntfy-juniors',
@@ -1138,6 +1140,15 @@ const scoresHref = url('/captains/admin/minigame/');
       tables: ['junior_entries'],
       when: 'When a junior entry is added or changed',
       fixedAccount: 'beds_juniors_1234',
+    },
+    {
+      slug: 'ntfy-closed',
+      name: 'ntfy Beds Closed',
+      accountSecret: '',
+      passwordSecret: '',
+      tables: ['sportmgr_matches'],
+      when: 'When a County Closed score comes in',
+      fixedAccount: 'beds_closed_1234',
     },
     {
       slug: 'englandsquash',
@@ -1202,7 +1213,7 @@ const scoresHref = url('/captains/admin/minigame/');
         const volume = item.tables.length === 0 ? '—' : matched.length === 0 ? 'Not stored yet' : formatCount(rows);
         const size = item.tables.length === 0 || matched.length === 0 ? '—' : formatBytes(bytes);
         const account = item.fixedAccount || accounts.get(item.slug) || (item.accountSecret ? `GitHub secret ${item.accountSecret}` : '—');
-        const password = item.passwordSecret ? `GitHub secret ${item.passwordSecret}` : '—';
+        const password = item.passwordNote || (item.passwordSecret ? `GitHub secret ${item.passwordSecret}` : '—');
         return `<tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(account)}</td><td>${escapeHtml(password)}</td><td>${escapeHtml(volume)}</td><td>${escapeHtml(size)}</td><td>${escapeHtml(item.when)}</td></tr>`;
       })
       .join('');
@@ -3603,15 +3614,46 @@ const scoresHref = url('/captains/admin/minigame/');
     }
     setStatus('Saving details…');
     if (card.profileId && !card.protectedAccount && email !== card.email.trim().toLowerCase()) {
-      const message = await callManageAccounts(supabase, { action: 'set-email', user_id: card.profileId, email });
-      if (message) {
-        setStatus(message);
-        return;
+      if (!email) {
+        const { error } = await supabase.rpc('clear_login_email', { p_user_id: card.profileId });
+        if (error) {
+          setStatus(error.message);
+          return;
+        }
+      } else {
+        const message = await callManageAccounts(supabase, { action: 'set-email', user_id: card.profileId, email });
+        if (message) {
+          setStatus(message);
+          return;
+        }
       }
     }
     const stored = { email: email || null, england_squash_id: es || null, phone: phone || null };
+    const writeSquad = async (ids: number[]) => {
+      if (!ids.length) return null;
+      if (email && es) {
+        const { error } = await supabase.from('squad_players').update(stored).in('id', ids);
+        return error;
+      }
+      const { data: rows, error } = await supabase
+        .from('squad_players')
+        .select('id, lm_email, lm_england_squash_id, lm_email_kept, lm_es_kept')
+        .in('id', ids);
+      if (error) {
+        const { error: fallback } = await supabase.from('squad_players').update(stored).in('id', ids);
+        return fallback;
+      }
+      for (const row of rows ?? []) {
+        const patch: Record<string, string | null> = { ...stored };
+        if (!email) patch.lm_email_kept = row.lm_email_kept ?? row.lm_email ?? '';
+        if (!es) patch.lm_es_kept = row.lm_es_kept ?? row.lm_england_squash_id ?? '';
+        const { error: writeError } = await supabase.from('squad_players').update(patch).eq('id', row.id);
+        if (writeError) return writeError;
+      }
+      return null;
+    };
     if (card.squadIds.length) {
-      const { error } = await supabase.from('squad_players').update(stored).in('id', card.squadIds);
+      const error = await writeSquad(card.squadIds);
       if (error) {
         setStatus(error.message);
         return;

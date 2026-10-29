@@ -11,7 +11,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { fetchTournament } from './sportmgr-lib.mjs';
+import { CLOSED_SCORE_TOPIC, fetchTournament, freshScores, scoreNote } from './sportmgr-lib.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const SUPABASE_URL = 'https://klxyjmwiaivvqjbhxzak.supabase.co';
@@ -59,6 +59,8 @@ for (const event of events) {
     }
     throw error;
   }
+  const stored = await rest(`sportmgr_matches?tournament_id=eq.${tournament.id}&select=id,score`);
+  const arrived = freshScores(Array.isArray(stored) ? stored : [], tournament.matches);
   await rest(`sportmgr_entries?tournament_id=eq.${tournament.id}`, { method: 'DELETE' });
   for (const batch of chunks(tournament.entries, 200)) {
     await rest('sportmgr_entries', {
@@ -94,6 +96,11 @@ for (const event of events) {
   const ids = tournament.matches.map((match) => match.id);
   const stale = ids.length ? `&id=not.in.(${ids.join(',')})` : '';
   await rest(`sportmgr_matches?tournament_id=eq.${tournament.id}${stale}`, { method: 'DELETE' });
+  let sent = 0;
+  for (const match of arrived) {
+    if (await publishScore(match)) sent += 1;
+  }
+  if (arrived.length) console.log(`Sent ${sent} of ${arrived.length} score notes to ${CLOSED_SCORE_TOPIC}.`);
 }
 
 function chunks(items, size) {
@@ -113,19 +120,35 @@ function loadEnv() {
   }
 }
 
-async function rest(path, { method = 'GET', body, prefer = 'return=minimal' } = {}) {
+async function publishScore(match) {
+  try {
+    const response = await fetch(`https://ntfy.sh/${CLOSED_SCORE_TOPIC}`, {
+      method: 'POST',
+      headers: { Title: 'Beds Closed', Tags: 'squash' },
+      body: scoreNote(match),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function rest(path, { method = 'GET', body, prefer } = {}) {
+  const headers = {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+    'Content-Type': 'application/json',
+  };
+  if (prefer) headers.Prefer = prefer;
+  else if (method !== 'GET') headers.Prefer = 'return=minimal';
   const response = await fetch(`${process.env.SUPABASE_URL || SUPABASE_URL}/rest/v1/${path}`, {
     method,
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
-      Prefer: prefer,
-    },
+    headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!response.ok) {
     const text = await response.text();
     throw new Error(`${method} ${path.split('?')[0]} returned ${response.status}: ${text.slice(0, 240)}`);
   }
+  if (method === 'GET') return response.json();
 }

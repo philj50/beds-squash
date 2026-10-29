@@ -157,6 +157,20 @@ test.describe('Users', () => {
     expect(hooks.squadWrites).toBe(0);
   });
 
+  test('an email, ES number and mobile can be cleared', async ({ page }) => {
+    await openUsers(page);
+    await page.getByRole('searchbox', { name: 'Search' }).fill('Sam Morris');
+    await page.getByRole('button', { name: 'More for Sam Morris' }).click();
+    await page.getByRole('textbox', { name: 'Email for Sam Morris' }).fill('');
+    await page.getByRole('textbox', { name: 'ES number for Sam Morris' }).fill('');
+    await page.getByRole('textbox', { name: 'Mobile for Sam Morris' }).fill('');
+    await page.getByRole('heading', { name: 'Users', exact: true }).click();
+    await expect(page.locator('[data-users-status]')).toContainText('Details saved for Sam Morris.');
+    await expect(page.getByRole('textbox', { name: 'Email for Sam Morris' })).toHaveValue('');
+    await expect(page.getByRole('textbox', { name: 'ES number for Sam Morris' })).toHaveValue('');
+    await expect(page.getByRole('textbox', { name: 'Mobile for Sam Morris' })).toHaveValue('');
+  });
+
   test('password on a row with no email says to add one', async ({ page }) => {
     await openUsers(page);
     await page.getByRole('button', { name: 'Password for Alex Away' }).click();
@@ -522,6 +536,38 @@ async function installAdmin(page: Page) {
     [countyId, true],
   ]);
   let statesDown = false;
+  const squads = [
+    {
+      id: 10,
+      name: 'Test Team 1',
+      team_id: 5,
+      squad_players: [
+        { id: 1, display_name: 'Pat Player', email: 'pat.player@example.test', phone: '07000000000', england_squash_id: '123456' },
+        { id: 2, display_name: 'Zoe Player', email: 'not-an-email', phone: null, england_squash_id: null },
+        { id: 5, display_name: 'Sam Morris', email: 'sam.morris@example.test', phone: '07000111111', england_squash_id: null },
+      ],
+    },
+    {
+      id: 11,
+      name: 'Test Team 2',
+      team_id: 6,
+      squad_players: [
+        { id: 6, display_name: 'Pat Player', email: 'pat.player@example.test', phone: '07000000000', england_squash_id: '123456' },
+        { id: 3, display_name: 'Sam Squad', email: 'sam.squad@example.test', phone: null, england_squash_id: null },
+      ],
+    },
+    {
+      id: 12,
+      name: 'Other Team',
+      team_id: 7,
+      squad_players: [{ id: 4, display_name: 'Alex Away', email: null, phone: null, england_squash_id: null }],
+    },
+  ];
+  const squadIds = (value: string) => {
+    if (value.startsWith('in.(') && value.endsWith(')')) return value.slice(4, -1).split(',').filter(Boolean);
+    if (value.startsWith('eq.')) return [value.slice(3)];
+    return [];
+  };
 
   await page.route(`${SUPABASE}/**`, async (route) => {
     const url = new URL(route.request().url());
@@ -612,6 +658,13 @@ async function installAdmin(page: Page) {
       await respond(profiles);
       return;
     }
+    if (path.endsWith('/rpc/clear_login_email')) {
+      const body = route.request().postDataJSON() as { p_user_id?: string } | null;
+      const person = profiles.find((row) => row.id === body?.p_user_id);
+      if (person) person.email = null;
+      await respond(null);
+      return;
+    }
     if (path.endsWith('/group_members')) {
       const profile = url.searchParams.get('profile_id');
       const slug = url.searchParams.get('group_slug');
@@ -639,33 +692,7 @@ async function installAdmin(page: Page) {
       return;
     }
     if (path.endsWith('/captain_squads')) {
-      await respond([
-        {
-          id: 10,
-          name: 'Test Team 1',
-          team_id: 5,
-          squad_players: [
-            { id: 1, display_name: 'Pat Player', email: 'pat.player@example.test', phone: '07000000000', england_squash_id: '123456' },
-            { id: 2, display_name: 'Zoe Player', email: 'not-an-email', phone: null, england_squash_id: null },
-            { id: 5, display_name: 'Sam Morris', email: 'sam.morris@example.test', phone: '07000111111', england_squash_id: null },
-          ],
-        },
-        {
-          id: 11,
-          name: 'Test Team 2',
-          team_id: 6,
-          squad_players: [
-            { id: 6, display_name: 'Pat Player', email: 'pat.player@example.test', phone: '07000000000', england_squash_id: '123456' },
-            { id: 3, display_name: 'Sam Squad', email: 'sam.squad@example.test', phone: null, england_squash_id: null },
-          ],
-        },
-        {
-          id: 12,
-          name: 'Other Team',
-          team_id: 7,
-          squad_players: [{ id: 4, display_name: 'Alex Away', email: null, phone: null, england_squash_id: null }],
-        },
-      ]);
+      await respond(squads);
       return;
     }
     if (path.endsWith('/nominations')) {
@@ -762,17 +789,26 @@ async function installAdmin(page: Page) {
     }
     if (path.endsWith('/squad_players')) {
       const select = url.searchParams.get('select') ?? '';
-      if (route.request().method() === 'GET' && select.includes('lm_email')) {
+      const id = url.searchParams.get('id') ?? '';
+      const ids = squadIds(id);
+      if (route.request().method() === 'GET' && select.includes('lm_email') && !id) {
         await respond(differencePlayers);
+        return;
+      }
+      if (route.request().method() === 'GET' && ids.length) {
+        const rows = squads.flatMap((squad) => squad.squad_players).filter((player) => ids.includes(String(player.id)));
+        await respond(rows);
         return;
       }
       if (route.request().method() !== 'GET') {
         hooks.squadWrites += 1;
         if (route.request().method() === 'PATCH') {
-          const id = url.searchParams.get('id') ?? '';
           const body = route.request().postDataJSON() as Record<string, string | null>;
-          const row = differencePlayers.find((item) => `eq.${item.id}` === id);
+          const row = differencePlayers.find((item) => ids.includes(String(item.id)));
           if (row) Object.assign(row, body);
+          for (const player of squads.flatMap((squad) => squad.squad_players)) {
+            if (ids.includes(String(player.id))) Object.assign(player, body);
+          }
         }
       }
     }

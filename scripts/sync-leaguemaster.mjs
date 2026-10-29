@@ -616,8 +616,8 @@ async function refreshPlayerDetails(seasonId) {
           if ((player.lm_england_squash_id || null) !== nextEs) body.lm_england_squash_id = nextEs;
           if ((player.lm_display_name || null) !== lm.name) body.lm_display_name = lm.name;
         }
-        if (blank(player.email) && (player.email || null) !== nextEmail) body.email = nextEmail;
-        if (blank(player.england_squash_id) && (player.england_squash_id || null) !== nextEs) body.england_squash_id = nextEs;
+        if (blank(player.email) && player.lm_email_kept == null && (player.email || null) !== nextEmail) body.email = nextEmail;
+        if (blank(player.england_squash_id) && player.lm_es_kept == null && (player.england_squash_id || null) !== nextEs) body.england_squash_id = nextEs;
         if (blank(player.display_name)) body.display_name = lm.name;
         if (!Object.keys(body).length) continue;
         await rest(`squad_players?id=eq.${player.id}`, { method: 'PATCH', body: JSON.stringify(body) });

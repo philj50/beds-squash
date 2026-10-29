@@ -201,13 +201,14 @@ Deno.serve(async (req) => {
     const userId = String(body.user_id ?? '');
     const email = String(body.email ?? '').trim().toLowerCase();
     if (!/^[0-9a-f-]{36}$/i.test(userId)) return json({ error: 'Choose an account.' }, 400);
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'Enter a valid email.' }, 400);
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'Enter a valid email.' }, 400);
     const keeper = await protectedAdminId();
     if (keeper.error) return json({ error: keeper.error }, 500);
     if (userId === keeper.id) return json({ error: 'The county admin email stays as it is.' }, 400);
-    const { error } = await admin.auth.admin.updateUserById(userId, { email, email_confirm: true });
+    const nextEmail = email || `cleared.${userId}@players.invalid`;
+    const { error } = await admin.auth.admin.updateUserById(userId, { email: nextEmail, email_confirm: true });
     if (error) return json({ error: error.message }, 400);
-    const { error: profileError } = await admin.from('profiles').update({ email }).eq('id', userId);
+    const { error: profileError } = await admin.from('profiles').update({ email: email || null }).eq('id', userId);
     if (profileError) return json({ error: profileError.message }, 400);
     return json({ ok: true, email });
   }

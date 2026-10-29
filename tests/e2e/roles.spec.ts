@@ -997,7 +997,8 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(integrations).toContainText('No login');
     await expect(integrations).toContainText('beds-jobs-topic');
     await expect(integrations).toContainText('beds_juniors_1234');
-    await expect(integrations).toContainText('GitHub secret NTFY_TOKEN');
+    await expect(integrations).toContainText('beds_closed_1234');
+    await expect(integrations).toContainText('Only if that topic is private');
 
     await page.goto('juniors/', { waitUntil: 'domcontentloaded' });
     const adminMenu = page.locator('[data-junior-admin]');

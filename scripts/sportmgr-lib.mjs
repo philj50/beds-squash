@@ -97,6 +97,27 @@ function matchesFrom(html, date) {
   return matches;
 }
 
+/** Scores already stored are the ones we have announced. An empty store is the first copy, so nothing is sent. */
+export function freshScores(stored, matches) {
+  if (!stored.length) return [];
+  const had = new Map(stored.map((row) => [Number(row.id), String(row.score || '').trim()]));
+  return matches.filter((match) => {
+    const score = String(match.score || '').trim();
+    if (!score) return false;
+    const before = had.get(Number(match.id));
+    return before === undefined || before !== score;
+  });
+}
+
+export function scoreNote(match) {
+  const players = [match.home, match.away].filter(Boolean).join(' v ');
+  const where = [match.court ? `Court ${match.court}` : '', match.start || ''].filter(Boolean).join(' at ');
+  const bits = [match.grade, players, match.score, where].map((part) => String(part || '').trim()).filter(Boolean);
+  return `${bits.join('. ')}.`;
+}
+
+export const CLOSED_SCORE_TOPIC = 'beds_closed_1234';
+
 export async function fetchTournament(id) {
   const info = await get(`/t/${id}/info`);
   const playersPage = await get(`/t/${id}/players`);
