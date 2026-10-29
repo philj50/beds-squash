@@ -114,7 +114,7 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="juniors" hidden>
             <h2>Juniors</h2>
             <p class="muted small">Junior County Closed entries submitted on this website. An admin can correct every field, and add an entry after the public form has closed. Saving sends a short note to the Junior organisers. It does not send an email. An admin or a junior organiser places each entrant in the draw, in the order the names come out of the hat, then publishes that draw on the Juniors page.</p>
-            <p class="actions"><button class="btn btn--primary btn--sm" type="button" data-add-junior hidden>Add an entry</button></p>
+            <p class="actions"><button class="btn btn--primary btn--sm" type="button" data-add-junior hidden>Add an entry</button><span data-junior-draw-publish></span></p>
             <div data-new-junior hidden></div>
             <div class="overview-box juniors-box">
               <table class="overview">
@@ -137,7 +137,6 @@ const scoresHref = url('/captains/admin/minigame/');
             <div class="junior-draw" data-junior-draw hidden>
               <h3>The draw</h3>
               <p class="muted small">Press a name as it comes out of the hat. The first names fill the top half, then the bottom half. Put a name back if it was drawn in the wrong place. Publish the draw when it is ready. The Juniors page then shows each placed player as a first name and surname initial.</p>
-              <p class="actions" data-junior-draw-publish></p>
               <ul class="tag-list" data-junior-draw-pills aria-label="Draw"></ul>
               <div data-junior-draw-sheet></div>
             </div>
@@ -2081,11 +2080,19 @@ const scoresHref = url('/captains/admin/minigame/');
   });
   let juniorDrawKey = '';
   let juniorDrawPublished = false;
+  function paintJuniorPublish() {
+    const publishHost = root.querySelector<HTMLElement>('[data-junior-draw-publish]')!;
+    publishHost.innerHTML = viewerSeesJuniors
+      ? juniorDrawPublished
+        ? '<button class="btn btn--ghost btn--sm" type="button" data-draw-publish="false">Take the draw off the Juniors page</button>'
+        : '<button class="btn btn--primary btn--sm" type="button" data-draw-publish="true">Publish the draw</button>'
+      : '';
+  }
   function paintJuniorDraw(entries: JuniorEntry[]) {
     const host = root.querySelector<HTMLElement>('[data-junior-draw]')!;
     const pills = root.querySelector<HTMLElement>('[data-junior-draw-pills]')!;
     const sheet = root.querySelector<HTMLElement>('[data-junior-draw-sheet]')!;
-    const publishHost = root.querySelector<HTMLElement>('[data-junior-draw-publish]')!;
+    paintJuniorPublish();
     const placed = new Set<number>();
     const groups = ENTRY_GROUPS.map((category) => {
       const players = entries.filter((entry) => entry.age_category === category.age && entry.draw === category.draw);
@@ -2099,15 +2106,9 @@ const scoresHref = url('/captains/admin/minigame/');
       juniorDrawKey = '';
       pills.innerHTML = '';
       sheet.innerHTML = '';
-      publishHost.innerHTML = '';
       return;
     }
     host.hidden = false;
-    publishHost.innerHTML = viewerSeesJuniors
-      ? juniorDrawPublished
-        ? '<button class="btn btn--ghost btn--sm" type="button" data-draw-publish="false">Take the draw off the Juniors page</button>'
-        : '<button class="btn btn--primary btn--sm" type="button" data-draw-publish="true">Publish the draw</button>'
-      : '';
     if (!groups.some((group) => group.key === juniorDrawKey)) juniorDrawKey = groups[0].key;
     pills.innerHTML = groups
       .map(
@@ -4723,6 +4724,9 @@ const scoresHref = url('/captains/admin/minigame/');
   html[data-theme='light'] #setup-app .users-box .source-tag--team { color: #8a5a00; }
   html[data-theme='navy'] #setup-app .users-box .source-tag--juniors,
   html[data-theme='light'] #setup-app .users-box .source-tag--juniors { color: #9d174d; }
+  #setup-app [data-junior-draw-publish] {
+    display: contents;
+  }
   #setup-app .junior-draw {
     margin-top: 1.25rem;
   }

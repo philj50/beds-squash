@@ -508,6 +508,9 @@ test.describe('Junior County Closed', () => {
       await send(route, []);
     });
     await page.goto('juniors/closed/entries/', { waitUntil: 'domcontentloaded' });
+    const entryActions = page.locator('#entries-app .actions').nth(1);
+    await expect(entryActions.getByRole('button', { name: 'Add an entry' })).toBeVisible();
+    await expect(entryActions.getByRole('button', { name: 'Publish the draw' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Public name' })).toBeVisible();
     const row = page.locator('tr', { hasText: 'Pat Guardian' }).first();
     await expect(row.getByRole('cell', { name: 'No', exact: true })).toBeVisible();

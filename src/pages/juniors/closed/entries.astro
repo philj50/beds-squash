@@ -20,7 +20,7 @@ import { url } from '@/lib/site';
           <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
         </p>
         <p data-denied hidden>This account cannot see entries.</p>
-        <p class="actions"><button class="btn btn--primary btn--sm" type="button" data-add-junior hidden>Add an entry</button></p>
+        <p class="actions"><button class="btn btn--primary btn--sm" type="button" data-add-junior hidden>Add an entry</button><span data-junior-draw-publish></span></p>
         <div data-new-junior hidden></div>
         <div data-list hidden></div>
       </div>
@@ -111,6 +111,29 @@ import { url } from '@/lib/site';
   }
   const newJuniorHost = root.querySelector<HTMLElement>('[data-new-junior]')!;
   const addJuniorButton = root.querySelector<HTMLButtonElement>('[data-add-junior]')!;
+  const publishHost = root.querySelector<HTMLElement>('[data-junior-draw-publish]')!;
+  let drawPublished = false;
+  function paintDrawPublish() {
+    publishHost.innerHTML = drawPublished
+      ? '<button class="btn btn--ghost btn--sm" type="button" data-draw-publish="false">Take the draw off the Juniors page</button>'
+      : '<button class="btn btn--primary btn--sm" type="button" data-draw-publish="true">Publish the draw</button>';
+  }
+  async function publishDraw(published: boolean) {
+    drawPublished = published;
+    paintDrawPublish();
+    const { error } = await supabase.rpc('set_junior_draw_published', { p_published: published });
+    if (error) {
+      statusEl.textContent = error.message;
+      await showSession();
+      return;
+    }
+    statusEl.textContent = published ? 'The draw is on the Juniors page.' : 'The draw is off the Juniors page.';
+  }
+  publishHost.addEventListener('click', (event) => {
+    const publish = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-draw-publish]');
+    if (!publish?.dataset.drawPublish) return;
+    void publishDraw(publish.dataset.drawPublish === 'true');
+  });
   const blankEntry = (): Entry => ({
     id: 0,
     player_first_name: '',
@@ -259,6 +282,7 @@ import { url } from '@/lib/site';
         denied.textContent = stopMessage(stop);
         list.hidden = true;
         addJuniorButton.hidden = true;
+        publishHost.innerHTML = '';
         return;
       }
     }
@@ -267,6 +291,7 @@ import { url } from '@/lib/site';
         denied.textContent = 'This account cannot see entries.';
         list.hidden = true;
         addJuniorButton.hidden = true;
+        publishHost.innerHTML = '';
         return;
     }
     denied.hidden = true;
@@ -282,6 +307,9 @@ import { url } from '@/lib/site';
     const entries = (rows ?? []) as Entry[];
     const canEdit = Boolean(account?.isAdmin);
     addJuniorButton.hidden = !canEdit;
+    const published = await supabase.rpc('junior_draw_is_published');
+    drawPublished = published.data === true;
+    paintDrawPublish();
     list.hidden = false;
     const placed = new Set<number>();
     const sections = ENTRY_GROUPS.map((category) => {
@@ -462,6 +490,9 @@ import { url } from '@/lib/site';
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
+  }
+  #entries-app [data-junior-draw-publish] {
+    display: contents;
   }
   #entries-app h2 {
     margin-top: 1.5rem;
