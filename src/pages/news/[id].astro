@@ -14,6 +14,7 @@ export async function getStaticPaths() {
 const { post } = Astro.props;
 const { Content } = await render(post);
 const { title, date, summary, image, imageAlt, category } = post.data;
+const expandHero = post.id === '2026-10-10-beds-closed-sponsors';
 const more = (await getNews()).filter((p) => p.id !== post.id).slice(0, 3);
 ---
 
@@ -53,7 +54,14 @@ const more = (await getNews()).filter((p) => p.id !== post.id).slice(0, 3);
     {
       image && (
         <div class="container narrow" style="margin-top:2rem">
-          <img class="hero-img" src={url(image)} alt={imageAlt ?? ''} />
+          {expandHero ? (
+            <a class="hero-expand" href={url(image)} data-hero-expand aria-haspopup="dialog" aria-controls="article-photo" aria-label="Expand main photo">
+              <img class="hero-img" src={url(image)} alt={imageAlt ?? ''} />
+              <span class="hero-expand__hint">Click to enlarge</span>
+            </a>
+          ) : (
+            <img class="hero-img" src={url(image)} alt={imageAlt ?? ''} />
+          )}
         </div>
       )
     }
@@ -61,6 +69,15 @@ const more = (await getNews()).filter((p) => p.id !== post.id).slice(0, 3);
       <Content />
     </div>
   </article>
+
+  {expandHero && image && (
+    <dialog id="article-photo" class="hero-lightbox" aria-label="Enlarged article photo" data-hero-dialog>
+      <button type="button" class="hero-lightbox__close" aria-label="Close enlarged photo" data-hero-close>×</button>
+      <figure>
+        <img src={url(image)} alt={imageAlt ?? ''} />
+      </figure>
+    </dialog>
+  )}
 
   {
     more.length > 0 && (
@@ -81,7 +98,85 @@ const more = (await getNews()).filter((p) => p.id !== post.id).slice(0, 3);
   }
 </Base>
 
+<script>
+  const trigger = document.querySelector<HTMLAnchorElement>('[data-hero-expand]');
+  const dialog = document.querySelector<HTMLDialogElement>('[data-hero-dialog]');
+  if (trigger && dialog) {
+    trigger.addEventListener('click', (event) => {
+      event.preventDefault();
+      if (!dialog.open) dialog.showModal();
+    });
+    dialog.querySelector('[data-hero-close]')?.addEventListener('click', () => dialog.close());
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog || event.target === dialog.querySelector('figure')) dialog.close();
+    });
+  }
+</script>
+
 <style>
+  .hero-expand {
+    display: block;
+    width: fit-content;
+    max-width: 100%;
+    margin-inline: auto;
+    text-align: center;
+    text-decoration: none;
+    cursor: zoom-in;
+  }
+  .hero-expand__hint {
+    display: block;
+    margin-top: .5rem;
+    color: var(--text-muted);
+    font-size: .875rem;
+  }
+  .hero-lightbox {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    max-width: 100vw;
+    max-height: 100vh;
+    width: 100vw;
+    height: 100vh;
+  }
+  .hero-lightbox[open] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .hero-lightbox::backdrop {
+    background: rgba(5, 6, 8, .92);
+  }
+  .hero-lightbox figure {
+    margin: 0;
+  }
+  .hero-lightbox img {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 92vw;
+    max-height: 84vh;
+    object-fit: contain;
+    border-radius: var(--radius-sm);
+  }
+  .hero-lightbox__close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 48px;
+    height: 48px;
+    border: 1px solid var(--border-strong);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .08);
+    color: #fff;
+    font-size: 1.8rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .hero-lightbox__close:hover {
+    background: var(--accent);
+    color: var(--ink-950);
+  }
+
   .back {
     display: inline-block;
     margin-bottom: 1rem;
