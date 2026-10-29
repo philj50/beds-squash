@@ -113,7 +113,7 @@ const scoresHref = url('/captains/admin/minigame/');
 
           <section class="admin-panel" data-tab="juniors" hidden>
             <h2>Juniors</h2>
-            <p class="muted small">Junior County Closed entries submitted on this website. An admin can correct every field, and add an entry after the public form has closed. Saving sends a short note to the Junior organisers. It does not send an email. A junior organiser places each entrant in the draw, in the order the names come out of the hat.</p>
+            <p class="muted small">Junior County Closed entries submitted on this website. An admin can correct every field, and add an entry after the public form has closed. Saving sends a short note to the Junior organisers. It does not send an email. An admin or a junior organiser places each entrant in the draw, in the order the names come out of the hat, then publishes that draw on the Juniors page.</p>
             <p class="actions"><button class="btn btn--primary btn--sm" type="button" data-add-junior hidden>Add an entry</button></p>
             <div data-new-junior hidden></div>
             <div class="overview-box juniors-box">
@@ -136,7 +136,8 @@ const scoresHref = url('/captains/admin/minigame/');
             </div>
             <div class="junior-draw" data-junior-draw hidden>
               <h3>The draw</h3>
-              <p class="muted small">Press a name as it comes out of the hat. The first names fill the top half, then the bottom half. Put a name back if it was drawn in the wrong place.</p>
+              <p class="muted small">Press a name as it comes out of the hat. The first names fill the top half, then the bottom half. Put a name back if it was drawn in the wrong place. Publish the draw when it is ready. The Juniors page then shows each placed player as a first name and surname initial.</p>
+              <p class="actions" data-junior-draw-publish></p>
               <ul class="tag-list" data-junior-draw-pills aria-label="Draw"></ul>
               <div data-junior-draw-sheet></div>
             </div>
@@ -2079,10 +2080,12 @@ const scoresHref = url('/captains/admin/minigame/');
     show_name: false,
   });
   let juniorDrawKey = '';
+  let juniorDrawPublished = false;
   function paintJuniorDraw(entries: JuniorEntry[]) {
     const host = root.querySelector<HTMLElement>('[data-junior-draw]')!;
     const pills = root.querySelector<HTMLElement>('[data-junior-draw-pills]')!;
     const sheet = root.querySelector<HTMLElement>('[data-junior-draw-sheet]')!;
+    const publishHost = root.querySelector<HTMLElement>('[data-junior-draw-publish]')!;
     const placed = new Set<number>();
     const groups = ENTRY_GROUPS.map((category) => {
       const players = entries.filter((entry) => entry.age_category === category.age && entry.draw === category.draw);
@@ -2096,9 +2099,15 @@ const scoresHref = url('/captains/admin/minigame/');
       juniorDrawKey = '';
       pills.innerHTML = '';
       sheet.innerHTML = '';
+      publishHost.innerHTML = '';
       return;
     }
     host.hidden = false;
+    publishHost.innerHTML = viewerSeesJuniors
+      ? juniorDrawPublished
+        ? '<button class="btn btn--ghost btn--sm" type="button" data-draw-publish="false">Take the draw off the Juniors page</button>'
+        : '<button class="btn btn--primary btn--sm" type="button" data-draw-publish="true">Publish the draw</button>'
+      : '';
     if (!groups.some((group) => group.key === juniorDrawKey)) juniorDrawKey = groups[0].key;
     pills.innerHTML = groups
       .map(
@@ -2148,7 +2157,21 @@ const scoresHref = url('/captains/admin/minigame/');
       result = await supabase.from('junior_entries').select(columns.replace(', draw_position', '')).order('player_last_name');
     }
     juniorEntriesLive = (result.error ? [] : (result.data ?? [])) as JuniorEntry[];
+    const published = await supabase.rpc('junior_draw_is_published');
+    juniorDrawPublished = published.data === true;
     paintJuniorEntries(juniorEntriesLive, result.error?.message ?? '');
+  }
+  async function publishJuniorDraw(published: boolean) {
+    if (!viewerSeesJuniors) return;
+    juniorDrawPublished = published;
+    paintJuniorDraw(juniorEntriesLive);
+    const { error } = await supabase.rpc('set_junior_draw_published', { p_published: published });
+    if (error) {
+      setStatus(error.message);
+      await loadJuniorEntries();
+      return;
+    }
+    setStatus(published ? 'The draw is on the Juniors page.' : 'The draw is off the Juniors page.');
   }
   async function placeInDraw(id: number, back: boolean) {
     if (!viewerSeesJuniors) return;
@@ -2203,6 +2226,11 @@ const scoresHref = url('/captains/admin/minigame/');
       newJuniorHost.hidden = false;
       newJuniorHost.innerHTML = juniorForm(blankJunior(), 'new');
       newJuniorHost.querySelector<HTMLInputElement>('input')?.focus();
+      return;
+    }
+    const publish = target.closest<HTMLButtonElement>('[data-draw-publish]');
+    if (publish?.dataset.drawPublish) {
+      void publishJuniorDraw(publish.dataset.drawPublish === 'true');
       return;
     }
     const place = target.closest<HTMLButtonElement>('[data-draw-place]');

@@ -315,6 +315,12 @@ test.describe('Junior County Closed', () => {
     await page.route(`${SUPABASE}/rest/v1/rpc/junior_public_entries**`, async (route) => {
       await send(route, groups);
     });
+    await page.route(`${SUPABASE}/rest/v1/rpc/junior_public_draw**`, async (route) => {
+      await send(route, {
+        published: true,
+        groups: [{ label: 'Girls U11', top: [{ place: 1, name: 'Jamie J.' }], bottom: [] }],
+      });
+    });
     await page.route(`${SUPABASE}/rest/v1/junior_entries**`, async (route) => {
       if (route.request().method() === 'POST') posted = route.request().postDataJSON() as Record<string, unknown>;
       await send(route, { id: 1 }, 201);
@@ -323,6 +329,11 @@ test.describe('Junior County Closed', () => {
     const girls = page.locator('[data-entry-group="Girls U11"]');
     await expect(girls).toContainText('2 entries');
     await expect(girls.getByRole('listitem')).toHaveText('Jamie J.');
+    const publicDraw = page.locator('[data-junior-public-draw]');
+    await expect(publicDraw).toBeVisible();
+    await expect(publicDraw.getByRole('heading', { name: 'The draw' })).toBeVisible();
+    await expect(publicDraw.locator('.junior-public-draw__half', { hasText: 'Top half' })).toContainText('Jamie J.');
+    await expect(publicDraw.locator('.junior-public-draw__half', { hasText: 'Bottom half' })).toContainText('Bye');
     await expect(page.locator('[data-entry-group="Mixed U9"]')).toContainText('0 entries');
     await expect(page.locator('[data-entry-group="Mixed U9"] li')).toHaveCount(0);
     await expect(page.locator('[data-entry-group="Girls U13"] li')).toHaveCount(0);

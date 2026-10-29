@@ -854,6 +854,9 @@ test.describe('Club captain, team captain, and player', () => {
     await juniorDraw.getByRole('button', { name: 'Put Jamie Junior back' }).click();
     await expect(juniorDraw.getByRole('button', { name: 'Draw Jamie Junior' })).toBeVisible();
     await juniorDraw.getByRole('button', { name: 'Draw Jamie Junior' }).click();
+    await juniorDraw.getByRole('button', { name: 'Publish the draw' }).click();
+    await expect(page.locator('[data-status]')).toHaveText('The draw is on the Juniors page.');
+    await expect(juniorDraw.getByRole('button', { name: 'Take the draw off the Juniors page' })).toBeVisible();
     const editButton = junior.getByRole('button', { name: 'Edit' });
     await expect(editButton).toBeVisible();
     const editFit = await editButton.evaluate((el) => {
