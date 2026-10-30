@@ -28,6 +28,8 @@ export type Rally = {
   a: number;
   b: number;
   handOut: boolean;
+  /** A stroke awards the point. A let has no score. */
+  stroke?: boolean;
 };
 
 export type ScoreState = {
@@ -178,6 +180,21 @@ export function addPoint(state: ScoreState, winner: Player): ScoreState {
   return { games, server: state.server, box: otherBox(state.box), choosing: false };
 }
 
+/** A stroke is a point, awarded to the player named, and it is marked as a stroke. */
+export function addStroke(state: ScoreState, winner: Player): ScoreState {
+  if (matchWinner(state)) return state;
+  const next = addPoint(state, winner);
+  if (next === state) return state;
+  const games = cloneGames(next.games);
+  for (let i = games.length - 1; i >= 0; i -= 1) {
+    const rally = games[i][games[i].length - 1];
+    if (!rally) continue;
+    if (rally.winner === winner) rally.stroke = true;
+    break;
+  }
+  return { ...next, games };
+}
+
 export function undoPoint(state: ScoreState): ScoreState {
   const games = cloneGames(state.games);
   if (games.length > 1 && games[games.length - 1].length === 0) games.pop();
@@ -227,8 +244,33 @@ function tenAllAlready(rallies: Rally[]): boolean {
 
 export type ScoreNote = '' | 'ten-all' | 'game-ball' | 'match-ball';
 
+export type StemMark = {
+  side: Player;
+  text: string;
+  box: Box;
+  kind: 'point' | 'let' | 'stroke';
+};
+
+/** One game as a vertical score sheet: each player's points sit on their own side of the line. */
+export function gameStem(rallies: Rally[]): { score: Game; rows: StemMark[] } {
+  const rows: StemMark[] = [];
+  for (const rally of rallies) {
+    if (rally.winner === 'let') {
+      rows.push({ side: rally.server, text: 'YL', box: rally.box, kind: 'let' });
+      continue;
+    }
+    rows.push({
+      side: rally.winner,
+      text: String(rally.winner === 'a' ? rally.a : rally.b),
+      box: rally.box,
+      kind: rally.stroke ? 'stroke' : 'point',
+    });
+  }
+  return { score: scoreOf(rallies), rows };
+}
+
 /** The mark to call after the last rally. The server's score comes first. */
-export function markerCall(state: ScoreState): { server: number; receiver: number; handOut: boolean; let: boolean; note: ScoreNote } | null {
+export function markerCall(state: ScoreState): { server: number; receiver: number; handOut: boolean; let: boolean; stroke: boolean; note: ScoreNote } | null {
   const live = currentRallies(state);
   if (!live.length) return null;
   const rally = live[live.length - 1];
@@ -238,7 +280,7 @@ export function markerCall(state: ScoreState): { server: number; receiver: numbe
   if (rally.winner === 'let') {
     const served = rally.server === 'a' ? rally.a : rally.b;
     const received = rally.server === 'a' ? rally.b : rally.a;
-    return { server: served, receiver: received, handOut: false, let: true, note: '' };
+    return { server: served, receiver: received, handOut: false, let: true, stroke: false, note: '' };
   }
   let note: ScoreNote = '';
   const score = currentGame(state);
@@ -253,7 +295,7 @@ export function markerCall(state: ScoreState): { server: number; receiver: numbe
       break;
     }
   }
-  return { server: serverPoints, receiver: receiverPoints, handOut: rally.handOut, let: false, note };
+  return { server: serverPoints, receiver: receiverPoints, handOut: rally.handOut, let: false, stroke: Boolean(rally.stroke), note };
 }
 
 export function cleanName(raw: string): string | null {
@@ -288,6 +330,7 @@ export function restoreMatch(raw: unknown): ScoreState | null {
         a: row.a,
         b: row.b,
         handOut: Boolean(row.handOut),
+        stroke: row.winner !== 'let' && Boolean(row.stroke),
       });
     }
     games.push(rallies);

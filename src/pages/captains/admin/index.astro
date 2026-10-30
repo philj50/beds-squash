@@ -182,7 +182,7 @@ const scoresHref = url('/captains/admin/minigame/');
 
           <section class="admin-panel" data-tab="scores" hidden>
             <h2>Scores</h2>
-            <p class="muted small">Matches marked on the website. PAR to 11, best of five. The serve starts on the right. The same player moves to the other box. Hand out is a change of server, and that serve starts on the right again. Edit a name here, or open the scorer to change the points. Sport Manager is not updated from here.</p>
+            <p class="muted small">Matches marked on the website. PAR to 11, best of five. The serve starts on the right. The same player moves to the other box. Hand out is a change of server, and that serve starts on the right again. A let is played again. A stroke gives the point. Edit a name here, or open the scorer to change the points. Delete removes the match. Sport Manager is not updated from here.</p>
             <p class="muted small" data-scores-status role="status"></p>
             <div class="overview-box">
               <table class="overview">
@@ -676,6 +676,7 @@ const scoresHref = url('/captains/admin/minigame/');
   import { loadAccount, noteActivity, privateStop, sendToLogin, stopMessage, type Account } from '@/lib/account';
   import { ENTRY_GROUPS } from '@/lib/junior-age';
   import { compareCellText, sortMarkupRows, watchSortableTables } from '@/lib/table-sort';
+  import { gameStem } from '@/lib/scoreboard';
 
   type Person = { id: string; display_name: string; email: string | null; is_admin: boolean };
   type Club = { slug: string; name: string; contact_name: string | null; contact_email: string | null; leaguemaster_club_id?: string | null };
@@ -1458,7 +1459,7 @@ const scoresHref = url('/captains/admin/minigame/');
     score: string;
     marker: string;
     createdAt: string;
-    history?: { games?: { winner: string; server?: string; box: string; a: number; b: number; handOut?: boolean }[][] };
+    history?: { games?: { winner: 'a' | 'b' | 'let'; server: 'a' | 'b'; box: 'R' | 'L'; choosing?: boolean; a: number; b: number; handOut?: boolean; stroke?: boolean }[][] };
   };
   let markedRows: MarkedRow[] = [];
   let editingMatch: MarkedRow | null = null;
@@ -1487,7 +1488,8 @@ const scoresHref = url('/captains/admin/minigame/');
   function paintScoreTape(row: MarkedRow) {
     scoreTape.replaceChildren();
     const games = row.history?.games ?? [];
-    if (!games.length) {
+    const played = games.filter((rallies) => rallies.length);
+    if (!played.length) {
       const empty = document.createElement('p');
       empty.textContent = 'This match has no rally list yet. Open the scorer to mark the points.';
       scoreTape.append(empty);
@@ -1495,18 +1497,41 @@ const scoresHref = url('/captains/admin/minigame/');
     }
     games.forEach((rallies, index) => {
       if (!rallies.length) return;
+      const stem = gameStem(rallies.map((rally) => ({ ...rally, choosing: Boolean(rally.choosing), handOut: Boolean(rally.handOut) })));
+      const game = document.createElement('section');
+      game.className = 'stem';
       const heading = document.createElement('p');
-      heading.className = 'game-head';
-      const last = [...rallies].reverse().find((rally) => rally.winner === 'a' || rally.winner === 'b');
-      heading.textContent = last ? `Game ${index + 1} · ${last.a}–${last.b}` : `Game ${index + 1}`;
-      const list = document.createElement('ol');
-      for (const rally of [...rallies].reverse()) {
-        const item = document.createElement('li');
-        const score = `${rally.a}–${rally.b} ${rally.box}`;
-        item.textContent = rally.winner === 'let' ? `Let ${score}` : rally.handOut ? `Hand out ${score}` : score;
-        list.append(item);
+      heading.className = 'stem-head';
+      const winner = stem.score.a === stem.score.b ? '' : stem.score.a > stem.score.b ? row.playerA : row.playerB;
+      heading.textContent = winner ? `Game ${index + 1} – ${winner}` : `Game ${index + 1}`;
+      const total = document.createElement('p');
+      total.className = 'stem-score';
+      total.textContent = `${stem.score.a} | ${stem.score.b}`;
+      const body = document.createElement('div');
+      for (const mark of stem.rows) {
+        const line = document.createElement('div');
+        line.className = 'stem-row';
+        const pip = document.createElement('span');
+        pip.className = `pip${mark.kind === 'let' ? ' is-let' : ''}${mark.kind === 'stroke' ? ' is-stroke' : ''}`;
+        pip.textContent = mark.text;
+        const box = document.createElement('span');
+        box.className = 'box-mark';
+        box.textContent = mark.box;
+        const cluster = document.createElement('span');
+        cluster.className = mark.side === 'a' ? 'cluster cluster--a' : 'cluster cluster--b';
+        if (mark.side === 'a') cluster.append(box, pip);
+        else cluster.append(pip, box);
+        const left = document.createElement('span');
+        const right = document.createElement('span');
+        const rail = document.createElement('span');
+        rail.className = 'stem-rail';
+        if (mark.side === 'a') left.append(cluster);
+        else right.append(cluster);
+        line.append(left, rail, right);
+        body.append(line);
       }
-      scoreTape.append(heading, list);
+      game.append(heading, total, body);
+      scoreTape.append(game);
     });
   }
 
@@ -1539,7 +1564,12 @@ const scoresHref = url('/captains/admin/minigame/');
       button.className = 'btn btn--ghost btn--sm';
       button.textContent = 'Edit';
       button.addEventListener('click', () => void openMarkedMatch(match.id));
-      action.append(button);
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn btn--ghost btn--sm';
+      remove.textContent = 'Delete';
+      remove.addEventListener('click', () => void deleteMarkedMatch(match.id));
+      action.append(button, remove);
       row.append(when, players, score, marker, action);
       scoreBody.append(row);
     }
@@ -1597,17 +1627,23 @@ const scoresHref = url('/captains/admin/minigame/');
     await loadMarkedMatches();
   });
 
-  root.querySelector<HTMLButtonElement>('[data-score-remove]')?.addEventListener('click', async () => {
-    if (!editingMatch || !confirm('Remove this marked match?')) return;
-    const { error } = await supabase.rpc('admin_delete_marked_match', { p_id: editingMatch.id });
+  async function deleteMarkedMatch(id: number) {
+    if (!confirm('Remove this marked match?')) return;
+    const { error } = await supabase.rpc('admin_delete_marked_match', { p_id: id });
     if (error) {
       scoreStatus.textContent = error.message;
       return;
     }
-    editingMatch = null;
-    scoreEdit.hidden = true;
+    if (editingMatch?.id === id) {
+      editingMatch = null;
+      scoreEdit.hidden = true;
+    }
     scoresLoaded = false;
     await loadMarkedMatches();
+  }
+
+  root.querySelector<HTMLButtonElement>('[data-score-remove]')?.addEventListener('click', () => {
+    if (editingMatch) void deleteMarkedMatch(editingMatch.id);
   });
 
   let viewerIsAdmin = false;
@@ -4801,12 +4837,53 @@ const scoresHref = url('/captains/admin/minigame/');
     font: inherit;
   }
   #setup-app [data-score-tape] {
-    max-height: 16rem;
-    overflow: auto;
+    display: flex;
+    gap: 0.75rem;
+    overflow-x: auto;
   }
-  #setup-app [data-score-tape] ol {
-    margin: 0.2rem 0 0.6rem;
+  #setup-app [data-score-tape] :global(.stem) {
+    flex: 1 0 10.5rem;
+    min-width: 10.5rem;
   }
+  #setup-app [data-score-tape] :global(.stem-head),
+  #setup-app [data-score-tape] :global(.stem-score) {
+    margin: 0;
+    text-align: center;
+    font-weight: 700;
+  }
+  #setup-app [data-score-tape] :global(.stem-row) {
+    display: grid;
+    grid-template-columns: 1fr 2px 1fr;
+    align-items: center;
+    min-height: 2.2rem;
+  }
+  #setup-app [data-score-tape] :global(.stem-rail) {
+    background: #e0a800;
+    align-self: stretch;
+  }
+  #setup-app [data-score-tape] :global(.cluster) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  #setup-app [data-score-tape] :global(.cluster--a) { justify-self: end; margin-right: 0.3rem; }
+  #setup-app [data-score-tape] :global(.cluster--b) { justify-self: start; margin-left: 0.3rem; }
+  #setup-app [data-score-tape] :global(.pip) {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    border: 2px solid #e0a800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    color: #111;
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+  #setup-app [data-score-tape] :global(.pip.is-stroke) { border-width: 3px; border-color: #0e2744; }
+  #setup-app [data-score-tape] :global(.box-mark) { font-size: 0.75rem; font-weight: 700; }
+  #setup-app [data-score-rows] .btn + .btn { margin-left: 0.35rem; }
   #setup-app .beds-search {
     display: flex;
     flex-direction: column;

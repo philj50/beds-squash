@@ -3,9 +3,11 @@ import { test } from 'node:test';
 import {
   addLet,
   addPoint,
+  addStroke,
   cleanName,
   currentGame,
   freshMatch,
+  gameStem,
   gameWon,
   legalGame,
   legalMatch,
@@ -71,6 +73,20 @@ test('hand out gives the serve to the other player, from the right', () => {
   assert.equal(state.server, 'b');
   assert.equal(state.box, 'R');
   assert.equal(state.games[0][2].box, 'L');
+});
+
+test('a stroke is a point on the sheet, and a let stays on the server side', () => {
+  let state = addStroke(freshMatch(), 'b');
+  assert.equal(state.games[0][0].stroke, true);
+  assert.equal(state.games[0][0].handOut, true);
+  assert.equal(markerCall(state).stroke, true);
+  assert.deepEqual(currentGame(state), { a: 0, b: 1 });
+  state = addLet(state);
+  const stem = gameStem(state.games[0]);
+  assert.deepEqual(stem.rows.map((row) => `${row.side}:${row.text}:${row.kind}`), ['b:1:stroke', 'b:YL:let']);
+  const saved = restoreMatch(state);
+  assert.equal(saved.games[0][0].stroke, true);
+  assert.equal(saved.games[0][1].stroke, false);
 });
 
 test('a let keeps the same server and the same box', () => {
