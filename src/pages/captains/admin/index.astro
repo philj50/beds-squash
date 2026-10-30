@@ -2125,7 +2125,7 @@ const scoresHref = url('/captains/admin/minigame/');
     const sheet = root.querySelector<HTMLElement>('[data-junior-draw-sheet]')!;
     paintJuniorPublish();
     const placed = new Set<number>();
-    const groups = ENTRY_GROUPS.map((category) => {
+    const groups: { key: string; players: JuniorEntry[] }[] = ENTRY_GROUPS.map((category) => {
       const players = entries.filter((entry) => entry.age_category === category.age && entry.draw === category.draw);
       for (const entry of players) placed.add(entry.id);
       return { key: category.label, players };
@@ -2229,12 +2229,22 @@ const scoresHref = url('/captains/admin/minigame/');
     sheet.innerHTML = `${planBar}${hat}${sheetBody}`;
   }
   async function loadJuniorEntries() {
-    const columns = 'id, player_first_name, player_last_name, date_of_birth, age_category, draw, club, guardian_name, guardian_email, guardian_phone, emergency_name, emergency_phone, notes, show_name, draw_position';
-    let result = await supabase.from('junior_entries').select(columns).order('player_last_name');
+    const withPosition =
+      'id, player_first_name, player_last_name, date_of_birth, age_category, draw, club, guardian_name, guardian_email, guardian_phone, emergency_name, emergency_phone, notes, show_name, draw_position';
+    const withoutPosition =
+      'id, player_first_name, player_last_name, date_of_birth, age_category, draw, club, guardian_name, guardian_email, guardian_phone, emergency_name, emergency_phone, notes, show_name';
+    const result = await supabase.from('junior_entries').select(withPosition).order('player_last_name');
+    let loadedRows: JuniorEntry[] = [];
+    let loadError = '';
     if (result.error && /draw_position|schema cache/i.test(result.error.message)) {
-      result = await supabase.from('junior_entries').select(columns.replace(', draw_position', '')).order('player_last_name');
+      const fallback = await supabase.from('junior_entries').select(withoutPosition).order('player_last_name');
+      loadError = fallback.error?.message ?? '';
+      loadedRows = fallback.error ? [] : ((fallback.data ?? []) as Omit<JuniorEntry, 'draw_position'>[]).map((row) => ({ ...row, draw_position: null }));
+    } else {
+      loadError = result.error?.message ?? '';
+      loadedRows = (result.error ? [] : (result.data ?? [])) as JuniorEntry[];
     }
-    juniorEntriesLive = (result.error ? [] : (result.data ?? [])) as JuniorEntry[];
+    juniorEntriesLive = loadedRows;
     const published = await supabase.rpc('junior_draw_is_published');
     juniorDrawPublished = published.data === true;
     const plans = await supabase.rpc('junior_draw_plans');
@@ -2243,7 +2253,7 @@ const scoresHref = url('/captains/admin/minigame/');
           (plan) => (plan?.format === 'knockout' || plan?.format === 'round_robin') && Array.isArray(plan.members) && plan.members.length > 0,
         )
       : [];
-    paintJuniorEntries(juniorEntriesLive, result.error?.message ?? '');
+    paintJuniorEntries(juniorEntriesLive, loadError);
   }
   async function saveJuniorDrawPlan(format?: JuniorDrawPlan['format']) {
     if (!viewerSeesJuniors) return;
