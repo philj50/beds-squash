@@ -13,6 +13,7 @@ import {
   legalMatch,
   markerCall,
   matchWinner,
+  publicPlayerName,
   restoreMatch,
   scoreLine,
   setBox,
@@ -25,6 +26,14 @@ function play(state, side, times) {
   for (let i = 0; i < times; i += 1) next = addPoint(next, side);
   return next;
 }
+
+test('a public name is the first name and the surname initial', () => {
+  assert.equal(publicPlayerName('Alex Hart'), 'Alex H');
+  assert.equal(publicPlayerName("James O'Connor"), 'James O');
+  assert.equal(publicPlayerName('Mary Ann Smith'), 'Mary S');
+  assert.equal(publicPlayerName('Alex'), 'Alex');
+  assert.equal(publicPlayerName('  Sam   Haigh '), 'Sam H');
+});
 
 test('a game ends at 11 with a two-point lead', () => {
   assert.equal(gameWon({ a: 11, b: 9 }), true);

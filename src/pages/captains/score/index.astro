@@ -124,7 +124,18 @@ const names = [
           <button class="btn btn--ghost" type="button" data-new>New match</button>
           <button class="btn btn--ghost" type="button" data-back>Back to current matches</button>
         </p>
+        <p class="watch-marker" data-watch-marker hidden></p>
       </div>
+
+      <section class="public-watch" data-public-watch hidden>
+        <p class="public-watch__names"><span data-public-a></span> v <span data-public-b></span></p>
+        <p class="public-watch__score" data-public-score></p>
+        <p class="watch-marker" data-public-marker hidden></p>
+        <p class="current-note" data-public-note>Sign in to see the full names and the point-by-point score.</p>
+        <p class="actions">
+          <button class="btn btn--ghost" type="button" data-public-back>Back to current matches</button>
+        </p>
+      </section>
 
       <section class="result-card" data-result hidden>
         <p class="result-kicker">Beds Squash</p>
@@ -174,6 +185,7 @@ const names = [
     markerCall,
     matchWinner,
     otherPlayer,
+    publicPlayerName,
     restoreMatch,
     scoreLine,
     setBox,
@@ -217,6 +229,9 @@ const names = [
   const currentNote = root.querySelector<HTMLElement>('[data-current-note]')!;
   const refreshBox = root.querySelector<HTMLInputElement>('[data-refresh]')!;
   const backBtn = root.querySelector<HTMLButtonElement>('[data-back]')!;
+  const publicWatch = root.querySelector<HTMLElement>('[data-public-watch]')!;
+  const publicMarker = root.querySelector<HTMLElement>('[data-public-marker]')!;
+  const watchMarkerEl = root.querySelector<HTMLElement>('[data-watch-marker]')!;
   const resultEl = root.querySelector<HTMLElement>('[data-result]')!;
   const resultSheet = root.querySelector<HTMLElement>('[data-result-sheet]')!;
   const resultLinkRow = root.querySelector<HTMLElement>('[data-result-link-row]')!;
@@ -267,12 +282,13 @@ const names = [
     playerA: string;
     playerB: string;
     score: string;
-    marker: string;
+    marker: string | null;
     updatedAt: string;
     history: unknown;
   };
 
   let currentRows: LiveRow[] = [];
+  let watchMarker = '';
   /** Ninety seconds between games, the interval allowed by the singles rules. */
   const REST_MS = 90_000;
   const NEXT_MS = 2_500;
@@ -639,6 +655,13 @@ const names = [
     } else {
       callEl.textContent = `${serverName} to serve, love-all.`;
     }
+    if (watching && signedIn && watchMarker) {
+      watchMarkerEl.hidden = false;
+      watchMarkerEl.textContent = `Marked by ${watchMarker}`;
+    } else {
+      watchMarkerEl.hidden = true;
+      watchMarkerEl.textContent = '';
+    }
     paintPrior();
     paintTape();
     queueLive();
@@ -661,6 +684,10 @@ const names = [
     return minutes === 1 ? 'Updated 1 min ago' : `Updated ${minutes} min ago`;
   }
 
+  function displayName(name: string) {
+    return signedIn ? name : publicPlayerName(name);
+  }
+
   function paintCurrent() {
     currentEl.replaceChildren();
     if (currentNote.textContent) return;
@@ -674,7 +701,8 @@ const names = [
       const item = document.createElement('li');
       const text = document.createElement('span');
       const when = updatedAgo(row.updatedAt);
-      text.textContent = `${row.playerA} v ${row.playerB} · ${dash(row.score) || '0–0'}${when ? ` · ${when}` : ''}`;
+      const markerBit = signedIn && row.marker ? ` · ${row.marker}` : '';
+      text.textContent = `${displayName(row.playerA)} v ${displayName(row.playerB)} · ${dash(row.score) || '0–0'}${markerBit}${when ? ` · ${when}` : ''}`;
       const watch = document.createElement('button');
       watch.type = 'button';
       watch.className = 'btn btn--ghost btn--sm';
@@ -713,26 +741,52 @@ const names = [
     if (error && missingFunction(error)) liveReady = false;
   }
 
+  function watchStamp(row: LiveRow) {
+    const restored = signedIn ? restoreMatch(row.history) : null;
+    if (restored) return JSON.stringify(row.history);
+    return `${displayName(row.playerA)}|${displayName(row.playerB)}|${row.score}|${signedIn ? row.marker ?? '' : ''}`;
+  }
+
+  function showPublicWatch(row: LiveRow) {
+    root.querySelector<HTMLElement>('[data-public-a]')!.textContent = displayName(row.playerA);
+    root.querySelector<HTMLElement>('[data-public-b]')!.textContent = displayName(row.playerB);
+    root.querySelector<HTMLElement>('[data-public-score]')!.textContent = dash(row.score) || '0–0';
+    const marker = signedIn ? row.marker : '';
+    publicMarker.hidden = !marker;
+    publicMarker.textContent = marker ? `Marked by ${marker}` : '';
+    root.querySelector<HTMLElement>('[data-public-note]')!.hidden = signedIn;
+    board.hidden = true;
+    publicWatch.hidden = false;
+    root.classList.add('is-playing', 'is-watching', 'is-public-watch');
+  }
+
   function applyWatched(row: LiveRow) {
-    const restored = restoreMatch(row.history);
-    if (!restored) return;
-    const json = JSON.stringify(row.history);
-    names = { a: row.playerA, b: row.playerB };
-    state = restored;
+    const restored = signedIn ? restoreMatch(row.history) : null;
     watching = true;
     watchId = row.id;
-    watchedJson = json;
-    breakForGames = finishedGames(state).length;
-    phase = matchWinner(state) ? 'done' : 'play';
+    watchedJson = watchStamp(row);
     saved = false;
     editingId = null;
     strokeArmed = false;
     setup.hidden = true;
-    board.hidden = false;
-    root.classList.add('is-playing', 'is-watching');
     const url = new URL(location.href);
     url.searchParams.set('watch', String(row.id));
     history.replaceState(null, '', `${url.pathname}${url.search}`);
+    if (!restored) {
+      watchMarker = '';
+      showPublicWatch(row);
+      paintCurrent();
+      return;
+    }
+    names = { a: row.playerA, b: row.playerB };
+    state = restored;
+    watchMarker = row.marker || '';
+    breakForGames = finishedGames(state).length;
+    phase = matchWinner(state) ? 'done' : 'play';
+    publicWatch.hidden = true;
+    board.hidden = false;
+    root.classList.remove('is-public-watch');
+    root.classList.add('is-playing', 'is-watching');
     paint();
     paintCurrent();
   }
@@ -746,8 +800,10 @@ const names = [
     watching = false;
     watchId = null;
     watchedJson = '';
-    root.classList.remove('is-playing', 'is-watching');
+    watchMarker = '';
+    root.classList.remove('is-playing', 'is-watching', 'is-public-watch');
     board.hidden = true;
+    publicWatch.hidden = true;
     setup.hidden = false;
     const url = new URL(location.href);
     url.searchParams.delete('watch');
@@ -776,7 +832,7 @@ const names = [
       leaveWatch();
       return;
     }
-    if (JSON.stringify(row.history) !== watchedJson) applyWatched(row);
+    if (watchStamp(row) !== watchedJson) applyWatched(row);
   }
 
   function resultHref() {
@@ -1333,6 +1389,7 @@ const names = [
     });
   }
   backBtn.addEventListener('click', () => leaveWatch());
+  root.querySelector<HTMLButtonElement>('[data-public-back]')!.addEventListener('click', () => leaveWatch());
 
   const { data } = await supabase.auth.getSession();
   signedIn = Boolean(data.session);
@@ -1350,7 +1407,6 @@ const names = [
     const { data: me } = await supabase.from('profiles').select('display_name').eq('id', data.session!.user.id).maybeSingle();
     const mine = me?.display_name || data.session?.user.user_metadata?.display_name;
     if (typeof mine === 'string' && mine.trim()) markerName = mine.trim();
-    if (markerName && cleanName(markerName) && !inputA.value) inputA.value = cleanName(markerName)!;
     const shared = Array.isArray(listResult.data) ? (listResult.data as Marked[]) : [];
     const local = nameResult.error && missingFunction(nameResult.error) ? readLocal() : [];
     if (listResult.error && !missingFunction(listResult.error)) show(listResult.error.message);
@@ -1546,8 +1602,35 @@ const names = [
     font-size: 0.7rem;
     font-weight: 700;
   }
-  .score:not(.is-watching) [data-back] {
+  .score:not(.is-watching) [data-back],
+  .score:not(.is-watching) [data-public-back] {
     display: none;
+  }
+  .public-watch {
+    margin-top: 1.25rem;
+    padding: 1.25rem 1rem 1.1rem;
+    background: #fff;
+    border: 1px solid var(--border-strong);
+    border-radius: 16px;
+    text-align: center;
+  }
+  .public-watch__names {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(1.8rem, 5vw, 2.6rem);
+    font-weight: 800;
+    line-height: 1.05;
+  }
+  .public-watch__score {
+    margin: 0.45rem 0 0.75rem;
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 4vw, 2.2rem);
+    font-weight: 800;
+    color: #e0a800;
+  }
+  .watch-marker {
+    margin: 0.35rem 0 0;
+    font-weight: 700;
   }
   .share {
     display: flex;

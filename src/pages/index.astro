@@ -89,6 +89,7 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
         <div class="hero__cta">
           <a class="btn btn--primary" href={url('/clubs/')}>Find a club near you</a>
           <a class="btn btn--ghost" href={url('/events/')}>What's on</a>
+          <a class="btn btn--ghost" href={url('/captains/score/')}>Watch</a>
         </div>
         <ul class="stats" aria-label="County at a glance">
           <li><strong>{leagueClubs.length}</strong><span>league clubs</span></li>
@@ -106,6 +107,16 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
           aria-label="Bedfordshire Squash launch film"
         ></video>
       </figure>
+    </div>
+  </section>
+
+  <section class="section section--tight" id="on-court" data-home-watch data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} data-score={url('/captains/score/')} hidden>
+    <div class="container">
+      <div class="section-head">
+        <h2>On court</h2>
+        <a href={url('/captains/score/')}>Watch →</a>
+      </div>
+      <ul class="watch-list" data-watch-list></ul>
     </div>
   </section>
 
@@ -319,6 +330,34 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
     border-radius: var(--radius);
     border: 1px solid var(--border-strong);
     background: #000;
+  }
+
+  .watch-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.75rem;
+  }
+  .watch-list a {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: baseline;
+    padding: 0.9rem 1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    text-decoration: none;
+    font-weight: 700;
+  }
+  .watch-list a:hover {
+    border-color: var(--accent);
+  }
+  .watch-list span {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
   }
 
   .quick {
@@ -681,6 +720,51 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
     cursor: pointer;
   }
 </style>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+  import { publicPlayerName } from '@/lib/scoreboard';
+
+  const homeWatch = document.querySelector<HTMLElement>('[data-home-watch]');
+  if (homeWatch?.dataset.url && homeWatch.dataset.key) {
+    const homeScore = homeWatch.dataset.score || '/captains/score/';
+    const homeList = homeWatch.querySelector<HTMLElement>('[data-watch-list]')!;
+    const homeClient = createClient(homeWatch.dataset.url, homeWatch.dataset.key);
+    type HomeMatch = { id: number; playerA: string; playerB: string; score: string };
+
+    async function paintHomeWatch() {
+      const { data: sessionData } = await homeClient.auth.getSession();
+      const { data, error } = await homeClient.rpc('current_matches');
+      const rows = !error && Array.isArray(data) ? (data as HomeMatch[]) : [];
+      if (!rows.length) {
+        homeWatch.hidden = true;
+        homeList.replaceChildren();
+        return;
+      }
+      const signedIn = Boolean(sessionData.session);
+      const name = (value: string) => (signedIn ? value : publicPlayerName(value));
+      const pretty = (score: string) => (score || '0-0').replace(/-/g, '–');
+      homeList.replaceChildren();
+      for (const row of rows) {
+        const item = document.createElement('li');
+        const link = document.createElement('a');
+        link.href = `${homeScore}?watch=${row.id}`;
+        const players = document.createElement('span');
+        players.textContent = `${name(row.playerA)} v ${name(row.playerB)}`;
+        players.style.color = 'inherit';
+        const score = document.createElement('span');
+        score.textContent = pretty(row.score);
+        link.append(players, score);
+        item.append(link);
+        homeList.append(item);
+      }
+      homeWatch.hidden = false;
+    }
+
+    void paintHomeWatch();
+    window.setInterval(() => void paintHomeWatch(), 15000);
+  }
+</script>
 
 <script>
   import { createClient } from '@supabase/supabase-js';

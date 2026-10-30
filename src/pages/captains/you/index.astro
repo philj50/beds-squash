@@ -25,12 +25,17 @@ const venues = (await getClubs()).map((club) => ({
       <div data-panel="signed-in" hidden>
         <p class="who" data-who></p>
         <p class="actions">
-          <a class="btn btn--primary btn--sm" href={url('/captains/score/')}>Score a match</a>
+          <a class="btn btn--primary btn--sm" href={url('/captains/score/')}>Score</a>
+          <a class="btn btn--ghost btn--sm" href={url('/captains/score/')} data-watch>Watch</a>
           <a class="btn btn--ghost btn--sm" href={url('/captains/matches/')}>Matches</a>
           <a class="btn btn--ghost btn--sm" href={url('/share/')}>Send something in</a>
           <a class="btn btn--ghost btn--sm" href={url('/captains/profile/')}>Profile</a>
           <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
         </p>
+        <div id="on-court" data-on-court hidden>
+          <h2>On court</h2>
+          <ul class="on-court" data-on-court-list></ul>
+        </div>
         <div data-private>
         <p class="places" data-places></p>
         <p class="places" data-groups></p>
@@ -589,6 +594,42 @@ const venues = (await getClubs()).map((club) => ({
     };
   }
 
+  const watchLink = root.querySelector<HTMLAnchorElement>('[data-watch]')!;
+  const onCourt = root.querySelector<HTMLElement>('[data-on-court]')!;
+  const onCourtList = root.querySelector<HTMLElement>('[data-on-court-list]')!;
+  const scoreHref = watchLink.getAttribute('href') || '';
+  type CourtMatch = { id: number; playerA: string; playerB: string; score: string };
+  let courtRows: CourtMatch[] = [];
+
+  function paintCourt() {
+    const pretty = (score: string) => (score || '0-0').replace(/-/g, '–');
+    const page = scoreHref.split('?')[0];
+    watchLink.href = courtRows.length === 1 ? `${page}?watch=${courtRows[0].id}` : page;
+    onCourt.hidden = courtRows.length < 2;
+    onCourtList.replaceChildren();
+    for (const row of courtRows) {
+      const item = document.createElement('li');
+      const link = document.createElement('a');
+      link.href = `${page}?watch=${row.id}`;
+      link.textContent = `${row.playerA} v ${row.playerB} · ${pretty(row.score)}`;
+      item.append(link);
+      onCourtList.append(item);
+    }
+  }
+
+  async function loadCourt() {
+    const { data, error } = await supabase.rpc('current_matches');
+    courtRows = !error && Array.isArray(data) ? (data as CourtMatch[]) : [];
+    paintCourt();
+  }
+
+  watchLink.addEventListener('click', (event) => {
+    if (courtRows.length < 2) return;
+    event.preventDefault();
+    onCourt.hidden = false;
+    onCourt.scrollIntoView({ block: 'nearest' });
+  });
+
   async function showSession() {
     const account = await loadAccount(supabase);
     signedIn.hidden = !account;
@@ -596,6 +637,8 @@ const venues = (await getClubs()).map((club) => ({
       sendToLogin();
       return;
     }
+    void loadCourt();
+    window.setInterval(() => void loadCourt(), 15000);
     whoEl.textContent = `Signed in as ${account.displayName || account.email}`;
     paintSummary(account, []);
     const stop = await privateStop(supabase, account, { role: true });
@@ -684,6 +727,26 @@ const venues = (await getClubs()).map((club) => ({
     flex-wrap: wrap;
     gap: 0.5rem;
     margin: 0 0 1.25rem;
+  }
+  .on-court {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .on-court li {
+    border-bottom: 1px solid var(--border);
+  }
+  .on-court a {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.65rem 0;
+    color: inherit;
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .on-court a:hover {
+    color: var(--accent);
   }
   h2 {
     margin: 1.4rem 0 0.6rem;

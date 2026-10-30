@@ -298,6 +298,15 @@ export function markerCall(state: ScoreState): { server: number; receiver: numbe
   return { server: serverPoints, receiver: receiverPoints, handOut: rally.handOut, let: false, stroke: Boolean(rally.stroke), note };
 }
 
+/** First name and the surname initial, for anyone who is not signed in. */
+export function publicPlayerName(fullName: string): string {
+  const cleaned = fullName.trim().replace(/\s+/g, ' ');
+  if (!cleaned) return '';
+  const parts = cleaned.split(' ');
+  if (parts.length < 2) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1].charAt(0).toUpperCase()}`;
+}
+
 export function cleanName(raw: string): string | null {
   const clean = raw.trim().replace(/\s+/g, ' ');
   if (clean.length < 2 || clean.length > 80) return null;

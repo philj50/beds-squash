@@ -17,7 +17,7 @@ const primaryNav = NAV.filter((item) => !item.more);
 const moreNav = NAV.filter((item) => item.more);
 ---
 
-<header class="site-header" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} data-login={loginHref} data-profile={profileHref}>
+<header class="site-header" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} data-login={loginHref} data-profile={profileHref} data-score={scoreHref}>
   <div class="container bar">
     <a class="brand" href={url('/')} aria-label={`${SITE.name} home`}>
       <img src={url('/brand/logo-coral.png')} alt="" width="168" height="99" />
@@ -43,6 +43,13 @@ const moreNav = NAV.filter((item) => item.more);
               ),
             )
           }
+          <li data-score-link hidden>
+            <a href={scoreHref}>Score</a>
+          </li>
+          <li class="watch" data-watch-item hidden>
+            <a href={scoreHref} data-watch-link aria-expanded="false" aria-controls="watch-menu">Watch</a>
+            <div id="watch-menu" class="watch-menu" data-watch-menu hidden></div>
+          </li>
           <li class="more" data-more-item>
             <button class="more-toggle" type="button" data-more-toggle aria-expanded="false" aria-controls="more-menu">
               More
@@ -99,6 +106,12 @@ const moreNav = NAV.filter((item) => item.more);
     if (!moreToggle || !moreMenu) return;
     moreToggle.setAttribute('aria-expanded', String(open));
     moreMenu.hidden = !open;
+    if (open) {
+      const watchMenu = document.querySelector<HTMLElement>('[data-watch-menu]');
+      const watchLink = document.querySelector<HTMLAnchorElement>('[data-watch-link]');
+      if (watchMenu) watchMenu.hidden = true;
+      watchLink?.setAttribute('aria-expanded', 'false');
+    }
   }
 
   btn?.addEventListener('click', () => {
@@ -122,7 +135,11 @@ const moreNav = NAV.filter((item) => item.more);
     if (moreItem && !moreItem.contains(event.target as Node)) setMoreOpen(false);
   });
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') setMoreOpen(false);
+    if (event.key === 'Escape') {
+      setMoreOpen(false);
+      document.querySelector<HTMLElement>('[data-watch-menu]')?.setAttribute('hidden', '');
+      document.querySelector<HTMLAnchorElement>('[data-watch-link]')?.setAttribute('aria-expanded', 'false');
+    }
   });
 
   const header = document.querySelector<HTMLElement>('.site-header');
@@ -161,6 +178,73 @@ const moreNav = NAV.filter((item) => item.more);
       location.reload();
     });
 
+    const scoreHref = header.dataset.score || '/captains/score/';
+    const scoreLink = header.querySelector<HTMLElement>('[data-score-link]');
+    const watchItem = header.querySelector<HTMLElement>('[data-watch-item]');
+    const watchLink = header.querySelector<HTMLAnchorElement>('[data-watch-link]');
+    const watchMenu = header.querySelector<HTMLElement>('[data-watch-menu]');
+    type LiveMatch = { id: number; playerA: string; playerB: string; score: string };
+    let watchRows: LiveMatch[] = [];
+    let watchTimer = 0;
+
+    function setWatchOpen(open: boolean) {
+      if (!watchMenu || !watchLink) return;
+      watchLink.setAttribute('aria-expanded', String(open));
+      watchMenu.hidden = !open;
+    }
+
+    function paintWatch() {
+      if (!watchLink || !watchMenu) return;
+      const pretty = (score: string) => (score || '0-0').replace(/-/g, '–');
+      if (watchRows.length === 1) watchLink.href = `${scoreHref}?watch=${watchRows[0].id}`;
+      else watchLink.href = scoreHref;
+      watchMenu.replaceChildren();
+      for (const row of watchRows) {
+        const link = document.createElement('a');
+        link.href = `${scoreHref}?watch=${row.id}`;
+        link.textContent = `${row.playerA} v ${row.playerB} · ${pretty(row.score)}`;
+        watchMenu.append(link);
+      }
+      if (watchRows.length < 2) setWatchOpen(false);
+    }
+
+    async function loadWatch() {
+      const { data, error } = await supabase.rpc('current_matches');
+      watchRows = !error && Array.isArray(data) ? (data as LiveMatch[]) : [];
+      paintWatch();
+    }
+
+    function setCourtLinks(on: boolean) {
+      if (scoreLink) scoreLink.hidden = !on;
+      if (watchItem) watchItem.hidden = !on;
+      if (!on) {
+        window.clearInterval(watchTimer);
+        watchTimer = 0;
+        watchRows = [];
+        setWatchOpen(false);
+        return;
+      }
+      if (!watchTimer) {
+        void loadWatch();
+        watchTimer = window.setInterval(() => void loadWatch(), 15000);
+      }
+    }
+
+    watchLink?.addEventListener('click', (event) => {
+      if (watchRows.length < 2) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const open = watchMenu?.hidden !== false;
+      setWatchOpen(open);
+      if (open) {
+        setMenuOpen(false);
+        setMoreOpen(false);
+      }
+    });
+    document.addEventListener('click', (event) => {
+      if (watchItem && !watchItem.contains(event.target as Node)) setWatchOpen(false);
+    });
+
     let paintId = 0;
     async function paintAccount() {
       const id = ++paintId;
@@ -172,11 +256,13 @@ const moreNav = NAV.filter((item) => item.more);
         loginLink!.hidden = false;
         signedIn!.hidden = true;
         if (yourSquash) yourSquash.hidden = true;
+        setCourtLinks(false);
         return;
       }
       loginLink!.hidden = true;
       signedIn!.hidden = false;
       if (yourSquash) yourSquash.hidden = false;
+      setCourtLinks(true);
       nameEl!.textContent = session.user.user_metadata?.display_name || session.user.email?.split('@')[0] || 'Profile';
       const { data: me } = await supabase.from('profiles').select('display_name').eq('id', session.user.id).maybeSingle();
       if (id !== paintId || !me?.display_name) return;
@@ -370,8 +456,47 @@ const moreNav = NAV.filter((item) => item.more);
     border-radius: 1px;
   }
   .account,
-  .more {
+  .more,
+  .watch {
     position: relative;
+  }
+  .watch-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.35rem);
+    min-width: 16rem;
+    background: var(--ink-900);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 0.35rem;
+    box-shadow: var(--shadow);
+    z-index: 30;
+  }
+  .watch-menu a {
+    display: block;
+    color: var(--ink-200);
+    font-weight: 600;
+    font-size: 0.9rem;
+    padding: 0.55rem 0.7rem;
+    border-radius: 6px;
+    text-decoration: none;
+  }
+  .watch-menu a:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.06);
+  }
+  :global(html[data-theme='navy']) .watch-menu,
+  :global(html[data-theme='light']) .watch-menu {
+    background: #fff;
+  }
+  :global(html[data-theme='navy']) .watch-menu a,
+  :global(html[data-theme='light']) .watch-menu a {
+    color: var(--text);
+  }
+  :global(html[data-theme='navy']) .watch-menu a:hover,
+  :global(html[data-theme='light']) .watch-menu a:hover {
+    color: var(--accent);
+    background: rgba(241, 90, 34, 0.08);
   }
   .more-menu {
     position: absolute;
