@@ -1,8 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { inflateRawSync } from 'node:zlib';
 
 /**
  * Turn a Sport Manager entry-list sheet into one action per person.
@@ -42,19 +39,46 @@ export function rowsFromSheet(sharedXml, sheetXml) {
   return rows;
 }
 
-export function readEntryList(xlsx) {
-  const dir = mkdtempSync(join(tmpdir(), 'beds-closed-'));
-  try {
-    const file = join(dir, 'entries.xlsx');
-    writeFileSync(file, xlsx);
-    execFileSync('tar', ['-xf', file, '-C', dir], { stdio: 'ignore' });
-    const sharedPath = join(dir, 'xl', 'sharedStrings.xml');
-    const shared = existsSync(sharedPath) ? readFileSync(sharedPath, 'utf8') : '';
-    const sheet = readFileSync(join(dir, 'xl', 'worksheets', 'sheet1.xml'), 'utf8');
-    return entriesFromTable(rowsFromSheet(shared, sheet));
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
+export function zipText(buffer, wanted) {
+  const data = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+  let eocd = -1;
+  const earliest = Math.max(0, data.length - 22 - 65535);
+  for (let index = data.length - 22; index >= earliest; index -= 1) {
+    if (data.readUInt32LE(index) === 0x06054b50) {
+      eocd = index;
+      break;
+    }
   }
+  if (eocd < 0) throw new Error('The entry list is not a spreadsheet.');
+  const count = data.readUInt16LE(eocd + 10);
+  let cursor = data.readUInt32LE(eocd + 16);
+  for (let entry = 0; entry < count; entry += 1) {
+    if (cursor + 46 > data.length || data.readUInt32LE(cursor) !== 0x02014b50) break;
+    const method = data.readUInt16LE(cursor + 10);
+    const compressed = data.readUInt32LE(cursor + 20);
+    const nameLength = data.readUInt16LE(cursor + 28);
+    const extraLength = data.readUInt16LE(cursor + 30);
+    const commentLength = data.readUInt16LE(cursor + 32);
+    const local = data.readUInt32LE(cursor + 42);
+    const name = data.slice(cursor + 46, cursor + 46 + nameLength).toString('utf8');
+    cursor += 46 + nameLength + extraLength + commentLength;
+    if (name !== wanted) continue;
+    const localName = data.readUInt16LE(local + 26);
+    const localExtra = data.readUInt16LE(local + 28);
+    const start = local + 30 + localName + localExtra;
+    const raw = data.slice(start, start + compressed);
+    if (method === 0) return raw.toString('utf8');
+    if (method === 8) return inflateRawSync(raw).toString('utf8');
+    throw new Error('The entry list spreadsheet could not be read.');
+  }
+  return '';
+}
+
+export function readEntryList(xlsx) {
+  const shared = zipText(xlsx, 'xl/sharedStrings.xml');
+  const sheet = zipText(xlsx, 'xl/worksheets/sheet1.xml');
+  if (!sheet) throw new Error('The entry list spreadsheet has no sheet.');
+  return entriesFromTable(rowsFromSheet(shared, sheet));
 }
 
 export function entriesFromTable(table) {

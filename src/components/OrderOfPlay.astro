@@ -10,7 +10,8 @@ const { data, live = false } = Astro.props;
 const state = defaultState(data);
 const html = renderBoard(data, state);
 const drawGrade = data.grades[0] ?? '';
-const draw = renderDraw(data, drawGrade);
+const drawReady = data.matches.length > 0;
+const draw = drawReady ? renderDraw(data, drawGrade) : '';
 ---
 
 <div
@@ -21,7 +22,7 @@ const draw = renderDraw(data, drawGrade);
   data-url={SUPABASE_URL}
   data-key={SUPABASE_PUBLISHABLE_KEY}
 >
-  <div data-draw data-grade={drawGrade} set:html={draw} />
+  <div data-draw data-grade={drawGrade} hidden={!drawReady} set:html={draw} />
   <div data-view set:html={html} />
 </div>
 
@@ -87,6 +88,12 @@ const draw = renderDraw(data, drawGrade);
 
     let signedIn = false;
     const paintDraw = () => {
+      const ready = data.matches.length > 0;
+      draw.hidden = !ready;
+      if (!ready) {
+        draw.innerHTML = '';
+        return;
+      }
       if (!data.grades.includes(drawGrade)) drawGrade = data.grades[0] || '';
       draw.dataset.grade = drawGrade;
       draw.innerHTML = renderDraw(data, drawGrade);

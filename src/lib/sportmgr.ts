@@ -484,16 +484,23 @@ export function renderBoard(data: TournamentData, state: BoardState) {
     )
     .join('');
   const players =
-    entries.length > 0
-      ? `<details class="player-list"><summary>Players <span>${playerCount}</span></summary><div class="player-grades">${playerBlocks}</div></details>`
+    entries.length === 0
+      ? ''
+      : data.matches.length > 0
+        ? `<details class="player-list"><summary>Players <span>${playerCount}</span></summary><div class="player-grades">${playerBlocks}</div></details>`
+        : `<div class="player-grades">${playerBlocks}</div>`;
+  const emptyGrade =
+    data.matches.length === 0 && data.entries.length > 0 && entries.length === 0
+      ? '<p class="notice">No entries in this grade yet.</p>'
       : '';
 
   const updated = state.showUpdated ? updatedLabel(data.syncedAt) : '';
   const heading = data.matches.length > 0 ? 'Order of play' : 'Players';
   return `<div class="section-head"><h2>${heading}</h2>${updated ? `<span class="muted">Updated ${esc(updated)}</span>` : ''}</div>
     ${liveHtml}
-    ${days ? `<div class="filters" role="group" aria-label="Day">${days}</div>` : ''}
+    ${data.matches.length > 0 && days ? `<div class="filters" role="group" aria-label="Day">${days}</div>` : ''}
     ${data.grades.length > 1 ? `<div class="filters" role="group" aria-label="Grade">${grades}</div>` : ''}
     ${data.matches.length > 0 && state.day ? `<h3 class="day-heading">${esc(dayHeading(state.day))}</h3>${list}` : ''}
+    ${emptyGrade}
     ${players}`;
 }

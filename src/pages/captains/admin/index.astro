@@ -3,6 +3,7 @@ import Base from '@/layouts/Base.astro';
 import PasswordRules from '@/components/PasswordRules.astro';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 import { url } from '@/lib/site';
+import closed2027 from '@/data/sportmgr/1244761.json';
 
 const captainsHref = url('/captains/');
 const juniorEntriesHref = url('/juniors/closed/entries/');
@@ -142,6 +143,7 @@ const scoresHref = url('/captains/admin/minigame/');
             </div>
           </section>
 
+          <script id="beds-closed-2027" type="application/json" set:html={JSON.stringify(closed2027.entries)} />
           <section class="admin-panel" data-tab="beds-closed" hidden>
             <h2>Beds Closed</h2>
             <p class="muted small">The entry list is copied from Sport Manager. Each person is tagged with the year, so they can be picked out and linked.</p>
@@ -1282,7 +1284,7 @@ const scoresHref = url('/captains/admin/minigame/');
     const count = root.querySelector<HTMLElement>('[data-beds-count]')!;
     const yearList = root.querySelector<HTMLElement>('[data-beds-years]')!;
     const query = (root.querySelector<HTMLInputElement>('[data-beds-search]')?.value || '').trim().toLowerCase();
-    const years = [...new Set(bedsEntries.map((entry) => entry.year).filter(Boolean))].sort((a, b) => b - a);
+    const years = [...new Set([...bedsEntries.map((entry) => entry.year).filter(Boolean), 2027, 2026])].sort((a, b) => b - a);
     if (bedsYear && !years.includes(bedsYear)) bedsYear = 0;
     yearList.innerHTML = [
       `<li><button type="button" data-beds-year="" aria-pressed="${bedsYear ? 'false' : 'true'}">All</button></li>`,
@@ -1298,13 +1300,14 @@ const scoresHref = url('/captains/admin/minigame/');
       const name = `${entry.forename} ${entry.surname}`.replace(/\s+/g, ' ').trim();
       const key = email || name.toLowerCase();
       if (!key) continue;
-      const person = people.get(key) ?? { name, email: entry.email.trim(), telephone: '', years: [], grades: [], paid: 0, rows: 0 };
+      const person = people.get(key) ?? { name, email: entry.email.trim(), telephone: '', years: [], grades: [], paid: 0, known: 0, rows: 0 };
       if (!person.name && name) person.name = name;
       if (!person.telephone && entry.telephone.trim()) person.telephone = entry.telephone.trim();
       if (entry.year && !person.years.includes(entry.year)) person.years.push(entry.year);
       const grade = entry.grade.trim();
       if (grade && !person.grades.includes(grade)) person.grades.push(grade);
       person.rows += 1;
+      if (entry.payment_status.trim()) person.known += 1;
       if (entry.payment_status.trim().toLowerCase() === 'succeeded') person.paid += 1;
       people.set(key, person);
     }
@@ -1314,7 +1317,8 @@ const scoresHref = url('/captains/admin/minigame/');
       const label = (profile.display_name || '').trim() || 'Login';
       return `<span class="pill">Linked</span> ${escapeHtml(label)}`;
     };
-    const paidLabel = (person: { paid: number; rows: number }) => {
+    const paidLabel = (person: { paid: number; known: number; rows: number }) => {
+      if (!person.known) return '—';
       if (!person.rows || person.paid === 0) return 'Not paid';
       if (person.paid === person.rows) return 'Paid';
       return 'Part paid';
@@ -1370,6 +1374,23 @@ const scoresHref = url('/captains/admin/minigame/');
       return;
     }
     bedsEntries = (data ?? []) as ClosedEntry[];
+    if (!bedsEntries.some((entry) => entry.year === 2027)) {
+      const published = JSON.parse(document.getElementById('beds-closed-2027')?.textContent || '[]') as { grade?: string; name?: string }[];
+      for (const entry of published) {
+        const parts = String(entry.name || '').trim().split(/\s+/).filter(Boolean);
+        const surname = parts.pop() || '';
+        if (!surname) continue;
+        bedsEntries.push({
+          year: 2027,
+          grade: String(entry.grade || ''),
+          forename: parts.join(' '),
+          surname,
+          email: '',
+          telephone: '',
+          payment_status: '',
+        });
+      }
+    }
     bedsProfiles = (profiles.data ?? []) as ClosedProfile[];
     paintBedsEntries();
     status.hidden = true;

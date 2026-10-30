@@ -22,16 +22,11 @@ const tournamentLive = Boolean(tournament) && (end ?? start).getTime() >= Date.n
 const externalLabel = link?.includes('sportmgr.co.uk') ? 'Sport Manager' : 'More details';
 const clubEntry = club ? await getEntry('clubs', club) : undefined;
 const others = (await getUpcomingEvents()).filter((e) => e.id !== event.id).slice(0, 3);
-const previousClosed = /Bedfordshire County Closed Championships/i.test(title)
+const closedYears = /Bedfordshire County Closed Championships/i.test(title)
   ? (await getEvents())
-      .filter(
-        (earlier) =>
-          earlier.id !== event.id &&
-          /Bedfordshire County Closed Championships/i.test(earlier.data.title) &&
-          earlier.data.start.getTime() < start.getTime(),
-      )
-      .sort((a, b) => b.data.start.getTime() - a.data.start.getTime())[0]
-  : undefined;
+      .filter((item) => /Bedfordshire County Closed Championships/i.test(item.data.title))
+      .sort((a, b) => b.data.start.getTime() - a.data.start.getTime())
+  : [];
 
 // Google Calendar quick-add link
 const gcalDates = allDay
@@ -84,11 +79,15 @@ const gcal = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=$
           {link && (
             <a class="btn btn--ghost btn--sm" href={link} target="_blank" rel="noopener">{externalLabel} ↗</a>
           )}
-          {previousClosed && (
-            <a class="btn btn--ghost btn--sm" href={url(`/events/${previousClosed.id}/`)}>
-              {previousClosed.data.start.getUTCFullYear()} history
+          {closedYears.map((item) => (
+            <a
+              class:list={['btn', 'btn--sm', item.id === event.id ? 'btn--primary' : 'btn--ghost']}
+              href={url(`/events/${item.id}/`)}
+              aria-current={item.id === event.id ? 'page' : undefined}
+            >
+              {item.data.start.getUTCFullYear()}
             </a>
-          )}
+          ))}
           <a class="btn btn--ghost btn--sm" href={gcal} target="_blank" rel="noopener">Add to Google Calendar</a>
         </div>
       </div>
