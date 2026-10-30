@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { deflateRawSync } from 'node:zlib';
-import { entriesFromTable, planClosedEntries, readEntryList, rowsFromSheet, summary, welcomeText } from '../scripts/beds-closed-lib.mjs';
+import { closedAccountEmails, contactFromPlayerPage, entriesFromTable, organiserPlayers, phoneFromEntrantPage, planClosedEntries, readEntryList, rowsFromSheet, summary, welcomeText } from '../scripts/beds-closed-lib.mjs';
 import { OUTBOUND_TO, buildMessage } from '../scripts/outbound-mail.mjs';
 
 test('every outbound message is addressed to the test inbox', () => {
@@ -50,6 +50,55 @@ test('a spreadsheet row becomes a tag, a new login, a skip, or a look', () => {
   assert.equal(counts.create, 1);
   assert.equal(counts.review, 3);
   assert.equal(counts.skip, 2);
+});
+
+test('this year\'s County Closed email is the address kept on the account', () => {
+  const rows = [
+    { forename: 'Pat', surname: 'Different', email: 'smgr@example.test' },
+    { forename: 'Steven', surname: 'Davies', email: 'steven@example.test' },
+    { forename: 'New', surname: 'Player', email: 'new@example.test' },
+    { forename: 'Two', surname: 'Mails', email: 'a@example.test' },
+    { forename: 'Two', surname: 'Mails', email: 'b@example.test' },
+    { forename: 'Taken', surname: 'Address', email: 'steven@example.test' },
+  ];
+  const updates = closedAccountEmails(rows, [
+    { id: '1', email: 'steven@example.test', display_name: 'Steven Davies' },
+    { id: '2', email: 'other@example.test', display_name: 'Pat Different' },
+    { id: '9', email: 'admin@example.test', display_name: 'County Admin', is_admin: true },
+  ]);
+  const byName = Object.fromEntries(updates.map((update) => [update.name, update]));
+  assert.equal(byName['Pat Different'].changed, true);
+  assert.equal(byName['Pat Different'].profileId, '2');
+  assert.equal(byName['Pat Different'].email, 'smgr@example.test');
+  assert.equal(byName['Steven Davies'].changed, false);
+  assert.equal(byName['New Player'].profileId, '');
+  assert.equal(byName['New Player'].changed, true);
+  assert.equal(byName['Two Mails'], undefined);
+  assert.equal(byName['Taken Address'], undefined);
+});
+
+test('email and phone are read from the Sport Manager player pages', () => {
+  const players = organiserPlayers(`
+    <div class="card-header"><div>A Grade</div></div>
+    <div class="tournament-player-container">
+      <a href="/t/1244761/entrant/41?returnUrl=%2FTournament%2FPlayers%2F1244761">Ada Lovelace</a>
+      <div class="stripe-info-status">Succeeded</div>
+    </div>
+    <div class="tournament-player-container">
+      <a href="/t/1244761/entrant/42?returnUrl=%2FTournament%2FPlayers%2F1244761">James O&#x27;Connor</a>
+      <div class="stripe-info-status">Succeeded</div>
+    </div>
+    <div class="card-header"><div>B Grade</div></div>
+  `);
+  assert.equal(players.length, 2);
+  assert.equal(players[0].id, '41');
+  assert.equal(players[0].grade, 'A Grade');
+  assert.equal(players[0].payment, 'Succeeded');
+  assert.equal(players[1].name, "James O'Connor");
+  const contact = contactFromPlayerPage('<input name="Forename" value="Ada" /><input name="Surname" value="Lovelace" /><input name="Email" value="ada@example.test" /><input name="Telephone" value="07000000000" />');
+  assert.equal(contact.email, 'ada@example.test');
+  assert.equal(contact.telephone, '07000000000');
+  assert.equal(phoneFromEntrantPage('new ejs.inputs.TextBox({\n  "value": "07000000001"\n}).appendTo("#EntrantInfo_Phone");'), '07000000001');
 });
 
 test('a zipped spreadsheet is read without unpacking it on disk', () => {

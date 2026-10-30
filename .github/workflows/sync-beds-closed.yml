@@ -2,8 +2,8 @@ name: Link County Closed entries
 
 on:
   schedule:
-    # Twice a day, after the public Sport Manager refresh. Not on the five-minute match clock.
-    - cron: '45 8,20 * * *'
+    # Every half hour, shortly after the public Sport Manager refresh.
+    - cron: '5,35 * * * *'
   workflow_dispatch:
 
 concurrency:

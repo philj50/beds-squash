@@ -81,6 +81,42 @@ export function readEntryList(xlsx) {
   return entriesFromTable(rowsFromSheet(shared, sheet));
 }
 
+/** Names, grades and payment from the organiser Players page. */
+export function organiserPlayers(html) {
+  const players = [];
+  for (const part of String(html || '').split(/<div\b[^>]*class="card-header"[^>]*>/i).slice(1)) {
+    const grade = decodeXml(part.match(/<div\b[^>]*>\s*([^<]+?)\s*<\/div>/i)?.[1] || '');
+    if (!grade) continue;
+    for (const block of part.split(/class="tournament-player-container"/i).slice(1)) {
+      const link = block.match(/href="\/t\/\d+\/entrant\/(\d+)[^"]*"[^>]*>([^<]+)</i);
+      if (!link) continue;
+      players.push({
+        id: link[1],
+        name: decodeXml(link[2]),
+        grade,
+        payment: decodeXml(block.match(/stripe-info-status">([^<]*)</i)?.[1] || ''),
+      });
+    }
+  }
+  return players;
+}
+
+/** Email, phone and name from a Sport Manager player page. */
+export function contactFromPlayerPage(html) {
+  return {
+    forename: inputValue(html, 'Forename'),
+    surname: inputValue(html, 'Surname'),
+    email: inputValue(html, 'Email'),
+    telephone: inputValue(html, 'Telephone'),
+  };
+}
+
+/** The phone number entered for this tournament, from the entrant page. */
+export function phoneFromEntrantPage(html) {
+  const match = String(html || '').match(/new ejs\.inputs\.TextBox\(\{\s*"value":\s*"([^"]*)"\s*\}\)\.appendTo\("#EntrantInfo_Phone"\)/);
+  return decodeXml(match?.[1] || '');
+}
+
 export function entriesFromTable(table) {
   const headerIndex = table.findIndex((row) => row.some((cell) => /^email$/i.test(String(cell || '').trim())));
   if (headerIndex < 0) return [];
@@ -215,6 +251,50 @@ export function planClosedEntries(rows, profiles, members = []) {
   });
 }
 
+/**
+ * The County Closed email for this year is the address the account should keep.
+ * A name with two addresses, or an address that already belongs to someone else, is left alone.
+ */
+export function closedAccountEmails(rows, profiles) {
+  const byName = new Map();
+  for (const row of rows) {
+    const name = cleanName(row.forename, row.surname);
+    const email = cleanEmail(row.email);
+    if (!name || !email) continue;
+    const key = nameKey(name);
+    const bucket = byName.get(key) || { name, emails: new Set() };
+    bucket.emails.add(email);
+    byName.set(key, bucket);
+  }
+  const profilesByName = new Map();
+  for (const profile of profiles) {
+    if (profile.is_admin) continue;
+    const key = nameKey(profile.display_name || '');
+    if (!key) continue;
+    const list = profilesByName.get(key) || [];
+    list.push(profile);
+    profilesByName.set(key, list);
+  }
+  const updates = [];
+  for (const bucket of byName.values()) {
+    if (bucket.emails.size !== 1) continue;
+    const email = [...bucket.emails][0];
+    if (profiles.some((profile) => profile.is_admin && cleanEmail(profile.email) === email)) continue;
+    const named = profilesByName.get(nameKey(bucket.name)) || [];
+    if (named.length > 1) continue;
+    const taken = profiles.some((profile) => !profile.is_admin && cleanEmail(profile.email) === email && !named.includes(profile));
+    if (taken) continue;
+    const profile = named[0];
+    updates.push({
+      name: bucket.name,
+      email,
+      profileId: profile?.id || '',
+      changed: !profile || cleanEmail(profile.email) !== email,
+    });
+  }
+  return updates;
+}
+
 export function summary(actions) {
   const count = (kind) => actions.filter((action) => action.kind === kind).length;
   return {
@@ -281,11 +361,18 @@ function cell(row, index) {
   return index < 0 ? '' : String(row[index] || '');
 }
 
+function inputValue(html, name) {
+  const tag = String(html || '').match(new RegExp(`<input\\b[^>]*\\bname="${name}"[^>]*>`, 'i'))?.[0] || '';
+  return decodeXml(tag.match(/\bvalue="([^"]*)"/)?.[1] || '');
+}
+
 function decodeXml(value) {
   return String(value || '')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'");
+    .replace(/&apos;/g, "'")
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, digits) => String.fromCharCode(Number(digits)));
 }

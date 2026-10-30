@@ -9,12 +9,13 @@
  * A new login is created from the Sport Manager email. The starting password
  * is emailed by scripts/outbound-mail.mjs, which always sends to the test inbox.
  * An existing login is marked as a BC Player and its password is left alone.
+ * This year's County Closed email is written onto that person's account.
  */
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { nameKey, planClosedEntries, readEntryList, startingPassword, summary, welcomeText } from './beds-closed-lib.mjs';
+import { closedAccountEmails, contactFromPlayerPage, nameKey, organiserPlayers, phoneFromEntrantPage, planClosedEntries, startingPassword, summary, welcomeText } from './beds-closed-lib.mjs';
 import { OUTBOUND_TO, sendOutbound } from './outbound-mail.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -33,12 +34,13 @@ const events = readdirSync(join(ROOT, 'src', 'content', 'events'))
     if (!id) return null;
     const title = text.match(/^title:\s*(.+)\s*$/m)?.[1]?.trim() || name;
     const year = (title.match(/20\d{2}/) || name.match(/20\d{2}/) || [''])[0];
-    return { title, sportmgr: id[1], place: year ? `County Closed ${year}` : 'County Closed' };
+    return { title, sportmgr: id[1], year: Number(year || 0), place: year ? `County Closed ${year}` : 'County Closed' };
   })
-  .filter(Boolean)
-  .filter((event) => !only || event.sportmgr === only);
+  .filter(Boolean);
+const currentYear = Math.max(0, ...events.map((event) => event.year));
+const chosen = events.filter((event) => !only || event.sportmgr === only);
 
-if (events.length === 0) {
+if (chosen.length === 0) {
   console.log('No events have a sportmgr id.');
   process.exit(0);
 }
@@ -50,12 +52,28 @@ if (!key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set.');
 if (!username || !password) throw new Error('The Sport Manager organiser login is not set.');
 
 const base = process.env.SUPABASE_URL || SUPABASE_URL;
-const lists = await downloadLists(events);
-const profiles = await restAll('profiles?select=id,email,display_name');
+const lists = await downloadLists(chosen);
+const profiles = await restAll('profiles?select=id,email,display_name,is_admin');
 const members = await restAll('group_members?group_slug=eq.bc_players&select=id,profile_id,person_name,place');
 const squads = await restAll('squad_players?select=id,display_name,email,phone');
 const users = await listUsers();
 const usersByEmail = new Map(users.map((user) => [String(user.email || '').trim().toLowerCase(), user]));
+
+let emailsFixed = 0;
+if (apply) {
+  for (const event of chosen) {
+    if (event.year !== currentYear) continue;
+    for (const update of closedAccountEmails(lists.get(event.sportmgr) || [], profiles)) {
+      if (update.profileId && update.changed) {
+        await keepClosedEmail(update.profileId, update.email);
+        const profile = profiles.find((item) => item.id === update.profileId);
+        if (profile) profile.email = update.email;
+        emailsFixed += 1;
+      }
+      await keepSquadEmail(update.name, update.email);
+    }
+  }
+}
 
 let mailFailed = false;
 let created = 0;
@@ -64,7 +82,7 @@ let tagged = 0;
 let phones = 0;
 
 const plans = [];
-for (const event of events) {
+for (const event of chosen) {
   const rows = lists.get(event.sportmgr) || [];
   const actions = planClosedEntries(rows, profiles, members);
   plans.push({ event, actions });
@@ -94,7 +112,7 @@ if (willCreate) {
     });
   } catch (error) {
     console.log(error instanceof Error ? error.message : 'The message could not be sent.');
-    console.log('No logins were changed.');
+    console.log(emailsFixed ? `Set ${emailsFixed} account emails from County Closed ${currentYear}. No new logins were opened.` : 'No logins were changed.');
     process.exit(1);
   }
 }
@@ -139,7 +157,7 @@ for (const { event, actions } of plans) {
   }
 }
 
-console.log(`Checked ${tagged} existing logins. Opened ${created} logins. Sent ${sent} messages to ${OUTBOUND_TO}. Saved ${phones} phone numbers.`);
+console.log(`Checked ${tagged} existing logins. Opened ${created} logins. Sent ${sent} messages to ${OUTBOUND_TO}. Saved ${phones} phone numbers. Set ${emailsFixed} account emails from County Closed ${currentYear}.`);
 if (mailFailed) process.exit(1);
 
 async function storeEntries(event, rows) {
@@ -190,11 +208,30 @@ async function downloadLists(eventList) {
       throw new Error('Sport Manager did not accept the organiser login.');
     }
     for (const event of eventList) {
-      const response = await page.context().request.get(`https://sportmgr.co.uk/Tournament/ExportEntryList?tournamentId=${event.sportmgr}`);
-      if (!response.ok()) throw new Error(`Sport Manager did not return the entry list for ${event.title}.`);
-      const file = Buffer.from(await response.body());
-      if (file.length < 4 || file[0] !== 0x50 || file[1] !== 0x4b) throw new Error(`Sport Manager did not return a spreadsheet for ${event.title}.`);
-      lists.set(event.sportmgr, readEntryList(file));
+      const response = await page.request.get(`https://sportmgr.co.uk/Tournament/Players/${event.sportmgr}`);
+      if (!response.ok()) throw new Error(`Sport Manager did not return the player page for ${event.title}.`);
+      const listed = organiserPlayers(await response.text());
+      const rows = [];
+      for (const player of listed) {
+        const [edit, entrant] = await Promise.all([
+          page.request.get(`https://sportmgr.co.uk/Player/Edit/${player.id}`),
+          page.request.get(`https://sportmgr.co.uk/t/${event.sportmgr}/entrant/${player.id}`),
+        ]);
+        if (!edit.ok()) throw new Error(`Sport Manager did not return the player page for ${player.name}.`);
+        const contact = contactFromPlayerPage(await edit.text());
+        const entryPhone = entrant.ok() ? phoneFromEntrantPage(await entrant.text()) : '';
+        const parts = player.name.split(/\s+/).filter(Boolean);
+        const surname = contact.surname || parts.pop() || '';
+        rows.push({
+          grade: player.grade,
+          forename: contact.forename || parts.join(' '),
+          surname,
+          email: contact.email,
+          telephone: entryPhone || contact.telephone,
+          payment: player.payment,
+        });
+      }
+      lists.set(event.sportmgr, rows);
     }
   } finally {
     await browser.close();
@@ -228,6 +265,30 @@ async function openAccount(action) {
   const profileId = await ensureProfile(created.id, action, true);
   usersByEmail.set(action.email, { ...created, user_metadata: metadata });
   return { profileId, welcomeDue: true, password, userId: created.id, metadata };
+}
+
+async function keepClosedEmail(profileId, email) {
+  const address = String(email || '').trim().toLowerCase();
+  if (!address) return;
+  const previous = [...usersByEmail.entries()].find(([, user]) => user.id === profileId);
+  if (!previous || previous[0] !== address) {
+    await authWrite(profileId, { email: address, email_confirm: true });
+    if (previous) usersByEmail.delete(previous[0]);
+    usersByEmail.set(address, { ...(previous?.[1] || { id: profileId }), email: address });
+  }
+  await restWrite(`profiles?id=eq.${profileId}`, 'PATCH', { email: address });
+}
+
+async function keepSquadEmail(name, email) {
+  const key = nameKey(name);
+  const address = String(email || '').trim().toLowerCase();
+  if (!key || !address) return;
+  for (const squad of squads) {
+    if (nameKey(squad.display_name || '') !== key) continue;
+    if (String(squad.email || '').trim().toLowerCase() === address) continue;
+    await restWrite(`squad_players?id=eq.${squad.id}`, 'PATCH', { email: address });
+    squad.email = address;
+  }
 }
 
 async function ensureProfile(id, action, isNew) {
