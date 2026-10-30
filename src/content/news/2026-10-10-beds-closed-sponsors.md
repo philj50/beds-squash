@@ -56,6 +56,10 @@ A first look at the confirmed sponsors — at least so far — for the [Bedfords
 
 ![J.A.J Electrical Services](/uploads/news/jaj-electrical-v2.png)
 
+David Birch Soft Tissue Therapy
+
+![David Birch Soft Tissue Therapy](/uploads/news/david-birch-soft-tissue-therapy.jpg)
+
 Thanks to everyone who has come on board. More names may still be added before the event.
 
 Logos supplied by the sponsors.
