@@ -25,6 +25,7 @@ const venues = (await getClubs()).map((club) => ({
       <div data-panel="signed-in" hidden>
         <p class="who" data-who></p>
         <p class="actions">
+          <a class="btn btn--primary btn--sm" href={url('/captains/score/')}>Score a match</a>
           <a class="btn btn--ghost btn--sm" href={url('/captains/matches/')}>Matches</a>
           <a class="btn btn--ghost btn--sm" href={url('/share/')}>Send something in</a>
           <a class="btn btn--ghost btn--sm" href={url('/captains/profile/')}>Profile</a>

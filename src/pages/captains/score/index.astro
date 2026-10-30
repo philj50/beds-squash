@@ -1,0 +1,519 @@
+---
+import Base from '@/layouts/Base.astro';
+import closed2026 from '@/data/sportmgr/945811.json';
+import closed2027 from '@/data/sportmgr/1244761.json';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
+
+const names = [
+  ...new Set(
+    [...closed2027.entries, ...closed2026.entries]
+      .map((entry) => entry.name?.trim())
+      .filter((name): name is string => Boolean(name)),
+  ),
+].sort((a, b) => a.localeCompare(b, 'en'));
+---
+
+<Base
+  title="Score a match"
+  description="Mark a squash match on Beds Squash. PAR to 11, win by two, best of five."
+  noindex
+  crumbs={[{ name: 'Score a match', path: '/captains/score/' }]}
+>
+  <section class="section">
+    <div class="container score" id="score-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
+      <h1>Score a match</h1>
+      <p class="lede">
+        Pick the two players, then tap the player who won the rally. PAR to 11, win by two, best of five. The score stays on Beds Squash for an organiser to accept. It is not sent to Sport Manager.
+      </p>
+      <p class="status" data-status role="status"></p>
+      <p class="signin" data-signin hidden>
+        <a data-login href="/login/">Sign in</a>
+        to keep the score on the site. You can still mark a match on this browser first.
+      </p>
+
+      <form class="card setup" data-setup>
+        <div class="card__body stack">
+          <label>
+            Player A
+            <input name="player-a" list="score-players" autocomplete="off" required placeholder="First player" />
+          </label>
+          <label>
+            Player B
+            <input name="player-b" list="score-players" autocomplete="off" required placeholder="Second player" />
+          </label>
+          <datalist id="score-players"></datalist>
+          <button class="btn btn--primary" type="submit">Start match</button>
+        </div>
+      </form>
+
+      <div class="board" data-board hidden>
+        <p class="call" data-call aria-live="polite"></p>
+        <div class="sides">
+          <button class="side side--a" type="button" data-side="a">
+            <span class="who" data-name="a"></span>
+            <span class="points" data-points="a">0</span>
+            <span class="games" data-games="a">0 games</span>
+          </button>
+          <button class="side side--b" type="button" data-side="b">
+            <span class="who" data-name="b"></span>
+            <span class="points" data-points="b">0</span>
+            <span class="games" data-games="b">0 games</span>
+          </button>
+        </div>
+        <p class="line" data-line aria-live="polite"></p>
+        <p class="actions">
+          <button class="btn btn--ghost" type="button" data-undo>Undo</button>
+          <button class="btn btn--primary" type="button" data-save hidden>Save score</button>
+          <button class="btn btn--ghost" type="button" data-new>New match</button>
+        </p>
+      </div>
+
+      <h2>Marked here</h2>
+      <ol class="recent" data-recent></ol>
+      <script id="score-names" type="application/json" is:inline set:html={JSON.stringify(names)}></script>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+  import {
+    addPoint,
+    cleanName,
+    currentGame,
+    finishedGames,
+    freshMatch,
+    gamesWon,
+    hasPoints,
+    legalMatch,
+    matchWinner,
+    scoreLine,
+    undoPoint,
+    type Game,
+    type ScoreState,
+    type Side,
+  } from '@/lib/scoreboard';
+
+  type Marked = {
+    id: number | string;
+    playerA: string;
+    playerB: string;
+    winner: Side;
+    score: string;
+    marker: string;
+    createdAt: string;
+    local?: boolean;
+  };
+
+  const LOCAL_KEY = 'beds-marked-matches';
+  const root = document.getElementById('score-app');
+  if (!root) throw new Error('score app missing');
+  const supabase = createClient(root.dataset.url!, root.dataset.key!);
+  const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
+  const signinEl = root.querySelector<HTMLElement>('[data-signin]')!;
+  const loginLink = root.querySelector<HTMLAnchorElement>('[data-login]')!;
+  const setup = root.querySelector<HTMLFormElement>('[data-setup]')!;
+  const board = root.querySelector<HTMLElement>('[data-board]')!;
+  const callEl = root.querySelector<HTMLElement>('[data-call]')!;
+  const lineEl = root.querySelector<HTMLElement>('[data-line]')!;
+  const undoBtn = root.querySelector<HTMLButtonElement>('[data-undo]')!;
+  const saveBtn = root.querySelector<HTMLButtonElement>('[data-save]')!;
+  const recentEl = root.querySelector<HTMLOListElement>('[data-recent]')!;
+  const list = root.querySelector<HTMLDataListElement>('#score-players')!;
+  const inputA = setup.querySelector<HTMLInputElement>('[name="player-a"]')!;
+  const inputB = setup.querySelector<HTMLInputElement>('[name="player-b"]')!;
+
+  const base = import.meta.env.BASE_URL.replace(/\/+$/, '');
+  loginLink.href = `${base}/login/?next=${encodeURIComponent(location.pathname + location.search)}`;
+
+  let state: ScoreState = freshMatch();
+  let names = { a: '', b: '' };
+  let saved = false;
+  let signedIn = false;
+  let recent: Marked[] = [];
+
+  function show(message: string) {
+    statusEl.textContent = message;
+  }
+
+  function readNames(): string[] {
+    const node = document.getElementById('score-names');
+    const raw = node?.textContent?.trim();
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((name) => typeof name === 'string') : [];
+  }
+
+  function fillNames(extra: string[]) {
+    const seen = new Set<string>();
+    list.replaceChildren();
+    for (const name of [...readNames(), ...extra].sort((a, b) => a.localeCompare(b, 'en'))) {
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const option = document.createElement('option');
+      option.value = name;
+      list.append(option);
+    }
+  }
+
+  function readLocal(): Marked[] {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(LOCAL_KEY) ?? '[]') as Marked[];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function writeLocal(rows: Marked[]) {
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(rows.slice(0, 30)));
+  }
+
+  function dash(score: string) {
+    return score.replace(/-/g, '–');
+  }
+
+  function gamesLabel(count: number) {
+    return count === 1 ? '1 game' : `${count} games`;
+  }
+
+  function paintRecent() {
+    recentEl.replaceChildren();
+    if (!recent.length) {
+      const item = document.createElement('li');
+      item.textContent = 'No scores yet.';
+      recentEl.append(item);
+      return;
+    }
+    for (const row of recent) {
+      const item = document.createElement('li');
+      const winner = row.winner === 'a' ? row.playerA : row.playerB;
+      const loser = row.winner === 'a' ? row.playerB : row.playerA;
+      const when = new Date(row.createdAt);
+      const time = Number.isNaN(when.getTime())
+        ? ''
+        : when.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+      item.textContent = `${winner} beat ${loser} ${dash(row.score)}${time ? ` · ${time}` : ''}${row.local ? ' · this browser' : ''}`;
+      recentEl.append(item);
+    }
+  }
+
+  function paint() {
+    const onCourt = currentGame(state);
+    const won = gamesWon(state);
+    const over = matchWinner(state);
+    for (const side of ['a', 'b'] as const) {
+      const button = root.querySelector<HTMLButtonElement>(`[data-side="${side}"]`)!;
+      root.querySelector<HTMLElement>(`[data-name="${side}"]`)!.textContent = names[side];
+      root.querySelector<HTMLElement>(`[data-points="${side}"]`)!.textContent = String(onCourt[side]);
+      root.querySelector<HTMLElement>(`[data-games="${side}"]`)!.textContent = gamesLabel(won[side]);
+      button.disabled = Boolean(over) || saved;
+      button.setAttribute('aria-label', `${names[side]}, ${onCourt[side]}. ${over || saved ? 'Match finished.' : 'Add a point.'}`);
+    }
+    lineEl.textContent = dash(scoreLine(state));
+    undoBtn.disabled = saved || !hasPoints(state);
+    saveBtn.hidden = !over;
+    saveBtn.disabled = saved;
+    saveBtn.textContent = saved ? 'Saved' : 'Save score';
+    if (over) {
+      const winner = over === 'a' ? names.a : names.b;
+      callEl.textContent = `${winner} wins ${dash(scoreLine(state))}`;
+    } else if (finishedGames(state).length && onCourt.a === 0 && onCourt.b === 0) {
+      callEl.textContent = `Game. ${names.a} ${won.a}–${won.b} ${names.b}.`;
+    } else {
+      callEl.textContent = 'Tap the player who won the rally.';
+    }
+  }
+
+  function missingFunction(error: { code?: string; message?: string } | null) {
+    const message = error?.message ?? '';
+    return error?.code === 'PGRST202' || /could not find the function/i.test(message) || /schema cache/i.test(message);
+  }
+
+  function rememberLocal(row: Marked) {
+    const rows = [row, ...readLocal().filter((item) => item.id !== row.id)];
+    writeLocal(rows);
+    recent = [...rows, ...recent.filter((item) => !item.local)];
+    paintRecent();
+  }
+
+  setup.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const a = cleanName(inputA.value);
+    const b = cleanName(inputB.value);
+    if (!a || !b) {
+      show('Enter both names, using letters.');
+      return;
+    }
+    if (a.toLowerCase() === b.toLowerCase()) {
+      show('Pick two different players.');
+      return;
+    }
+    names = { a, b };
+    state = freshMatch();
+    saved = false;
+    show('');
+    setup.hidden = true;
+    board.hidden = false;
+    root.classList.add('is-playing');
+    paint();
+  });
+
+  board.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-side]');
+    if (!button || button.disabled) return;
+    const side = button.dataset.side === 'b' ? 'b' : 'a';
+    state = addPoint(state, side);
+    paint();
+  });
+
+  undoBtn.addEventListener('click', () => {
+    if (undoBtn.disabled) return;
+    state = undoPoint(state);
+    paint();
+  });
+
+  root.querySelector<HTMLButtonElement>('[data-new]')!.addEventListener('click', () => {
+    if (!saved && hasPoints(state) && !confirm('Leave this score without saving it?')) return;
+    state = freshMatch();
+    saved = false;
+    board.hidden = true;
+    setup.hidden = false;
+    root.classList.remove('is-playing');
+    show('');
+    inputA.focus();
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    const games: Game[] = finishedGames(state);
+    const winner = legalMatch(games);
+    if (!winner || saved) return;
+    saveBtn.disabled = true;
+    const row: Marked = {
+      id: `local-${Date.now()}`,
+      playerA: names.a,
+      playerB: names.b,
+      winner,
+      score: games.map((game) => `${game.a}-${game.b}`).join(', '),
+      marker: 'You',
+      createdAt: new Date().toISOString(),
+      local: true,
+    };
+    if (!signedIn) {
+      rememberLocal(row);
+      saved = true;
+      paint();
+      show('Saved on this browser. Sign in to put it on the site.');
+      return;
+    }
+    show('Saving…');
+    const { data, error } = await supabase.rpc('save_marked_match', {
+      p_a: names.a,
+      p_b: names.b,
+      p_games: games,
+    });
+    if (error && missingFunction(error)) {
+      rememberLocal(row);
+      saved = true;
+      paint();
+      show('Saved on this browser. The shared list is not on the database yet.');
+      return;
+    }
+    if (error || !data) {
+      saveBtn.disabled = false;
+      show(error?.message || 'That score could not be saved.');
+      return;
+    }
+    const stored = data as Marked;
+    recent = [stored, ...recent.filter((item) => item.id !== stored.id && item.id !== row.id)];
+    paintRecent();
+    saved = true;
+    paint();
+    show('Saved. An organiser can accept it before it goes into Sport Manager.');
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (board.hidden) return;
+    const target = event.target as HTMLElement | null;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      state = addPoint(state, 'a');
+      paint();
+    } else if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      state = addPoint(state, 'b');
+      paint();
+    } else if ((event.key === 'Backspace' || event.key === 'z') && !saved) {
+      event.preventDefault();
+      state = undoPoint(state);
+      paint();
+    }
+  });
+
+  fillNames([]);
+  paintRecent();
+
+  const { data } = await supabase.auth.getSession();
+  signedIn = Boolean(data.session);
+  signinEl.hidden = signedIn;
+  if (!signedIn) {
+    recent = readLocal();
+    paintRecent();
+  } else {
+    const [nameResult, listResult] = await Promise.all([
+      supabase.rpc('scoreboard_names'),
+      supabase.rpc('marked_matches'),
+    ]);
+    const extra = Array.isArray(nameResult.data) ? (nameResult.data as string[]) : [];
+    fillNames(extra);
+    const { data: me } = await supabase.from('profiles').select('display_name').eq('id', data.session!.user.id).maybeSingle();
+    const mine = me?.display_name || data.session?.user.user_metadata?.display_name;
+    if (typeof mine === 'string' && cleanName(mine) && !inputA.value) inputA.value = cleanName(mine)!;
+    const shared = Array.isArray(listResult.data) ? (listResult.data as Marked[]) : [];
+    const local = nameResult.error && missingFunction(nameResult.error) ? readLocal() : [];
+    if (listResult.error && !missingFunction(listResult.error)) show(listResult.error.message);
+    recent = [...shared, ...local.filter((row) => !shared.some((item) => item.score === row.score && item.playerA === row.playerA && item.playerB === row.playerB))];
+    paintRecent();
+  }
+</script>
+
+<style>
+  .score {
+    max-width: 52rem;
+  }
+  .lede {
+    color: var(--text-muted);
+  }
+  .score.is-playing .lede,
+  .score.is-playing .signin {
+    display: none;
+  }
+  .status:empty {
+    display: none;
+  }
+  .status {
+    margin: 1rem 0;
+    color: var(--gold-600);
+    font-weight: 700;
+  }
+  .signin {
+    margin: 0 0 1rem;
+  }
+  .setup {
+    max-width: 28rem;
+  }
+  .stack {
+    display: grid;
+    gap: 0.85rem;
+  }
+  label {
+    display: grid;
+    gap: 0.3rem;
+    font-size: 0.95rem;
+  }
+  input {
+    width: 100%;
+    background: var(--ink-900);
+    color: #fff;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 0.7rem 0.75rem;
+    font: inherit;
+  }
+  .board {
+    display: grid;
+    gap: 0.85rem;
+  }
+  .call {
+    margin: 0;
+    min-height: 1.5rem;
+    font-weight: 700;
+  }
+  .sides {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+  .side {
+    min-height: 42vh;
+    border: 0;
+    border-radius: 16px;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 1rem;
+    cursor: pointer;
+    font-family: var(--font-display);
+    touch-action: manipulation;
+    user-select: none;
+  }
+  .side--a {
+    background: #0e2744;
+  }
+  .side--b {
+    background: #f15a22;
+  }
+  .side:disabled {
+    cursor: default;
+  }
+  .who {
+    font-size: clamp(1.15rem, 3vw, 1.7rem);
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+  .points {
+    font-size: clamp(4.5rem, 14vw, 7.5rem);
+    font-weight: 800;
+    line-height: 0.85;
+  }
+  .games {
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    letter-spacing: 0;
+    text-transform: none;
+    opacity: 0.9;
+  }
+  .line {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(1.4rem, 4vw, 2rem);
+    font-weight: 700;
+    letter-spacing: 0.03em;
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+  .recent {
+    margin: 0.4rem 0 0;
+    padding-left: 1.2rem;
+  }
+  .recent li + li {
+    margin-top: 0.35rem;
+  }
+  @media (max-width: 640px) {
+    .sides {
+      grid-template-columns: 1fr;
+    }
+    .side {
+      min-height: 30vh;
+    }
+    .score.is-playing h1 {
+      font-size: 1.45rem;
+      margin-bottom: 0.2rem;
+    }
+    .score.is-playing .call,
+    .score.is-playing .line {
+      margin: 0;
+    }
+  }
+</style>

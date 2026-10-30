@@ -12,6 +12,7 @@ const loginHref = url('/login/');
 const youHref = url('/captains/you/');
 const shareHref = url('/share/');
 const profileHref = url('/captains/profile/');
+const scoreHref = url('/captains/score/');
 const primaryNav = NAV.filter((item) => !item.more);
 const moreNav = NAV.filter((item) => item.more);
 ---
@@ -63,6 +64,7 @@ const moreNav = NAV.filter((item) => item.more);
                 <span data-account-name>Profile</span>
               </button>
               <div id="account-menu" class="account-menu" data-account-menu hidden role="menu">
+                <a role="menuitem" href={scoreHref}>Score a match</a>
                 <a role="menuitem" href={youHref}>My squash</a>
                 <a role="menuitem" href={shareHref}>Send something in</a>
                 <a role="menuitem" href={profileHref}>Profile</a>
