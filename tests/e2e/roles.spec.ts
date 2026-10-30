@@ -725,7 +725,7 @@ test.describe('Club captain, team captain, and player', () => {
 
     await page.goto('captains/admin/#users', { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: 'Users', exact: true })).toBeVisible();
-    await expect(page.locator('.admin-tabs .tab-label')).toHaveText(['League Master', 'Juniors', 'Beds Closed', 'SquashLevels', 'Permissions', 'Links', 'Config']);
+    await expect(page.locator('.admin-tabs .tab-label')).toHaveText(['League Master', 'Juniors', 'Beds Closed', 'Scores', 'SquashLevels', 'Permissions', 'Links', 'Config']);
     await expect(page.locator('[data-junior-link]')).toBeVisible();
     await expect(page.locator('[data-share-link]')).toBeVisible();
     await expect(page.locator('[data-scores-link]')).toBeVisible();

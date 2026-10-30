@@ -23,7 +23,7 @@ const names = [
     <div class="container score" id="score-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
       <h1>Score a match</h1>
       <p class="lede">
-        Pick the two players, then tap the player who won the rally. PAR to 11, win by two, best of five. The score stays on Beds Squash for an organiser to accept. It is not sent to Sport Manager.
+        Pick the two players, then tap the player who won the rally. PAR to 11, win by two, best of five. The first serve is from the right. Change it to the left when that is the box. The same player then serves from the other side. Hand out means the other player serves, from the right unless you change it. A let is the same server and the same box. The score stays on Beds Squash for an admin to check. It is not sent to Sport Manager.
       </p>
       <p class="status" data-status role="status"></p>
       <p class="signin" data-signin hidden>
@@ -36,10 +36,12 @@ const names = [
           <label>
             Player A
             <input name="player-a" list="score-players" autocomplete="off" required placeholder="First player" />
+            <span class="sl-note" data-sl="a" hidden></span>
           </label>
           <label>
             Player B
             <input name="player-b" list="score-players" autocomplete="off" required placeholder="Second player" />
+            <span class="sl-note" data-sl="b" hidden></span>
           </label>
           <datalist id="score-players"></datalist>
           <button class="btn btn--primary" type="submit">Start match</button>
@@ -48,14 +50,25 @@ const names = [
 
       <div class="board" data-board hidden>
         <p class="call" data-call aria-live="polite"></p>
+        <div class="serve">
+          <p data-serve-who></p>
+          <div class="boxes" role="group" aria-label="Service box">
+            <button class="box" type="button" data-box="R" aria-pressed="true">R</button>
+            <button class="box" type="button" data-box="L" aria-pressed="false">L</button>
+          </div>
+          <button class="btn btn--ghost btn--sm" type="button" data-hand>Other player serves</button>
+          <button class="btn btn--ghost btn--sm" type="button" data-let>Let</button>
+        </div>
         <div class="sides">
           <button class="side side--a" type="button" data-side="a">
             <span class="who" data-name="a"></span>
+            <span class="level" data-level="a"></span>
             <span class="points" data-points="a">0</span>
             <span class="games" data-games="a">0 games</span>
           </button>
           <button class="side side--b" type="button" data-side="b">
             <span class="who" data-name="b"></span>
+            <span class="level" data-level="b"></span>
             <span class="points" data-points="b">0</span>
             <span class="games" data-games="b">0 games</span>
           </button>
@@ -66,6 +79,7 @@ const names = [
           <button class="btn btn--primary" type="button" data-save hidden>Save score</button>
           <button class="btn btn--ghost" type="button" data-new>New match</button>
         </p>
+        <div class="tape" data-tape></div>
       </div>
 
       <h2>Marked here</h2>
@@ -78,18 +92,27 @@ const names = [
 <script>
   import { createClient } from '@supabase/supabase-js';
   import {
+    addLet,
     addPoint,
+    canChooseServer,
     cleanName,
     currentGame,
+    currentRallies,
     finishedGames,
     freshMatch,
     gamesWon,
-    hasPoints,
+    hasRallies,
     legalMatch,
+    markerCall,
     matchWinner,
+    otherPlayer,
+    restoreMatch,
     scoreLine,
+    setBox,
+    setServer,
     undoPoint,
     type Game,
+    type Rally,
     type ScoreState,
     type Side,
   } from '@/lib/scoreboard';
@@ -102,6 +125,7 @@ const names = [
     score: string;
     marker: string;
     createdAt: string;
+    history?: ScoreState;
     local?: boolean;
   };
 
@@ -118,6 +142,10 @@ const names = [
   const lineEl = root.querySelector<HTMLElement>('[data-line]')!;
   const undoBtn = root.querySelector<HTMLButtonElement>('[data-undo]')!;
   const saveBtn = root.querySelector<HTMLButtonElement>('[data-save]')!;
+  const handBtn = root.querySelector<HTMLButtonElement>('[data-hand]')!;
+  const letBtn = root.querySelector<HTMLButtonElement>('[data-let]')!;
+  const serveWho = root.querySelector<HTMLElement>('[data-serve-who]')!;
+  const tapeEl = root.querySelector<HTMLElement>('[data-tape]')!;
   const recentEl = root.querySelector<HTMLOListElement>('[data-recent]')!;
   const list = root.querySelector<HTMLDataListElement>('#score-players')!;
   const inputA = setup.querySelector<HTMLInputElement>('[name="player-a"]')!;
@@ -130,6 +158,7 @@ const names = [
   let names = { a: '', b: '' };
   let saved = false;
   let signedIn = false;
+  let editingId: number | null = null;
   let recent: Marked[] = [];
 
   function show(message: string) {
@@ -144,17 +173,80 @@ const names = [
     return Array.isArray(parsed) ? parsed.filter((name) => typeof name === 'string') : [];
   }
 
+  function personKey(name: string) {
+    return name.trim().replace(/\s+/g, ' ').toLowerCase();
+  }
+
+  const levelsByName = new Map<string, number[]>();
+  const levelNames = new Map<string, string>();
+  let levelsReady = false;
+
+  function formatLevels(levels: number[]) {
+    return [...new Set(levels)].sort((a, b) => a - b).map((level) => level.toLocaleString('en-GB')).join(', ');
+  }
+
+  function slText(name: string) {
+    const levels = levelsByName.get(personKey(name));
+    if (!levels?.length) return '';
+    return `SL ${formatLevels(levels)}`;
+  }
+
+  function paintLevels() {
+    for (const side of ['a', 'b'] as const) {
+      const input = side === 'a' ? inputA : inputB;
+      const note = root.querySelector<HTMLElement>(`[data-sl="${side}"]`)!;
+      const chosen = input.value.trim();
+      const level = slText(chosen);
+      note.textContent = level || (levelsReady && chosen.length >= 2 ? 'No SquashLevels level' : '');
+      note.hidden = !note.textContent;
+      const onCourt = root.querySelector<HTMLElement>(`[data-level="${side}"]`);
+      if (onCourt) onCourt.textContent = slText(names[side]);
+    }
+  }
+
   function fillNames(extra: string[]) {
     const seen = new Set<string>();
     list.replaceChildren();
-    for (const name of [...readNames(), ...extra].sort((a, b) => a.localeCompare(b, 'en'))) {
-      const key = name.toLowerCase();
-      if (seen.has(key)) continue;
+    for (const name of [...readNames(), ...extra, ...levelNames.values()].sort((a, b) => a.localeCompare(b, 'en'))) {
+      const key = personKey(name);
+      if (!key || seen.has(key)) continue;
       seen.add(key);
       const option = document.createElement('option');
       option.value = name;
+      const level = slText(name);
+      if (level) option.label = `${name} · ${level}`;
       list.append(option);
     }
+    paintLevels();
+  }
+
+  async function loadLevels() {
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase
+        .from('squashlevels_players')
+        .select('display_name, current_level')
+        .order('display_name', { ascending: true })
+        .range(from, from + 999);
+      if (error) break;
+      if (!data?.length) {
+        levelsReady = true;
+        break;
+      }
+      for (const row of data as { display_name: string | null; current_level: number | null }[]) {
+        const name = row.display_name?.trim();
+        if (!name || row.current_level == null) continue;
+        const key = personKey(name);
+        if (!levelNames.has(key)) levelNames.set(key, name.replace(/\s+/g, ' '));
+        const levels = levelsByName.get(key) ?? [];
+        levels.push(Number(row.current_level));
+        levelsByName.set(key, levels);
+      }
+      if (data.length < 1000) {
+        levelsReady = true;
+        break;
+      }
+    }
+    fillNames([]);
   }
 
   function readLocal(): Marked[] {
@@ -199,31 +291,87 @@ const names = [
     }
   }
 
+  function rallyLine(rally: Rally) {
+    const score = `${rally.a}–${rally.b}`;
+    if (rally.winner === 'let') return `Let ${score} ${rally.box}`;
+    if (rally.handOut) return `Hand out ${score} ${rally.box}`;
+    return `${score} ${rally.box}`;
+  }
+
+  function paintTape() {
+    tapeEl.replaceChildren();
+    const sheets = state.games
+      .map((rallies, index) => ({ rallies, index }))
+      .filter((sheet) => sheet.rallies.length);
+    if (!sheets.length) {
+      const empty = document.createElement('p');
+      empty.textContent = 'The rally list appears here, with the score and the service box.';
+      tapeEl.append(empty);
+      return;
+    }
+    for (const sheet of sheets) {
+      const last = [...sheet.rallies].reverse().find((rally) => rally.winner !== 'let');
+      const heading = document.createElement('p');
+      heading.className = 'game-head';
+      heading.textContent = last ? `Game ${sheet.index + 1} · ${last.a}–${last.b}` : `Game ${sheet.index + 1}`;
+      const list = document.createElement('ol');
+      for (const rally of [...sheet.rallies].reverse()) {
+        const item = document.createElement('li');
+        item.textContent = rallyLine(rally);
+        list.append(item);
+      }
+      tapeEl.append(heading, list);
+    }
+  }
+
   function paint() {
     const onCourt = currentGame(state);
     const won = gamesWon(state);
     const over = matchWinner(state);
+    const serverName = names[state.server] || 'Player';
     for (const side of ['a', 'b'] as const) {
       const button = root.querySelector<HTMLButtonElement>(`[data-side="${side}"]`)!;
       root.querySelector<HTMLElement>(`[data-name="${side}"]`)!.textContent = names[side];
       root.querySelector<HTMLElement>(`[data-points="${side}"]`)!.textContent = String(onCourt[side]);
       root.querySelector<HTMLElement>(`[data-games="${side}"]`)!.textContent = gamesLabel(won[side]);
       button.disabled = Boolean(over) || saved;
-      button.setAttribute('aria-label', `${names[side]}, ${onCourt[side]}. ${over || saved ? 'Match finished.' : 'Add a point.'}`);
+      button.classList.toggle('is-serving', side === state.server && !over);
+      const serving = side === state.server && !over ? ` Serving from ${state.box}.` : '';
+      const level = slText(names[side]);
+      button.setAttribute('aria-label', `${names[side]}${level ? `, ${level}` : ''}, ${onCourt[side]}.${serving} ${over || saved ? 'Match finished.' : 'Add a point.'}`);
     }
+    paintLevels();
+    serveWho.textContent = over ? 'Match finished' : `${serverName} to serve`;
+    for (const box of ['R', 'L'] as const) {
+      const button = root.querySelector<HTMLButtonElement>(`[data-box="${box}"]`)!;
+      button.setAttribute('aria-pressed', String(state.box === box));
+      button.disabled = Boolean(over) || saved;
+    }
+    handBtn.hidden = !canChooseServer(state) || saved;
+    handBtn.textContent = `${names[otherPlayer(state.server)] || 'Other player'} serves`;
+    letBtn.disabled = Boolean(over) || saved;
     lineEl.textContent = dash(scoreLine(state));
-    undoBtn.disabled = saved || !hasPoints(state);
+    undoBtn.disabled = saved || !hasRallies(state);
     saveBtn.hidden = !over;
     saveBtn.disabled = saved;
-    saveBtn.textContent = saved ? 'Saved' : 'Save score';
+    saveBtn.textContent = saved ? 'Saved' : editingId ? 'Save changes' : 'Save score';
+    const called = markerCall(state);
     if (over) {
       const winner = over === 'a' ? names.a : names.b;
       callEl.textContent = `${winner} wins ${dash(scoreLine(state))}`;
-    } else if (finishedGames(state).length && onCourt.a === 0 && onCourt.b === 0) {
-      callEl.textContent = `Game. ${names.a} ${won.a}–${won.b} ${names.b}.`;
+    } else if (!currentRallies(state).length && finishedGames(state).length) {
+      const winner = state.server === 'a' ? names.a : names.b;
+      callEl.textContent = `Game. ${names.a} ${won.a}–${won.b} ${names.b}. ${winner} to serve, love-all.`;
+    } else if (called?.let) {
+      callEl.textContent = `Yes let, ${called.server}–${called.receiver}`;
+    } else if (called) {
+      const note = called.note === 'ten-all' ? '10-all: a player must win by 2 points' : called.note === 'match-ball' ? 'Match ball' : called.note === 'game-ball' ? 'Game ball' : '';
+      const lead = called.handOut ? 'Hand out, ' : '';
+      callEl.textContent = note === '10-all: a player must win by 2 points' ? `${lead}${note}` : `${lead}${called.server}–${called.receiver}${note ? `, ${note}` : ''}`;
     } else {
-      callEl.textContent = 'Tap the player who won the rally.';
+      callEl.textContent = `${serverName} to serve, love-all.`;
     }
+    paintTape();
   }
 
   function missingFunction(error: { code?: string; message?: string } | null) {
@@ -253,6 +401,7 @@ const names = [
     names = { a, b };
     state = freshMatch();
     saved = false;
+    editingId = null;
     show('');
     setup.hidden = true;
     board.hidden = false;
@@ -261,23 +410,48 @@ const names = [
   });
 
   board.addEventListener('click', (event) => {
-    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-side]');
+    const target = event.target as HTMLElement;
+    const box = target.closest<HTMLButtonElement>('[data-box]');
+    if (box && !box.disabled) {
+      state = setBox(state, box.dataset.box === 'L' ? 'L' : 'R');
+      saved = false;
+      paint();
+      return;
+    }
+    const button = target.closest<HTMLButtonElement>('[data-side]');
     if (!button || button.disabled) return;
     const side = button.dataset.side === 'b' ? 'b' : 'a';
     state = addPoint(state, side);
+    saved = false;
+    paint();
+  });
+
+  handBtn.addEventListener('click', () => {
+    state = setServer(state, otherPlayer(state.server));
+    saved = false;
+    paint();
+  });
+
+  letBtn.addEventListener('click', () => {
+    if (letBtn.disabled) return;
+    state = addLet(state);
+    saved = false;
     paint();
   });
 
   undoBtn.addEventListener('click', () => {
     if (undoBtn.disabled) return;
     state = undoPoint(state);
+    saved = false;
     paint();
   });
 
   root.querySelector<HTMLButtonElement>('[data-new]')!.addEventListener('click', () => {
-    if (!saved && hasPoints(state) && !confirm('Leave this score without saving it?')) return;
+    if (!saved && hasRallies(state) && !confirm('Leave this score without saving it?')) return;
     state = freshMatch();
     saved = false;
+    editingId = null;
+    history.replaceState(null, '', location.pathname);
     board.hidden = true;
     setup.hidden = false;
     root.classList.remove('is-playing');
@@ -291,13 +465,14 @@ const names = [
     if (!winner || saved) return;
     saveBtn.disabled = true;
     const row: Marked = {
-      id: `local-${Date.now()}`,
+      id: editingId ?? `local-${Date.now()}`,
       playerA: names.a,
       playerB: names.b,
       winner,
       score: games.map((game) => `${game.a}-${game.b}`).join(', '),
       marker: 'You',
       createdAt: new Date().toISOString(),
+      history: state,
       local: true,
     };
     if (!signedIn) {
@@ -308,11 +483,11 @@ const names = [
       return;
     }
     show('Saving…');
-    const { data, error } = await supabase.rpc('save_marked_match', {
-      p_a: names.a,
-      p_b: names.b,
-      p_games: games,
-    });
+    const payload = { p_a: names.a, p_b: names.b, p_games: games, p_history: state };
+    const savedCall = editingId
+      ? supabase.rpc('admin_save_marked_match', { p_id: editingId, ...payload })
+      : supabase.rpc('save_marked_match', payload);
+    const { data, error } = await savedCall;
     if (error && missingFunction(error)) {
       rememberLocal(row);
       saved = true;
@@ -330,7 +505,7 @@ const names = [
     paintRecent();
     saved = true;
     paint();
-    show('Saved. An organiser can accept it before it goes into Sport Manager.');
+    show(editingId ? 'Saved. The admin list has this match.' : 'Saved. An admin can open it under Scores.');
   });
 
   document.addEventListener('keydown', (event) => {
@@ -340,10 +515,16 @@ const names = [
     if (event.key === 'ArrowLeft') {
       event.preventDefault();
       state = addPoint(state, 'a');
+      saved = false;
       paint();
     } else if (event.key === 'ArrowRight') {
       event.preventDefault();
       state = addPoint(state, 'b');
+      saved = false;
+      paint();
+    } else if ((event.key === 'r' || event.key === 'l') && !saved) {
+      event.preventDefault();
+      state = setBox(state, event.key === 'l' ? 'L' : 'R');
       paint();
     } else if ((event.key === 'Backspace' || event.key === 'z') && !saved) {
       event.preventDefault();
@@ -352,8 +533,11 @@ const names = [
     }
   });
 
+  inputA.addEventListener('input', paintLevels);
+  inputB.addEventListener('input', paintLevels);
   fillNames([]);
   paintRecent();
+  void loadLevels();
 
   const { data } = await supabase.auth.getSession();
   signedIn = Boolean(data.session);
@@ -376,6 +560,27 @@ const names = [
     if (listResult.error && !missingFunction(listResult.error)) show(listResult.error.message);
     recent = [...shared, ...local.filter((row) => !shared.some((item) => item.score === row.score && item.playerA === row.playerA && item.playerB === row.playerB))];
     paintRecent();
+    const editId = Number(new URLSearchParams(location.search).get('id'));
+    if (editId) {
+      const { data: match, error: matchError } = await supabase.rpc('admin_marked_match', { p_id: editId });
+      const row = match as Marked | null;
+      const restored = restoreMatch(row?.history);
+      if (matchError || !row || !restored) {
+        show(matchError?.message || 'That match could not be opened.');
+      } else {
+        names = { a: row.playerA, b: row.playerB };
+        inputA.value = row.playerA;
+        inputB.value = row.playerB;
+        state = restored;
+        editingId = editId;
+        saved = false;
+        setup.hidden = true;
+        board.hidden = false;
+        root.classList.add('is-playing');
+        show('Editing this match. Undo a point to change the score, then save.');
+        paint();
+      }
+    }
   }
 </script>
 
@@ -413,6 +618,21 @@ const names = [
     gap: 0.3rem;
     font-size: 0.95rem;
   }
+  .sl-note {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+  .level {
+    min-height: 1.1rem;
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .level:empty {
+    display: none;
+  }
   input {
     width: 100%;
     background: var(--ink-900);
@@ -430,6 +650,62 @@ const names = [
     margin: 0;
     min-height: 1.5rem;
     font-weight: 700;
+  }
+  .serve {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.55rem;
+  }
+  .serve p {
+    margin: 0;
+    font-weight: 700;
+  }
+  .boxes {
+    display: flex;
+    gap: 0.35rem;
+  }
+  .box {
+    min-width: 3rem;
+    min-height: 3rem;
+    border-radius: 10px;
+    border: 2px solid var(--border-strong);
+    background: #fff;
+    color: #0e2744;
+    font-family: var(--font-display);
+    font-size: 1.35rem;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .box[aria-pressed='true'] {
+    background: #0e2744;
+    color: #fff;
+    border-color: #0e2744;
+  }
+  .side.is-serving {
+    outline: 3px solid #0e2744;
+    outline-offset: 3px;
+  }
+  .side--b.is-serving {
+    outline-color: #f15a22;
+  }
+  .tape {
+    max-height: 16rem;
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.55rem 0.8rem;
+    background: var(--bg-card);
+  }
+  .tape p,
+  .tape ol {
+    margin: 0.2rem 0 0.45rem;
+  }
+  .game-head {
+    font-weight: 700;
+  }
+  .tape ol {
+    padding-left: 1.2rem;
   }
   .sides {
     display: grid;
@@ -505,7 +781,7 @@ const names = [
       grid-template-columns: 1fr;
     }
     .side {
-      min-height: 30vh;
+      min-height: 26vh;
     }
     .score.is-playing h1 {
       font-size: 1.45rem;

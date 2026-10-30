@@ -65,6 +65,12 @@ const scoresHref = url('/captains/admin/minigame/');
                 <button type="button" data-tab-button="beds-closed">Players</button>
               </span>
             </span>
+            <span class="tab-group" data-lm-only>
+              <span class="tab-label">Scores</span>
+              <span class="tab-buttons">
+                <button type="button" data-tab-button="scores">Matches</button>
+              </span>
+            </span>
             <span class="tab-group">
               <span class="tab-label">SquashLevels</span>
               <span class="tab-buttons">
@@ -172,6 +178,43 @@ const scoresHref = url('/captains/admin/minigame/');
                 </table>
               </div>
             </div>
+          </section>
+
+          <section class="admin-panel" data-tab="scores" hidden>
+            <h2>Scores</h2>
+            <p class="muted small">Matches marked on the website. PAR to 11, best of five. The serve starts on the right. The same player moves to the other box. Hand out is a change of server, and that serve starts on the right again. Edit a name here, or open the scorer to change the points. Sport Manager is not updated from here.</p>
+            <p class="muted small" data-scores-status role="status"></p>
+            <div class="overview-box">
+              <table class="overview">
+                <thead>
+                  <tr>
+                    <th>When</th>
+                    <th>Match</th>
+                    <th>Score</th>
+                    <th>Marker</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody data-score-rows></tbody>
+              </table>
+            </div>
+            <form class="score-edit" data-score-edit hidden>
+              <h3>Edit match</h3>
+              <label>
+                Player A
+                <input data-score-a required />
+              </label>
+              <label>
+                Player B
+                <input data-score-b required />
+              </label>
+              <div data-score-tape></div>
+              <p class="actions">
+                <button class="btn btn--primary btn--sm" type="submit">Save names</button>
+                <a class="btn btn--ghost btn--sm" data-score-open href={url('/captains/score/')}>Change the points</a>
+                <button class="btn btn--ghost btn--sm" type="button" data-score-remove>Remove</button>
+              </p>
+            </form>
           </section>
 
           <section class="admin-panel" data-tab="site-sl" hidden>
@@ -748,7 +791,7 @@ const scoresHref = url('/captains/admin/minigame/');
   let roleCatalogLive: RoleCatalog[] = [];
   let protectedAdminId = '';
   const siteTabs = ['site-club', 'site-team', 'site-player', 'site-sl'] as const;
-  const tabs = [...siteTabs, 'juniors', 'beds-closed', 'members', 'permissions-groups', 'permissions-roles', 'links', 'traffic', 'database', 'integrations'] as const;
+  const tabs = [...siteTabs, 'juniors', 'beds-closed', 'scores', 'members', 'permissions-groups', 'permissions-roles', 'links', 'traffic', 'database', 'integrations'] as const;
   type Tab = (typeof tabs)[number];
   const tabAlias: Record<string, Tab> = {
     overview: 'members',
@@ -780,6 +823,7 @@ const scoresHref = url('/captains/admin/minigame/');
   let databaseLoaded = false;
   let integrationsLoaded = false;
   let bedsClosedLoaded = false;
+  let scoresLoaded = false;
   const databaseStatus = root.querySelector<HTMLElement>('[data-database-status]')!;
   const databasePanel = root.querySelector<HTMLElement>('[data-database]')!;
   const databaseCharts = root.querySelector<HTMLElement>('[data-database-charts]')!;
@@ -1406,6 +1450,166 @@ const scoresHref = url('/captains/admin/minigame/');
     paintBedsEntries();
   });
 
+  type MarkedRow = {
+    id: number;
+    playerA: string;
+    playerB: string;
+    winner: 'a' | 'b';
+    score: string;
+    marker: string;
+    createdAt: string;
+    history?: { games?: { winner: string; server?: string; box: string; a: number; b: number; handOut?: boolean }[][] };
+  };
+  let markedRows: MarkedRow[] = [];
+  let editingMatch: MarkedRow | null = null;
+  const scoreStatus = root.querySelector<HTMLElement>('[data-scores-status]')!;
+  const scoreBody = root.querySelector<HTMLElement>('[data-score-rows]')!;
+  const scoreEdit = root.querySelector<HTMLFormElement>('[data-score-edit]')!;
+  const scoreTape = root.querySelector<HTMLElement>('[data-score-tape]')!;
+  const scoreOpen = root.querySelector<HTMLAnchorElement>('[data-score-open]')!;
+  const scoreNameA = scoreEdit.querySelector<HTMLInputElement>('[data-score-a]')!;
+  const scoreNameB = scoreEdit.querySelector<HTMLInputElement>('[data-score-b]')!;
+
+  function scoreWhen(value: string) {
+    const when = new Date(value);
+    return Number.isNaN(when.getTime()) ? '' : when.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function gamesFromHistory(row: MarkedRow) {
+    const games = [];
+    for (const rallies of row.history?.games ?? []) {
+      const last = [...rallies].reverse().find((rally) => rally.winner === 'a' || rally.winner === 'b');
+      if (last) games.push({ a: last.a, b: last.b });
+    }
+    return games;
+  }
+
+  function paintScoreTape(row: MarkedRow) {
+    scoreTape.replaceChildren();
+    const games = row.history?.games ?? [];
+    if (!games.length) {
+      const empty = document.createElement('p');
+      empty.textContent = 'This match has no rally list yet. Open the scorer to mark the points.';
+      scoreTape.append(empty);
+      return;
+    }
+    games.forEach((rallies, index) => {
+      if (!rallies.length) return;
+      const heading = document.createElement('p');
+      heading.className = 'game-head';
+      const last = [...rallies].reverse().find((rally) => rally.winner === 'a' || rally.winner === 'b');
+      heading.textContent = last ? `Game ${index + 1} · ${last.a}–${last.b}` : `Game ${index + 1}`;
+      const list = document.createElement('ol');
+      for (const rally of [...rallies].reverse()) {
+        const item = document.createElement('li');
+        const score = `${rally.a}–${rally.b} ${rally.box}`;
+        item.textContent = rally.winner === 'let' ? `Let ${score}` : rally.handOut ? `Hand out ${score}` : score;
+        list.append(item);
+      }
+      scoreTape.append(heading, list);
+    });
+  }
+
+  function paintMarkedMatches() {
+    scoreBody.replaceChildren();
+    if (!markedRows.length) {
+      const row = document.createElement('tr');
+      const cell = document.createElement('td');
+      cell.colSpan = 5;
+      cell.textContent = 'No marked matches yet.';
+      row.append(cell);
+      scoreBody.append(row);
+      return;
+    }
+    for (const match of markedRows) {
+      const row = document.createElement('tr');
+      const when = document.createElement('td');
+      when.textContent = scoreWhen(match.createdAt);
+      const players = document.createElement('td');
+      const winner = match.winner === 'a' ? match.playerA : match.playerB;
+      const loser = match.winner === 'a' ? match.playerB : match.playerA;
+      players.textContent = `${winner} beat ${loser}`;
+      const score = document.createElement('td');
+      score.textContent = match.score;
+      const marker = document.createElement('td');
+      marker.textContent = match.marker;
+      const action = document.createElement('td');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn btn--ghost btn--sm';
+      button.textContent = 'Edit';
+      button.addEventListener('click', () => void openMarkedMatch(match.id));
+      action.append(button);
+      row.append(when, players, score, marker, action);
+      scoreBody.append(row);
+    }
+  }
+
+  async function openMarkedMatch(id: number) {
+    scoreStatus.textContent = 'Opening the match…';
+    const { data, error } = await supabase.rpc('admin_marked_match', { p_id: id });
+    if (error || !data) {
+      scoreStatus.textContent = error?.message || 'That match could not be opened.';
+      return;
+    }
+    editingMatch = data as MarkedRow;
+    scoreNameA.value = editingMatch.playerA;
+    scoreNameB.value = editingMatch.playerB;
+    scoreOpen.href = `${scoreOpen.pathname}?id=${editingMatch.id}`;
+    paintScoreTape(editingMatch);
+    scoreEdit.hidden = false;
+    scoreStatus.textContent = '';
+  }
+
+  async function loadMarkedMatches() {
+    scoreStatus.textContent = 'Loading matches…';
+    const { data, error } = await supabase.rpc('admin_marked_matches');
+    if (error) {
+      const message = error.message ?? '';
+      scoreStatus.textContent = error.code === 'PGRST202' || /could not find the function/i.test(message) ? 'The score list is not on the database yet.' : message;
+      scoresLoaded = true;
+      return;
+    }
+    markedRows = (data ?? []) as MarkedRow[];
+    paintMarkedMatches();
+    scoreStatus.textContent = markedRows.length ? '' : 'No marked matches yet.';
+    scoresLoaded = true;
+  }
+
+  scoreEdit.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!editingMatch) return;
+    const games = gamesFromHistory(editingMatch);
+    scoreStatus.textContent = 'Saving…';
+    const { error } = await supabase.rpc('admin_save_marked_match', {
+      p_id: editingMatch.id,
+      p_a: scoreNameA.value,
+      p_b: scoreNameB.value,
+      p_games: games,
+      p_history: editingMatch.history ?? {},
+    });
+    if (error) {
+      scoreStatus.textContent = error.message;
+      return;
+    }
+    scoreStatus.textContent = 'Saved.';
+    scoresLoaded = false;
+    await loadMarkedMatches();
+  });
+
+  root.querySelector<HTMLButtonElement>('[data-score-remove]')?.addEventListener('click', async () => {
+    if (!editingMatch || !confirm('Remove this marked match?')) return;
+    const { error } = await supabase.rpc('admin_delete_marked_match', { p_id: editingMatch.id });
+    if (error) {
+      scoreStatus.textContent = error.message;
+      return;
+    }
+    editingMatch = null;
+    scoreEdit.hidden = true;
+    scoresLoaded = false;
+    await loadMarkedMatches();
+  });
+
   let viewerIsAdmin = false;
   let viewerSeesJuniors = false;
   let viewerSeesBeds = false;
@@ -1414,7 +1618,7 @@ const scoresHref = url('/captains/admin/minigame/');
     const next = [...siteTabs] as Tab[];
     if (viewerSeesJuniors) next.push('juniors');
     if (viewerSeesBeds) next.push('beds-closed');
-    if (viewerIsAdmin) next.push('members', 'permissions-groups', 'permissions-roles', 'links', 'traffic', 'database', 'integrations');
+    if (viewerIsAdmin) next.push('scores', 'members', 'permissions-groups', 'permissions-roles', 'links', 'traffic', 'database', 'integrations');
     return next;
   };
 
@@ -1429,6 +1633,7 @@ const scoresHref = url('/captains/admin/minigame/');
     if (next === 'database' && !databaseLoaded) void loadDatabase();
     if (next === 'integrations' && !integrationsLoaded) void loadIntegrations();
     if (next === 'beds-closed' && !bedsClosedLoaded) void loadBedsClosed();
+    if (next === 'scores' && !scoresLoaded) void loadMarkedMatches();
   };
 
   root.addEventListener('click', (event) => {
@@ -4576,6 +4781,31 @@ const scoresHref = url('/captains/admin/minigame/');
     font-size: 1.75rem;
     font-weight: 700;
     color: var(--ink-950);
+  }
+  #setup-app .score-edit {
+    display: grid;
+    gap: 0.75rem;
+    max-width: 36rem;
+    margin-top: 1rem;
+  }
+  #setup-app .score-edit label {
+    display: grid;
+    gap: 0.25rem;
+  }
+  #setup-app .score-edit input {
+    background: var(--ink-900);
+    color: #fff;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 0.55rem 0.7rem;
+    font: inherit;
+  }
+  #setup-app [data-score-tape] {
+    max-height: 16rem;
+    overflow: auto;
+  }
+  #setup-app [data-score-tape] ol {
+    margin: 0.2rem 0 0.6rem;
   }
   #setup-app .beds-search {
     display: flex;

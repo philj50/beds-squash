@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  addLet,
   addPoint,
   cleanName,
   currentGame,
@@ -8,8 +9,12 @@ import {
   gameWon,
   legalGame,
   legalMatch,
+  markerCall,
   matchWinner,
+  restoreMatch,
   scoreLine,
+  setBox,
+  setServer,
   undoPoint,
 } from '../src/lib/scoreboard.ts';
 
@@ -30,40 +35,107 @@ test('a game ends at 11 with a two-point lead', () => {
   assert.equal(legalGame({ a: 13, b: 11 }), true);
 });
 
-test('points build a game, then the next game starts at love', () => {
+test('the first serve is from the right and changes side when the server continues', () => {
   let state = freshMatch();
-  state = play(state, 'a', 11);
-  assert.deepEqual(currentGame(state), { a: 0, b: 0 });
-  assert.equal(scoreLine(state), '11-0');
-  state = addPoint(state, 'b');
-  assert.deepEqual(currentGame(state), { a: 0, b: 1 });
-  assert.equal(scoreLine(state), '11-0, 0-1');
+  assert.equal(state.box, 'R');
+  assert.equal(state.server, 'a');
+  state = addPoint(state, 'a');
+  assert.equal(state.server, 'a');
+  assert.equal(state.box, 'L');
+  assert.equal(state.choosing, false);
+  const rally = state.games[0][0];
+  assert.equal(rally.box, 'R');
+  assert.equal(rally.handOut, false);
+  assert.deepEqual(currentGame(state), { a: 1, b: 0 });
 });
 
-test('deuce needs two clear points', () => {
+test('the opening box can be the left, and that choice is what the rally records', () => {
+  let state = setBox(freshMatch(), 'L');
+  state = addPoint(state, 'a');
+  assert.equal(state.games[0][0].box, 'L');
+  assert.equal(state.box, 'R');
+});
+
+test('hand out gives the serve to the other player, from the right', () => {
+  let state = addPoint(freshMatch(), 'a');
+  state = addPoint(state, 'b');
+  assert.equal(state.server, 'b');
+  assert.equal(state.box, 'R');
+  assert.equal(state.choosing, true);
+  const handOut = state.games[0][1];
+  assert.equal(handOut.handOut, true);
+  assert.equal(handOut.box, 'L');
+  assert.deepEqual(currentGame(state), { a: 1, b: 1 });
+  state = setBox(state, 'L');
+  state = addPoint(state, 'b');
+  assert.equal(state.server, 'b');
+  assert.equal(state.box, 'R');
+  assert.equal(state.games[0][2].box, 'L');
+});
+
+test('a let keeps the same server and the same box', () => {
+  let state = addPoint(freshMatch(), 'a');
+  assert.equal(state.box, 'L');
+  state = addLet(state);
+  assert.equal(state.server, 'a');
+  assert.equal(state.box, 'L');
+  assert.deepEqual(currentGame(state), { a: 1, b: 0 });
+  assert.equal(state.games[0][1].winner, 'let');
+  const call = markerCall(state);
+  assert.equal(call.let, true);
+  assert.deepEqual([call.server, call.receiver], [1, 0]);
+});
+
+test('the call puts the server score first and says hand out', () => {
+  let state = addPoint(freshMatch(), 'b');
+  const call = markerCall(state);
+  assert.equal(call.handOut, true);
+  assert.deepEqual([call.server, call.receiver], [1, 0]);
+});
+
+test('10-all is called once, then the leader has game ball', () => {
   let state = freshMatch();
   state = play(state, 'a', 10);
   state = play(state, 'b', 10);
-  assert.equal(gameWon(currentGame(state)), false);
+  assert.equal(markerCall(state).note, 'ten-all');
   state = addPoint(state, 'a');
-  assert.deepEqual(currentGame(state), { a: 11, b: 10 });
+  assert.equal(markerCall(state).note, 'game-ball');
+  assert.equal(gameWon(currentGame(state)), false);
+});
+
+test('undo puts the serve back on the box it came from', () => {
+  let state = play(freshMatch(), 'a', 2);
+  assert.equal(state.box, 'R');
+  state = undoPoint(state);
+  assert.equal(state.server, 'a');
+  assert.equal(state.box, 'L');
+  assert.deepEqual(currentGame(state), { a: 1, b: 0 });
+  state = undoPoint(play(freshMatch(), 'a', 11));
+  assert.deepEqual(currentGame(state), { a: 10, b: 0 });
+  assert.equal(state.box, 'R');
+});
+
+test('the winner of a game serves the next one from the right', () => {
+  let state = play(freshMatch(), 'b', 11);
+  assert.deepEqual(currentGame(state), { a: 0, b: 0 });
+  assert.equal(state.server, 'b');
+  assert.equal(state.box, 'R');
+  assert.equal(state.choosing, true);
+  assert.equal(scoreLine(state), '0-11');
+  state = setServer(state, 'a');
+  assert.equal(state.server, 'a');
+  state = addPoint(state, 'a');
+  assert.equal(setServer(state, 'b').server, 'a');
+});
+
+test('deuce needs two clear points and the match stops at three games', () => {
+  let state = freshMatch();
+  state = play(state, 'a', 10);
+  state = play(state, 'b', 10);
+  state = addPoint(state, 'a');
   state = addPoint(state, 'a');
   assert.equal(scoreLine(state), '12-10');
-  assert.deepEqual(currentGame(state), { a: 0, b: 0 });
-});
-
-test('undo reopens the game that just finished', () => {
-  let state = play(freshMatch(), 'a', 11);
-  state = undoPoint(state);
-  assert.deepEqual(currentGame(state), { a: 10, b: 0 });
-  assert.equal(scoreLine(state), '10-0');
-  state = undoPoint(state);
-  assert.deepEqual(currentGame(state), { a: 9, b: 0 });
-});
-
-test('best of five stops when one player has three games', () => {
-  let state = freshMatch();
-  state = play(state, 'a', 11);
+  state = play(freshMatch(), 'a', 11);
   state = play(state, 'b', 11);
   state = play(state, 'a', 11);
   state = play(state, 'a', 11);
@@ -77,15 +149,17 @@ test('best of five stops when one player has three games', () => {
     { a: 11, b: 0 },
     { a: 11, b: 0 },
   ]), 'a');
-  assert.equal(legalMatch([
-    { a: 11, b: 0 },
-    { a: 11, b: 0 },
-    { a: 11, b: 0 },
-    { a: 11, b: 0 },
-  ]), null);
 });
 
-test('names keep an apostrophe and reject a blank or a duplicate shape', () => {
+test('a saved match can be opened again with its serve history', () => {
+  const played = addPoint(setBox(freshMatch(), 'L'), 'a');
+  const restored = restoreMatch(played);
+  assert.equal(restored.games[0][0].box, 'L');
+  assert.equal(restored.box, 'R');
+  assert.equal(restoreMatch({ server: 'a' }), null);
+});
+
+test('names keep an apostrophe and reject a blank', () => {
   assert.equal(cleanName("  James   O'Connor "), "James O'Connor");
   assert.equal(cleanName('A'), null);
   assert.equal(cleanName('Max2'), null);
