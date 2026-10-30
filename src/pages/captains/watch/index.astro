@@ -5,14 +5,14 @@ import { url } from '@/lib/site';
 ---
 
 <Base
-  title="Watch a match"
+  title="Match commentary"
   description="Follow a squash match being marked on Beds Squash, and hear the score as it changes."
   noindex
-  crumbs={[{ name: 'Watch a match', path: '/captains/watch/' }]}
+  crumbs={[{ name: 'Match commentary', path: '/captains/watch/' }]}
 >
   <section class="section">
     <div class="container watch" id="watch-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} data-login={url('/login/')}>
-      <h1>Watch a match</h1>
+      <h1>Match commentary</h1>
       <p class="lede">Choose a match that is being marked. The score updates as each point is entered. Tick Say the score to hear it.</p>
       <p class="status" data-status role="status"></p>
 
@@ -30,9 +30,9 @@ import { url } from '@/lib/site';
           <p data-b></p>
         </div>
         <p class="points" data-points></p>
-        <p class="line" data-line></p>
+        <p class="clock" data-clock></p>
+        <ul class="game-times" data-times></ul>
         <p class="call" data-call></p>
-        <div class="sheet" data-sheet></div>
         <p class="marker" data-marker></p>
         <p class="updated" data-updated></p>
         <p class="note" data-note></p>
@@ -51,14 +51,13 @@ import { url } from '@/lib/site';
     currentGame,
     currentRallies,
     finishedGames,
-    gameStem,
+    liveMatchCurrent,
     matchWinner,
     publicPlayerName,
     restoreMatch,
-    scoreLine,
     spokenMark,
     spokenPublicLine,
-    type ScoreState,
+    unpackLiveScore,
   } from '@/lib/scoreboard';
 
   type LiveRow = {
@@ -88,6 +87,10 @@ import { url } from '@/lib/site';
   let sayScore = localStorage.getItem('beds-say-score') === '1';
   let heard = '';
   let voiceArmed = false;
+  let heardRestart = 0;
+  let clockText = '';
+  let clockAt = 0;
+  let clockLive = false;
   sayBox.checked = sayScore;
 
   const shown = (name: string) => (signedIn ? name : publicPlayerName(name));
@@ -112,14 +115,23 @@ import { url } from '@/lib/site';
     return minutes === 1 ? 'Updated 1 min ago' : `Updated ${minutes} min ago`;
   }
 
-  function speak(text: string) {
+  let speakTimer = 0;
+
+  function speak(text: string, quietAfter = text) {
     if (!sayScore || !text || !window.speechSynthesis) return;
     heard = text;
-    const line = new SpeechSynthesisUtterance(text);
-    line.lang = 'en-GB';
-    line.rate = 0.95;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(line);
+    const synth = window.speechSynthesis;
+    window.clearTimeout(speakTimer);
+    synth.cancel();
+    speakTimer = window.setTimeout(() => {
+      if (!sayScore || heard !== text) return;
+      heard = quietAfter;
+      const line = new SpeechSynthesisUtterance(text);
+      line.lang = 'en-GB';
+      line.rate = 0.95;
+      synth.resume();
+      synth.speak(line);
+    }, 80);
   }
 
   function announce(text: string) {
@@ -133,19 +145,40 @@ import { url } from '@/lib/site';
     speak(text);
   }
 
-  function paintSheet(state: ScoreState) {
-    const sheet = root.querySelector<HTMLElement>('[data-sheet]')!;
-    sheet.replaceChildren();
-    state.games.forEach((rallies, index) => {
-      if (!rallies.length) return;
-      const stem = gameStem(rallies);
-      const game = document.createElement('section');
-      const heading = document.createElement('p');
-      heading.textContent = `Game ${index + 1}`;
-      const total = document.createElement('p');
-      total.textContent = `${stem.score.a}–${stem.score.b}`;
-      game.append(heading, total);
-      sheet.append(game);
+  function shownClock() {
+    if (!clockText) return '';
+    if (!clockLive) return clockText;
+    const [minutes, seconds] = clockText.split(':').map((part) => Number(part) || 0);
+    const total = minutes * 60 + seconds + Math.max(0, Math.floor((Date.now() - clockAt) / 1000));
+    const nextMinutes = Math.floor(total / 60);
+    const nextSeconds = total % 60;
+    return `${String(nextMinutes).padStart(2, '0')}:${String(nextSeconds).padStart(2, '0')}`;
+  }
+
+  function paintClock() {
+    const clock = root.querySelector<HTMLElement>('[data-clock]');
+    if (!clock) return;
+    const text = shownClock();
+    clock.textContent = text ? `This game ${text}` : '';
+  }
+
+  function paintTimes(line: string, times: string[]) {
+    const list = root.querySelector<HTMLElement>('[data-times]')!;
+    const parts = line && line !== '0-0' ? line.split(',').map((part) => part.trim()).filter(Boolean) : [];
+    list.replaceChildren();
+    times.forEach((time, index) => {
+      const item = document.createElement('li');
+      const label = document.createElement('span');
+      label.className = 'label';
+      label.textContent = `Game ${index + 1}`;
+      const score = document.createElement('span');
+      score.className = 'game-score';
+      score.textContent = (parts[index] || '').replace('-', '–');
+      const taken = document.createElement('span');
+      taken.className = 'time';
+      taken.textContent = time;
+      item.append(label, score, taken);
+      list.append(item);
     });
   }
 
@@ -165,7 +198,7 @@ import { url } from '@/lib/site';
       const players = document.createElement('span');
       players.textContent = `${shown(row.playerA)} v ${shown(row.playerB)}`;
       const score = document.createElement('span');
-      score.textContent = pretty(row.score);
+      score.textContent = pretty(unpackLiveScore(row.score).line);
       button.append(players, score);
       button.addEventListener('click', () => openMatch(row.id));
       item.append(button);
@@ -175,26 +208,34 @@ import { url } from '@/lib/site';
 
   function paintLive(row: LiveRow) {
     const names = { a: shown(row.playerA), b: shown(row.playerB) };
+    const shared = unpackLiveScore(row.score || '0-0');
     const restored = signedIn ? restoreMatch(row.history) : null;
-    const nextStamp = restored ? JSON.stringify(row.history) : `${names.a}|${names.b}|${row.score}`;
+    const said = shared.call || spokenPublicLine(names.a, names.b, shared.line);
+    const nextStamp = `${shared.line}|${shared.restart}|${said}|${restored ? JSON.stringify(restored) : `${names.a}|${names.b}`}`;
     const changed = nextStamp !== stamp;
+    const restarting = voiceArmed && shared.restart !== heardRestart;
     stamp = nextStamp;
+    heardRestart = shared.restart;
     picker.hidden = true;
     live.hidden = false;
     root.querySelector<HTMLElement>('[data-a]')!.textContent = names.a;
     root.querySelector<HTMLElement>('[data-b]')!.textContent = names.b;
-    const line = pretty(row.score) || '0–0';
-    root.querySelector<HTMLElement>('[data-line]')!.textContent = line;
     root.querySelector<HTMLElement>('[data-updated]')!.textContent = updatedAgo(row.updatedAt);
+    clockText = shared.clock;
+    clockAt = new Date(row.updatedAt).getTime() || Date.now();
+    clockLive = Boolean(shared.clock);
+    paintClock();
+    paintTimes(shared.line, shared.times);
     const marker = root.querySelector<HTMLElement>('[data-marker]')!;
     const note = root.querySelector<HTMLElement>('[data-note]')!;
     const call = root.querySelector<HTMLElement>('[data-call]')!;
     const points = root.querySelector<HTMLElement>('[data-points]')!;
     if (!restored) {
-      points.textContent = '';
-      call.textContent = '';
+      const parts = shared.line && shared.line !== '0-0' ? shared.line.split(',').map((part) => part.trim()).filter(Boolean) : [];
+      const current = parts.length > shared.times.length ? parts[parts.length - 1] : '0-0';
+      points.textContent = pretty(current).replace('–', ' – ');
+      call.textContent = said;
       marker.textContent = '';
-      root.querySelector<HTMLElement>('[data-sheet]')!.replaceChildren();
       note.replaceChildren();
       if (!signedIn) {
         const link = document.createElement('a');
@@ -202,7 +243,11 @@ import { url } from '@/lib/site';
         link.textContent = 'Sign in';
         note.append(link, ' to see the full names and every point.');
       }
-      if (changed) announce(spokenPublicLine(names.a, names.b, row.score || '0-0'));
+      if (restarting && shared.times.length) {
+        speak(spokenPublicLine(names.a, names.b, shared.line), said);
+        return;
+      }
+      if (changed) announce(said);
       return;
     }
     note.textContent = '';
@@ -213,7 +258,10 @@ import { url } from '@/lib/site';
     const phase = winner ? 'done' : between ? 'next' : 'play';
     call.textContent = spokenMark(restored, names, phase);
     marker.textContent = row.marker ? `Marked by ${row.marker}` : '';
-    paintSheet(restored);
+    if (restarting && finishedGames(restored).length) {
+      speak(spokenMark(restored, names, 'next'), call.textContent);
+      return;
+    }
     if (changed) announce(call.textContent);
   }
 
@@ -222,6 +270,7 @@ import { url } from '@/lib/site';
     stamp = '';
     voiceArmed = false;
     heard = '';
+    heardRestart = 0;
     const url = new URL(location.href);
     url.searchParams.set('match', String(id));
     history.replaceState(null, '', `${url.pathname}${url.search}`);
@@ -253,7 +302,7 @@ import { url } from '@/lib/site';
       return;
     }
     show('');
-    rows = Array.isArray(data) ? (data as LiveRow[]) : [];
+    rows = (Array.isArray(data) ? (data as LiveRow[]) : []).filter((row) => liveMatchCurrent(row.updatedAt));
     if (matchId) {
       const row = rows.find((item) => item.id === matchId);
       if (!row) {
@@ -282,11 +331,9 @@ import { url } from '@/lib/site';
     voiceArmed = true;
     heard = '';
     const row = rows.find((item) => item.id === matchId);
-    const text = row
-      ? (signedIn && restoreMatch(row.history)
-          ? root.querySelector('[data-call]')?.textContent
-          : spokenPublicLine(shown(row.playerA), shown(row.playerB), row.score || '0-0'))
-      : '';
+    const shared = row ? unpackLiveScore(row.score || '0-0') : null;
+    const text = root.querySelector('[data-call]')?.textContent
+      || (row && shared ? shared.call || spokenPublicLine(shown(row.playerA), shown(row.playerB), shared.line) : '');
     speak(text || 'The score will be read out.');
   });
 
@@ -298,6 +345,7 @@ import { url } from '@/lib/site';
   if (requested) matchId = requested;
   await loadRows();
   window.setInterval(() => void loadRows(), 2000);
+  window.setInterval(paintClock, 1000);
 </script>
 
 <style>
@@ -315,6 +363,7 @@ import { url } from '@/lib/site';
   .call:empty,
   .marker:empty,
   .points:empty,
+  .clock:empty,
   .updated:empty,
   .current-note:empty {
     display: none;
@@ -371,7 +420,6 @@ import { url } from '@/lib/site';
     text-align: right;
   }
   .points,
-  .line,
   .call {
     margin: 0.35rem 0 0;
     text-align: center;
@@ -382,33 +430,52 @@ import { url } from '@/lib/site';
     font-size: clamp(3rem, 12vw, 5.5rem);
     line-height: 1;
   }
-  .line {
-    color: #e0a800;
+  .clock {
+    margin: 0.2rem 0 0;
+    text-align: center;
+    color: var(--text-muted);
+    font-weight: 700;
+  }
+  .game-times {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.55rem;
+    margin: 0.9rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .game-times:empty {
+    display: none;
+  }
+  .game-times :global(li) {
+    min-width: 5.4rem;
+    padding: 0.45rem 0.7rem 0.5rem;
+    background: #fff;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    text-align: center;
+  }
+  .game-times :global(.label),
+  .game-times :global(.time) {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .game-times :global(.game-score) {
+    display: block;
+    margin: 0.1rem 0;
+    color: #0e2744;
     font-family: var(--font-display);
-    font-size: 1.6rem;
+    font-size: 1.35rem;
+    font-weight: 800;
   }
   .marker {
     margin: 0.8rem 0 0;
     font-weight: 700;
-  }
-  .sheet {
-    display: flex;
-    gap: 0.75rem;
-    overflow-x: auto;
-    margin-top: 1rem;
-  }
-  .sheet :global(section) {
-    flex: 1 0 7rem;
-    text-align: center;
-  }
-  .sheet :global(p) {
-    margin: 0;
-    font-weight: 700;
-  }
-  .sheet :global(p:last-child) {
-    color: #e0a800;
-    font-family: var(--font-display);
-    font-size: 1.3rem;
   }
   .say {
     display: flex;

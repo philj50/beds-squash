@@ -25,8 +25,8 @@ const venues = (await getClubs()).map((club) => ({
       <div data-panel="signed-in" hidden>
         <p class="who" data-who></p>
         <p class="actions">
-          <a class="btn btn--ghost" href={url('/captains/score/')}>Score</a>
-          <a class="btn btn--ghost" href={url('/captains/watch/')} data-watch>Watch</a>
+          <a class="btn btn--ghost" href={url('/captains/score/')}>Marking</a>
+          <a class="btn btn--ghost" href={url('/captains/watch/')} data-watch>Match commentary</a>
         </p>
         <p class="actions">
           <a class="btn btn--ghost btn--sm" href={url('/captains/matches/')}>Matches</a>
@@ -75,6 +75,7 @@ const venues = (await getClubs()).map((club) => ({
 <script>
   import { createClient } from '@supabase/supabase-js';
   import { loadAccount, noteActivity, privateStop, sendToLogin, stopMessage, type Account } from '@/lib/account';
+  import { liveMatchCurrent, unpackLiveScore } from '@/lib/scoreboard';
 
   type Membership = { role: string; club_slug: string | null; team_id: number | null };
   type Squad = { id: number; name: string; team_id: number };
@@ -600,11 +601,11 @@ const venues = (await getClubs()).map((club) => ({
   const onCourt = root.querySelector<HTMLElement>('[data-on-court]')!;
   const onCourtList = root.querySelector<HTMLElement>('[data-on-court-list]')!;
   const scoreHref = watchLink.getAttribute('href') || '';
-  type CourtMatch = { id: number; playerA: string; playerB: string; score: string };
+  type CourtMatch = { id: number; playerA: string; playerB: string; score: string; updatedAt: string };
   let courtRows: CourtMatch[] = [];
 
   function paintCourt() {
-    const pretty = (score: string) => (score || '0-0').replace(/-/g, '–');
+    const pretty = (score: string) => (unpackLiveScore(score).line || '0-0').replace(/-/g, '–');
     const page = scoreHref.split('?')[0];
     watchLink.href = courtRows.length === 1 ? `${page}?match=${courtRows[0].id}` : page;
     onCourt.hidden = courtRows.length < 2;
@@ -621,7 +622,7 @@ const venues = (await getClubs()).map((club) => ({
 
   async function loadCourt() {
     const { data, error } = await supabase.rpc('current_matches');
-    courtRows = !error && Array.isArray(data) ? (data as CourtMatch[]) : [];
+    courtRows = (!error && Array.isArray(data) ? (data as CourtMatch[]) : []).filter((row) => liveMatchCurrent(row.updatedAt));
     paintCourt();
   }
 

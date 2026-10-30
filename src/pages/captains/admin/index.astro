@@ -66,7 +66,7 @@ const scoresHref = url('/captains/admin/minigame/');
               </span>
             </span>
             <span class="tab-group" data-lm-only>
-              <span class="tab-label">Scores</span>
+              <span class="tab-label">Marking</span>
               <span class="tab-buttons">
                 <button type="button" data-tab-button="scores">Matches</button>
               </span>
@@ -181,8 +181,29 @@ const scoresHref = url('/captains/admin/minigame/');
           </section>
 
           <section class="admin-panel" data-tab="scores" hidden>
-            <h2>Scores</h2>
-            <p class="muted small">Matches marked on the website. PAR to 11, best of five. The serve starts on the right. The same player moves to the other box. Hand out is a change of server, and that serve starts on the right again. A let is played again. A stroke gives the point. Edit a name here, or open the scorer to change the points. Delete removes the match. Sport Manager is not updated from here.</p>
+            <h2>Marking</h2>
+            <p class="muted small">Matches marked on the website. PAR to 11, or PAR to 15 for the second division, best of five. The serve starts on the right. The same player moves to the other box. Hand out is a change of server, and that serve starts on the right again. A let is played again. A stroke gives the point. Edit a name here, or open Marking to change the points. Delete removes the match. Sport Manager is not updated from here.</p>
+            <h3>In play</h3>
+            <p class="muted small">A match with no score for an hour can be taken off the list. A match that is still being marked stays.</p>
+            <p class="muted small" data-live-status role="status"></p>
+            <p class="actions">
+              <button class="btn btn--ghost btn--sm" type="button" data-live-clear hidden>Clear stale matches</button>
+            </p>
+            <div class="overview-box">
+              <table class="overview">
+                <thead>
+                  <tr>
+                    <th>Last score</th>
+                    <th>Match</th>
+                    <th>Score</th>
+                    <th>Marker</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody data-live-rows></tbody>
+              </table>
+            </div>
+            <h3>Saved</h3>
             <p class="muted small" data-scores-status role="status"></p>
             <div class="overview-box">
               <table class="overview">
@@ -676,7 +697,7 @@ const scoresHref = url('/captains/admin/minigame/');
   import { loadAccount, noteActivity, privateStop, sendToLogin, stopMessage, type Account } from '@/lib/account';
   import { ENTRY_GROUPS } from '@/lib/junior-age';
   import { compareCellText, sortMarkupRows, watchSortableTables } from '@/lib/table-sort';
-  import { gameStem } from '@/lib/scoreboard';
+  import { gameStem, unpackLiveScore } from '@/lib/scoreboard';
 
   type Person = { id: string; display_name: string; email: string | null; is_admin: boolean };
   type Club = { slug: string; name: string; contact_name: string | null; contact_email: string | null; leaguemaster_club_id?: string | null };
@@ -1470,6 +1491,89 @@ const scoresHref = url('/captains/admin/minigame/');
   const scoreOpen = root.querySelector<HTMLAnchorElement>('[data-score-open]')!;
   const scoreNameA = scoreEdit.querySelector<HTMLInputElement>('[data-score-a]')!;
   const scoreNameB = scoreEdit.querySelector<HTMLInputElement>('[data-score-b]')!;
+  const liveStatus = root.querySelector<HTMLElement>('[data-live-status]')!;
+  const liveBody = root.querySelector<HTMLElement>('[data-live-rows]')!;
+  const liveClear = root.querySelector<HTMLButtonElement>('[data-live-clear]')!;
+  type LiveStale = { id: number; playerA: string; playerB: string; score: string; marker: string; updatedAt: string };
+  let staleRows: LiveStale[] = [];
+
+  function liveLine(score: string) {
+    return (unpackLiveScore(score).line || '0-0').replace(/-/g, '–');
+  }
+
+  function paintStaleMatches() {
+    liveBody.replaceChildren();
+    liveClear.hidden = staleRows.length === 0;
+    if (!staleRows.length) {
+      const row = document.createElement('tr');
+      const cell = document.createElement('td');
+      cell.colSpan = 5;
+      cell.textContent = 'No stale matches in play.';
+      row.append(cell);
+      liveBody.append(row);
+      return;
+    }
+    for (const match of staleRows) {
+      const row = document.createElement('tr');
+      const when = document.createElement('td');
+      when.textContent = scoreWhen(match.updatedAt);
+      const players = document.createElement('td');
+      players.textContent = `${match.playerA} v ${match.playerB}`;
+      const score = document.createElement('td');
+      score.textContent = liveLine(match.score);
+      const marker = document.createElement('td');
+      marker.textContent = match.marker;
+      const action = document.createElement('td');
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn btn--ghost btn--sm';
+      remove.textContent = 'Clear';
+      remove.addEventListener('click', () => void clearStaleMatch(match.id));
+      action.append(remove);
+      row.append(when, players, score, marker, action);
+      liveBody.append(row);
+    }
+  }
+
+  async function loadStaleMatches() {
+    liveStatus.textContent = 'Loading matches in play…';
+    const { data, error } = await supabase.rpc('admin_stale_live_matches');
+    if (error) {
+      const message = error.message ?? '';
+      liveStatus.textContent = error.code === 'PGRST202' || /could not find the function/i.test(message) ? 'Stale matches are not on the database yet.' : message;
+      staleRows = [];
+      liveClear.hidden = true;
+      liveBody.replaceChildren();
+      return;
+    }
+    staleRows = (data ?? []) as LiveStale[];
+    paintStaleMatches();
+    liveStatus.textContent = '';
+  }
+
+  async function clearStaleMatch(id: number) {
+    if (!confirm('Take this match off the list?')) return;
+    liveStatus.textContent = 'Clearing…';
+    const { error } = await supabase.rpc('admin_clear_stale_live_match', { p_id: id });
+    if (error) {
+      liveStatus.textContent = error.message;
+      return;
+    }
+    liveStatus.textContent = 'Cleared.';
+    await loadStaleMatches();
+  }
+
+  liveClear.addEventListener('click', async () => {
+    if (!staleRows.length || !confirm('Take every stale match off the list?')) return;
+    liveStatus.textContent = 'Clearing…';
+    const { error } = await supabase.rpc('admin_clear_stale_live_matches');
+    if (error) {
+      liveStatus.textContent = error.message;
+      return;
+    }
+    liveStatus.textContent = 'Cleared.';
+    await loadStaleMatches();
+  });
 
   function scoreWhen(value: string) {
     const when = new Date(value);
@@ -1491,7 +1595,7 @@ const scoresHref = url('/captains/admin/minigame/');
     const played = games.filter((rallies) => rallies.length);
     if (!played.length) {
       const empty = document.createElement('p');
-      empty.textContent = 'This match has no rally list yet. Open the scorer to mark the points.';
+      empty.textContent = 'This match has no rally list yet. Open Marking to mark the points.';
       scoreTape.append(empty);
       return;
     }
@@ -1669,7 +1773,10 @@ const scoresHref = url('/captains/admin/minigame/');
     if (next === 'database' && !databaseLoaded) void loadDatabase();
     if (next === 'integrations' && !integrationsLoaded) void loadIntegrations();
     if (next === 'beds-closed' && !bedsClosedLoaded) void loadBedsClosed();
-    if (next === 'scores' && !scoresLoaded) void loadMarkedMatches();
+    if (next === 'scores' && !scoresLoaded) {
+      void loadMarkedMatches();
+      void loadStaleMatches();
+    }
   };
 
   root.addEventListener('click', (event) => {

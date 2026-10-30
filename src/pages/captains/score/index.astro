@@ -14,18 +14,18 @@ const names = [
 ---
 
 <Base
-  title="Score a match"
-  description="Mark a squash match on Beds Squash. PAR to 11, win by two, best of five."
+  title="Mark a match"
+  description="Mark a squash match on Beds Squash. PAR to 11, or PAR to 15 for the second division. Win by two, best of five."
   noindex
-  crumbs={[{ name: 'Score a match', path: '/captains/score/' }]}
+  crumbs={[{ name: 'Mark a match', path: '/captains/score/' }]}
 >
   <section class="section">
     <div class="container score" id="score-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
-      <h1>Score a match</h1>
+      <h1>Mark a match</h1>
       <p class="status" data-status role="status"></p>
       <p class="signin" data-signin hidden>
         <a data-login href="/login/">Sign in</a>
-        to keep the score on the site and to let other people watch. You can still mark a match on this browser first.
+        to keep the match on the site and to show it on Match commentary. You can still mark a match on this browser first.
       </p>
 
       <form class="card setup" data-setup>
@@ -48,9 +48,13 @@ const names = [
               <span class="sl-note" data-sl="b" hidden></span>
             </label>
           </div>
+          <div class="par" role="group" aria-label="Game length">
+            <button class="par__opt" type="button" data-par="11" aria-pressed="true">PAR 11</button>
+            <button class="par__opt" type="button" data-par="15" aria-pressed="false">PAR 15</button>
+          </div>
           <label class="share">
             <input type="checkbox" data-share />
-            Let people watch this match
+            Show on Match commentary
           </label>
           <button class="btn btn--primary" type="submit">Start match</button>
         </div>
@@ -59,6 +63,10 @@ const names = [
       <div class="board" data-board hidden>
         <div class="topbar">
           <p class="game-no" data-game-no>Game 1/5</p>
+          <div class="par" role="group" aria-label="Game length">
+            <button class="par__opt" type="button" data-par="11" aria-pressed="true">PAR 11</button>
+            <button class="par__opt" type="button" data-par="15" aria-pressed="false">PAR 15</button>
+          </div>
           <div class="top-actions">
             <button class="btn btn--ghost btn--sm" type="button" data-let>Let</button>
             <button class="btn btn--ghost btn--sm" type="button" data-stroke aria-pressed="false">Stroke</button>
@@ -104,12 +112,13 @@ const names = [
         <p class="actions">
           <label class="share share--board">
             <input type="checkbox" data-share />
-            Let people watch
+            Show on Match commentary
           </label>
           <button class="btn btn--ghost btn--sm" type="button" data-hand>Other player serves</button>
-          <button class="btn btn--primary" type="button" data-save hidden>Save score</button>
+          <button class="btn btn--primary" type="button" data-save hidden>Save match</button>
           <button class="btn btn--ghost" type="button" data-new>New match</button>
           <button class="btn btn--ghost" type="button" data-reset>Reset</button>
+          <button class="btn btn--ghost" type="button" data-clear>Clear</button>
           <button class="btn btn--ghost" type="button" data-back>Back to current matches</button>
         </p>
         <p class="watch-marker" data-watch-marker hidden></p>
@@ -158,19 +167,18 @@ const names = [
 
       <div class="recent-head">
         <h2>Marked here</h2>
-        <button class="btn btn--ghost btn--sm" type="button" data-clear hidden>Clear</button>
       </div>
       <dialog class="reset-dialog" data-reset-dialog>
         <h2>Reset this match?</h2>
         <p>The score goes back to love all and the clock starts again. The two players stay as they are.</p>
         <p class="actions">
           <button class="btn btn--primary" type="button" data-reset-yes>Reset match</button>
-          <button class="btn btn--ghost" type="button" data-reset-no>Keep scoring</button>
+          <button class="btn btn--ghost" type="button" data-reset-no>Keep marking</button>
         </p>
       </dialog>
       <ol class="recent" data-recent></ol>
       <p class="lede">
-        Pick the two players, then tap the player who won the rally. PAR to 11, win by two, best of five. Tick Let people watch and the match is listed under Current matches, so anyone on the site can follow it. The rally runs down the middle, and a clock runs for each game. After a game the board says Next game, then counts a 90 second rest. The first serve is from the right. Change it to the left when that is the box. The same player then serves from the other side. Hand out means the other player serves, from the right unless you change it. A let is played again. A stroke gives the point to the player you tap. The score stays on Beds Squash for an admin to check. It is not sent to Sport Manager.
+        Pick the two players and choose PAR 11 or PAR 15, then tap the player who won the rally. Both are win by two, best of five. PAR 15 is the second-division game. Tick Show on Match commentary and the match is listed under Current matches, so anyone on the site can follow it. The rally runs down the middle, and a clock runs for each game. After a game the board says Next game, then counts a 90 second rest. The first serve is from the right. Change it to the left when that is the box. The same player then serves from the other side. Hand out means the other player serves, from the right unless you change it. A let is played again. A stroke gives the point to the player you tap. The match stays on Beds Squash for an admin to check. It is not sent to Sport Manager.
       </p>
       <script id="score-names" type="application/json" is:inline set:html={JSON.stringify(names)}></script>
     </div>
@@ -190,17 +198,22 @@ const names = [
     finishedGames,
     freshMatch,
     gameStem,
+    gameTarget,
     gamesWon,
     hasRallies,
     legalMatch,
+    LIVE_IDLE_MS,
+    liveMatchCurrent,
     matchWinner,
     otherPlayer,
+    packLiveScore,
     publicPlayerName,
     restoreMatch,
     scoreLine,
     setBox,
     setServer,
     spokenMark,
+    unpackLiveScore,
     undoPoint,
     type Game,
     type ScoreState,
@@ -220,6 +233,7 @@ const names = [
   };
 
   const LOCAL_KEY = 'beds-marked-matches';
+  const SESSION_KEY = 'beds-score-session';
   const root = document.getElementById('score-app');
   if (!root) throw new Error('score app missing');
   const supabase = createClient(root.dataset.url!, root.dataset.key!);
@@ -274,6 +288,8 @@ const names = [
   let strokeArmed = false;
   let nameChoices: string[] = [];
   let shareLive = false;
+  let activeAt = Date.now();
+  let keepActivity = true;
   let watching = false;
   let watchId: number | null = null;
   let watchedJson = '';
@@ -309,6 +325,10 @@ const names = [
   let breakForGames = 0;
   let nextUntil = 0;
   let restUntil = 0;
+  /** Milliseconds for each finished game. */
+  let gameTimes: number[] = [];
+  /** How many times the next game has been started after a rest. */
+  let restartCount = 0;
 
   function formatClock(ms: number) {
     const total = Math.max(0, Math.floor(ms / 1000));
@@ -336,8 +356,17 @@ const names = [
     const finished = finishedGames(state).length;
     phase = matchWinner(state) ? 'done' : 'play';
     breakForGames = finished;
+    gameTimes = [];
+    restartCount = 0;
     if (phase === 'play') resetClock();
     else clockElapsed = 0;
+  }
+
+  function startNextGame() {
+    phase = 'play';
+    restartCount += 1;
+    resetClock();
+    paint();
   }
 
   /** Move between the game clock, the next-game message, and the rest. */
@@ -358,6 +387,7 @@ const names = [
     }
     if (finished > breakForGames && !live) {
       if (phase === 'play') freezeClock();
+      if (gameTimes.length < finished) gameTimes.push(clockElapsed);
       phase = 'next';
       nextUntil = performance.now() + NEXT_MS;
       breakForGames = finished;
@@ -365,6 +395,7 @@ const names = [
     }
     if (finished < breakForGames) {
       breakForGames = finished;
+      gameTimes.length = finished;
       phase = 'play';
       clockStart = performance.now();
     }
@@ -520,7 +551,6 @@ const names = [
 
   function paintRecent() {
     recentEl.replaceChildren();
-    clearBtn.hidden = recent.length === 0;
     if (!recent.length) {
       const item = document.createElement('li');
       item.textContent = 'No scores yet.';
@@ -647,7 +677,7 @@ const names = [
     undoBtn.disabled = watching || saved || !hasRallies(state);
     saveBtn.hidden = !over;
     saveBtn.disabled = saved;
-    saveBtn.textContent = saved ? 'Saved' : editingId ? 'Save changes' : 'Save score';
+    saveBtn.textContent = saved ? 'Saved' : editingId ? 'Save changes' : 'Save match';
     if (strokeArmed && phase === 'play') {
       callEl.textContent = 'Tap the player who is awarded the stroke.';
     } else {
@@ -665,6 +695,134 @@ const names = [
     queueLive();
     syncResult();
     paintResult();
+    saveSession();
+    syncPar();
+  }
+
+  function syncPar() {
+    const target = String(gameTarget(state));
+    const locked = !board.hidden && hasRallies(state);
+    for (const opt of root.querySelectorAll<HTMLButtonElement>('[data-par]')) {
+      opt.setAttribute('aria-pressed', opt.dataset.par === target ? 'true' : 'false');
+      opt.disabled = locked;
+    }
+  }
+
+  function chosenTarget(): 11 | 15 {
+    const pressed = root.querySelector<HTMLButtonElement>('[data-par][aria-pressed="true"]');
+    return pressed?.dataset.par === '15' ? 15 : 11;
+  }
+
+  function saveSession(touch = true) {
+    if (watching || board.hidden || resultMode) return;
+    if (touch && keepActivity) activeAt = Date.now();
+    localStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({
+        names,
+        state,
+        shareLive,
+        gameTimes,
+        restartCount,
+        phase,
+        clockElapsed: elapsedMs(),
+        breakForGames,
+        restLeft: phase === 'rest' ? Math.max(0, restUntil - performance.now()) : 0,
+        activeAt,
+        saved,
+        editingId,
+      }),
+    );
+  }
+
+  function clearSession() {
+    localStorage.removeItem(SESSION_KEY);
+  }
+
+  /** Leave the court. Saved matches under Marked here stay as they are. */
+  function endCourt(message: string) {
+    clearSession();
+    state = freshMatch('a', chosenTarget());
+    names = { a: '', b: '' };
+    inputA.value = '';
+    inputB.value = '';
+    saved = false;
+    editingId = null;
+    strokeArmed = false;
+    armSession();
+    watching = false;
+    watchId = null;
+    resultId = null;
+    resultBlocked = false;
+    resultMode = false;
+    resultScrolled = false;
+    void clearLive();
+    history.replaceState(null, '', location.pathname);
+    board.hidden = true;
+    setup.hidden = false;
+    root.classList.remove('is-playing', 'is-watching', 'is-result');
+    resultEl.hidden = true;
+    show(message);
+  }
+
+  function resumeSession() {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return;
+    let stored: {
+      names?: { a: string; b: string };
+      state?: unknown;
+      shareLive?: boolean;
+      gameTimes?: number[];
+      restartCount?: number;
+      phase?: 'play' | 'next' | 'rest' | 'done';
+      clockElapsed?: number;
+      breakForGames?: number;
+      restLeft?: number;
+      activeAt?: number;
+      saved?: boolean;
+      editingId?: number | null;
+    } | null = null;
+    try {
+      stored = JSON.parse(raw) as typeof stored;
+    } catch {
+      stored = null;
+    }
+    if (!stored?.activeAt || Date.now() - stored.activeAt > LIVE_IDLE_MS) {
+      clearSession();
+      void clearLive();
+      if (stored?.activeAt) show('That match timed out after an hour with no score.');
+      return;
+    }
+    const restored = restoreMatch(stored.state);
+    if (!restored || !stored.names?.a || !stored.names?.b) {
+      clearSession();
+      return;
+    }
+    keepActivity = false;
+    names = { a: stored.names.a, b: stored.names.b };
+    inputA.value = names.a;
+    inputB.value = names.b;
+    state = restored;
+    shareLive = Boolean(stored.shareLive);
+    for (const box of root.querySelectorAll<HTMLInputElement>('[data-share]')) box.checked = shareLive;
+    gameTimes = Array.isArray(stored.gameTimes) ? stored.gameTimes.filter((ms) => typeof ms === 'number') : [];
+    restartCount = stored.restartCount || 0;
+    activeAt = stored.activeAt;
+    phase = stored.phase === 'next' || stored.phase === 'rest' || stored.phase === 'done' ? stored.phase : 'play';
+    clockElapsed = stored.clockElapsed || 0;
+    clockStart = performance.now();
+    breakForGames = stored.breakForGames ?? finishedGames(state).length;
+    if (phase === 'rest') restUntil = performance.now() + (stored.restLeft || 0);
+    saved = Boolean(stored.saved);
+    editingId = typeof stored.editingId === 'number' ? stored.editingId : null;
+    setup.hidden = true;
+    board.hidden = false;
+    root.classList.add('is-playing');
+    show('This match is still on the court.');
+    paint();
+    keepActivity = true;
+    const top = board.getBoundingClientRect().top + window.scrollY - 96;
+    window.scrollTo({ top: Math.max(0, top), left: 0 });
   }
 
   function missingFunction(error: { code?: string; message?: string } | null) {
@@ -700,11 +858,11 @@ const names = [
       const text = document.createElement('span');
       const when = updatedAgo(row.updatedAt);
       const markerBit = signedIn && row.marker ? ` · ${row.marker}` : '';
-      text.textContent = `${displayName(row.playerA)} v ${displayName(row.playerB)} · ${dash(row.score) || '0–0'}${markerBit}${when ? ` · ${when}` : ''}`;
+      text.textContent = `${displayName(row.playerA)} v ${displayName(row.playerB)} · ${dash(unpackLiveScore(row.score).line) || '0–0'}${markerBit}${when ? ` · ${when}` : ''}`;
       const watch = document.createElement('a');
       watch.className = 'btn btn--ghost btn--sm';
       watch.href = `${base}/captains/watch/?match=${row.id}`;
-      watch.textContent = 'Watch';
+      watch.textContent = 'Commentary';
       item.append(text, watch);
       currentEl.append(item);
     }
@@ -721,7 +879,13 @@ const names = [
     const { error } = await supabase.rpc('publish_live_match', {
       p_a: names.a,
       p_b: names.b,
-      p_score: scoreLine(state) || '0-0',
+      p_score: packLiveScore(
+        scoreLine(state) || '0-0',
+        gameTimes.map((ms) => formatClock(ms)),
+        phase === 'play' ? formatClock(elapsedMs()) : '',
+        restartCount,
+        spokenMark(state, names, phase === 'done' ? 'play' : phase),
+      ),
       p_history: state,
     });
     if (error && missingFunction(error)) {
@@ -739,15 +903,16 @@ const names = [
   }
 
   function watchStamp(row: LiveRow) {
+    const live = unpackLiveScore(row.score);
     const restored = signedIn ? restoreMatch(row.history) : null;
-    if (restored) return JSON.stringify(row.history);
-    return `${displayName(row.playerA)}|${displayName(row.playerB)}|${row.score}|${signedIn ? row.marker ?? '' : ''}`;
+    if (restored) return `${JSON.stringify(restored)}|${live.restart}`;
+    return `${displayName(row.playerA)}|${displayName(row.playerB)}|${live.line}|${live.restart}|${signedIn ? row.marker ?? '' : ''}`;
   }
 
   function showPublicWatch(row: LiveRow) {
     root.querySelector<HTMLElement>('[data-public-a]')!.textContent = displayName(row.playerA);
     root.querySelector<HTMLElement>('[data-public-b]')!.textContent = displayName(row.playerB);
-    root.querySelector<HTMLElement>('[data-public-score]')!.textContent = dash(row.score) || '0–0';
+    root.querySelector<HTMLElement>('[data-public-score]')!.textContent = dash(unpackLiveScore(row.score).line) || '0–0';
     const marker = signedIn ? row.marker : '';
     publicMarker.hidden = !marker;
     publicMarker.textContent = marker ? `Marked by ${marker}` : '';
@@ -820,7 +985,7 @@ const names = [
       return;
     }
     currentNote.textContent = '';
-    currentRows = Array.isArray(data) ? (data as LiveRow[]) : [];
+    currentRows = (Array.isArray(data) ? (data as LiveRow[]) : []).filter((row) => liveMatchCurrent(row.updatedAt));
     paintCurrent();
     if (!watching || watchId == null) return;
     const row = currentRows.find((item) => item.id === watchId);
@@ -1103,6 +1268,14 @@ const names = [
     paintRecent();
   }
 
+  root.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-par]');
+    if (!button || button.disabled || watching) return;
+    if (!board.hidden && hasRallies(state)) return;
+    state = { ...state, target: button.dataset.par === '15' ? 15 : 11 };
+    syncPar();
+  });
+
   setup.addEventListener('submit', (event) => {
     event.preventDefault();
     const a = cleanName(inputA.value);
@@ -1116,7 +1289,7 @@ const names = [
       return;
     }
     names = { a, b };
-    state = freshMatch();
+    state = freshMatch('a', chosenTarget());
     saved = false;
     editingId = null;
     strokeArmed = false;
@@ -1125,12 +1298,15 @@ const names = [
     watching = false;
     root.classList.remove('is-watching');
     if (!shareLive) void clearLive();
-    if (shareLive && !signedIn) show('Sign in to let other people watch. This score stays on this browser.');
+    if (shareLive && !signedIn) show('Sign in to show this match on Match commentary. This mark stays on this browser.');
     else show('');
     setup.hidden = true;
     board.hidden = false;
     root.classList.add('is-playing');
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     paint();
+    const top = board.getBoundingClientRect().top + window.scrollY - 96;
+    window.scrollTo({ top: Math.max(0, top), left: 0 });
   });
 
   board.addEventListener('click', (event) => {
@@ -1160,11 +1336,7 @@ const names = [
       paint();
       return;
     }
-    if (phase === 'rest') {
-      phase = 'play';
-      resetClock();
-      paint();
-    }
+    if (phase === 'rest') startNextGame();
   });
 
   handBtn.addEventListener('click', () => {
@@ -1203,19 +1375,10 @@ const names = [
     show('Removed.');
   }
 
-  clearBtn.addEventListener('click', async () => {
-    if (!recent.length || !confirm('Remove every match you marked?')) return;
-    writeLocal([]);
-    if (signedIn) {
-      const { error } = await supabase.rpc('clear_marked_matches');
-      if (error && !missingFunction(error)) {
-        show(error.message);
-        return;
-      }
-    }
-    recent = [];
-    paintRecent();
-    show('Cleared.');
+  clearBtn.addEventListener('click', () => {
+    if (hasRallies(state) && !confirm('Clear this match?')) return;
+    endCourt('');
+    inputA.focus();
   });
 
   undoBtn.addEventListener('click', () => {
@@ -1237,7 +1400,7 @@ const names = [
   });
   resetDialog.querySelector<HTMLButtonElement>('[data-reset-yes]')!.addEventListener('click', () => {
     resetDialog.close();
-    state = freshMatch();
+    state = freshMatch('a', gameTarget(state));
     saved = false;
     strokeArmed = false;
     resultScrolled = false;
@@ -1247,8 +1410,9 @@ const names = [
   });
 
   root.querySelector<HTMLButtonElement>('[data-new]')!.addEventListener('click', () => {
-    if (!saved && hasRallies(state) && !confirm('Leave this score without saving it?')) return;
-    state = freshMatch();
+    if (!saved && hasRallies(state) && !confirm('Leave this match without saving it?')) return;
+    clearSession();
+    state = freshMatch('a', chosenTarget());
     saved = false;
     editingId = null;
     strokeArmed = false;
@@ -1271,7 +1435,7 @@ const names = [
 
   saveBtn.addEventListener('click', async () => {
     const games: Game[] = finishedGames(state);
-    const winner = legalMatch(games);
+    const winner = legalMatch(games, gameTarget(state));
     if (!winner || saved) return;
     saveBtn.disabled = true;
     const row: Marked = {
@@ -1288,6 +1452,7 @@ const names = [
     if (!signedIn) {
       rememberLocal(row);
       saved = true;
+      clearSession();
       paint();
       show('Saved on this browser. Sign in to put it on the site.');
       return;
@@ -1301,6 +1466,7 @@ const names = [
     if (error && missingFunction(error)) {
       rememberLocal(row);
       saved = true;
+      clearSession();
       paint();
       show('Saved on this browser. The shared list is not on the database yet.');
       void clearLive();
@@ -1315,8 +1481,9 @@ const names = [
     recent = [stored, ...recent.filter((item) => item.id !== stored.id && item.id !== row.id)];
     paintRecent();
     saved = true;
+    clearSession();
     paint();
-    show(editingId ? 'Saved. The admin list has this match.' : 'Saved. An admin can open it under Scores.');
+    show(editingId ? 'Saved. The admin list has this match.' : 'Saved. An admin can open it under Marking.');
     void clearLive();
   });
 
@@ -1331,9 +1498,7 @@ const names = [
     }
     if (phase === 'rest') {
       if (now >= restUntil) {
-        phase = 'play';
-        resetClock();
-        paint();
+        startNextGame();
         return;
       }
       const left = Math.max(0, Math.ceil((restUntil - now) / 1000));
@@ -1343,6 +1508,17 @@ const names = [
     }
     if (phase === 'play' && !watching) clockEl.textContent = formatClock(elapsedMs());
   }, 250);
+
+  window.setInterval(() => {
+    if (board.hidden || watching || resultMode) return;
+    if (Date.now() - activeAt <= LIVE_IDLE_MS) return;
+    endCourt('This match timed out after an hour with no score.');
+  }, 30_000);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') saveSession(false);
+  });
+  window.addEventListener('pagehide', () => saveSession(false));
 
   document.addEventListener('keydown', (event) => {
     if (board.hidden || watching) return;
@@ -1400,7 +1576,7 @@ const names = [
         return;
       }
       if (!signedIn) {
-        show('Sign in to let other people watch.');
+        show('Sign in to show this match on Match commentary.');
         return;
       }
       queueLive();
@@ -1469,11 +1645,12 @@ const names = [
   await loadCurrent();
   const params = new URLSearchParams(location.search);
   const resultParam = Number(params.get('result'));
+  const editing = params.get('id');
+  if (!resultParam && !editing) resumeSession();
   if (resultParam) {
     await loadPublicResult(resultParam);
   }
   const watchParam = Number(params.get('watch'));
-  const editing = params.get('id');
   if (!resultParam && watchParam && !editing && !root.classList.contains('is-playing')) {
     location.replace(`${base}/captains/watch/?match=${watchParam}`);
   }
@@ -1485,6 +1662,10 @@ const names = [
 <style>
   .score {
     max-width: 52rem;
+  }
+  .score h1,
+  .board {
+    scroll-margin-top: 6rem;
   }
   .lede {
     margin-top: 2rem;
@@ -1500,6 +1681,7 @@ const names = [
   .score.is-watching [data-save],
   .score.is-watching [data-new],
   .score.is-watching [data-reset],
+  .score.is-watching [data-clear],
   .score.is-watching .share--board,
   .score.is-result .setup,
   .score.is-result .board,
@@ -1743,6 +1925,28 @@ const names = [
     margin: 0;
     font-weight: 800;
     font-size: 1.05rem;
+  }
+  .par {
+    display: flex;
+    gap: 0.35rem;
+  }
+  .par__opt {
+    border: 1px solid var(--border-strong);
+    background: #fff;
+    color: #0e2744;
+    border-radius: 999px;
+    padding: 0.35rem 0.75rem;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 800;
+  }
+  .par__opt[aria-pressed='true'] {
+    background: #0e2744;
+    color: #fff;
+    border-color: #0e2744;
+  }
+  .par__opt:disabled {
+    cursor: default;
   }
   .top-actions {
     display: flex;

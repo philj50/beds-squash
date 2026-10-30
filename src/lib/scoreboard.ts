@@ -2,7 +2,8 @@
  * PAR scoring for one singles match, from the World Squash singles rules (2024).
  *
  * A rally winner scores one point and serves next (rule 2.1). Games are to 11,
- * and from 10-all a player must lead by two (rule 2.2). A match is the best of five.
+ * and from 10-all a player must lead by two (rule 2.2). Second-division matches
+ * use the same rule to 15. A match is the best of five.
  *
  * The first server is the one who won the spin (rule 5.1). At the start of each
  * game, and after hand-out, that server chooses the service box. This board
@@ -13,6 +14,11 @@
 
 export const GAME_TARGET = 11;
 export const GAMES_TO_WIN = 3;
+export type GameTarget = 11 | 15;
+
+export function gameTarget(state: { target?: number } | null | undefined): GameTarget {
+  return state?.target === 15 ? 15 : 11;
+}
 
 export type Player = 'a' | 'b';
 export type Side = Player;
@@ -37,10 +43,12 @@ export type ScoreState = {
   server: Player;
   box: Box;
   choosing: boolean;
+  /** 11 is the usual game. 15 is the second-division game. Missing means 11. */
+  target?: GameTarget;
 };
 
-export function freshMatch(server: Player = 'a'): ScoreState {
-  return { games: [[]], server, box: 'R', choosing: true };
+export function freshMatch(server: Player = 'a', target: GameTarget = 11): ScoreState {
+  return { games: [[]], server, box: 'R', choosing: true, target };
 }
 
 export function otherBox(box: Box): Box {
@@ -61,22 +69,23 @@ export function scoreOf(rallies: Rally[]): Game {
   return { a, b };
 }
 
-export function gameWon(game: Game): boolean {
+export function gameWon(game: Game, target: GameTarget = 11): boolean {
   const high = Math.max(game.a, game.b);
-  return high >= GAME_TARGET && Math.abs(game.a - game.b) >= 2;
+  return high >= target && Math.abs(game.a - game.b) >= 2;
 }
 
 /** A finished game that stops on the first winning point. */
-export function legalGame(game: Game): boolean {
-  if (!gameWon(game)) return false;
+export function legalGame(game: Game, target: GameTarget = 11): boolean {
+  if (!gameWon(game, target)) return false;
   const high = Math.max(game.a, game.b);
   const low = Math.min(game.a, game.b);
-  if (high === GAME_TARGET) return low <= GAME_TARGET - 2;
+  if (high === target) return low <= target - 2;
   return low === high - 2;
 }
 
 export function finishedGames(state: ScoreState): Game[] {
-  return state.games.map(scoreOf).filter(gameWon);
+  const target = gameTarget(state);
+  return state.games.map(scoreOf).filter((game) => gameWon(game, target));
 }
 
 export function gamesWon(state: ScoreState): Game {
@@ -132,7 +141,7 @@ export function addLet(state: ScoreState): ScoreState {
   if (!games.length) games.push([]);
   const last = games[games.length - 1];
   const score = scoreOf(last);
-  if (gameWon(score) && last.length) return state;
+  if (gameWon(score, gameTarget(state)) && last.length) return state;
   last.push({
     winner: 'let',
     server: state.server,
@@ -142,7 +151,7 @@ export function addLet(state: ScoreState): ScoreState {
     b: score.b,
     handOut: false,
   });
-  return { games, server: state.server, box: state.box, choosing: false };
+  return { games, server: state.server, box: state.box, choosing: false, target: gameTarget(state) };
 }
 
 export function addPoint(state: ScoreState, winner: Player): ScoreState {
@@ -151,7 +160,8 @@ export function addPoint(state: ScoreState, winner: Player): ScoreState {
   if (!games.length) games.push([]);
   const last = games[games.length - 1];
   const score = scoreOf(last);
-  if (gameWon(score) && last.length) return state;
+  const target = gameTarget(state);
+  if (gameWon(score, target) && last.length) return state;
   const next = {
     a: score.a + (winner === 'a' ? 1 : 0),
     b: score.b + (winner === 'b' ? 1 : 0),
@@ -166,18 +176,19 @@ export function addPoint(state: ScoreState, winner: Player): ScoreState {
     b: next.b,
     handOut,
   });
-  if (gameWon(next)) {
-    const won = gamesWon({ games, server: state.server, box: state.box, choosing: false });
+  if (gameWon(next, target)) {
+    const carried: ScoreState = { games, server: state.server, box: state.box, choosing: false, target };
+    const won = gamesWon(carried);
     const leader = next.a > next.b ? 'a' : 'b';
     const taken = leader === 'a' ? won.a : won.b;
     if (taken >= GAMES_TO_WIN) {
-      return { games, server: leader, box: state.box, choosing: false };
+      return { games, server: leader, box: state.box, choosing: false, target };
     }
     games.push([]);
-    return { games, server: leader, box: 'R', choosing: true };
+    return { games, server: leader, box: 'R', choosing: true, target };
   }
-  if (handOut) return { games, server: winner, box: 'R', choosing: true };
-  return { games, server: state.server, box: otherBox(state.box), choosing: false };
+  if (handOut) return { games, server: winner, box: 'R', choosing: true, target };
+  return { games, server: state.server, box: otherBox(state.box), choosing: false, target };
 }
 
 /** A stroke is a point, awarded to the player named, and it is marked as a stroke. */
@@ -199,11 +210,11 @@ export function undoPoint(state: ScoreState): ScoreState {
   const games = cloneGames(state.games);
   if (games.length > 1 && games[games.length - 1].length === 0) games.pop();
   const last = games[games.length - 1];
-  if (!last?.length) return freshMatch(state.server);
+  if (!last?.length) return freshMatch(state.server, gameTarget(state));
   const rally = last.pop()!;
   if (!last.length && games.length > 1) games.pop();
   if (!games.length) games.push([]);
-  return { games, server: rally.server, box: rally.box, choosing: rally.choosing };
+  return { games, server: rally.server, box: rally.box, choosing: rally.choosing, target: gameTarget(state) };
 }
 
 export function hasRallies(state: ScoreState): boolean {
@@ -213,17 +224,17 @@ export function hasRallies(state: ScoreState): boolean {
 export function scoreLine(state: ScoreState): string {
   const parts = finishedGames(state).map((game) => `${game.a}-${game.b}`);
   const current = currentGame(state);
-  if (!gameWon(current) && (current.a > 0 || current.b > 0)) parts.push(`${current.a}-${current.b}`);
+  if (!gameWon(current, gameTarget(state)) && (current.a > 0 || current.b > 0)) parts.push(`${current.a}-${current.b}`);
   return parts.join(', ');
 }
 
-export function legalMatch(games: Game[]): Player | null {
+export function legalMatch(games: Game[], target: GameTarget = 11): Player | null {
   if (games.length < GAMES_TO_WIN || games.length > GAMES_TO_WIN * 2 - 1) return null;
   let a = 0;
   let b = 0;
   for (let i = 0; i < games.length; i += 1) {
     const game = games[i];
-    if (!legalGame(game)) return null;
+    if (!legalGame(game, target)) return null;
     if (game.a > game.b) a += 1;
     else b += 1;
     const decided = a >= GAMES_TO_WIN || b >= GAMES_TO_WIN;
@@ -234,12 +245,18 @@ export function legalMatch(games: Game[]): Player | null {
   return null;
 }
 
-function tenAllAlready(rallies: Rally[]): boolean {
+function deuceAlready(rallies: Rally[], target: GameTarget): boolean {
+  const mark = target - 1;
   let seen = 0;
   for (const rally of rallies) {
-    if (rally.a === 10 && rally.b === 10 && rally.winner !== 'let') seen += 1;
+    if (rally.a === mark && rally.b === mark && rally.winner !== 'let') seen += 1;
   }
   return seen > 1;
+}
+
+function deuceCall(target: GameTarget): string {
+  const word = target === 15 ? 'Fourteen' : 'Ten';
+  return `${word} all. A player must win by two.`;
 }
 
 export type ScoreNote = '' | 'ten-all' | 'game-ball' | 'match-ball';
@@ -284,12 +301,14 @@ export function markerCall(state: ScoreState): { server: number; receiver: numbe
   }
   let note: ScoreNote = '';
   const score = currentGame(state);
-  if (score.a === 10 && score.b === 10 && !tenAllAlready(live)) note = 'ten-all';
-  else if (!gameWon(score)) {
+  const target = gameTarget(state);
+  const deuce = target - 1;
+  if (score.a === deuce && score.b === deuce && !deuceAlready(live, target)) note = 'ten-all';
+  else if (!gameWon(score, target)) {
     const games = gamesWon(state);
     for (const player of ['a', 'b'] as const) {
       const next = player === 'a' ? { a: score.a + 1, b: score.b } : { a: score.a, b: score.b + 1 };
-      if (!gameWon(next)) continue;
+      if (!gameWon(next, target)) continue;
       const held = player === 'a' ? games.a : games.b;
       note = held + 1 >= GAMES_TO_WIN ? 'match-ball' : 'game-ball';
       break;
@@ -366,8 +385,10 @@ export function spokenMark(state: ScoreState, names: { a: string; b: string }, b
   }
   const score = spokenPair(called.server, called.receiver);
   if (called.let) return `Yes let. ${score}.`;
-  if (called.note === 'ten-all') return 'Ten all. A player must win by two.';
-  const lead = [called.stroke ? 'Stroke' : '', called.handOut ? 'Hand out' : '', called.note === 'match-ball' ? 'Match ball' : called.note === 'game-ball' ? 'Game ball' : '']
+  if (called.note === 'ten-all') return deuceCall(gameTarget(state));
+  const rally = currentRallies(state)[currentRallies(state).length - 1];
+  const strokeTo = called.stroke && rally && rally.winner !== 'let' ? `Stroke to ${named(rally.winner)}` : called.stroke ? 'Stroke' : '';
+  const lead = [strokeTo, called.handOut ? 'Hand out' : '', called.note === 'match-ball' ? 'Match ball' : called.note === 'game-ball' ? 'Game ball' : '']
     .filter(Boolean)
     .join('. ');
   if (called.handOut) return `${lead}. ${score}. ${server}.`;
@@ -384,6 +405,43 @@ export function spokenPublicLine(playerA: string, playerB: string, score: string
   return `${intro}${spokenScoreLine(trimmed)}`;
 }
 
+export type LiveClock = {
+  line: string;
+  /** Finished games, as mm:ss. */
+  times: string[];
+  /** The game on court, as mm:ss. Empty between games. */
+  clock: string;
+  /** Increases when the next game actually starts, so a watcher can say the score again. */
+  restart: number;
+  /** The marker's call, so a public watcher can hear it without the point history. */
+  call: string;
+};
+
+/** The public score, finished times, the live clock, the restart count, and the words to say. */
+export function packLiveScore(line: string, times: string[], clock: string, restart: number, call = ''): string {
+  const score = line.trim() || '0-0';
+  const spoken = call.replace(/\s+/g, ' ').trim();
+  const withTimes = `${score}||${times.join(',')}||${clock}||${restart}||${spoken}`;
+  if (withTimes.length <= 120) return withTimes;
+  const bare = `${score}||||${clock}||${restart}||`;
+  const room = 120 - bare.length;
+  if (room <= 0) return score.slice(0, 120);
+  return `${bare}${spoken.slice(0, room)}`;
+}
+
+export function unpackLiveScore(raw: string): LiveClock {
+  const parts = (raw || '').split('||');
+  if (parts.length < 4) return { line: (raw || '0-0').trim() || '0-0', times: [], clock: '', restart: 0, call: '' };
+  const restart = Number(parts[3]);
+  return {
+    line: parts[0].trim() || '0-0',
+    times: parts[1] ? parts[1].split(',').map((part) => part.trim()).filter(Boolean) : [],
+    clock: parts[2].trim(),
+    restart: Number.isFinite(restart) ? restart : 0,
+    call: (parts[4] || '').trim(),
+  };
+}
+
 /** Turns a score line such as 11-0, 4-2 into words. */
 export function spokenScoreLine(score: string): string {
   const parts = score
@@ -397,7 +455,13 @@ export function spokenScoreLine(score: string): string {
   return parts.length ? `${parts.join('. ')}.` : '';
 }
 
-/** First name and the surname initial, for anyone who is not signed in. */
+/** A live match drops off the site after an hour with no score. */
+export const LIVE_IDLE_MS = 60 * 60 * 1000;
+
+export function liveMatchCurrent(updatedAt: string, now = Date.now()): boolean {
+  const then = new Date(updatedAt).getTime();
+  return !Number.isNaN(then) && now - then <= LIVE_IDLE_MS;
+}
 export function publicPlayerName(fullName: string): string {
   const cleaned = fullName.trim().replace(/\s+/g, ' ');
   if (!cleaned) return '';
@@ -444,5 +508,11 @@ export function restoreMatch(raw: unknown): ScoreState | null {
     games.push(rallies);
   }
   if (!games.length) games.push([]);
-  return { games, server: value.server, box: value.box, choosing: Boolean(value.choosing) };
+  return {
+    games,
+    server: value.server,
+    box: value.box,
+    choosing: Boolean(value.choosing),
+    target: value.target === 15 ? 15 : 11,
+  };
 }

@@ -12,13 +12,16 @@ import {
   legalGame,
   legalMatch,
   markerCall,
+  liveMatchCurrent,
   matchWinner,
   publicPlayerName,
   restoreMatch,
   scoreLine,
   spokenMark,
+  packLiveScore,
   spokenPublicLine,
   spokenScoreLine,
+  unpackLiveScore,
   setBox,
   setServer,
   undoPoint,
@@ -52,6 +55,12 @@ test('the spoken score uses first names and puts the server first', () => {
   state = addLet(state);
   assert.equal(spokenMark(state, names, 'play'), 'Yes let. 7 all.');
   state = freshMatch();
+  state = addStroke(state, 'a');
+  assert.equal(spokenMark(state, names, 'play'), 'Stroke to Phil. 1, love.');
+  state = freshMatch();
+  state = addStroke(state, 'b');
+  assert.equal(spokenMark(state, names, 'play'), 'Stroke to Sam. Hand out. 1, love. Sam.');
+  state = freshMatch();
   state = play(state, 'a', 11);
   assert.equal(
     spokenMark(state, names, 'next'),
@@ -69,12 +78,53 @@ test('the spoken score uses first names and puts the server first', () => {
   assert.equal(spokenPublicLine('Phil Jenkins', 'Sam Cole', '11-8, 4-2'), 'Phil versus Sam. 11, 8. 4, 2.');
 });
 
+test('a shared score carries the game times and the restart', () => {
+  const packed = packLiveScore('11-8, 4-2', ['12:04', '03:10'], '01:02', 2);
+  const live = unpackLiveScore(packed);
+  assert.equal(live.line, '11-8, 4-2');
+  assert.deepEqual(live.times, ['12:04', '03:10']);
+  assert.equal(live.clock, '01:02');
+  assert.equal(live.restart, 2);
+  assert.equal(live.call, '');
+  const said = packLiveScore('4-2', ['12:04'], '01:02', 0, 'Stroke to Sam. Hand out. 1, love. Sam.');
+  assert.equal(unpackLiveScore(said).call, 'Stroke to Sam. Hand out. 1, love. Sam.');
+  assert.equal(unpackLiveScore('11-8').line, '11-8');
+  assert.equal(unpackLiveScore('11-8').restart, 0);
+  assert.equal(unpackLiveScore('11-8').call, '');
+});
+
+test('a live match stays up for an hour', () => {
+  const now = Date.parse('2026-10-30T15:00:00Z');
+  assert.equal(liveMatchCurrent('2026-10-30T14:10:00Z', now), true);
+  assert.equal(liveMatchCurrent('2026-10-30T13:50:00Z', now), false);
+});
+
 test('a public name is the first name and the surname initial', () => {
   assert.equal(publicPlayerName('Alex Hart'), 'Alex H');
   assert.equal(publicPlayerName("James O'Connor"), 'James O');
   assert.equal(publicPlayerName('Mary Ann Smith'), 'Mary S');
   assert.equal(publicPlayerName('Alex'), 'Alex');
   assert.equal(publicPlayerName('  Sam   Haigh '), 'Sam H');
+});
+
+test('PAR 15 is won at 15 with a two-point lead, and 14-all is called once', () => {
+  assert.equal(gameWon({ a: 15, b: 13 }, 15), true);
+  assert.equal(gameWon({ a: 15, b: 14 }, 15), false);
+  assert.equal(gameWon({ a: 11, b: 9 }, 15), false);
+  assert.equal(legalGame({ a: 15, b: 0 }, 15), true);
+  assert.equal(legalGame({ a: 17, b: 15 }, 15), true);
+  let state = freshMatch('a', 15);
+  state = play(state, 'a', 14);
+  state = play(state, 'b', 14);
+  assert.equal(markerCall(state).note, 'ten-all');
+  assert.equal(spokenMark(state, { a: 'Phil Jenkins', b: 'Sam Cole' }, 'play'), 'Fourteen all. A player must win by two.');
+  state = play(state, 'a', 2);
+  assert.equal(state.games[0].at(-1).a, 16);
+  assert.equal(state.games[0].at(-1).b, 14);
+  assert.equal(state.games.length, 2);
+  assert.equal(state.target, 15);
+  const saved = restoreMatch(state);
+  assert.equal(saved.target, 15);
 });
 
 test('a game ends at 11 with a two-point lead', () => {

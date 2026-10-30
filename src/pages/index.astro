@@ -87,7 +87,7 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
           )
         }
         <div class="hero__cta">
-          <a class="btn btn--primary" href={url('/captains/watch/')}>Watch</a>
+          <a class="btn btn--primary" href={url('/captains/watch/')}>Match commentary</a>
           <a class="btn btn--ghost" href={url('/clubs/')}>Find a club near you</a>
           <a class="btn btn--ghost" href={url('/events/')}>What's on</a>
         </div>
@@ -114,7 +114,7 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
     <div class="container">
       <div class="section-head">
         <h2>On court</h2>
-        <a href={url('/captains/watch/')}>Watch →</a>
+        <a href={url('/captains/watch/')}>Match commentary →</a>
       </div>
       <ul class="watch-list" data-watch-list></ul>
     </div>
@@ -723,19 +723,19 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { publicPlayerName } from '@/lib/scoreboard';
+  import { liveMatchCurrent, publicPlayerName, unpackLiveScore } from '@/lib/scoreboard';
 
   const homeWatch = document.querySelector<HTMLElement>('[data-home-watch]');
   if (homeWatch?.dataset.url && homeWatch.dataset.key) {
     const homeScore = homeWatch.dataset.watch || '/captains/watch/';
     const homeList = homeWatch.querySelector<HTMLElement>('[data-watch-list]')!;
     const homeClient = createClient(homeWatch.dataset.url, homeWatch.dataset.key);
-    type HomeMatch = { id: number; playerA: string; playerB: string; score: string };
+    type HomeMatch = { id: number; playerA: string; playerB: string; score: string; updatedAt: string };
 
     async function paintHomeWatch() {
       const { data: sessionData } = await homeClient.auth.getSession();
       const { data, error } = await homeClient.rpc('current_matches');
-      const rows = !error && Array.isArray(data) ? (data as HomeMatch[]) : [];
+      const rows = (!error && Array.isArray(data) ? (data as HomeMatch[]) : []).filter((row) => liveMatchCurrent(row.updatedAt));
       if (!rows.length) {
         homeWatch.hidden = true;
         homeList.replaceChildren();
@@ -743,7 +743,7 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
       }
       const signedIn = Boolean(sessionData.session);
       const name = (value: string) => (signedIn ? value : publicPlayerName(value));
-      const pretty = (score: string) => (score || '0-0').replace(/-/g, '–');
+      const pretty = (score: string) => (unpackLiveScore(score).line || '0-0').replace(/-/g, '–');
       homeList.replaceChildren();
       for (const row of rows) {
         const item = document.createElement('li');
