@@ -26,7 +26,7 @@ const venues = (await getClubs()).map((club) => ({
         <p class="who" data-who></p>
         <p class="actions">
           <a class="btn btn--primary" href={url('/captains/score/')}>Score</a>
-          <a class="btn btn--ghost" href={url('/captains/score/')} data-watch>Watch</a>
+          <a class="btn btn--ghost" href={url('/captains/watch/')} data-watch>Watch</a>
         </p>
         <p class="actions">
           <a class="btn btn--ghost btn--sm" href={url('/captains/matches/')}>Matches</a>
@@ -606,13 +606,13 @@ const venues = (await getClubs()).map((club) => ({
   function paintCourt() {
     const pretty = (score: string) => (score || '0-0').replace(/-/g, '–');
     const page = scoreHref.split('?')[0];
-    watchLink.href = courtRows.length === 1 ? `${page}?watch=${courtRows[0].id}` : page;
+    watchLink.href = courtRows.length === 1 ? `${page}?match=${courtRows[0].id}` : page;
     onCourt.hidden = courtRows.length < 2;
     onCourtList.replaceChildren();
     for (const row of courtRows) {
       const item = document.createElement('li');
       const link = document.createElement('a');
-      link.href = `${page}?watch=${row.id}`;
+      link.href = `${page}?match=${row.id}`;
       link.textContent = `${row.playerA} v ${row.playerB} · ${pretty(row.score)}`;
       item.append(link);
       onCourtList.append(item);

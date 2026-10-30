@@ -1,0 +1,424 @@
+---
+import Base from '@/layouts/Base.astro';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
+import { url } from '@/lib/site';
+---
+
+<Base
+  title="Watch a match"
+  description="Follow a squash match being marked on Beds Squash, and hear the score as it changes."
+  noindex
+  crumbs={[{ name: 'Watch a match', path: '/captains/watch/' }]}
+>
+  <section class="section">
+    <div class="container watch" id="watch-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} data-login={url('/login/')}>
+      <h1>Watch a match</h1>
+      <p class="lede">Choose a match that is being marked. The score updates as each point is entered. Tick Say the score to hear it.</p>
+      <p class="status" data-status role="status"></p>
+
+      <div data-picker>
+        <p class="current-note" data-empty></p>
+        <ul class="matches" data-matches></ul>
+      </div>
+
+      <div class="live" data-live hidden>
+        <p class="actions">
+          <button class="btn btn--ghost btn--sm" type="button" data-back>Choose another match</button>
+        </p>
+        <div class="names">
+          <p data-a></p>
+          <p data-b></p>
+        </div>
+        <p class="points" data-points></p>
+        <p class="line" data-line></p>
+        <p class="call" data-call></p>
+        <div class="sheet" data-sheet></div>
+        <p class="marker" data-marker></p>
+        <p class="updated" data-updated></p>
+        <p class="note" data-note></p>
+        <label class="say">
+          <input type="checkbox" data-say />
+          Say the score
+        </label>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+  import {
+    currentGame,
+    currentRallies,
+    finishedGames,
+    gameStem,
+    matchWinner,
+    publicPlayerName,
+    restoreMatch,
+    scoreLine,
+    spokenMark,
+    spokenScoreLine,
+    type ScoreState,
+  } from '@/lib/scoreboard';
+
+  type LiveRow = {
+    id: number;
+    playerA: string;
+    playerB: string;
+    score: string;
+    marker: string | null;
+    updatedAt: string;
+    history: unknown;
+  };
+
+  const root = document.getElementById('watch-app');
+  if (!root) throw new Error('watch app missing');
+  const supabase = createClient(root.dataset.url!, root.dataset.key!);
+  const picker = root.querySelector<HTMLElement>('[data-picker]')!;
+  const list = root.querySelector<HTMLElement>('[data-matches]')!;
+  const empty = root.querySelector<HTMLElement>('[data-empty]')!;
+  const live = root.querySelector<HTMLElement>('[data-live]')!;
+  const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
+  const sayBox = root.querySelector<HTMLInputElement>('[data-say]')!;
+
+  let signedIn = false;
+  let rows: LiveRow[] = [];
+  let matchId: number | null = null;
+  let stamp = '';
+  let sayScore = localStorage.getItem('beds-say-score') === '1';
+  let heard = '';
+  let voiceArmed = false;
+  sayBox.checked = sayScore;
+
+  const shown = (name: string) => (signedIn ? name : publicPlayerName(name));
+  const pretty = (score: string) => (score || '0-0').replace(/-/g, '–');
+
+  function show(message: string) {
+    statusEl.textContent = message;
+  }
+
+  function missingFunction(error: { code?: string; message?: string } | null) {
+    const message = error?.message ?? '';
+    return error?.code === 'PGRST202' || /could not find the function/i.test(message) || /schema cache/i.test(message);
+  }
+
+  function updatedAgo(iso: string) {
+    const then = new Date(iso).getTime();
+    if (Number.isNaN(then)) return '';
+    const seconds = Math.max(0, Math.round((Date.now() - then) / 1000));
+    if (seconds < 15) return 'Updated just now';
+    if (seconds < 60) return `Updated ${seconds}s ago`;
+    const minutes = Math.round(seconds / 60);
+    return minutes === 1 ? 'Updated 1 min ago' : `Updated ${minutes} min ago`;
+  }
+
+  function speak(text: string) {
+    if (!sayScore || !text || !window.speechSynthesis) return;
+    heard = text;
+    const line = new SpeechSynthesisUtterance(text);
+    line.lang = 'en-GB';
+    line.rate = 0.95;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(line);
+  }
+
+  function announce(text: string) {
+    if (!text) return;
+    if (!voiceArmed) {
+      heard = text;
+      voiceArmed = true;
+      return;
+    }
+    if (text === heard) return;
+    speak(text);
+  }
+
+  function paintSheet(state: ScoreState) {
+    const sheet = root.querySelector<HTMLElement>('[data-sheet]')!;
+    sheet.replaceChildren();
+    state.games.forEach((rallies, index) => {
+      if (!rallies.length) return;
+      const stem = gameStem(rallies);
+      const game = document.createElement('section');
+      const heading = document.createElement('p');
+      heading.textContent = `Game ${index + 1}`;
+      const total = document.createElement('p');
+      total.textContent = `${stem.score.a}–${stem.score.b}`;
+      game.append(heading, total);
+      sheet.append(game);
+    });
+  }
+
+  function paintList() {
+    live.hidden = true;
+    picker.hidden = false;
+    list.replaceChildren();
+    if (!rows.length) {
+      empty.textContent = empty.textContent || 'No matches are being marked right now.';
+      return;
+    }
+    empty.textContent = '';
+    for (const row of rows) {
+      const item = document.createElement('li');
+      const button = document.createElement('button');
+      button.type = 'button';
+      const players = document.createElement('span');
+      players.textContent = `${shown(row.playerA)} v ${shown(row.playerB)}`;
+      const score = document.createElement('span');
+      score.textContent = pretty(row.score);
+      button.append(players, score);
+      button.addEventListener('click', () => openMatch(row.id));
+      item.append(button);
+      list.append(item);
+    }
+  }
+
+  function paintLive(row: LiveRow) {
+    const names = { a: shown(row.playerA), b: shown(row.playerB) };
+    const restored = signedIn ? restoreMatch(row.history) : null;
+    const nextStamp = restored ? JSON.stringify(row.history) : `${names.a}|${names.b}|${row.score}`;
+    const changed = nextStamp !== stamp;
+    stamp = nextStamp;
+    picker.hidden = true;
+    live.hidden = false;
+    root.querySelector<HTMLElement>('[data-a]')!.textContent = names.a;
+    root.querySelector<HTMLElement>('[data-b]')!.textContent = names.b;
+    const line = pretty(row.score) || '0–0';
+    root.querySelector<HTMLElement>('[data-line]')!.textContent = line;
+    root.querySelector<HTMLElement>('[data-updated]')!.textContent = updatedAgo(row.updatedAt);
+    const marker = root.querySelector<HTMLElement>('[data-marker]')!;
+    const note = root.querySelector<HTMLElement>('[data-note]')!;
+    const call = root.querySelector<HTMLElement>('[data-call]')!;
+    const points = root.querySelector<HTMLElement>('[data-points]')!;
+    if (!restored) {
+      points.textContent = '';
+      call.textContent = '';
+      marker.textContent = '';
+      root.querySelector<HTMLElement>('[data-sheet]')!.replaceChildren();
+      note.replaceChildren();
+      if (!signedIn) {
+        const link = document.createElement('a');
+        link.href = root.dataset.login || '/login/';
+        link.textContent = 'Sign in';
+        note.append(link, ' to see the full names and every point.');
+      }
+      if (changed) announce(spokenScoreLine(row.score || '0-0'));
+      return;
+    }
+    note.textContent = '';
+    const score = currentGame(restored);
+    points.textContent = `${score.a} – ${score.b}`;
+    const winner = matchWinner(restored);
+    const between = !winner && currentRallies(restored).length === 0 && finishedGames(restored).length > 0;
+    const phase = winner ? 'done' : between ? 'next' : 'play';
+    call.textContent = spokenMark(restored, names, phase);
+    marker.textContent = row.marker ? `Marked by ${row.marker}` : '';
+    paintSheet(restored);
+    if (changed) announce(call.textContent);
+  }
+
+  function openMatch(id: number) {
+    matchId = id;
+    stamp = '';
+    voiceArmed = false;
+    heard = '';
+    const url = new URL(location.href);
+    url.searchParams.set('match', String(id));
+    history.replaceState(null, '', `${url.pathname}${url.search}`);
+    const row = rows.find((item) => item.id === id);
+    if (row) paintLive(row);
+    else show('That match is not being shared.');
+  }
+
+  function leaveMatch() {
+    matchId = null;
+    stamp = '';
+    voiceArmed = false;
+    const url = new URL(location.href);
+    url.searchParams.delete('match');
+    history.replaceState(null, '', url.pathname);
+    window.speechSynthesis?.cancel();
+    paintList();
+  }
+
+  async function loadRows() {
+    const { data, error } = await supabase.rpc('current_matches');
+    if (error && missingFunction(error)) {
+      empty.textContent = 'Live matches are not on the database yet.';
+      list.replaceChildren();
+      return;
+    }
+    if (error) {
+      show(error.message);
+      return;
+    }
+    show('');
+    rows = Array.isArray(data) ? (data as LiveRow[]) : [];
+    if (matchId) {
+      const row = rows.find((item) => item.id === matchId);
+      if (!row) {
+        show('That match is no longer being shared.');
+        leaveMatch();
+        return;
+      }
+      paintLive(row);
+      return;
+    }
+    empty.textContent = rows.length ? '' : 'No matches are being marked right now.';
+    paintList();
+  }
+
+  sayBox.addEventListener('change', () => {
+    sayScore = sayBox.checked;
+    localStorage.setItem('beds-say-score', sayScore ? '1' : '0');
+    if (!sayScore) {
+      window.speechSynthesis?.cancel();
+      return;
+    }
+    if (!window.speechSynthesis) {
+      show('This browser cannot read the score aloud.');
+      return;
+    }
+    voiceArmed = true;
+    heard = '';
+    const row = rows.find((item) => item.id === matchId);
+    const text = row
+      ? (signedIn && restoreMatch(row.history) ? root.querySelector('[data-call]')?.textContent : spokenScoreLine(row.score || '0-0'))
+      : '';
+    speak(text || 'The score will be read out.');
+  });
+
+  root.querySelector('[data-back]')!.addEventListener('click', () => leaveMatch());
+
+  const { data } = await supabase.auth.getSession();
+  signedIn = Boolean(data.session);
+  const requested = Number(new URLSearchParams(location.search).get('match'));
+  if (requested) matchId = requested;
+  await loadRows();
+  window.setInterval(() => void loadRows(), 2000);
+</script>
+
+<style>
+  .watch {
+    max-width: 52rem;
+  }
+  .lede,
+  .note,
+  .updated,
+  .status {
+    color: var(--text-muted);
+  }
+  .status:empty,
+  .note:empty,
+  .call:empty,
+  .marker:empty,
+  .points:empty,
+  .updated:empty,
+  .current-note:empty {
+    display: none;
+  }
+  .matches {
+    list-style: none;
+    margin: 1rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.75rem;
+  }
+  .matches button {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: center;
+    padding: 1rem 1.1rem;
+    background: #fff;
+    border: 1px solid var(--border-strong);
+    border-radius: 16px;
+    color: var(--text);
+    font: inherit;
+    font-weight: 800;
+    text-align: left;
+    cursor: pointer;
+  }
+  .matches button:hover {
+    border-color: #f15a22;
+  }
+  .matches span:last-child {
+    color: #e0a800;
+    font-family: var(--font-display);
+    font-size: 1.4rem;
+  }
+  .names {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+  }
+  .names p {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(1.8rem, 5vw, 2.8rem);
+    font-weight: 800;
+    line-height: 1.05;
+  }
+  .names p:first-child {
+    color: #0e2744;
+  }
+  .names p:last-child {
+    color: #f15a22;
+    text-align: right;
+  }
+  .points,
+  .line,
+  .call {
+    margin: 0.35rem 0 0;
+    text-align: center;
+    font-weight: 800;
+  }
+  .points {
+    font-family: var(--font-display);
+    font-size: clamp(3rem, 12vw, 5.5rem);
+    line-height: 1;
+  }
+  .line {
+    color: #e0a800;
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+  }
+  .marker {
+    margin: 0.8rem 0 0;
+    font-weight: 700;
+  }
+  .sheet {
+    display: flex;
+    gap: 0.75rem;
+    overflow-x: auto;
+    margin-top: 1rem;
+  }
+  .sheet :global(section) {
+    flex: 1 0 7rem;
+    text-align: center;
+  }
+  .sheet :global(p) {
+    margin: 0;
+    font-weight: 700;
+  }
+  .sheet :global(p:last-child) {
+    color: #e0a800;
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+  }
+  .say {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-top: 1rem;
+    font-weight: 700;
+  }
+  .say input {
+    width: 1.15rem;
+    height: 1.15rem;
+    padding: 0;
+    accent-color: #f15a22;
+  }
+</style>

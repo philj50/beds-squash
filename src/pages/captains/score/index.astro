@@ -38,6 +38,10 @@ const names = [
             <input type="checkbox" data-refresh />
             Auto refresh
           </label>
+          <label class="share">
+            <input type="checkbox" data-say />
+            Say the score
+          </label>
         </div>
         <p class="current-note" data-current-note></p>
         <ol class="recent" data-current></ol>
@@ -119,6 +123,10 @@ const names = [
             <input type="checkbox" data-share />
             Let people watch
           </label>
+          <label class="share share--board">
+            <input type="checkbox" data-say />
+            Say the score
+          </label>
           <button class="btn btn--ghost btn--sm" type="button" data-hand>Other player serves</button>
           <button class="btn btn--primary" type="button" data-save hidden>Save score</button>
           <button class="btn btn--ghost" type="button" data-new>New match</button>
@@ -132,6 +140,12 @@ const names = [
         <p class="public-watch__score" data-public-score></p>
         <p class="watch-marker" data-public-marker hidden></p>
         <p class="current-note" data-public-note>Sign in to see the full names and the point-by-point score.</p>
+        <p class="actions">
+          <label class="share">
+            <input type="checkbox" data-say />
+            Say the score
+          </label>
+        </p>
         <p class="actions">
           <button class="btn btn--ghost" type="button" data-public-back>Back to current matches</button>
         </p>
@@ -190,6 +204,8 @@ const names = [
     scoreLine,
     setBox,
     setServer,
+    spokenMark,
+    spokenScoreLine,
     undoPoint,
     type Game,
     type ScoreState,
@@ -268,6 +284,9 @@ const names = [
   let watchedJson = '';
   let liveReady = true;
   let refreshOn = localStorage.getItem('beds-live-refresh') !== '0';
+  let sayScore = localStorage.getItem('beds-say-score') === '1';
+  let heard = '';
+  let voiceArmed = false;
   let publishTimer = 0;
   let markerName = '';
   let cardMarker = '';
@@ -665,6 +684,7 @@ const names = [
     paintPrior();
     paintTape();
     queueLive();
+    announce();
     syncResult();
     paintResult();
   }
@@ -703,11 +723,10 @@ const names = [
       const when = updatedAgo(row.updatedAt);
       const markerBit = signedIn && row.marker ? ` · ${row.marker}` : '';
       text.textContent = `${displayName(row.playerA)} v ${displayName(row.playerB)} · ${dash(row.score) || '0–0'}${markerBit}${when ? ` · ${when}` : ''}`;
-      const watch = document.createElement('button');
-      watch.type = 'button';
+      const watch = document.createElement('a');
       watch.className = 'btn btn--ghost btn--sm';
-      watch.textContent = watchId === row.id ? 'Watching' : 'Watch';
-      watch.addEventListener('click', () => openWatch(row));
+      watch.href = `${base}/captains/watch/?match=${row.id}`;
+      watch.textContent = 'Watch';
       item.append(text, watch);
       currentEl.append(item);
     }
@@ -758,6 +777,38 @@ const names = [
     board.hidden = true;
     publicWatch.hidden = false;
     root.classList.add('is-playing', 'is-watching', 'is-public-watch');
+    announce();
+  }
+
+  function currentSpoken() {
+    if (!publicWatch.hidden) {
+      const score = root.querySelector<HTMLElement>('[data-public-score]')?.textContent || '';
+      return spokenScoreLine(score.replace(/–/g, '-'));
+    }
+    if (board.hidden || strokeArmed) return '';
+    return spokenMark(state, names, phase === 'done' ? 'play' : phase);
+  }
+
+  function speak(text: string) {
+    if (!sayScore || !text || !window.speechSynthesis) return;
+    heard = text;
+    const line = new SpeechSynthesisUtterance(text);
+    line.lang = 'en-GB';
+    line.rate = 0.95;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(line);
+  }
+
+  function announce() {
+    const text = currentSpoken();
+    if (!text) return;
+    if (!voiceArmed) {
+      heard = text;
+      voiceArmed = true;
+      return;
+    }
+    if (text === heard) return;
+    speak(text);
   }
 
   function applyWatched(row: LiveRow) {
@@ -1133,6 +1184,8 @@ const names = [
     setup.hidden = true;
     board.hidden = false;
     root.classList.add('is-playing');
+    voiceArmed = false;
+    heard = '';
     paint();
   });
 
@@ -1241,6 +1294,8 @@ const names = [
     resultBlocked = false;
     resultMode = false;
     resultScrolled = false;
+    voiceArmed = false;
+    heard = '';
     void clearLive();
     history.replaceState(null, '', location.pathname);
     board.hidden = true;
@@ -1368,6 +1423,25 @@ const names = [
   void loadLevels();
 
   refreshBox.checked = refreshOn;
+  for (const box of root.querySelectorAll<HTMLInputElement>('[data-say]')) box.checked = sayScore;
+  for (const box of root.querySelectorAll<HTMLInputElement>('[data-say]')) {
+    box.addEventListener('change', () => {
+      sayScore = box.checked;
+      for (const other of root.querySelectorAll<HTMLInputElement>('[data-say]')) other.checked = sayScore;
+      localStorage.setItem('beds-say-score', sayScore ? '1' : '0');
+      if (!sayScore) {
+        window.speechSynthesis?.cancel();
+        return;
+      }
+      if (!window.speechSynthesis) {
+        show('This browser cannot read the score aloud.');
+        return;
+      }
+      voiceArmed = true;
+      heard = '';
+      speak(currentSpoken() || 'The score will be read out.');
+    });
+  }
   refreshBox.addEventListener('change', () => {
     refreshOn = refreshBox.checked;
     localStorage.setItem('beds-live-refresh', refreshOn ? '1' : '0');
@@ -1457,9 +1531,7 @@ const names = [
   const watchParam = Number(params.get('watch'));
   const editing = params.get('id');
   if (!resultParam && watchParam && !editing && !root.classList.contains('is-playing')) {
-    const row = currentRows.find((item) => item.id === watchParam);
-    if (row) applyWatched(row);
-    else if (!currentNote.textContent) show('That match is not being shared.');
+    location.replace(`${base}/captains/watch/?match=${watchParam}`);
   }
   window.setInterval(() => {
     if (refreshOn) void loadCurrent();

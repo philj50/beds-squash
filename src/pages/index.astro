@@ -87,7 +87,7 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
           )
         }
         <div class="hero__cta">
-          <a class="btn btn--primary" href={url('/captains/score/')}>Watch</a>
+          <a class="btn btn--primary" href={url('/captains/watch/')}>Watch</a>
           <a class="btn btn--ghost" href={url('/clubs/')}>Find a club near you</a>
           <a class="btn btn--ghost" href={url('/events/')}>What's on</a>
         </div>
@@ -110,11 +110,11 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
     </div>
   </section>
 
-  <section class="section section--tight" id="on-court" data-home-watch data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} data-score={url('/captains/score/')} hidden>
+  <section class="section section--tight" id="on-court" data-home-watch data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} data-watch={url('/captains/watch/')} hidden>
     <div class="container">
       <div class="section-head">
         <h2>On court</h2>
-        <a href={url('/captains/score/')}>Watch →</a>
+        <a href={url('/captains/watch/')}>Watch →</a>
       </div>
       <ul class="watch-list" data-watch-list></ul>
     </div>
@@ -727,7 +727,7 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
 
   const homeWatch = document.querySelector<HTMLElement>('[data-home-watch]');
   if (homeWatch?.dataset.url && homeWatch.dataset.key) {
-    const homeScore = homeWatch.dataset.score || '/captains/score/';
+    const homeScore = homeWatch.dataset.watch || '/captains/watch/';
     const homeList = homeWatch.querySelector<HTMLElement>('[data-watch-list]')!;
     const homeClient = createClient(homeWatch.dataset.url, homeWatch.dataset.key);
     type HomeMatch = { id: number; playerA: string; playerB: string; score: string };
@@ -748,7 +748,7 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
       for (const row of rows) {
         const item = document.createElement('li');
         const link = document.createElement('a');
-        link.href = `${homeScore}?watch=${row.id}`;
+        link.href = `${homeScore}?match=${row.id}`;
         const players = document.createElement('span');
         players.textContent = `${name(row.playerA)} v ${name(row.playerB)}`;
         players.style.color = 'inherit';

@@ -16,6 +16,8 @@ import {
   publicPlayerName,
   restoreMatch,
   scoreLine,
+  spokenMark,
+  spokenScoreLine,
   setBox,
   setServer,
   undoPoint,
@@ -26,6 +28,18 @@ function play(state, side, times) {
   for (let i = 0; i < times; i += 1) next = addPoint(next, side);
   return next;
 }
+
+test('the spoken score puts the server first', () => {
+  let state = freshMatch();
+  assert.equal(spokenMark(state, { a: 'Alex', b: 'Sam' }, 'play'), 'Love all.');
+  state = addPoint(state, 'a');
+  assert.equal(spokenMark(state, { a: 'Alex', b: 'Sam' }, 'play'), '1, love.');
+  state = addLet(state);
+  assert.equal(spokenMark(state, { a: 'Alex', b: 'Sam' }, 'play'), 'Yes let. 1, love.');
+  state = addPoint(state, 'b');
+  assert.match(spokenMark(state, { a: 'Alex', b: 'Sam' }, 'play'), /^Hand out\. 1, 1\.$/);
+  assert.equal(spokenScoreLine('11-0, 4-2'), '11, love. 4, 2.');
+});
 
 test('a public name is the first name and the surname initial', () => {
   assert.equal(publicPlayerName('Alex Hart'), 'Alex H');

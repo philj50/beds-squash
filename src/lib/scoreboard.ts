@@ -298,6 +298,53 @@ export function markerCall(state: ScoreState): { server: number; receiver: numbe
   return { server: serverPoints, receiver: receiverPoints, handOut: rally.handOut, let: false, stroke: Boolean(rally.stroke), note };
 }
 
+function spokenPoint(n: number) {
+  return n === 0 ? 'love' : String(n);
+}
+
+/** A short line for the browser to read aloud. The server's score comes first. */
+export function spokenMark(state: ScoreState, names: { a: string; b: string }, breakPhase: 'play' | 'next' | 'rest' | 'done'): string {
+  const winner = matchWinner(state);
+  if (winner) {
+    const who = names[winner] || 'The match';
+    const games = scoreLine(state)
+      .split(',')
+      .map((part) => part.trim().replace('-', ' '))
+      .filter(Boolean)
+      .join(', ');
+    return games ? `${who} wins. ${games}.` : `${who} wins.`;
+  }
+  if (breakPhase === 'next' || breakPhase === 'rest') {
+    const games = finishedGames(state);
+    const last = games[games.length - 1];
+    if (!last) return 'Next game.';
+    return `Game. ${last.a}, ${last.b}.`;
+  }
+  const called = markerCall(state);
+  if (!called) return 'Love all.';
+  const score = `${spokenPoint(called.server)}, ${spokenPoint(called.receiver)}`;
+  if (called.let) return `Yes let. ${score}.`;
+  if (called.note === 'ten-all') return 'Ten all. A player must win by two.';
+  const lead = [called.stroke ? 'Stroke' : '', called.handOut ? 'Hand out' : '', called.note === 'match-ball' ? 'Match ball' : called.note === 'game-ball' ? 'Game ball' : '']
+    .filter(Boolean)
+    .join('. ');
+  return lead ? `${lead}. ${score}.` : `${score}.`;
+}
+
+/** Turns a score line such as 11-0, 4-2 into words. */
+export function spokenScoreLine(score: string): string {
+  const parts = score
+    .split(',')
+    .map((part) => {
+      const bits = part.trim().split('-');
+      if (bits.length !== 2) return part.trim();
+      const say = (n: string) => (n === '0' ? 'love' : n);
+      return `${say(bits[0])}, ${say(bits[1])}`;
+    })
+    .filter(Boolean);
+  return parts.length ? `${parts.join('. ')}.` : '';
+}
+
 /** First name and the surname initial, for anyone who is not signed in. */
 export function publicPlayerName(fullName: string): string {
   const cleaned = fullName.trim().replace(/\s+/g, ' ');
