@@ -28,7 +28,7 @@ A first look at the confirmed sponsors — at least so far — for the [Bedfords
 
 ![Brook Harris](/uploads/news/brook-harris-v2.png)
 
-David Birch Soft Tissue Therapy
+[David Birch Soft Tissue Therapy](https://www.instagram.com/db.softtissuetherapist/)
 
 ![David Birch Soft Tissue Therapy](/uploads/news/david-birch-soft-tissue-therapy.jpg)
 
@@ -36,7 +36,7 @@ David Birch Soft Tissue Therapy
 
 ![Decant Wine & Cheese Bar](/uploads/news/decant.png)
 
-EpicTech Media
+[EpicTech Media](https://www.epictechmedia.co.uk/)
 
 ![EpicTech Media](/uploads/news/epictech-media-v2.png)
 
