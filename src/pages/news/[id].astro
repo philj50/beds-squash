@@ -114,6 +114,23 @@ const more = (await getNews()).filter((p) => p.id !== post.id).slice(0, 3);
 </script>
 
 <style>
+  [data-article-slug="2026-10-10-beds-closed-sponsors"] :global(.sponsor-grid) {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+    gap: 2rem 1.5rem;
+    margin-block: 1.5rem 2rem;
+  }
+  [data-article-slug="2026-10-10-beds-closed-sponsors"] :global(.sponsor-card) {
+    min-width: 0;
+  }
+  [data-article-slug="2026-10-10-beds-closed-sponsors"] :global(.sponsor-card p) {
+    margin: 0 0 .75rem;
+    font-weight: 600;
+  }
+  [data-article-slug="2026-10-10-beds-closed-sponsors"] :global(.sponsor-card img) {
+    margin-block: 0;
+  }
+
   [data-article-slug="2026-10-10-beds-closed-sponsors"] [data-article-body] :global(img) {
     display: block;
     width: 15rem;
