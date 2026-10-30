@@ -2,8 +2,8 @@
 title: Confirmed sponsors for the Beds County Closed
 date: 2026-10-10T16:00:00
 summary: The Dental Centre Bedford is the main sponsor, with a strong list of additional sponsors already confirmed for the County Closed.
-image: /uploads/news/beds-closed-sponsors-v7.jpg
-imageAlt: The Dental Centre Bedford reception, with logos for the Dental Centre, JR Builders, Decant, Brook Harris, Open House, the Bedford Cheese Company, My Next Car, Specsavers, Samo Sports, J.A.J Electrical Services and David Birch Soft Tissue Therapy.
+image: /uploads/news/beds-closed-sponsors-v8.jpg
+imageAlt: The Dental Centre Bedford reception, with logos for the Dental Centre, JR Builders, Decant, Brook Harris, Open House, the Bedford Cheese Company, My Next Car, Specsavers, Samo Sports, J.A.J Electrical Services David Birch Soft Tissue Therapy and EpicTech Media.
 category: tournaments
 featured: true
 ---
@@ -59,6 +59,10 @@ A first look at the confirmed sponsors — at least so far — for the [Bedfords
 David Birch Soft Tissue Therapy
 
 ![David Birch Soft Tissue Therapy](/uploads/news/david-birch-soft-tissue-therapy.jpg)
+
+EpicTech Media
+
+![EpicTech Media](/uploads/news/epictech-media.png)
 
 Thanks to everyone who has come on board. More names may still be added before the event.
 
