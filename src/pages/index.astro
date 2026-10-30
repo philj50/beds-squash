@@ -87,9 +87,9 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
           )
         }
         <div class="hero__cta">
-          <a class="btn btn--primary" href={url('/clubs/')}>Find a club near you</a>
+          <a class="btn btn--primary" href={url('/captains/score/')}>Watch</a>
+          <a class="btn btn--ghost" href={url('/clubs/')}>Find a club near you</a>
           <a class="btn btn--ghost" href={url('/events/')}>What's on</a>
-          <a class="btn btn--ghost" href={url('/captains/score/')}>Watch</a>
         </div>
         <ul class="stats" aria-label="County at a glance">
           <li><strong>{leagueClubs.length}</strong><span>league clubs</span></li>
