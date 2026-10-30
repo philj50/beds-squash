@@ -154,6 +154,14 @@ const more = (await getNews()).filter((p) => p.id !== post.id).slice(0, 3);
     margin-block: .75rem 1.5rem;
   }
 
+  [data-article-slug="2026-10-10-beds-closed-sponsors"] [data-article-body] :global(img[src*="dental-centre-bedford"]) {
+    width: min(100%, 15rem);
+    height: auto;
+    aspect-ratio: 1 / 1;
+    object-fit: contain;
+    background: #fff;
+  }
+
   .hero-expand {
     display: block;
     width: fit-content;
