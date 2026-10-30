@@ -302,33 +302,86 @@ function spokenPoint(n: number) {
   return n === 0 ? 'love' : String(n);
 }
 
-/** A short line for the browser to read aloud. The server's score comes first. */
+/** Server's score first. Level scores are "7 all", and 0–0 is "love all". */
+function spokenPair(server: number | string, receiver: number | string) {
+  const left = String(server);
+  const right = String(receiver);
+  if (left === right) return left === '0' ? 'love all' : `${left} all`;
+  const say = (n: string) => (n === '0' ? 'love' : n);
+  return `${say(left)}, ${say(right)}`;
+}
+
+function firstName(full: string) {
+  const cleaned = full.trim().replace(/\s+/g, ' ');
+  return cleaned ? cleaned.split(' ')[0] : '';
+}
+
+/** Games in hand, from the named player's side. "Sam, 1 game to love." */
+function gamesInHand(name: string, mine: number, theirs: number) {
+  const word = mine === 1 ? 'game' : 'games';
+  if (mine === theirs) return `${mine} ${mine === 1 ? 'game' : 'games'} all`;
+  if (theirs === 0) return `${name}, ${mine} ${word} to love`;
+  return `${name}, ${mine} ${word} to ${theirs}`;
+}
+
+/** A short line for the browser to read aloud. The server's score comes first, with first names. */
 export function spokenMark(state: ScoreState, names: { a: string; b: string }, breakPhase: 'play' | 'next' | 'rest' | 'done'): string {
+  const a = firstName(names.a) || 'Player';
+  const b = firstName(names.b) || 'Player';
+  const named = (side: Player) => (side === 'a' ? a : b);
+  const server = named(state.server);
   const winner = matchWinner(state);
   if (winner) {
-    const who = names[winner] || 'The match';
-    const games = scoreLine(state)
-      .split(',')
-      .map((part) => part.trim().replace('-', ' '))
-      .filter(Boolean)
-      .join(', ');
-    return games ? `${who} wins. ${games}.` : `${who} wins.`;
+    const who = named(winner);
+    const games = finishedGames(state)
+      .map((game) => {
+        const high = Math.max(game.a, game.b);
+        const low = Math.min(game.a, game.b);
+        return `${spokenPoint(high)}, ${spokenPoint(low)}`;
+      })
+      .join('. ');
+    const held = gamesWon(state);
+    const mine = winner === 'a' ? held.a : held.b;
+    const theirs = winner === 'a' ? held.b : held.a;
+    const tally = gamesInHand(who, mine, theirs);
+    return games ? `${who} wins the match. ${games}. ${tally}.` : `${who} wins the match. ${tally}.`;
   }
   if (breakPhase === 'next' || breakPhase === 'rest') {
     const games = finishedGames(state);
     const last = games[games.length - 1];
-    if (!last) return 'Next game.';
-    return `Game. ${last.a}, ${last.b}.`;
+    if (!last) return `${server} to serve, love all.`;
+    const leader: Player = last.a > last.b ? 'a' : 'b';
+    const who = named(leader);
+    const high = Math.max(last.a, last.b);
+    const low = Math.min(last.a, last.b);
+    const held = gamesWon(state);
+    const mine = leader === 'a' ? held.a : held.b;
+    const theirs = leader === 'a' ? held.b : held.a;
+    return `${who} wins ${spokenPoint(high)}, ${spokenPoint(low)}. ${gamesInHand(who, mine, theirs)}. ${server} to serve, love all.`;
   }
   const called = markerCall(state);
-  if (!called) return 'Love all.';
-  const score = `${spokenPoint(called.server)}, ${spokenPoint(called.receiver)}`;
+  if (!called) {
+    if (finishedGames(state).length) return `${server} to serve, love all.`;
+    return `${a} versus ${b}. ${server} to serve, love all.`;
+  }
+  const score = spokenPair(called.server, called.receiver);
   if (called.let) return `Yes let. ${score}.`;
   if (called.note === 'ten-all') return 'Ten all. A player must win by two.';
   const lead = [called.stroke ? 'Stroke' : '', called.handOut ? 'Hand out' : '', called.note === 'match-ball' ? 'Match ball' : called.note === 'game-ball' ? 'Game ball' : '']
     .filter(Boolean)
     .join('. ');
+  if (called.handOut) return `${lead}. ${score}. ${server}.`;
   return lead ? `${lead}. ${score}.` : `${score}.`;
+}
+
+/** A score with no point-by-point history: first names, then the score. */
+export function spokenPublicLine(playerA: string, playerB: string, score: string): string {
+  const a = firstName(playerA);
+  const b = firstName(playerB);
+  const intro = a && b ? `${a} versus ${b}. ` : '';
+  const trimmed = score.replace(/[–—]/g, '-').trim();
+  if (!trimmed || trimmed === '0-0') return `${intro}Love all.`;
+  return `${intro}${spokenScoreLine(trimmed)}`;
 }
 
 /** Turns a score line such as 11-0, 4-2 into words. */
@@ -338,8 +391,7 @@ export function spokenScoreLine(score: string): string {
     .map((part) => {
       const bits = part.trim().split('-');
       if (bits.length !== 2) return part.trim();
-      const say = (n: string) => (n === '0' ? 'love' : n);
-      return `${say(bits[0])}, ${say(bits[1])}`;
+      return spokenPair(bits[0], bits[1]);
     })
     .filter(Boolean);
   return parts.length ? `${parts.join('. ')}.` : '';

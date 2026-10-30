@@ -17,6 +17,7 @@ import {
   restoreMatch,
   scoreLine,
   spokenMark,
+  spokenPublicLine,
   spokenScoreLine,
   setBox,
   setServer,
@@ -29,16 +30,43 @@ function play(state, side, times) {
   return next;
 }
 
-test('the spoken score puts the server first', () => {
+test('the spoken score uses first names and puts the server first', () => {
+  const names = { a: 'Phil Jenkins', b: 'Sam Cole' };
   let state = freshMatch();
-  assert.equal(spokenMark(state, { a: 'Alex', b: 'Sam' }, 'play'), 'Love all.');
+  assert.equal(spokenMark(state, names, 'play'), 'Phil versus Sam. Phil to serve, love all.');
+  state = setServer(state, 'b');
+  assert.equal(spokenMark(state, names, 'play'), 'Phil versus Sam. Sam to serve, love all.');
+  state = setServer(state, 'a');
   state = addPoint(state, 'a');
-  assert.equal(spokenMark(state, { a: 'Alex', b: 'Sam' }, 'play'), '1, love.');
+  assert.equal(spokenMark(state, names, 'play'), '1, love.');
+  state = addPoint(state, 'a');
+  assert.equal(spokenMark(state, names, 'play'), '2, love.');
   state = addLet(state);
-  assert.equal(spokenMark(state, { a: 'Alex', b: 'Sam' }, 'play'), 'Yes let. 1, love.');
+  assert.equal(spokenMark(state, names, 'play'), 'Yes let. 2, love.');
   state = addPoint(state, 'b');
-  assert.match(spokenMark(state, { a: 'Alex', b: 'Sam' }, 'play'), /^Hand out\. 1, 1\.$/);
+  assert.equal(spokenMark(state, names, 'play'), 'Hand out. 1, 2. Sam.');
+  state = freshMatch();
+  state = play(state, 'a', 7);
+  state = play(state, 'b', 7);
+  assert.equal(spokenMark(state, names, 'play'), '7 all.');
+  state = addLet(state);
+  assert.equal(spokenMark(state, names, 'play'), 'Yes let. 7 all.');
+  state = freshMatch();
+  state = play(state, 'a', 11);
+  assert.equal(
+    spokenMark(state, names, 'next'),
+    'Phil wins 11, love. Phil, 1 game to love. Phil to serve, love all.',
+  );
+  state = play(state, 'a', 11);
+  state = play(state, 'a', 11);
+  assert.equal(
+    spokenMark(state, names, 'play'),
+    'Phil wins the match. 11, love. 11, love. 11, love. Phil, 3 games to love.',
+  );
   assert.equal(spokenScoreLine('11-0, 4-2'), '11, love. 4, 2.');
+  assert.equal(spokenScoreLine('11-8, 7-7'), '11, 8. 7 all.');
+  assert.equal(spokenPublicLine('Phil Jenkins', 'Sam Cole', '0-0'), 'Phil versus Sam. Love all.');
+  assert.equal(spokenPublicLine('Phil Jenkins', 'Sam Cole', '11-8, 4-2'), 'Phil versus Sam. 11, 8. 4, 2.');
 });
 
 test('a public name is the first name and the surname initial', () => {

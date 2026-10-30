@@ -22,49 +22,32 @@ const names = [
   <section class="section">
     <div class="container score" id="score-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
       <h1>Score a match</h1>
-      <p class="lede">
-        Pick the two players, then tap the player who won the rally. PAR to 11, win by two, best of five. Tick Let people watch and the match is listed under Current matches, so anyone on the site can follow it. The rally runs down the middle, and a clock runs for each game. After a game the board says Next game, then counts a 90 second rest. The first serve is from the right. Change it to the left when that is the box. The same player then serves from the other side. Hand out means the other player serves, from the right unless you change it. A let is played again. A stroke gives the point to the player you tap. The score stays on Beds Squash for an admin to check. It is not sent to Sport Manager.
-      </p>
       <p class="status" data-status role="status"></p>
       <p class="signin" data-signin hidden>
         <a data-login href="/login/">Sign in</a>
         to keep the score on the site and to let other people watch. You can still mark a match on this browser first.
       </p>
 
-      <div class="current">
-        <div class="recent-head">
-          <h2>Current matches</h2>
-          <label class="share">
-            <input type="checkbox" data-refresh />
-            Auto refresh
-          </label>
-          <label class="share">
-            <input type="checkbox" data-say />
-            Say the score
-          </label>
-        </div>
-        <p class="current-note" data-current-note></p>
-        <ol class="recent" data-current></ol>
-      </div>
-
       <form class="card setup" data-setup>
         <div class="card__body stack">
-          <label>
-            Player A
-            <span class="picker">
-              <input name="player-a" autocomplete="off" autocapitalize="words" required placeholder="First player" />
-              <div class="picks" data-picks="a" hidden></div>
-            </span>
-            <span class="sl-note" data-sl="a" hidden></span>
-          </label>
-          <label>
-            Player B
-            <span class="picker">
-              <input name="player-b" autocomplete="off" autocapitalize="words" required placeholder="Second player" />
-              <div class="picks" data-picks="b" hidden></div>
-            </span>
-            <span class="sl-note" data-sl="b" hidden></span>
-          </label>
+          <div class="players">
+            <label>
+              Player A
+              <span class="picker">
+                <input name="player-a" autocomplete="off" autocapitalize="words" required placeholder="First player" />
+                <div class="picks" data-picks="a" hidden></div>
+              </span>
+              <span class="sl-note" data-sl="a" hidden></span>
+            </label>
+            <label>
+              Player B
+              <span class="picker">
+                <input name="player-b" autocomplete="off" autocapitalize="words" required placeholder="Second player" />
+                <div class="picks" data-picks="b" hidden></div>
+              </span>
+              <span class="sl-note" data-sl="b" hidden></span>
+            </label>
+          </div>
           <label class="share">
             <input type="checkbox" data-share />
             Let people watch this match
@@ -123,13 +106,10 @@ const names = [
             <input type="checkbox" data-share />
             Let people watch
           </label>
-          <label class="share share--board">
-            <input type="checkbox" data-say />
-            Say the score
-          </label>
           <button class="btn btn--ghost btn--sm" type="button" data-hand>Other player serves</button>
           <button class="btn btn--primary" type="button" data-save hidden>Save score</button>
           <button class="btn btn--ghost" type="button" data-new>New match</button>
+          <button class="btn btn--ghost" type="button" data-reset>Reset</button>
           <button class="btn btn--ghost" type="button" data-back>Back to current matches</button>
         </p>
         <p class="watch-marker" data-watch-marker hidden></p>
@@ -140,12 +120,6 @@ const names = [
         <p class="public-watch__score" data-public-score></p>
         <p class="watch-marker" data-public-marker hidden></p>
         <p class="current-note" data-public-note>Sign in to see the full names and the point-by-point score.</p>
-        <p class="actions">
-          <label class="share">
-            <input type="checkbox" data-say />
-            Say the score
-          </label>
-        </p>
         <p class="actions">
           <button class="btn btn--ghost" type="button" data-public-back>Back to current matches</button>
         </p>
@@ -170,11 +144,34 @@ const names = [
         </p>
       </section>
 
+      <div class="current">
+        <div class="recent-head">
+          <h2>Current matches</h2>
+          <label class="share">
+            <input type="checkbox" data-refresh />
+            Auto refresh
+          </label>
+        </div>
+        <p class="current-note" data-current-note></p>
+        <ol class="recent" data-current></ol>
+      </div>
+
       <div class="recent-head">
         <h2>Marked here</h2>
         <button class="btn btn--ghost btn--sm" type="button" data-clear hidden>Clear</button>
       </div>
+      <dialog class="reset-dialog" data-reset-dialog>
+        <h2>Reset this match?</h2>
+        <p>The score goes back to love all and the clock starts again. The two players stay as they are.</p>
+        <p class="actions">
+          <button class="btn btn--primary" type="button" data-reset-yes>Reset match</button>
+          <button class="btn btn--ghost" type="button" data-reset-no>Keep scoring</button>
+        </p>
+      </dialog>
       <ol class="recent" data-recent></ol>
+      <p class="lede">
+        Pick the two players, then tap the player who won the rally. PAR to 11, win by two, best of five. Tick Let people watch and the match is listed under Current matches, so anyone on the site can follow it. The rally runs down the middle, and a clock runs for each game. After a game the board says Next game, then counts a 90 second rest. The first serve is from the right. Change it to the left when that is the box. The same player then serves from the other side. Hand out means the other player serves, from the right unless you change it. A let is played again. A stroke gives the point to the player you tap. The score stays on Beds Squash for an admin to check. It is not sent to Sport Manager.
+      </p>
       <script id="score-names" type="application/json" is:inline set:html={JSON.stringify(names)}></script>
     </div>
   </section>
@@ -196,7 +193,6 @@ const names = [
     gamesWon,
     hasRallies,
     legalMatch,
-    markerCall,
     matchWinner,
     otherPlayer,
     publicPlayerName,
@@ -205,7 +201,6 @@ const names = [
     setBox,
     setServer,
     spokenMark,
-    spokenScoreLine,
     undoPoint,
     type Game,
     type ScoreState,
@@ -284,9 +279,6 @@ const names = [
   let watchedJson = '';
   let liveReady = true;
   let refreshOn = localStorage.getItem('beds-live-refresh') !== '0';
-  let sayScore = localStorage.getItem('beds-say-score') === '1';
-  let heard = '';
-  let voiceArmed = false;
   let publishTimer = 0;
   let markerName = '';
   let cardMarker = '';
@@ -656,23 +648,10 @@ const names = [
     saveBtn.hidden = !over;
     saveBtn.disabled = saved;
     saveBtn.textContent = saved ? 'Saved' : editingId ? 'Save changes' : 'Save score';
-    const called = markerCall(state);
-    if (phase === 'next' || phase === 'rest') {
-      callEl.textContent = 'Next game';
-    } else if (over) {
-      const winner = over === 'a' ? names.a : names.b;
-      callEl.textContent = `${winner} wins ${dash(scoreLine(state))}`;
-    } else if (strokeArmed) {
+    if (strokeArmed && phase === 'play') {
       callEl.textContent = 'Tap the player who is awarded the stroke.';
-    } else if (called?.let) {
-      callEl.textContent = `Yes let, ${called.server}–${called.receiver}`;
-    } else if (called) {
-      const note = called.note === 'ten-all' ? '10-all: a player must win by 2 points' : called.note === 'match-ball' ? 'Match ball' : called.note === 'game-ball' ? 'Game ball' : '';
-      const stroke = called.stroke ? 'Stroke, ' : '';
-      const lead = called.handOut ? 'Hand out, ' : '';
-      callEl.textContent = note === '10-all: a player must win by 2 points' ? `${stroke}${lead}${note}` : `${stroke}${lead}${called.server}–${called.receiver}${note ? `, ${note}` : ''}`;
     } else {
-      callEl.textContent = `${serverName} to serve, love-all.`;
+      callEl.textContent = spokenMark(state, names, phase === 'done' ? 'play' : phase);
     }
     if (watching && signedIn && watchMarker) {
       watchMarkerEl.hidden = false;
@@ -684,7 +663,6 @@ const names = [
     paintPrior();
     paintTape();
     queueLive();
-    announce();
     syncResult();
     paintResult();
   }
@@ -777,38 +755,6 @@ const names = [
     board.hidden = true;
     publicWatch.hidden = false;
     root.classList.add('is-playing', 'is-watching', 'is-public-watch');
-    announce();
-  }
-
-  function currentSpoken() {
-    if (!publicWatch.hidden) {
-      const score = root.querySelector<HTMLElement>('[data-public-score]')?.textContent || '';
-      return spokenScoreLine(score.replace(/–/g, '-'));
-    }
-    if (board.hidden || strokeArmed) return '';
-    return spokenMark(state, names, phase === 'done' ? 'play' : phase);
-  }
-
-  function speak(text: string) {
-    if (!sayScore || !text || !window.speechSynthesis) return;
-    heard = text;
-    const line = new SpeechSynthesisUtterance(text);
-    line.lang = 'en-GB';
-    line.rate = 0.95;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(line);
-  }
-
-  function announce() {
-    const text = currentSpoken();
-    if (!text) return;
-    if (!voiceArmed) {
-      heard = text;
-      voiceArmed = true;
-      return;
-    }
-    if (text === heard) return;
-    speak(text);
   }
 
   function applyWatched(row: LiveRow) {
@@ -1184,8 +1130,6 @@ const names = [
     setup.hidden = true;
     board.hidden = false;
     root.classList.add('is-playing');
-    voiceArmed = false;
-    heard = '';
     paint();
   });
 
@@ -1281,6 +1225,27 @@ const names = [
     paint();
   });
 
+  const resetDialog = root.querySelector<HTMLDialogElement>('[data-reset-dialog]')!;
+  root.querySelector<HTMLButtonElement>('[data-reset]')!.addEventListener('click', () => {
+    if (!resetDialog.open) resetDialog.showModal();
+  });
+  resetDialog.querySelector<HTMLButtonElement>('[data-reset-no]')!.addEventListener('click', () => {
+    resetDialog.close();
+  });
+  resetDialog.addEventListener('click', (event) => {
+    if (event.target === resetDialog) resetDialog.close();
+  });
+  resetDialog.querySelector<HTMLButtonElement>('[data-reset-yes]')!.addEventListener('click', () => {
+    resetDialog.close();
+    state = freshMatch();
+    saved = false;
+    strokeArmed = false;
+    resultScrolled = false;
+    armSession();
+    show('');
+    paint();
+  });
+
   root.querySelector<HTMLButtonElement>('[data-new]')!.addEventListener('click', () => {
     if (!saved && hasRallies(state) && !confirm('Leave this score without saving it?')) return;
     state = freshMatch();
@@ -1294,8 +1259,6 @@ const names = [
     resultBlocked = false;
     resultMode = false;
     resultScrolled = false;
-    voiceArmed = false;
-    heard = '';
     void clearLive();
     history.replaceState(null, '', location.pathname);
     board.hidden = true;
@@ -1423,25 +1386,6 @@ const names = [
   void loadLevels();
 
   refreshBox.checked = refreshOn;
-  for (const box of root.querySelectorAll<HTMLInputElement>('[data-say]')) box.checked = sayScore;
-  for (const box of root.querySelectorAll<HTMLInputElement>('[data-say]')) {
-    box.addEventListener('change', () => {
-      sayScore = box.checked;
-      for (const other of root.querySelectorAll<HTMLInputElement>('[data-say]')) other.checked = sayScore;
-      localStorage.setItem('beds-say-score', sayScore ? '1' : '0');
-      if (!sayScore) {
-        window.speechSynthesis?.cancel();
-        return;
-      }
-      if (!window.speechSynthesis) {
-        show('This browser cannot read the score aloud.');
-        return;
-      }
-      voiceArmed = true;
-      heard = '';
-      speak(currentSpoken() || 'The score will be read out.');
-    });
-  }
   refreshBox.addEventListener('change', () => {
     refreshOn = refreshBox.checked;
     localStorage.setItem('beds-live-refresh', refreshOn ? '1' : '0');
@@ -1543,11 +1487,10 @@ const names = [
     max-width: 52rem;
   }
   .lede {
+    margin-top: 2rem;
     color: var(--text-muted);
   }
-  .score.is-playing .lede,
   .score.is-playing .signin,
-  .score.is-result .lede,
   .score.is-result .signin,
   .score.is-playing:not(.is-watching) .current {
     display: none;
@@ -1556,6 +1499,7 @@ const names = [
   .score.is-watching [data-hand],
   .score.is-watching [data-save],
   .score.is-watching [data-new],
+  .score.is-watching [data-reset],
   .score.is-watching .share--board,
   .score.is-result .setup,
   .score.is-result .board,
@@ -1716,6 +1660,9 @@ const names = [
     padding: 0;
     accent-color: #f15a22;
   }
+  .current {
+    margin-top: 1.75rem;
+  }
   .current-note {
     margin: 0.35rem 0 0;
     color: var(--text-muted);
@@ -1735,11 +1682,19 @@ const names = [
     margin: 0 0 1rem;
   }
   .setup {
-    max-width: 28rem;
+    overflow: visible;
+  }
+  .setup .btn {
+    justify-self: start;
   }
   .stack {
     display: grid;
     gap: 0.85rem;
+  }
+  .players {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.85rem 1rem;
   }
   label {
     display: grid;
@@ -1774,6 +1729,9 @@ const names = [
   .board {
     display: grid;
     gap: 0.55rem;
+  }
+  .board[hidden] {
+    display: none !important;
   }
   .topbar {
     display: flex;
@@ -2041,6 +1999,27 @@ const names = [
     flex-wrap: wrap;
     gap: 0.6rem;
   }
+  .reset-dialog {
+    max-width: 26rem;
+    padding: 1.15rem 1.25rem 1.2rem;
+    background: #fff;
+    color: #0e2744;
+    border: 1px solid var(--border-strong);
+    border-radius: 16px;
+  }
+  .reset-dialog::backdrop {
+    background: rgba(0, 10, 24, 0.62);
+  }
+  .reset-dialog h2 {
+    margin: 0 0 0.4rem;
+    font-size: 1.35rem;
+  }
+  .reset-dialog p {
+    margin: 0 0 0.9rem;
+  }
+  .reset-dialog .actions {
+    margin: 0;
+  }
   .recent-head {
     display: flex;
     align-items: center;
@@ -2098,6 +2077,9 @@ const names = [
     border-bottom: 0;
   }
   @media (max-width: 640px) {
+    .players {
+      grid-template-columns: 1fr;
+    }
     .score.is-playing h1 {
       font-size: 1.35rem;
       margin-bottom: 0.15rem;

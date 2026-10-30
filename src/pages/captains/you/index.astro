@@ -25,7 +25,7 @@ const venues = (await getClubs()).map((club) => ({
       <div data-panel="signed-in" hidden>
         <p class="who" data-who></p>
         <p class="actions">
-          <a class="btn btn--primary" href={url('/captains/score/')}>Score</a>
+          <a class="btn btn--ghost" href={url('/captains/score/')}>Score</a>
           <a class="btn btn--ghost" href={url('/captains/watch/')} data-watch>Watch</a>
         </p>
         <p class="actions">

@@ -57,7 +57,7 @@ import { url } from '@/lib/site';
     restoreMatch,
     scoreLine,
     spokenMark,
-    spokenScoreLine,
+    spokenPublicLine,
     type ScoreState,
   } from '@/lib/scoreboard';
 
@@ -202,7 +202,7 @@ import { url } from '@/lib/site';
         link.textContent = 'Sign in';
         note.append(link, ' to see the full names and every point.');
       }
-      if (changed) announce(spokenScoreLine(row.score || '0-0'));
+      if (changed) announce(spokenPublicLine(names.a, names.b, row.score || '0-0'));
       return;
     }
     note.textContent = '';
@@ -283,7 +283,9 @@ import { url } from '@/lib/site';
     heard = '';
     const row = rows.find((item) => item.id === matchId);
     const text = row
-      ? (signedIn && restoreMatch(row.history) ? root.querySelector('[data-call]')?.textContent : spokenScoreLine(row.score || '0-0'))
+      ? (signedIn && restoreMatch(row.history)
+          ? root.querySelector('[data-call]')?.textContent
+          : spokenPublicLine(shown(row.playerA), shown(row.playerB), row.score || '0-0'))
       : '';
     speak(text || 'The score will be read out.');
   });
