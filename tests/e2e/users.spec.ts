@@ -542,7 +542,7 @@ async function installAdmin(page: Page) {
     localStorage.setItem('sb-klxyjmwiaivvqjbhxzak-auth-token', JSON.stringify(stored));
   }, session);
 
-  const profiles = [
+  const profiles: { id: string; display_name: string; email: string | null; is_admin: boolean }[] = [
     { id: adminId, display_name: 'Ada Admin', email: 'admin@example.test', is_admin: true },
     { id: samId, display_name: 'Sam Morris', email: 'sam.morris@example.test', is_admin: true },
     { id: countyId, display_name: 'County Keeper', email: 'county-admin@players.invalid', is_admin: false },
@@ -563,7 +563,14 @@ async function installAdmin(page: Page) {
     [countyId, true],
   ]);
   let statesDown = false;
-  const squads = [
+  type SquadPlayer = {
+    id: number;
+    display_name: string;
+    email: string | null;
+    phone: string | null;
+    england_squash_id: string | null;
+  };
+  const squads: { id: number; name: string; team_id: number; squad_players: SquadPlayer[] }[] = [
     {
       id: 10,
       name: 'Test Team 1',
