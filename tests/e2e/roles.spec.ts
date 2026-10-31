@@ -286,6 +286,7 @@ test.describe('Club captain, team captain, and player', () => {
         emergency_phone: '07000000001',
         notes: 'Needs a spare racket',
         show_name: false,
+        draw_position: null,
       },
     ];
     await page.route(`${SUPABASE}/**`, async (route) => {

@@ -239,8 +239,9 @@ const names = [
 
   const LOCAL_KEY = 'beds-marked-matches';
   const SESSION_KEY = 'beds-score-session';
-  const root = document.getElementById('score-app');
-  if (!root) throw new Error('score app missing');
+  const scoreRoot = document.getElementById('score-app');
+  if (!scoreRoot) throw new Error('score app missing');
+  const root: HTMLElement = scoreRoot;
   const supabase = createClient(root.dataset.url!, root.dataset.key!);
   const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
   const signinEl = root.querySelector<HTMLElement>('[data-signin]')!;
@@ -800,25 +801,27 @@ const names = [
     show(message);
   }
 
+  type MarkSession = {
+    names?: { a: string; b: string };
+    state?: unknown;
+    shareLive?: boolean;
+    gameTimes?: number[];
+    restartCount?: number;
+    phase?: 'play' | 'next' | 'rest' | 'done';
+    clockElapsed?: number;
+    breakForGames?: number;
+    restLeft?: number;
+    activeAt?: number;
+    saved?: boolean;
+    editingId?: number | null;
+  };
+
   function resumeSession() {
     const raw = localStorage.getItem(SESSION_KEY);
     if (!raw) return;
-    let stored: {
-      names?: { a: string; b: string };
-      state?: unknown;
-      shareLive?: boolean;
-      gameTimes?: number[];
-      restartCount?: number;
-      phase?: 'play' | 'next' | 'rest' | 'done';
-      clockElapsed?: number;
-      breakForGames?: number;
-      restLeft?: number;
-      activeAt?: number;
-      saved?: boolean;
-      editingId?: number | null;
-    } | null = null;
+    let stored: MarkSession | null = null;
     try {
-      stored = JSON.parse(raw) as typeof stored;
+      stored = JSON.parse(raw) as MarkSession;
     } catch {
       stored = null;
     }

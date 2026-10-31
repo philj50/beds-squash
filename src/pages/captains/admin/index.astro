@@ -1369,13 +1369,32 @@ const scoresHref = url('/captains/admin/minigame/');
       ),
     ].join('');
     const chosen = bedsYear ? bedsEntries.filter((entry) => entry.year === bedsYear) : bedsEntries;
-    const people = new Map<string, { name: string; email: string; telephone: string; years: number[]; grades: string[]; paid: number; rows: number }>();
+    type ClosedPerson = {
+      name: string;
+      email: string;
+      telephone: string;
+      years: number[];
+      grades: string[];
+      paid: number;
+      known: number;
+      rows: number;
+    };
+    const people = new Map<string, ClosedPerson>();
     for (const entry of chosen) {
       const email = entry.email.trim().toLowerCase();
       const name = `${entry.forename} ${entry.surname}`.replace(/\s+/g, ' ').trim();
       const key = email || name.toLowerCase();
       if (!key) continue;
-      const person = people.get(key) ?? { name, email: entry.email.trim(), telephone: '', years: [], grades: [], paid: 0, known: 0, rows: 0 };
+      const person: ClosedPerson = people.get(key) ?? {
+        name,
+        email: entry.email.trim(),
+        telephone: '',
+        years: [],
+        grades: [],
+        paid: 0,
+        known: 0,
+        rows: 0,
+      };
       if (!person.name && name) person.name = name;
       if (!person.telephone && entry.telephone.trim()) person.telephone = entry.telephone.trim();
       if (entry.year && !person.years.includes(entry.year)) person.years.push(entry.year);
@@ -2504,7 +2523,7 @@ const scoresHref = url('/captains/admin/minigame/');
     const sheet = root.querySelector<HTMLElement>('[data-junior-draw-sheet]')!;
     paintJuniorPublish();
     const placed = new Set<number>();
-    const groups = ENTRY_GROUPS.map((category) => {
+    const groups: { key: string; players: JuniorEntry[] }[] = ENTRY_GROUPS.map((category) => {
       const players = entries.filter((entry) => entry.age_category === category.age && entry.draw === category.draw);
       for (const entry of players) placed.add(entry.id);
       return { key: category.label, players };
@@ -2608,12 +2627,25 @@ const scoresHref = url('/captains/admin/minigame/');
     sheet.innerHTML = `${planBar}${hat}${sheetBody}`;
   }
   async function loadJuniorEntries() {
-    const columns = 'id, player_first_name, player_last_name, date_of_birth, age_category, draw, club, guardian_name, guardian_email, guardian_phone, emergency_name, emergency_phone, notes, show_name, draw_position';
-    let result = await supabase.from('junior_entries').select(columns).order('player_last_name');
-    if (result.error && /draw_position|schema cache/i.test(result.error.message)) {
-      result = await supabase.from('junior_entries').select(columns.replace(', draw_position', '')).order('player_last_name');
+    const withPosition =
+      'id, player_first_name, player_last_name, date_of_birth, age_category, draw, club, guardian_name, guardian_email, guardian_phone, emergency_name, emergency_phone, notes, show_name, draw_position';
+    const withoutPosition =
+      'id, player_first_name, player_last_name, date_of_birth, age_category, draw, club, guardian_name, guardian_email, guardian_phone, emergency_name, emergency_phone, notes, show_name';
+    const first = await supabase.from('junior_entries').select(withPosition).order('player_last_name');
+    let rows: JuniorEntry[] = [];
+    let message = '';
+    if (first.error && /draw_position|schema cache/i.test(first.error.message)) {
+      const second = await supabase.from('junior_entries').select(withoutPosition).order('player_last_name');
+      rows = ((second.error ? [] : (second.data ?? [])) as Omit<JuniorEntry, 'draw_position'>[]).map((row) => ({
+        ...row,
+        draw_position: null,
+      }));
+      message = second.error?.message ?? '';
+    } else {
+      rows = (first.error ? [] : (first.data ?? [])) as JuniorEntry[];
+      message = first.error?.message ?? '';
     }
-    juniorEntriesLive = (result.error ? [] : (result.data ?? [])) as JuniorEntry[];
+    juniorEntriesLive = rows;
     const published = await supabase.rpc('junior_draw_is_published');
     juniorDrawPublished = published.data === true;
     const plans = await supabase.rpc('junior_draw_plans');
@@ -2622,7 +2654,7 @@ const scoresHref = url('/captains/admin/minigame/');
           (plan) => (plan?.format === 'knockout' || plan?.format === 'round_robin') && Array.isArray(plan.members) && plan.members.length > 0,
         )
       : [];
-    paintJuniorEntries(juniorEntriesLive, result.error?.message ?? '');
+    paintJuniorEntries(juniorEntriesLive, message);
   }
   async function saveJuniorDrawPlan(format?: JuniorDrawPlan['format']) {
     if (!viewerSeesJuniors) return;

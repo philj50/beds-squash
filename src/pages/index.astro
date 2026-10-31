@@ -726,10 +726,13 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
   import { liveMatchCurrent, publicPlayerName, unpackLiveScore } from '@/lib/scoreboard';
 
   const homeWatch = document.querySelector<HTMLElement>('[data-home-watch]');
-  if (homeWatch?.dataset.url && homeWatch.dataset.key) {
-    const homeScore = homeWatch.dataset.watch || '/captains/watch/';
-    const homeList = homeWatch.querySelector<HTMLElement>('[data-watch-list]')!;
-    const homeClient = createClient(homeWatch.dataset.url, homeWatch.dataset.key);
+  const homeUrl = homeWatch?.dataset.url;
+  const homeKey = homeWatch?.dataset.key;
+  if (homeWatch && homeUrl && homeKey) {
+    const panel: HTMLElement = homeWatch;
+    const homeScore = panel.dataset.watch || '/captains/watch/';
+    const homeList = panel.querySelector<HTMLElement>('[data-watch-list]')!;
+    const homeClient = createClient(homeUrl, homeKey);
     type HomeMatch = { id: number; playerA: string; playerB: string; score: string; updatedAt: string };
 
     async function paintHomeWatch() {
@@ -737,7 +740,7 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
       const { data, error } = await homeClient.rpc('current_matches');
       const rows = (!error && Array.isArray(data) ? (data as HomeMatch[]) : []).filter((row) => liveMatchCurrent(row.updatedAt));
       if (!rows.length) {
-        homeWatch.hidden = true;
+        panel.hidden = true;
         homeList.replaceChildren();
         return;
       }
@@ -758,7 +761,7 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
         item.append(link);
         homeList.append(item);
       }
-      homeWatch.hidden = false;
+      panel.hidden = false;
     }
 
     void paintHomeWatch();

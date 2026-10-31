@@ -74,8 +74,9 @@ import { url } from '@/lib/site';
     history: unknown;
   };
 
-  const root = document.getElementById('watch-app');
-  if (!root) throw new Error('watch app missing');
+  const watchRoot = document.getElementById('watch-app');
+  if (!watchRoot) throw new Error('watch app missing');
+  const root: HTMLElement = watchRoot;
   const supabase = createClient(root.dataset.url!, root.dataset.key!);
   const picker = root.querySelector<HTMLElement>('[data-picker]')!;
   const list = root.querySelector<HTMLElement>('[data-matches]')!;
