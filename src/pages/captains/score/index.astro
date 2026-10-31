@@ -912,23 +912,22 @@ const names = [
     publishTimer = window.setTimeout(() => void sendLive(), 400);
   }
 
-  let lastCommentaryNote = '';
-  let lastCommentaryTitle = '';
+  const commentaryNoteKey = 'beds-commentary-noted';
 
-  function notifyCommentary(title: string, body: string, key = `${title}|${body}`) {
-    if (!body || key === lastCommentaryNote) return;
-    lastCommentaryNote = key;
-    lastCommentaryTitle = title;
+  function notifyMatchOn() {
+    const key = `${names.a}|${names.b}`;
+    if (!names.a || !names.b || sessionStorage.getItem(commentaryNoteKey) === key) return;
+    sessionStorage.setItem(commentaryNoteKey, key);
     void fetch(`https://ntfy.sh/${commentaryTopic}`, {
       method: 'POST',
-      body,
+      body: `${names.a} v ${names.b} is on Match commentary.`,
       headers: {
-        Title: title,
+        Title: 'Match commentary',
         Click: `${location.origin}${base}/captains/watch/`,
         Tags: 'squash',
       },
     }).catch(() => {
-      lastCommentaryNote = '';
+      if (sessionStorage.getItem(commentaryNoteKey) === key) sessionStorage.removeItem(commentaryNoteKey);
     });
   }
 
@@ -956,22 +955,14 @@ const names = [
       show(error.message);
       return;
     }
-    notifyCommentary(
-      `${names.a} v ${names.b}`,
-      call,
-      `${names.a}|${names.b}|${call}|${scoreLine(state)}|${currentRallies(state).length}`,
-    );
+    notifyMatchOn();
   }
 
   async function clearLive() {
     if (!signedIn || !liveReady) return;
     const { error } = await supabase.rpc('clear_live_match');
     if (error && missingFunction(error)) liveReady = false;
-    if (!error && lastCommentaryNote) {
-      const title = lastCommentaryTitle || 'Match commentary';
-      lastCommentaryNote = '';
-      notifyCommentary(title, 'That match is no longer on the court.', `cleared|${title}|${Date.now()}`);
-    }
+    if (!error) sessionStorage.removeItem(commentaryNoteKey);
   }
 
   function watchStamp(row: LiveRow) {

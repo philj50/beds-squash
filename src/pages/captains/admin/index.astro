@@ -184,7 +184,7 @@ const scoresHref = url('/captains/admin/minigame/');
             <h2>Marking</h2>
             <p class="muted small">Matches marked on the website. PAR to 11, or PAR to 15 for the second division, best of five. The serve starts on the right. The same player moves to the other box. Hand out is a change of server, and that serve starts on the right again. A let is played again. A stroke gives the point. Edit a name here, or open Marking to change the points. Delete removes the match. Sport Manager is not updated from here.</p>
             <h3>In play</h3>
-            <p class="muted small">A match with no score for an hour can be taken off the list. A match that is still being marked stays.</p>
+            <p class="muted small">Every match on Match commentary is listed here. Clear takes that one off the list. Clear stale matches takes off every match with no score for an hour.</p>
             <p class="muted small" data-live-status role="status"></p>
             <p class="actions">
               <button class="btn btn--ghost btn--sm" type="button" data-live-clear hidden>Clear stale matches</button>
@@ -1265,7 +1265,7 @@ const scoresHref = url('/captains/admin/minigame/');
       accountSecret: '',
       passwordSecret: '',
       tables: ['live_matches'],
-      when: 'When a marked match on commentary changes score',
+      when: 'When a match goes on Match commentary',
       fixedAccount: 'beds_commentary_1234',
     },
     {
@@ -1512,12 +1512,13 @@ const scoresHref = url('/captains/admin/minigame/');
 
   function paintStaleMatches() {
     liveBody.replaceChildren();
-    liveClear.hidden = staleRows.length === 0;
+    const staleCount = staleRows.filter((match) => Date.now() - new Date(match.updatedAt).getTime() >= 60 * 60 * 1000).length;
+    liveClear.hidden = staleCount === 0;
     if (!staleRows.length) {
       const row = document.createElement('tr');
       const cell = document.createElement('td');
       cell.colSpan = 5;
-      cell.textContent = 'No stale matches in play.';
+      cell.textContent = 'No matches are in play.';
       row.append(cell);
       liveBody.append(row);
       return;
