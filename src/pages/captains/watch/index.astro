@@ -14,6 +14,10 @@ import { url } from '@/lib/site';
     <div class="container watch" id="watch-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} data-login={url('/login/')}>
       <h1>Match commentary</h1>
       <p class="lede">Choose a match that is being marked. The score updates as each point is entered. Tick Say the score to hear it.</p>
+      <p class="ntfy">
+        <a href="https://ntfy.sh/beds_commentary_1234" target="_blank" rel="noopener noreferrer">Subscribe on ntfy</a>
+        for a note each time a score changes. The topic is beds_commentary_1234.
+      </p>
       <p class="status" data-status role="status"></p>
 
       <div data-picker>
@@ -375,29 +379,39 @@ import { url } from '@/lib/site';
     display: grid;
     gap: 0.75rem;
   }
-  .matches button {
+  .ntfy {
+    margin: 0.35rem 0 0;
+    font-weight: 700;
+  }
+  .ntfy a {
+    font-weight: 800;
+  }
+  .matches :global(button) {
     width: 100%;
     display: flex;
     justify-content: space-between;
     gap: 1rem;
     align-items: center;
-    padding: 1rem 1.1rem;
+    padding: 1.15rem 1.2rem;
     background: #fff;
     border: 1px solid var(--border-strong);
     border-radius: 16px;
     color: var(--text);
     font: inherit;
+    font-size: clamp(1.35rem, 3.4vw, 1.85rem);
     font-weight: 800;
+    line-height: 1.2;
     text-align: left;
     cursor: pointer;
   }
-  .matches button:hover {
+  .matches :global(button:hover) {
     border-color: #f15a22;
   }
-  .matches span:last-child {
+  .matches :global(span:last-child) {
     color: #e0a800;
     font-family: var(--font-display);
-    font-size: 1.4rem;
+    font-size: clamp(1.8rem, 4vw, 2.5rem);
+    line-height: 1;
   }
   .names {
     display: grid;
@@ -408,7 +422,7 @@ import { url } from '@/lib/site';
   .names p {
     margin: 0;
     font-family: var(--font-display);
-    font-size: clamp(1.8rem, 5vw, 2.8rem);
+    font-size: clamp(2.4rem, 8vw, 4rem);
     font-weight: 800;
     line-height: 1.05;
   }
@@ -427,8 +441,12 @@ import { url } from '@/lib/site';
   }
   .points {
     font-family: var(--font-display);
-    font-size: clamp(3rem, 12vw, 5.5rem);
+    font-size: clamp(3.4rem, 14vw, 6.5rem);
     line-height: 1;
+  }
+  .call {
+    font-size: clamp(1.55rem, 4.6vw, 2.35rem);
+    line-height: 1.25;
   }
   .clock {
     margin: 0.2rem 0 0;
@@ -460,7 +478,7 @@ import { url } from '@/lib/site';
   .game-times :global(.time) {
     display: block;
     color: var(--text-muted);
-    font-size: 0.78rem;
+    font-size: 0.95rem;
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -470,7 +488,7 @@ import { url } from '@/lib/site';
     margin: 0.1rem 0;
     color: #0e2744;
     font-family: var(--font-display);
-    font-size: 1.35rem;
+    font-size: clamp(1.7rem, 4vw, 2.2rem);
     font-weight: 800;
   }
   .marker {

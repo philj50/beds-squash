@@ -167,6 +167,7 @@ Install the **ntfy** app ([ntfy.sh](https://ntfy.sh)) and subscribe to the topic
 | `beds_errors_1234` | When a GitHub job fails |
 | `beds_juniors_1234` | When a junior entry is added, changed or removed |
 | `beds_closed_1234` | When a County Closed score comes in |
+| `beds_commentary_1234` | When a score changes on Match commentary |
 
 Workflows: **Deploy to GitHub Pages** (build + post-deploy smoke tests), **Site tests** (`npm run check` + Playwright), **SquashLevels daily**, **Sync League Master**.
 

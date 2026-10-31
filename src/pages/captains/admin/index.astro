@@ -515,7 +515,7 @@ const scoresHref = url('/captains/admin/minigame/');
           <section class="admin-panel" data-tab="integrations" data-lm-only hidden>
             <h2>Integrations</h2>
             <p class="muted small">
-              Each outside service, the account it signs in with, and how much it has stored here. Passwords stay in GitHub. Each ntfy topic is public. League Master, SquashLevels, other job notes, failures, juniors and County Closed scores each have their own.
+              Each outside service, the account it signs in with, and how much it has stored here. Passwords stay in GitHub. Each ntfy topic is public. League Master, SquashLevels, other job notes, failures, juniors, County Closed scores and match commentary each have their own.
             </p>
             <p class="muted small" data-integrations-status hidden role="status"></p>
             <div class="overview-box" data-integrations hidden>
@@ -1258,6 +1258,15 @@ const scoresHref = url('/captains/admin/minigame/');
       tables: ['sportmgr_matches'],
       when: 'When a County Closed score comes in',
       fixedAccount: 'beds_closed_1234',
+    },
+    {
+      slug: 'ntfy-commentary',
+      name: 'ntfy match commentary',
+      accountSecret: '',
+      passwordSecret: '',
+      tables: ['live_matches'],
+      when: 'When a marked match on commentary changes score',
+      fixedAccount: 'beds_commentary_1234',
     },
     {
       slug: 'englandsquash',

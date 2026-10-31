@@ -53,8 +53,12 @@ const names = [
             <button class="par__opt" type="button" data-par="15" aria-pressed="false">PAR 15</button>
           </div>
           <label class="share">
-            <input type="checkbox" data-share />
+            <input type="checkbox" data-share checked />
             Show on Match commentary
+          </label>
+          <label class="share">
+            <input type="checkbox" data-say />
+            Say it out loud
           </label>
           <button class="btn btn--primary" type="submit">Start match</button>
         </div>
@@ -111,8 +115,12 @@ const names = [
         <p class="line" data-line></p>
         <p class="actions">
           <label class="share share--board">
-            <input type="checkbox" data-share />
+            <input type="checkbox" data-share checked />
             Show on Match commentary
+          </label>
+          <label class="share share--board">
+            <input type="checkbox" data-say />
+            Say it out loud
           </label>
           <button class="btn btn--ghost btn--sm" type="button" data-hand>Other player serves</button>
           <button class="btn btn--primary" type="button" data-save hidden>Save match</button>
@@ -177,9 +185,6 @@ const names = [
         </p>
       </dialog>
       <ol class="recent" data-recent></ol>
-      <p class="lede">
-        Pick the two players and choose PAR 11 or PAR 15, then tap the player who won the rally. Both are win by two, best of five. PAR 15 is the second-division game. Tick Show on Match commentary and the match is listed under Current matches, so anyone on the site can follow it. The rally runs down the middle, and a clock runs for each game. After a game the board says Next game, then counts a 90 second rest. The first serve is from the right. Change it to the left when that is the box. The same player then serves from the other side. Hand out means the other player serves, from the right unless you change it. A let is played again. A stroke gives the point to the player you tap. The match stays on Beds Squash for an admin to check. It is not sent to Sport Manager.
-      </p>
       <script id="score-names" type="application/json" is:inline set:html={JSON.stringify(names)}></script>
     </div>
   </section>
@@ -277,6 +282,7 @@ const names = [
   const inputB = setup.querySelector<HTMLInputElement>('[name="player-b"]')!;
 
   const base = import.meta.env.BASE_URL.replace(/\/+$/, '');
+  const commentaryTopic = 'beds_commentary_1234';
   loginLink.href = `${base}/login/?next=${encodeURIComponent(location.pathname + location.search)}`;
 
   let state: ScoreState = freshMatch();
@@ -287,7 +293,11 @@ const names = [
   let recent: Marked[] = [];
   let strokeArmed = false;
   let nameChoices: string[] = [];
-  let shareLive = false;
+  let shareLive = true;
+  let sayAloud = localStorage.getItem('beds-say-mark') === '1';
+  let sayHeard = '';
+  let sayTimer = 0;
+  let sayQuiet = false;
   let activeAt = Date.now();
   let keepActivity = true;
   let watching = false;
@@ -682,6 +692,7 @@ const names = [
       callEl.textContent = 'Tap the player who is awarded the stroke.';
     } else {
       callEl.textContent = spokenMark(state, names, phase === 'done' ? 'play' : phase);
+      speakAloud(callEl.textContent);
     }
     if (watching && signedIn && watchMarker) {
       watchMarkerEl.hidden = false;
@@ -697,6 +708,29 @@ const names = [
     paintResult();
     saveSession();
     syncPar();
+  }
+
+  function speakAloud(text: string) {
+    if (sayQuiet || !sayAloud || watching || !text || !window.speechSynthesis) return;
+    if (text === sayHeard) return;
+    sayHeard = text;
+    const synth = window.speechSynthesis;
+    window.clearTimeout(sayTimer);
+    synth.cancel();
+    sayTimer = window.setTimeout(() => {
+      if (!sayAloud || sayHeard !== text) return;
+      const line = new SpeechSynthesisUtterance(text);
+      line.lang = 'en-GB';
+      line.rate = 0.95;
+      synth.resume();
+      synth.speak(line);
+    }, 80);
+  }
+
+  function stopSaying() {
+    window.clearTimeout(sayTimer);
+    window.speechSynthesis?.cancel();
+    sayHeard = '';
   }
 
   function syncPar() {
@@ -757,6 +791,7 @@ const names = [
     resultMode = false;
     resultScrolled = false;
     void clearLive();
+    stopSaying();
     history.replaceState(null, '', location.pathname);
     board.hidden = true;
     setup.hidden = false;
@@ -819,7 +854,10 @@ const names = [
     board.hidden = false;
     root.classList.add('is-playing');
     show('This match is still on the court.');
+    sayQuiet = true;
     paint();
+    sayQuiet = false;
+    sayHeard = callEl.textContent || '';
     keepActivity = true;
     const top = board.getBoundingClientRect().top + window.scrollY - 96;
     window.scrollTo({ top: Math.max(0, top), left: 0 });
@@ -874,8 +912,29 @@ const names = [
     publishTimer = window.setTimeout(() => void sendLive(), 400);
   }
 
+  let lastCommentaryNote = '';
+  let lastCommentaryTitle = '';
+
+  function notifyCommentary(title: string, body: string, key = `${title}|${body}`) {
+    if (!body || key === lastCommentaryNote) return;
+    lastCommentaryNote = key;
+    lastCommentaryTitle = title;
+    void fetch(`https://ntfy.sh/${commentaryTopic}`, {
+      method: 'POST',
+      body,
+      headers: {
+        Title: title,
+        Click: `${location.origin}${base}/captains/watch/`,
+        Tags: 'squash',
+      },
+    }).catch(() => {
+      lastCommentaryNote = '';
+    });
+  }
+
   async function sendLive() {
     if (!shareLive || !signedIn || watching || !liveReady || board.hidden) return;
+    const call = spokenMark(state, names, phase === 'done' ? 'play' : phase);
     const { error } = await supabase.rpc('publish_live_match', {
       p_a: names.a,
       p_b: names.b,
@@ -884,7 +943,7 @@ const names = [
         gameTimes.map((ms) => formatClock(ms)),
         phase === 'play' ? formatClock(elapsedMs()) : '',
         restartCount,
-        spokenMark(state, names, phase === 'done' ? 'play' : phase),
+        call,
       ),
       p_history: state,
     });
@@ -893,13 +952,26 @@ const names = [
       show('Live matches are not on the database yet. The score stays on this browser.');
       return;
     }
-    if (error) show(error.message);
+    if (error) {
+      show(error.message);
+      return;
+    }
+    notifyCommentary(
+      `${names.a} v ${names.b}`,
+      call,
+      `${names.a}|${names.b}|${call}|${scoreLine(state)}|${currentRallies(state).length}`,
+    );
   }
 
   async function clearLive() {
     if (!signedIn || !liveReady) return;
     const { error } = await supabase.rpc('clear_live_match');
     if (error && missingFunction(error)) liveReady = false;
+    if (!error && lastCommentaryNote) {
+      const title = lastCommentaryTitle || 'Match commentary';
+      lastCommentaryNote = '';
+      notifyCommentary(title, 'That match is no longer on the court.', `cleared|${title}|${Date.now()}`);
+    }
   }
 
   function watchStamp(row: LiveRow) {
@@ -1304,6 +1376,7 @@ const names = [
     board.hidden = false;
     root.classList.add('is-playing');
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    sayHeard = '';
     paint();
     const top = board.getBoundingClientRect().top + window.scrollY - 96;
     window.scrollTo({ top: Math.max(0, top), left: 0 });
@@ -1406,6 +1479,7 @@ const names = [
     resultScrolled = false;
     armSession();
     show('');
+    sayHeard = '';
     paint();
   });
 
@@ -1424,6 +1498,7 @@ const names = [
     resultMode = false;
     resultScrolled = false;
     void clearLive();
+    stopSaying();
     history.replaceState(null, '', location.pathname);
     board.hidden = true;
     setup.hidden = false;
@@ -1582,6 +1657,24 @@ const names = [
       queueLive();
     });
   }
+  for (const box of root.querySelectorAll<HTMLInputElement>('[data-say]')) {
+    box.checked = sayAloud;
+    box.addEventListener('change', () => {
+      sayAloud = box.checked;
+      for (const other of root.querySelectorAll<HTMLInputElement>('[data-say]')) other.checked = sayAloud;
+      localStorage.setItem('beds-say-mark', sayAloud ? '1' : '0');
+      if (!sayAloud) {
+        stopSaying();
+        return;
+      }
+      if (!window.speechSynthesis) {
+        show('This browser cannot read the score aloud.');
+        return;
+      }
+      sayHeard = '';
+      speakAloud(callEl.textContent || '');
+    });
+  }
   backBtn.addEventListener('click', () => leaveWatch());
   root.querySelector<HTMLButtonElement>('[data-public-back]')!.addEventListener('click', () => leaveWatch());
 
@@ -1667,13 +1760,11 @@ const names = [
   .board {
     scroll-margin-top: 6rem;
   }
-  .lede {
-    margin-top: 2rem;
-    color: var(--text-muted);
-  }
   .score.is-playing .signin,
   .score.is-result .signin,
-  .score.is-playing:not(.is-watching) .current {
+  .score.is-playing:not(.is-watching) .current,
+  .score.is-playing .recent-head,
+  .score.is-playing .recent {
     display: none;
   }
   .score.is-watching .top-actions,
@@ -1956,7 +2047,9 @@ const names = [
   .call {
     margin: 0;
     min-height: 1.4rem;
-    font-weight: 700;
+    font-size: clamp(1.2rem, 3vw, 1.7rem);
+    font-weight: 800;
+    line-height: 1.25;
     text-align: center;
   }
   .pills {
@@ -1991,7 +2084,7 @@ const names = [
     cursor: default;
   }
   .pill .who {
-    font-size: 1rem;
+    font-size: clamp(1.2rem, 3.4vw, 1.75rem);
     text-transform: none;
     letter-spacing: 0;
   }
@@ -2168,8 +2261,8 @@ const names = [
   }
   .foot-copy [data-serve-who] {
     margin: 0.15rem 0 0;
-    font-weight: 700;
-    font-size: 1.05rem;
+    font-weight: 800;
+    font-size: clamp(1.05rem, 2.6vw, 1.35rem);
   }
   .serve-pip {
     grid-column: 3;
@@ -2292,12 +2385,60 @@ const names = [
     .score.is-playing .line {
       margin: 0;
     }
-    .pill .who {
-      font-size: 0.92rem;
-    }
     .middle,
     .reel {
       height: 11.5rem;
+    }
+  }
+  @media (orientation: landscape) and (max-height: 520px) {
+    :global(body:has(#score-app.is-playing) .site-header),
+    :global(body:has(#score-app.is-playing) .site-footer) {
+      display: none;
+    }
+    :global(body:has(#score-app.is-playing) .section) {
+      padding-block: 0.3rem;
+    }
+    .score.is-playing {
+      width: calc(100% - 0.8rem);
+    }
+    .score.is-playing h1,
+    .score.is-playing .status {
+      display: none;
+    }
+    .score.is-playing .board {
+      gap: 0.2rem;
+    }
+    .score.is-playing .call {
+      font-size: 1.45rem;
+      min-height: 0;
+    }
+    .score.is-playing .pill .who {
+      font-size: 1.65rem;
+    }
+    .score.is-playing .pill {
+      min-height: 2.2rem;
+      padding: 0.15rem 0.45rem;
+    }
+    .score.is-playing .middle,
+    .score.is-playing .reel {
+      height: 4.6rem;
+    }
+    .score.is-playing .points {
+      font-size: clamp(4.4rem, 28vh, 7.2rem);
+    }
+    .score.is-playing .foot-copy .clock {
+      font-size: 1.7rem;
+    }
+    .score.is-playing .serve-pip {
+      width: 3rem;
+      height: 3rem;
+      font-size: 1.45rem;
+    }
+    .score.is-playing .actions {
+      gap: 0.35rem;
+    }
+    .score.is-playing .actions :global(.btn) {
+      padding: 0.3rem 0.65rem;
     }
   }
 </style>

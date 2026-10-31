@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Post to a public ntfy.sh topic. The topic name is the third argument.
 # beds_lm_1234, beds_sl_1234, beds_config_1234, beds_errors_1234,
-# beds_juniors_1234 and beds_closed_1234 are the topics in use.
+# beds_juniors_1234, beds_closed_1234 and beds_commentary_1234 are the topics in use.
 set -euo pipefail
 
 title="${1:?title}"

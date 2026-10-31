@@ -1,6 +1,7 @@
 ---
 import { getEntry, render } from 'astro:content';
 import Base from '@/layouts/Base.astro';
+import ClosedSponsors from '@/components/ClosedSponsors.astro';
 import EventCard from '@/components/EventCard.astro';
 import OrderOfPlay from '@/components/OrderOfPlay.astro';
 import { getEvents, getUpcomingEvents } from '@/lib/content';
@@ -22,6 +23,7 @@ const tournamentLive = Boolean(tournament) && (end ?? start).getTime() >= Date.n
 const externalLabel = link?.includes('sportmgr.co.uk') ? 'Sport Manager' : 'More details';
 const clubEntry = club ? await getEntry('clubs', club) : undefined;
 const others = (await getUpcomingEvents()).filter((e) => e.id !== event.id).slice(0, 3);
+const showSponsors = event.id === '2027-01-beds-closed';
 const closedYears = /Bedfordshire County Closed Championships/i.test(title)
   ? (await getEvents())
       .filter((item) => /Bedfordshire County Closed Championships/i.test(item.data.title))
@@ -59,7 +61,8 @@ const gcal = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=$
 >
   <article>
     <header class="page-hero">
-      <div class="container narrow">
+      <div class:list={['container', showSponsors ? 'hero-split' : 'narrow']}>
+        <div>
         <a class="back" href={url('/events/')}>← All events</a>
         <div class="card__meta" style="margin-bottom:.75rem">
           <span class:list={['pill', { 'pill--red': source === 'england-squash' }]}>{SOURCE_LABEL[source]}</span>
@@ -90,8 +93,12 @@ const gcal = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=$
           ))}
           <a class="btn btn--ghost btn--sm" href={gcal} target="_blank" rel="noopener">Add to Google Calendar</a>
         </div>
+        </div>
+        {showSponsors && <ClosedSponsors place="main" />}
       </div>
     </header>
+
+    {showSponsors && <ClosedSponsors place="board" />}
 
     {
       tournament && tournament.matches.length > 0 && (
@@ -131,6 +138,8 @@ const gcal = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=$
         </section>
       )
     }
+
+    {showSponsors && <ClosedSponsors place="board" />}
   </article>
 
   {
@@ -161,6 +170,16 @@ const gcal = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=$
   }
   .back:hover {
     color: var(--accent);
+  }
+  .hero-split {
+    display: grid;
+    gap: 1.5rem;
+    align-items: center;
+  }
+  @media (min-width: 800px) {
+    .hero-split {
+      grid-template-columns: minmax(0, 1fr) 17rem;
+    }
   }
   .when strong {
     color: var(--accent);
