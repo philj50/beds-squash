@@ -224,6 +224,7 @@ const names = [
     type ScoreState,
     type Side,
   } from '@/lib/scoreboard';
+  import { speakScore, stopScore } from '@/lib/speak';
 
   type Marked = {
     id: number | string;
@@ -297,7 +298,6 @@ const names = [
   let shareLive = true;
   let sayAloud = localStorage.getItem('beds-say-mark') === '1';
   let sayHeard = '';
-  let sayTimer = 0;
   let sayQuiet = false;
   let activeAt = Date.now();
   let keepActivity = true;
@@ -715,22 +715,11 @@ const names = [
     if (sayQuiet || !sayAloud || watching || !text || !window.speechSynthesis) return;
     if (text === sayHeard) return;
     sayHeard = text;
-    const synth = window.speechSynthesis;
-    window.clearTimeout(sayTimer);
-    synth.cancel();
-    sayTimer = window.setTimeout(() => {
-      if (!sayAloud || sayHeard !== text) return;
-      const line = new SpeechSynthesisUtterance(text);
-      line.lang = 'en-GB';
-      line.rate = 0.95;
-      synth.resume();
-      synth.speak(line);
-    }, 80);
+    speakScore(text);
   }
 
   function stopSaying() {
-    window.clearTimeout(sayTimer);
-    window.speechSynthesis?.cancel();
+    stopScore();
     sayHeard = '';
   }
 

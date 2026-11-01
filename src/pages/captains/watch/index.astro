@@ -63,6 +63,7 @@ import { url } from '@/lib/site';
     spokenPublicLine,
     unpackLiveScore,
   } from '@/lib/scoreboard';
+  import { speakScore, stopScore } from '@/lib/speak';
 
   type LiveRow = {
     id: number;
@@ -120,23 +121,10 @@ import { url } from '@/lib/site';
     return minutes === 1 ? 'Updated 1 min ago' : `Updated ${minutes} min ago`;
   }
 
-  let speakTimer = 0;
-
   function speak(text: string, quietAfter = text) {
     if (!sayScore || !text || !window.speechSynthesis) return;
-    heard = text;
-    const synth = window.speechSynthesis;
-    window.clearTimeout(speakTimer);
-    synth.cancel();
-    speakTimer = window.setTimeout(() => {
-      if (!sayScore || heard !== text) return;
-      heard = quietAfter;
-      const line = new SpeechSynthesisUtterance(text);
-      line.lang = 'en-GB';
-      line.rate = 0.95;
-      synth.resume();
-      synth.speak(line);
-    }, 80);
+    heard = quietAfter;
+    speakScore(text);
   }
 
   function announce(text: string) {
@@ -291,7 +279,7 @@ import { url } from '@/lib/site';
     const url = new URL(location.href);
     url.searchParams.delete('match');
     history.replaceState(null, '', url.pathname);
-    window.speechSynthesis?.cancel();
+    stopScore();
     paintList();
   }
 
@@ -326,7 +314,7 @@ import { url } from '@/lib/site';
     sayScore = sayBox.checked;
     localStorage.setItem('beds-say-score', sayScore ? '1' : '0');
     if (!sayScore) {
-      window.speechSynthesis?.cancel();
+      stopScore();
       return;
     }
     if (!window.speechSynthesis) {
