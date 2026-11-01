@@ -240,7 +240,12 @@ test.describe('Signed-in account', () => {
 });
 
 test.describe('Junior County Closed', () => {
+  async function whileEntriesAreOpen(page: Page) {
+    await page.clock.install({ time: new Date('2026-10-20T12:00:00Z') });
+  }
+
   test('a date of birth shows the age group, and Under 9 is Mixed', async ({ page }) => {
+    await whileEntriesAreOpen(page);
     await page.goto('juniors/closed/', { waitUntil: 'domcontentloaded' });
     const dob = page.locator('[name="date_of_birth"]');
     const category = page.locator('[data-category]');
@@ -257,6 +262,7 @@ test.describe('Junior County Closed', () => {
   });
 
   test('a date outside the age groups is refused', async ({ page }) => {
+    await whileEntriesAreOpen(page);
     await page.goto('juniors/closed/', { waitUntil: 'domcontentloaded' });
     await page.locator('[name="date_of_birth"]').evaluate((input) => {
       const field = input as HTMLInputElement;
@@ -276,6 +282,7 @@ test.describe('Junior County Closed', () => {
   });
 
   test('a complete entry is accepted and nothing is emailed', async ({ page }) => {
+    await whileEntriesAreOpen(page);
     let posted: Record<string, unknown> | null = null;
     await page.route(`${SUPABASE}/rest/v1/junior_entries**`, async (route) => {
       if (route.request().method() === 'POST') posted = route.request().postDataJSON() as Record<string, unknown>;
@@ -298,6 +305,7 @@ test.describe('Junior County Closed', () => {
   });
 
   test('ticking the name box sends consent, and the public list shows only those names', async ({ page }) => {
+    await whileEntriesAreOpen(page);
     let posted: Record<string, unknown> | null = null;
     const groups = [
       { label: 'Mixed U9', count: 0, names: [] },
@@ -349,6 +357,7 @@ test.describe('Junior County Closed', () => {
   });
 
   test('the same player entered twice is refused', async ({ page }) => {
+    await whileEntriesAreOpen(page);
     await page.route(`${SUPABASE}/rest/v1/junior_entries**`, async (route) => {
       await route.fulfill({
         status: 409,
@@ -369,6 +378,7 @@ test.describe('Junior County Closed', () => {
   });
 
   test('the hidden company field does not create an entry', async ({ page }) => {
+    await whileEntriesAreOpen(page);
     let posts = 0;
     await page.route(`${SUPABASE}/rest/v1/junior_entries**`, async (route) => {
       if (route.request().method() === 'POST') posts += 1;

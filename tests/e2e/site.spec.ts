@@ -793,8 +793,8 @@ test.describe('Public site', () => {
   test('junior closed signup form', async ({ page }) => {
     await open(page, 'juniors/closed/');
     await expect(page.getByRole('heading', { level: 1, name: 'Junior County Closed' })).toBeVisible();
-    await expect(page.locator('form[data-form]')).toBeVisible();
-    await expect(page.locator('input[name="player_first_name"]')).toBeVisible();
+    await expect(page.locator('[data-status]')).toHaveText('Entries closed on Wednesday 28th October.');
+    await expect(page.locator('form[data-form]')).toBeHidden();
   });
 
   test('login accepts a name as well as an email', async ({ page }) => {
