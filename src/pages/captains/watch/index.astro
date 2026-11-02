@@ -13,7 +13,11 @@ import { url } from '@/lib/site';
   <section class="section">
     <div class="container watch" id="watch-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} data-login={url('/login/')}>
       <h1>Match commentary</h1>
-      <p class="lede">Choose a match that is being marked. The score updates as each point is entered. Tick Say the score to hear it.</p>
+      <p class="lede">Choose a match that is being marked. The score updates as each point is entered. Tick Say it out loud to hear it.</p>
+      <label class="say">
+        <input type="checkbox" data-say />
+        Say it out loud
+      </label>
       <p class="ntfy">
         <a href="https://ntfy.sh/beds_commentary_1234" target="_blank" rel="noopener noreferrer">Subscribe on ntfy</a>
         for a note when a match goes on. The topic is beds_commentary_1234.
@@ -40,10 +44,6 @@ import { url } from '@/lib/site';
         <p class="marker" data-marker></p>
         <p class="updated" data-updated></p>
         <p class="note" data-note></p>
-        <label class="say">
-          <input type="checkbox" data-say />
-          Say the score
-        </label>
       </div>
     </div>
   </section>
@@ -63,7 +63,7 @@ import { url } from '@/lib/site';
     spokenPublicLine,
     unpackLiveScore,
   } from '@/lib/scoreboard';
-  import { speakScore, stopScore } from '@/lib/speak';
+  import { followScore, speakScore, speechUnlocked, stopScore } from '@/lib/speak';
 
   type LiveRow = {
     id: number;
@@ -127,15 +127,24 @@ import { url } from '@/lib/site';
     speakScore(text);
   }
 
-  function announce(text: string) {
+  function follow(text: string, quietAfter = text) {
+    if (!sayScore || !text || !window.speechSynthesis) return;
+    if (!speechUnlocked()) return;
+    heard = quietAfter;
+    followScore(text);
+  }
+
+  function announce(text: string, tapped = false) {
     if (!text) return;
     if (!voiceArmed) {
       heard = text;
       voiceArmed = true;
+      if (tapped) speak(text);
       return;
     }
     if (text === heard) return;
-    speak(text);
+    if (tapped) speak(text);
+    else follow(text);
   }
 
   function shownClock() {
@@ -199,7 +208,7 @@ import { url } from '@/lib/site';
     }
   }
 
-  function paintLive(row: LiveRow) {
+  function paintLive(row: LiveRow, tapped = false) {
     const names = { a: shown(row.playerA), b: shown(row.playerB) };
     const shared = unpackLiveScore(row.score || '0-0');
     const restored = signedIn ? restoreMatch(row.history) : null;
@@ -237,10 +246,10 @@ import { url } from '@/lib/site';
         note.append(link, ' to see the full names and every point.');
       }
       if (restarting && shared.times.length) {
-        speak(spokenPublicLine(names.a, names.b, shared.line), said);
+        follow(spokenPublicLine(names.a, names.b, shared.line), said);
         return;
       }
-      if (changed) announce(said);
+      if (changed) announce(said, tapped);
       return;
     }
     note.textContent = '';
@@ -252,10 +261,10 @@ import { url } from '@/lib/site';
     call.textContent = spokenMark(restored, names, phase);
     marker.textContent = row.marker ? `Marked by ${row.marker}` : '';
     if (restarting && finishedGames(restored).length) {
-      speak(spokenMark(restored, names, 'next'), call.textContent);
+      follow(spokenMark(restored, names, 'next'), call.textContent);
       return;
     }
-    if (changed) announce(call.textContent);
+    if (changed) announce(call.textContent, tapped);
   }
 
   function openMatch(id: number) {
@@ -268,7 +277,7 @@ import { url } from '@/lib/site';
     url.searchParams.set('match', String(id));
     history.replaceState(null, '', `${url.pathname}${url.search}`);
     const row = rows.find((item) => item.id === id);
-    if (row) paintLive(row);
+    if (row) paintLive(row, true);
     else show('That match is not being shared.');
   }
 
@@ -310,6 +319,18 @@ import { url } from '@/lib/site';
     paintList();
   }
 
+  function currentCall() {
+    return root.querySelector('[data-call]')?.textContent?.trim() || '';
+  }
+
+  root.addEventListener('pointerdown', () => {
+    if (!sayScore || speechUnlocked()) return;
+    const text = currentCall();
+    if (!text) return;
+    voiceArmed = true;
+    speak(text);
+  });
+
   sayBox.addEventListener('change', () => {
     sayScore = sayBox.checked;
     localStorage.setItem('beds-say-score', sayScore ? '1' : '0');
@@ -325,7 +346,7 @@ import { url } from '@/lib/site';
     heard = '';
     const row = rows.find((item) => item.id === matchId);
     const shared = row ? unpackLiveScore(row.score || '0-0') : null;
-    const text = root.querySelector('[data-call]')?.textContent
+    const text = currentCall()
       || (row && shared ? shared.call || spokenPublicLine(shown(row.playerA), shown(row.playerB), shared.line) : '');
     speak(text || 'The score will be read out.');
   });
