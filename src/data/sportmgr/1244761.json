@@ -120,6 +120,12 @@
       "grade": "B Grade"
     },
     {
+      "name": "Andrew McCulloch",
+      "club": "",
+      "seed": "",
+      "grade": "C Grade"
+    },
+    {
       "name": "Barry Ephgrave",
       "club": "",
       "seed": "",
@@ -156,6 +162,12 @@
       "grade": "C Grade"
     },
     {
+      "name": "Philip Martynski",
+      "club": "",
+      "seed": "",
+      "grade": "C Grade"
+    },
+    {
       "name": "Sam Swann",
       "club": "",
       "seed": "",
@@ -180,5 +192,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-04T08:15:48.036Z"
+  "syncedAt": "2026-11-04T16:26:44.620Z"
 }
