@@ -16,4 +16,4 @@ tags: [squash, racketball, juniors, members-club]
 order: 30
 ---
 
-Biggleswade Squash Club shares a home with Biggleswade Rugby Club on Langford Road. Four courts, internal box leagues and a friendly bar make it the hub for squash in the east of the county.
+Biggleswade Squash Club shares a home with Biggleswade Rugby Club on Langford Road. Four courts, internal box leagues and a friendly bar make it the hub for squash in the east of the county. There is also a thriving junior setup at the club, with 20-30 regular juniors attending sessions.
