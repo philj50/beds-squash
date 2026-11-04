@@ -60,6 +60,7 @@ const names = [
             <input type="checkbox" data-say />
             Say it out loud
           </label>
+          <p class="say-note">Take the phone off silent to hear the voice.</p>
           <button class="btn btn--primary" type="submit">Start match</button>
         </div>
       </form>
@@ -122,6 +123,7 @@ const names = [
             <input type="checkbox" data-say />
             Say it out loud
           </label>
+          <p class="say-note say-note--board">Take the phone off silent to hear the voice.</p>
           <button class="btn btn--ghost btn--sm" type="button" data-hand>Other player serves</button>
           <button class="btn btn--primary" type="button" data-save hidden>Save match</button>
           <button class="btn btn--ghost" type="button" data-new>New match</button>
@@ -1917,6 +1919,13 @@ const names = [
     height: 1.15rem;
     padding: 0;
     accent-color: #f15a22;
+  }
+  .say-note {
+    flex-basis: 100%;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    font-weight: 700;
   }
   .current {
     margin-top: 1.75rem;

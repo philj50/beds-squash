@@ -19,6 +19,7 @@ import { url } from '@/lib/site';
         <input type="checkbox" data-say />
         Say it out loud
       </label>
+      <p class="say-note">Take the phone off silent to hear the voice.</p>
       {COMMENTARY_NOTES && (
         <p class="ntfy">
           <a href="https://ntfy.sh/beds_commentary_1234" target="_blank" rel="noopener noreferrer">Subscribe on ntfy</a>
@@ -75,7 +76,7 @@ import { url } from '@/lib/site';
     finishedGames,
     liveMatchCurrent,
     matchWinner,
-    pointLines,
+    gameStem,
     publicPlayerName,
     restoreMatch,
     spokenMark,
@@ -255,7 +256,7 @@ import { url } from '@/lib/site';
     return name.trim().split(/\s+/)[0] || name;
   }
 
-  function paintHistory(restored: ReturnType<typeof restoreMatch>, names: { a: string; b: string }) {
+  function paintHistory(restored: ReturnType<typeof restoreMatch>) {
     historyBody.replaceChildren();
     if (!restored) {
       historyBody.textContent = archiveId
@@ -263,23 +264,53 @@ import { url } from '@/lib/site';
         : 'The points will show here as they are marked.';
       return;
     }
-    const games = pointLines(restored, names);
-    if (!games.length) {
+    const played = restored.games.filter((game) => game.length > 0);
+    if (!played.length) {
       historyBody.textContent = 'No points yet.';
       return;
     }
-    for (const game of games) {
-      const title = document.createElement('p');
-      title.className = 'game-label';
-      title.textContent = game.title;
-      const list = document.createElement('ol');
-      for (const line of game.lines) {
-        const item = document.createElement('li');
-        item.textContent = line;
-        list.append(item);
+    const sheet = document.createElement('div');
+    sheet.className = 'result-sheet';
+    played.forEach((rallies, index) => {
+      const stem = gameStem(rallies);
+      const game = document.createElement('section');
+      game.className = 'stem';
+      const heading = document.createElement('p');
+      heading.className = 'stem-head';
+      heading.textContent = `Game ${index + 1}`;
+      const total = document.createElement('p');
+      total.className = 'stem-score';
+      total.textContent = `${stem.score.a}–${stem.score.b}`;
+      const body = document.createElement('div');
+      body.className = 'stem-body';
+      for (const mark of stem.rows) {
+        const row = document.createElement('div');
+        row.className = 'stem-row';
+        const pip = document.createElement('span');
+        pip.className = `pip${mark.kind === 'let' ? ' is-let' : ''}${mark.kind === 'stroke' ? ' is-stroke' : ''}`;
+        pip.textContent = mark.text;
+        const box = document.createElement('span');
+        box.className = 'box-mark';
+        box.textContent = mark.box;
+        const cluster = document.createElement('span');
+        cluster.className = mark.side === 'a' ? 'cluster cluster--a' : 'cluster cluster--b';
+        if (mark.side === 'a') cluster.append(box, pip);
+        else cluster.append(pip, box);
+        const left = document.createElement('span');
+        const right = document.createElement('span');
+        const rail = document.createElement('span');
+        rail.className = 'stem-rail';
+        if (mark.side === 'a') left.append(cluster);
+        else right.append(cluster);
+        row.append(left, rail, right);
+        const kind = mark.kind === 'let' ? 'Yes let' : mark.kind === 'stroke' ? 'Stroke' : 'Point';
+        row.setAttribute('aria-label', `${kind}, ${mark.text}, from ${mark.box}`);
+        body.append(row);
       }
-      historyBody.append(title, list);
-    }
+      game.append(heading, total, body);
+      sheet.append(game);
+    });
+    historyBody.append(sheet);
   }
 
   function paintComeOn(names: { a: string; b: string }) {
@@ -403,7 +434,7 @@ import { url } from '@/lib/site';
       call.textContent = spokenMark(restored, names, phase);
       marker.textContent = row.marker ? `Marked by ${row.marker}` : '';
     }
-    paintHistory(restored, names);
+    paintHistory(restored);
     if (quiet) {
       voiceArmed = true;
       heard = call.textContent;
@@ -816,6 +847,11 @@ import { url } from '@/lib/site';
     padding: 0;
     accent-color: #f15a22;
   }
+  .say-note {
+    margin: 0.15rem 0 0;
+    color: var(--text-muted);
+    font-weight: 700;
+  }
   .archive-title {
     margin: 1.5rem 0 0;
     font-size: 1.35rem;
@@ -870,16 +906,69 @@ import { url } from '@/lib/site';
     font-weight: 800;
     cursor: pointer;
   }
-  .points-history :global(.game-label) {
-    margin: 0.7rem 0 0.15rem;
-    font-weight: 800;
+  .points-history :global(.result-sheet) {
+    display: flex;
+    gap: 0.75rem;
+    overflow-x: auto;
+    margin-top: 0.6rem;
   }
-  .points-history :global(ol) {
+  .points-history :global(.stem) {
+    flex: 1 0 9.5rem;
+    min-width: 9.5rem;
+  }
+  .points-history :global(.stem-head),
+  .points-history :global(.stem-score) {
     margin: 0;
-    padding-left: 1.25rem;
+    text-align: center;
+    font-weight: 700;
   }
-  .points-history :global(li) {
-    margin: 0.12rem 0;
+  .points-history :global(.stem-score) {
+    color: #e0a800;
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+  }
+  .points-history :global(.stem-row) {
+    display: grid;
+    grid-template-columns: 1fr 2px 1fr;
+    align-items: center;
+    min-height: 2rem;
+  }
+  .points-history :global(.stem-rail) {
+    background: #e0a800;
+    align-self: stretch;
+  }
+  .points-history :global(.cluster) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+  }
+  .points-history :global(.cluster--a) {
+    justify-self: end;
+    margin-right: 0.2rem;
+  }
+  .points-history :global(.cluster--b) {
+    justify-self: start;
+    margin-left: 0.2rem;
+  }
+  .points-history :global(.pip) {
+    width: 1.7rem;
+    height: 1.7rem;
+    border-radius: 50%;
+    border: 2px solid #e0a800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    color: #111;
+    font-size: 0.72rem;
+    font-weight: 700;
+  }
+  .points-history :global(.pip.is-stroke) {
+    border-width: 3px;
+    border-color: #0e2744;
+  }
+  .points-history :global(.box-mark) {
+    font-size: 0.7rem;
     font-weight: 700;
   }
 </style>
