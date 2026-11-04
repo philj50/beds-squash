@@ -95,6 +95,18 @@ for (const event of chosen) {
   await storeEntries(event, rows);
 }
 
+if (plans.length) {
+  await restWrite('import_runs', 'POST', [{
+    source: 'beds-closed',
+    summary: {
+      events: plans.map((plan) => ({
+        title: plan.event.title,
+        ...summary(plan.actions),
+      })),
+    },
+  }]);
+}
+
 if (!apply) {
   console.log('The entry list was saved. No logins were changed and no mail was sent.');
   process.exit(0);

@@ -36,6 +36,7 @@ if (events.length === 0) {
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!snapshotOnly && !key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set. Use --snapshot to write JSON only.');
 
+const savedEvents = [];
 for (const event of events) {
   const tournament = await fetchTournament(event.sportmgr);
   console.log(`${tournament.title}: ${tournament.entries.length} entries, ${tournament.matches.length} matches`);
@@ -100,6 +101,10 @@ for (const event of events) {
     if (await publishScore(match)) sent += 1;
   }
   if (arrived.length) console.log(`Sent ${sent} of ${arrived.length} score notes to ${CLOSED_SCORE_TOPIC}.`);
+  savedEvents.push({ title: tournament.title, entries: tournament.entries.length, matches: tournament.matches.length });
+}
+if (!snapshotOnly && savedEvents.length) {
+  await rest('import_runs', { method: 'POST', body: [{ source: 'sportmanager', summary: { events: savedEvents } }] });
 }
 
 function chunks(items, size) {

@@ -1279,6 +1279,7 @@ async function save(payload) {
     write: true,
     body: [{ source: 'squashlevels', summary: payload.summary }],
   });
+  console.log(JSON.stringify(payload.summary));
   return [];
 }
 
@@ -1436,6 +1437,7 @@ async function exceptions() {
     summary: { exceptions: true, season, wanted: wanted.length, found: [...players.values()].filter((player) => player.currentLevel != null).length, searches },
   });
   console.error(JSON.stringify({ exceptions: true, season, wanted: wanted.length, found: nameRows.filter((row) => row.status === 'matched').length, searches }));
+  console.log(JSON.stringify({ exceptions: true, season, wanted: wanted.length, found: nameRows.filter((row) => row.status === 'matched').length, searches }));
 }
 
 async function main() {
@@ -1462,6 +1464,10 @@ async function main() {
   const days = await leagueDays();
   if (!days.length) {
     console.error('No scored rubbers to read.');
+    console.log(JSON.stringify({ note: 'No scored rubbers.' }));
+    if (canWrite) {
+      await rest('import_runs', { method: 'POST', write: true, body: [{ source: 'squashlevels', summary: { note: 'No scored rubbers.' } }] });
+    }
     return;
   }
   const yesterday = londonDate(new Date(Date.now() - 24 * 60 * 60 * 1000));
@@ -1469,6 +1475,11 @@ async function main() {
   const rubbers = days.find(([date]) => date === playedOn)?.[1] ?? [];
   if (!rubbers.length) {
     console.error(`No player matches on ${playedOn}. No article.`);
+    const summary = { playedOn, players: 0, matches: 0, ratings: 0, articles: [], note: 'No player matches.' };
+    console.log(JSON.stringify(summary));
+    if (canWrite) {
+      await rest('import_runs', { method: 'POST', write: true, body: [{ source: 'squashlevels', summary }] });
+    }
     return;
   }
 
@@ -1616,6 +1627,7 @@ async function main() {
   };
   const chunks = await save(payload);
   console.error(JSON.stringify(payload.summary));
+  console.log(JSON.stringify(payload.summary));
   if (chunks.length) console.error(chunks.join('\n'));
 }
 

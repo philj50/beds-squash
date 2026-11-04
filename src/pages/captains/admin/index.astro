@@ -584,7 +584,7 @@ const scoresHref = url('/captains/admin/minigame/');
             <details class="notes">
               <summary>Notes</summary>
               <p class="muted small">
-                Each outside service, the account it signs in with, and how much it has stored here. Passwords stay in GitHub. Each ntfy topic is public. League Master, SquashLevels, other job notes, failures, juniors, County Closed scores and match commentary each have their own.
+                Each outside service, the account it signs in with, and how much it has stored here. Last run is the newest stored job, in UK time. Updates is what that job changed. Passwords stay in GitHub. Each ntfy topic is public. League Master, SquashLevels, other job notes, failures, juniors, County Closed scores and match commentary each have their own.
               </p>
             </details>
             <p class="muted small" data-integrations-status hidden role="status"></p>
@@ -598,6 +598,8 @@ const scoresHref = url('/captains/admin/minigame/');
                     <th>Rows</th>
                     <th>Size</th>
                     <th>When</th>
+                    <th>Last run</th>
+                    <th>Updates</th>
                   </tr>
                 </thead>
                 <tbody data-integrations-rows></tbody>
@@ -1259,7 +1261,15 @@ const scoresHref = url('/captains/admin/minigame/');
       accountSecret: 'SPORTS_MANAGER_USERNAME',
       passwordSecret: 'SPORTS_MANAGER_PASSWORD',
       tables: ['sportmgr_tournaments', 'sportmgr_entries', 'sportmgr_matches'],
-      when: 'Twice a day, and every five minutes on the Closed weekend',
+      when: 'Every half hour, and every five minutes on the County Closed weekend',
+    },
+    {
+      slug: 'beds-closed',
+      name: 'County Closed list',
+      accountSecret: 'SPORTS_MANAGER_USERNAME',
+      passwordSecret: 'SPORTS_MANAGER_PASSWORD',
+      tables: ['beds_closed_entries'],
+      when: 'Every half hour',
     },
     {
       slug: 'cmstringers',
@@ -1338,7 +1348,7 @@ const scoresHref = url('/captains/admin/minigame/');
       accountSecret: '',
       passwordSecret: '',
       tables: ['live_matches'],
-      when: 'Paused. A match on Match commentary does not send a note',
+      when: 'When a match goes on Match commentary',
       fixedAccount: 'beds_commentary_1234',
     },
     {
@@ -1375,11 +1385,12 @@ const scoresHref = url('/captains/admin/minigame/');
     status.hidden = false;
     status.textContent = 'Loading integrations…';
     table.hidden = true;
-    const [reportResult, accountResult] = await Promise.all([
+    const [reportResult, accountResult, runResult] = await Promise.all([
       supabase.rpc('admin_database_report'),
       supabase.rpc('admin_integration_accounts'),
+      supabase.rpc('admin_integration_runs'),
     ]);
-    const report = reportResult.data as { tables?: { name: string; rows: number; bytes: number }[] } | null;
+    const report = reportResult.data as { tables?: { name: string; rows: number; bytes: number; newest?: string | null }[] } | null;
     const tables = Array.isArray(report?.tables) ? report.tables : [];
     const accounts = new Map<string, string>();
     const accountRows = accountResult.data as { slug?: string; account?: string }[] | null;
@@ -1396,6 +1407,52 @@ const scoresHref = url('/captains/admin/minigame/');
       return `${mb.toFixed(mb < 10 ? 1 : 0)} MB`;
     };
     const formatCount = (value: number) => Number(value || 0).toLocaleString('en-GB');
+    type ImportRun = { source?: string; ranAt?: string; summary?: Record<string, unknown> };
+    const runRows = Array.isArray(runResult.data) ? (runResult.data as ImportRun[]) : [];
+    const runsBySource = new Map<string, ImportRun[]>();
+    for (const row of runRows) {
+      if (!row.source) continue;
+      const list = runsBySource.get(row.source) ?? [];
+      list.push(row);
+      runsBySource.set(row.source, list);
+    }
+    const runSources: Record<string, string> = {
+      squashlevels: 'squashlevels',
+      leaguemaster: 'league-master',
+      sportmanager: 'sportmanager',
+      'beds-closed': 'beds-closed',
+    };
+    const countText = (value: unknown) => Number(value || 0).toLocaleString('en-GB');
+    const runLine = (summary: Record<string, unknown>) => {
+      if (summary.exceptions) return `Still missing: looked for ${countText(summary.wanted)}, found ${countText(summary.found)}.`;
+      if (summary.backfill) return `Backfill listed ${countText(summary.listed)}, fetched ${countText(summary.fetched)}.`;
+      if (summary.playedOn) {
+        const articles = Array.isArray(summary.articles) ? summary.articles.length : 0;
+        const articleText = articles ? `${articles} article${articles === 1 ? '' : 's'}.` : 'No article.';
+        return `${formatDay(String(summary.playedOn))}: ${countText(summary.players)} players, ${countText(summary.matches)} matches, ${countText(summary.ratings)} ratings. ${articleText}`;
+      }
+      if (typeof summary.note === 'string' && summary.note) return summary.note;
+      if (summary.fixtures != null) return `${summary.season}: ${countText(summary.fixtures)} fixtures, ${countText(summary.rubbers)} rubbers, ${countText(summary.nominations)} nominations. ${countText(summary.players_added)} new players.`;
+      if (Array.isArray(summary.events)) {
+        return summary.events
+          .map((event) => {
+            const row = event as { title?: string; entries?: number; matches?: number; people?: number; paid?: number };
+            if (row.people != null) return `${row.title}: ${countText(row.people)} people, ${countText(row.paid)} paid.`;
+            return `${row.title}: ${countText(row.entries)} entries, ${countText(row.matches)} matches.`;
+          })
+          .join(' ');
+      }
+      return 'Finished.';
+    };
+    const describeRuns = (rows: ImportRun[]) => {
+      if (!rows.length) return { when: 'No run recorded', detail: '' };
+      const latestAt = new Date(rows[0].ranAt || '').getTime();
+      const together = Number.isNaN(latestAt)
+        ? [rows[0]]
+        : rows.filter((row) => latestAt - new Date(row.ranAt || '').getTime() < 30 * 60 * 1000);
+      const detail = [...new Set(together.map((row) => runLine(row.summary || {})).filter(Boolean))].join(' ');
+      return { when: formatWhen(rows[0].ranAt || null), detail };
+    };
     body.innerHTML = integrationCatalog
       .map((item) => {
         const matched = tables.filter((table) => item.tables.includes(table.name));
@@ -1405,7 +1462,15 @@ const scoresHref = url('/captains/admin/minigame/');
         const size = item.tables.length === 0 || matched.length === 0 ? '—' : formatBytes(bytes);
         const account = item.fixedAccount || accounts.get(item.slug) || (item.accountSecret ? `GitHub secret ${item.accountSecret}` : '—');
         const password = item.passwordNote || (item.passwordSecret ? `GitHub secret ${item.passwordSecret}` : '—');
-        return `<tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(account)}</td><td>${escapeHtml(password)}</td><td>${escapeHtml(volume)}</td><td>${escapeHtml(size)}</td><td>${escapeHtml(item.when)}</td></tr>`;
+        const source = runSources[item.slug];
+        const described = source ? describeRuns(runsBySource.get(source) || []) : { when: 'No scheduled run', detail: '' };
+        const newest = matched
+          .map((table) => table.newest)
+          .filter((value): value is string => Boolean(value))
+          .sort()
+          .at(-1);
+        const detail = described.detail || (newest ? `Newest stored row ${formatWhen(newest)}.` : '—');
+        return `<tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(account)}</td><td>${escapeHtml(password)}</td><td>${escapeHtml(volume)}</td><td>${escapeHtml(size)}</td><td>${escapeHtml(item.when)}</td><td>${escapeHtml(described.when)}</td><td class="run-detail">${escapeHtml(detail)}</td></tr>`;
       })
       .join('');
     status.hidden = true;
@@ -5386,6 +5451,13 @@ const scoresHref = url('/captains/admin/minigame/');
   #setup-app .db-table th:nth-child(n + 2) {
     text-align: right;
     font-variant-numeric: tabular-nums;
+  }
+  #setup-app [data-integrations] td:last-child,
+  #setup-app [data-integrations] th:last-child {
+    text-align: left;
+    white-space: normal;
+    min-width: 16rem;
+    max-width: 28rem;
   }
   #setup-app .traffic-table code {
     font-size: 0.85rem;

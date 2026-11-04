@@ -118,7 +118,6 @@ const names = [
         <details class="crowd" data-crowd hidden>
           <summary>Watching</summary>
           <p class="crowd-people" data-crowd-people></p>
-          <p class="crowd-emojis" data-crowd-emojis></p>
         </details>
         <p class="actions">
           <label class="share share--board">
@@ -276,7 +275,7 @@ const names = [
   const watchMarkerEl = root.querySelector<HTMLElement>('[data-watch-marker]')!;
   const crowdEl = root.querySelector<HTMLDetailsElement>('[data-crowd]')!;
   const crowdPeople = root.querySelector<HTMLElement>('[data-crowd-people]')!;
-  const crowdEmojis = root.querySelector<HTMLElement>('[data-crowd-emojis]')!;
+  const crowdSummary = crowdEl.querySelector('summary')!;
   const resultEl = root.querySelector<HTMLElement>('[data-result]')!;
   const resultSheet = root.querySelector<HTMLElement>('[data-result-sheet]')!;
   const resultLinkRow = root.querySelector<HTMLElement>('[data-result-link-row]')!;
@@ -1020,25 +1019,48 @@ const names = [
     celebrate: '🎉',
   };
 
-  function crowdNames(names: string[], guests: number) {
-    const shown = names.map((name) => name.trim()).filter(Boolean);
-    if (guests === 1) shown.push('1 other');
-    else if (guests > 1) shown.push(`${guests} others`);
-    return shown.join(', ');
-  }
-
-  function paintCrowd(data: { watching?: string[]; looked?: string[]; guests?: number; guestsEarlier?: number; emojis?: { kind: string; n: number }[] } | null) {
-    const watching = crowdNames(Array.isArray(data?.watching) ? data.watching : [], Number(data?.guests) || 0);
-    const looked = crowdNames(Array.isArray(data?.looked) ? data.looked : [], Number(data?.guestsEarlier) || 0);
-    const parts = [];
-    if (watching) parts.push(`Watching: ${watching}`);
-    if (looked) parts.push(`Looked in: ${looked}`);
-    crowdPeople.textContent = parts.join('. ') || 'Nobody is watching.';
-    const counts = new Map((Array.isArray(data?.emojis) ? data.emojis : []).map((row) => [row.kind, Number(row.n) || 0]));
-    const bits = Object.entries(crowdEmoji)
+  function emojiBits(rows: { kind: string; n: number }[] | undefined) {
+    const counts = new Map((Array.isArray(rows) ? rows : []).map((row) => [row.kind, Number(row.n) || 0]));
+    return Object.entries(crowdEmoji)
       .filter(([kind]) => (counts.get(kind) || 0) > 0)
       .map(([kind, emoji]) => `${emoji} ${counts.get(kind)}`);
-    crowdEmojis.textContent = bits.join('   ') || 'No reactions yet.';
+  }
+
+  function paintCrowd(data: { people?: { name?: string; here?: boolean; emojis?: { kind: string; n: number }[] }[] } | null) {
+    const people = (Array.isArray(data?.people) ? data.people : [])
+      .map((person) => ({
+        name: String(person.name || '').trim(),
+        here: Boolean(person.here),
+        emojis: person.emojis,
+      }))
+      .filter((person) => person.name);
+    const here = people.filter((person) => person.here);
+    crowdSummary.textContent = here.length ? `Watching · ${here.length}` : 'Watching';
+    crowdPeople.replaceChildren();
+    if (!people.length) {
+      crowdPeople.textContent = 'Nobody is watching.';
+      return;
+    }
+    const paintGroup = (title: string, rows: typeof people) => {
+      if (!rows.length) return;
+      const heading = document.createElement('p');
+      heading.className = 'crowd-label';
+      heading.textContent = title;
+      const list = document.createElement('ul');
+      list.className = 'crowd-list';
+      for (const person of rows) {
+        const item = document.createElement('li');
+        const who = document.createElement('span');
+        who.textContent = person.name;
+        const reactions = document.createElement('span');
+        reactions.textContent = emojiBits(person.emojis).join('  ');
+        item.append(who, reactions);
+        list.append(item);
+      }
+      crowdPeople.append(heading, list);
+    };
+    paintGroup('Watching', here);
+    paintGroup('Looked in', people.filter((person) => !person.here));
   }
 
   async function loadCrowd() {
@@ -1050,7 +1072,7 @@ const names = [
       if (missingFunction(error)) crowdEl.hidden = true;
       return;
     }
-    paintCrowd(data as { watching?: string[]; looked?: string[]; guests?: number; guestsEarlier?: number; emojis?: { kind: string; n: number }[] });
+    paintCrowd(data as { people?: { name?: string; here?: boolean; emojis?: { kind: string; n: number }[] }[] });
   }
 
   async function clearLive() {
@@ -2417,13 +2439,32 @@ const names = [
     font-weight: 800;
     width: fit-content;
   }
-  .crowd-people,
-  .crowd-emojis {
+  .crowd-people {
     margin: 0.45rem 0 0;
     font-weight: 700;
   }
-  .crowd-emojis {
-    font-size: 1.2rem;
+  .crowd-people :global(.crowd-label) {
+    margin: 0.55rem 0 0;
+    font-weight: 800;
+  }
+  .crowd-people :global(.crowd-list) {
+    list-style: none;
+    margin: 0.2rem 0 0;
+    padding: 0;
+  }
+  .crowd-people :global(.crowd-list li) {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    align-items: baseline;
+    margin-top: 0.35rem;
+  }
+  .crowd-people :global(.crowd-list li span:last-child) {
+    font-size: 1.15rem;
+    white-space: nowrap;
+  }
+  .crowd-people :global(.crowd-list li span:last-child:empty) {
+    display: none;
   }
   .reset-dialog {
     max-width: 26rem;
