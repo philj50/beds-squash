@@ -13,7 +13,7 @@ import { url } from '@/lib/site';
   <section class="section">
     <div class="container watch" id="watch-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} data-login={url('/login/')}>
       <h1>Match commentary</h1>
-      <p class="lede">Choose a match that is being marked. The score updates as each point is entered. Tick Say it out loud to hear it.</p>
+      <p class="lede">Choose a match that is being marked. Tick Say it out loud to hear the score. Earlier matches stay in the list below.</p>
       <label class="say">
         <input type="checkbox" data-say />
         Say it out loud
@@ -27,6 +27,8 @@ import { url } from '@/lib/site';
       <div data-picker>
         <p class="current-note" data-empty></p>
         <ul class="matches" data-matches></ul>
+        <h2 class="archive-title" data-archive-title hidden>Earlier matches</h2>
+        <ul class="matches archive" data-archive></ul>
       </div>
 
       <div class="live" data-live hidden>
@@ -41,6 +43,19 @@ import { url } from '@/lib/site';
         <p class="clock" data-clock></p>
         <ul class="game-times" data-times></ul>
         <p class="call" data-call></p>
+        <p class="shout-banner" data-shout-banner></p>
+        <p class="watchers" data-watchers></p>
+        <ul class="shout-log" data-shout-log></ul>
+        <div class="shout-bar" data-shout-bar>
+          <button type="button" data-shout="a">Come on</button>
+          <button type="button" data-shout="b">Come on</button>
+          <button type="button" data-shout="yes">Yes!</button>
+          <button type="button" data-shout="clap" aria-label="Clap">👏</button>
+        </div>
+        <details class="points-history">
+          <summary>Points</summary>
+          <div data-history-body></div>
+        </details>
         <p class="marker" data-marker></p>
         <p class="updated" data-updated></p>
         <p class="note" data-note></p>
@@ -57,6 +72,7 @@ import { url } from '@/lib/site';
     finishedGames,
     liveMatchCurrent,
     matchWinner,
+    pointLines,
     publicPlayerName,
     restoreMatch,
     spokenMark,
@@ -73,7 +89,17 @@ import { url } from '@/lib/site';
     marker: string | null;
     updatedAt: string;
     history: unknown;
+    endedAt?: string | null;
   };
+
+  type Room = {
+    now?: string[];
+    looked?: string[];
+    guestsNow?: number;
+    guestsEarlier?: number;
+  };
+
+  type Shout = { id: number; kind: string; name: string };
 
   const watchRoot = document.getElementById('watch-app');
   if (!watchRoot) throw new Error('watch app missing');
@@ -85,6 +111,13 @@ import { url } from '@/lib/site';
   const live = root.querySelector<HTMLElement>('[data-live]')!;
   const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
   const sayBox = root.querySelector<HTMLInputElement>('[data-say]')!;
+  const archiveList = root.querySelector<HTMLElement>('[data-archive]')!;
+  const archiveTitle = root.querySelector<HTMLElement>('[data-archive-title]')!;
+  const shoutBar = root.querySelector<HTMLElement>('[data-shout-bar]')!;
+  const shoutLog = root.querySelector<HTMLElement>('[data-shout-log]')!;
+  const shoutBanner = root.querySelector<HTMLElement>('[data-shout-banner]')!;
+  const watchersEl = root.querySelector<HTMLElement>('[data-watchers]')!;
+  const historyBody = root.querySelector<HTMLElement>('[data-history-body]')!;
 
   let signedIn = false;
   let rows: LiveRow[] = [];
@@ -97,6 +130,13 @@ import { url } from '@/lib/site';
   let clockText = '';
   let clockAt = 0;
   let clockLive = false;
+  let archiveId: number | null = null;
+  let archiveRows: LiveRow[] = [];
+  let roomReady = true;
+  let lastShoutId = 0;
+  const seenShouts = new Set<number>();
+  let liveNames = { a: '', b: '' };
+  let bannerTimer = 0;
   sayBox.checked = sayScore;
 
   const shown = (name: string) => (signedIn ? name : publicPlayerName(name));
@@ -208,26 +248,125 @@ import { url } from '@/lib/site';
     }
   }
 
-  function paintLive(row: LiveRow, tapped = false) {
+  function firstWord(name: string) {
+    return name.trim().split(/\s+/)[0] || name;
+  }
+
+  function paintHistory(restored: ReturnType<typeof restoreMatch>, names: { a: string; b: string }) {
+    historyBody.replaceChildren();
+    if (!restored) {
+      historyBody.textContent = archiveId
+        ? 'No point-by-point list for this match.'
+        : 'The points will show here as they are marked.';
+      return;
+    }
+    const games = pointLines(restored, names);
+    if (!games.length) {
+      historyBody.textContent = 'No points yet.';
+      return;
+    }
+    for (const game of games) {
+      const title = document.createElement('p');
+      title.className = 'game-label';
+      title.textContent = game.title;
+      const list = document.createElement('ol');
+      for (const line of game.lines) {
+        const item = document.createElement('li');
+        item.textContent = line;
+        list.append(item);
+      }
+      historyBody.append(title, list);
+    }
+  }
+
+  function paintComeOn(names: { a: string; b: string }) {
+    liveNames = names;
+    const comeA = root.querySelector<HTMLButtonElement>('[data-shout="a"]');
+    const comeB = root.querySelector<HTMLButtonElement>('[data-shout="b"]');
+    if (comeA) comeA.textContent = `Come on ${firstWord(names.a)}`;
+    if (comeB) comeB.textContent = `Come on ${firstWord(names.b)}`;
+  }
+
+  function shoutText(shout: Shout) {
+    const who = signedIn ? shout.name : shout.name === 'Someone' ? 'Someone' : publicPlayerName(shout.name);
+    if (shout.kind === 'clap') return `${who} 👏`;
+    if (shout.kind === 'yes') return `${who}: Yes!`;
+    const player = shout.kind === 'b' ? liveNames.b : liveNames.a;
+    return `${who}: Come on ${firstWord(player)}`;
+  }
+
+  function showShout(shout: Shout) {
+    if (!shout.id || seenShouts.has(shout.id)) return;
+    seenShouts.add(shout.id);
+    if (shout.id > lastShoutId) lastShoutId = shout.id;
+    const text = shoutText(shout);
+    shoutBanner.textContent = text;
+    window.clearTimeout(bannerTimer);
+    bannerTimer = window.setTimeout(() => {
+      shoutBanner.textContent = '';
+    }, 4000);
+    const item = document.createElement('li');
+    item.textContent = text;
+    shoutLog.prepend(item);
+    while (shoutLog.children.length > 6) shoutLog.lastElementChild?.remove();
+  }
+
+  function clearShouts() {
+    lastShoutId = 0;
+    seenShouts.clear();
+    shoutLog.replaceChildren();
+    shoutBanner.textContent = '';
+    watchersEl.textContent = '';
+  }
+
+  function peopleLine(names: string[], guests: number) {
+    const shownNames = names.map((name) => (signedIn ? name : publicPlayerName(name))).filter(Boolean);
+    if (guests === 1) shownNames.push('1 other');
+    else if (guests > 1) shownNames.push(`${guests} others`);
+    return shownNames.join(', ');
+  }
+
+  function paintRoom(room: Room | null, ended: boolean) {
+    if (!room) {
+      watchersEl.textContent = '';
+      return;
+    }
+    const now = peopleLine(Array.isArray(room.now) ? room.now : [], Number(room.guestsNow) || 0);
+    const looked = peopleLine(Array.isArray(room.looked) ? room.looked : [], Number(room.guestsEarlier) || 0);
+    const parts = [];
+    if (ended) {
+      if (looked) parts.push(`Watched by ${looked}`);
+    } else {
+      if (now) parts.push(`Watching: ${now}`);
+      if (looked) parts.push(`Looked in: ${looked}`);
+    }
+    watchersEl.textContent = parts.join('. ');
+  }
+
+  function paintLive(row: LiveRow, tapped = false, quiet = false) {
     const names = { a: shown(row.playerA), b: shown(row.playerB) };
     const shared = unpackLiveScore(row.score || '0-0');
-    const restored = signedIn ? restoreMatch(row.history) : null;
+    const restored = restoreMatch(row.history);
     const said = shared.call || spokenPublicLine(names.a, names.b, shared.line);
     const nextStamp = `${shared.line}|${shared.restart}|${said}|${restored ? JSON.stringify(restored) : `${names.a}|${names.b}`}`;
     const changed = nextStamp !== stamp;
-    const restarting = voiceArmed && shared.restart !== heardRestart;
-    stamp = nextStamp;
-    heardRestart = shared.restart;
+    const restarting = !quiet && voiceArmed && shared.restart !== heardRestart;
+    if (!quiet) {
+      stamp = nextStamp;
+      heardRestart = shared.restart;
+    }
     picker.hidden = true;
     live.hidden = false;
+    shoutBar.hidden = quiet || !roomReady;
     root.querySelector<HTMLElement>('[data-a]')!.textContent = names.a;
     root.querySelector<HTMLElement>('[data-b]')!.textContent = names.b;
-    root.querySelector<HTMLElement>('[data-updated]')!.textContent = updatedAgo(row.updatedAt);
-    clockText = shared.clock;
+    root.querySelector<HTMLElement>('[data-updated]')!.textContent = quiet && row.endedAt ? endedLabel(row.endedAt) : updatedAgo(row.updatedAt);
+    clockText = quiet ? '' : shared.clock;
     clockAt = new Date(row.updatedAt).getTime() || Date.now();
-    clockLive = Boolean(shared.clock);
+    clockLive = !quiet && Boolean(shared.clock);
     paintClock();
     paintTimes(shared.line, shared.times);
+    paintComeOn(names);
     const marker = root.querySelector<HTMLElement>('[data-marker]')!;
     const note = root.querySelector<HTMLElement>('[data-note]')!;
     const call = root.querySelector<HTMLElement>('[data-call]')!;
@@ -245,6 +384,29 @@ import { url } from '@/lib/site';
         link.textContent = 'Sign in';
         note.append(link, ' to see the full names and every point.');
       }
+    } else {
+      note.replaceChildren();
+      if (!signedIn) {
+        const link = document.createElement('a');
+        link.href = root.dataset.login || '/login/';
+        link.textContent = 'Sign in';
+        note.append(link, ' to see the full names.');
+      }
+      const score = currentGame(restored);
+      points.textContent = `${score.a} – ${score.b}`;
+      const winner = matchWinner(restored);
+      const between = !winner && currentRallies(restored).length === 0 && finishedGames(restored).length > 0;
+      const phase = winner ? 'done' : between ? 'next' : 'play';
+      call.textContent = spokenMark(restored, names, phase);
+      marker.textContent = row.marker ? `Marked by ${row.marker}` : '';
+    }
+    paintHistory(restored, names);
+    if (quiet) {
+      voiceArmed = true;
+      heard = call.textContent;
+      return;
+    }
+    if (!restored) {
       if (restarting && shared.times.length) {
         follow(spokenPublicLine(names.a, names.b, shared.line), said);
         return;
@@ -252,14 +414,6 @@ import { url } from '@/lib/site';
       if (changed) announce(said, tapped);
       return;
     }
-    note.textContent = '';
-    const score = currentGame(restored);
-    points.textContent = `${score.a} – ${score.b}`;
-    const winner = matchWinner(restored);
-    const between = !winner && currentRallies(restored).length === 0 && finishedGames(restored).length > 0;
-    const phase = winner ? 'done' : between ? 'next' : 'play';
-    call.textContent = spokenMark(restored, names, phase);
-    marker.textContent = row.marker ? `Marked by ${row.marker}` : '';
     if (restarting && finishedGames(restored).length) {
       follow(spokenMark(restored, names, 'next'), call.textContent);
       return;
@@ -267,29 +421,70 @@ import { url } from '@/lib/site';
     if (changed) announce(call.textContent, tapped);
   }
 
+  function endedLabel(iso: string) {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '';
+    return `Ended ${date.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`;
+  }
+
+  function dayLabel(iso: string) {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  }
+
+  function paintArchiveList() {
+    archiveTitle.hidden = !roomReady || archiveRows.length === 0;
+    archiveList.replaceChildren();
+    if (!roomReady) return;
+    for (const row of archiveRows) {
+      const item = document.createElement('li');
+      const button = document.createElement('button');
+      button.type = 'button';
+      const players = document.createElement('span');
+      const when = row.endedAt ? dayLabel(row.endedAt) : '';
+      players.textContent = `${shown(row.playerA)} v ${shown(row.playerB)}${when ? ` · ${when}` : ''}`;
+      const score = document.createElement('span');
+      score.textContent = pretty(unpackLiveScore(row.score).line);
+      button.append(players, score);
+      button.addEventListener('click', () => void openArchive(row.id));
+      item.append(button);
+      archiveList.append(item);
+    }
+  }
+
   function openMatch(id: number) {
     matchId = id;
+    archiveId = null;
     stamp = '';
     voiceArmed = false;
     heard = '';
     heardRestart = 0;
+    clearShouts();
     const url = new URL(location.href);
+    url.searchParams.delete('archive');
     url.searchParams.set('match', String(id));
     history.replaceState(null, '', `${url.pathname}${url.search}`);
     const row = rows.find((item) => item.id === id);
     if (row) paintLive(row, true);
     else show('That match is not being shared.');
+    void touchRoom();
+    void loadShouts();
   }
 
   function leaveMatch() {
     matchId = null;
+    archiveId = null;
     stamp = '';
     voiceArmed = false;
     const url = new URL(location.href);
     url.searchParams.delete('match');
+    url.searchParams.delete('archive');
     history.replaceState(null, '', url.pathname);
     stopScore();
+    clearShouts();
     paintList();
+    paintArchiveList();
   }
 
   async function loadRows() {
@@ -305,6 +500,7 @@ import { url } from '@/lib/site';
     }
     show('');
     rows = (Array.isArray(data) ? (data as LiveRow[]) : []).filter((row) => liveMatchCurrent(row.updatedAt));
+    if (archiveId) return;
     if (matchId) {
       const row = rows.find((item) => item.id === matchId);
       if (!row) {
@@ -317,6 +513,91 @@ import { url } from '@/lib/site';
     }
     empty.textContent = rows.length ? '' : 'No matches are being marked right now.';
     paintList();
+  }
+
+  function guestToken() {
+    const key = 'beds-watch-guest';
+    let token = sessionStorage.getItem(key);
+    if (!token || !/^[0-9a-f-]{36}$/i.test(token)) {
+      token = crypto.randomUUID();
+      sessionStorage.setItem(key, token);
+    }
+    return token;
+  }
+
+  function roomMissing(error: { code?: string; message?: string } | null) {
+    if (!missingFunction(error)) return false;
+    roomReady = false;
+    shoutBar.hidden = true;
+    paintArchiveList();
+    return true;
+  }
+
+  async function touchRoom() {
+    if (!matchId || !roomReady) return;
+    const { data, error } = await supabase.rpc('commentary_here', { p_live: matchId, p_guest: guestToken() });
+    if (error) {
+      roomMissing(error);
+      return;
+    }
+    paintRoom(data as Room, false);
+  }
+
+  async function loadShouts() {
+    if (!matchId || !roomReady) return;
+    const { data, error } = await supabase.rpc('commentary_shouts', { p_live: matchId, p_after: lastShoutId });
+    if (error) {
+      roomMissing(error);
+      return;
+    }
+    const shouts = (Array.isArray(data) ? (data as Shout[]) : []).slice().sort((a, b) => a.id - b.id);
+    for (const shout of shouts) showShout(shout);
+  }
+
+  async function sendShout(kind: string) {
+    if (!matchId || !roomReady) return;
+    const { data, error } = await supabase.rpc('commentary_shout', { p_live: matchId, p_kind: kind, p_guest: guestToken() });
+    if (error) {
+      roomMissing(error);
+      return;
+    }
+    const shout = data as (Shout & { ok?: boolean }) | null;
+    if (shout?.ok && shout.id) showShout(shout);
+  }
+
+  async function loadArchive() {
+    const { data, error } = await supabase.rpc('commentary_archive');
+    if (error) {
+      roomMissing(error);
+      return;
+    }
+    archiveRows = Array.isArray(data) ? (data as LiveRow[]) : [];
+    if (!archiveId) paintArchiveList();
+  }
+
+  async function openArchive(id: number) {
+    const { data, error } = await supabase.rpc('commentary_match', { p_id: id });
+    if (error) {
+      if (!roomMissing(error)) show('That match could not be opened.');
+      return;
+    }
+    const row = data as (LiveRow & { room?: Room; shouts?: Shout[] }) | null;
+    if (!row?.id) {
+      show('That match is not in the archive.');
+      return;
+    }
+    matchId = null;
+    archiveId = id;
+    stamp = '';
+    clearShouts();
+    const url = new URL(location.href);
+    url.searchParams.delete('match');
+    url.searchParams.set('archive', String(id));
+    history.replaceState(null, '', `${url.pathname}${url.search}`);
+    paintLive(row, false, true);
+    paintRoom(row.room ?? null, true);
+    const shouts = (Array.isArray(row.shouts) ? row.shouts : []).slice().sort((a, b) => a.id - b.id);
+    for (const shout of shouts) showShout(shout);
   }
 
   function currentCall() {
@@ -352,13 +633,27 @@ import { url } from '@/lib/site';
   });
 
   root.querySelector('[data-back]')!.addEventListener('click', () => leaveMatch());
+  for (const button of root.querySelectorAll<HTMLButtonElement>('[data-shout]')) {
+    button.addEventListener('click', () => void sendShout(button.dataset.shout || ''));
+  }
 
   const { data } = await supabase.auth.getSession();
   signedIn = Boolean(data.session);
-  const requested = Number(new URLSearchParams(location.search).get('match'));
+  const params = new URLSearchParams(location.search);
+  const requested = Number(params.get('match'));
+  const archived = Number(params.get('archive'));
   if (requested) matchId = requested;
   await loadRows();
+  await loadArchive();
+  if (!requested && archived) await openArchive(archived);
   window.setInterval(() => void loadRows(), 2000);
+  window.setInterval(() => {
+    if (matchId) void loadShouts();
+  }, 2000);
+  window.setInterval(() => {
+    if (matchId) void touchRoom();
+    void loadArchive();
+  }, 15000);
   window.setInterval(paintClock, 1000);
 </script>
 
@@ -517,5 +812,71 @@ import { url } from '@/lib/site';
     height: 1.15rem;
     padding: 0;
     accent-color: #f15a22;
+  }
+  .archive-title {
+    margin: 1.5rem 0 0;
+    font-size: 1.35rem;
+  }
+  .shout-banner {
+    margin: 0.55rem 0 0;
+    text-align: center;
+    color: #f15a22;
+    font-size: clamp(1.6rem, 5vw, 2.4rem);
+    font-weight: 800;
+    line-height: 1.15;
+  }
+  .shout-banner:empty,
+  .watchers:empty,
+  .shout-log:empty {
+    display: none;
+  }
+  .watchers {
+    margin: 0.75rem 0 0;
+    font-weight: 700;
+  }
+  .shout-log {
+    list-style: none;
+    margin: 0.35rem 0 0;
+    padding: 0;
+    text-align: center;
+    font-weight: 700;
+  }
+  .shout-bar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-top: 0.85rem;
+  }
+  .shout-bar button {
+    font: inherit;
+    font-weight: 800;
+    font-size: 1.05rem;
+    padding: 0.75rem 0.4rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    background: #fff;
+    cursor: pointer;
+  }
+  .shout-bar button:nth-child(n + 3) {
+    font-size: 1.35rem;
+  }
+  .points-history {
+    margin-top: 0.9rem;
+  }
+  .points-history summary {
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .points-history :global(.game-label) {
+    margin: 0.7rem 0 0.15rem;
+    font-weight: 800;
+  }
+  .points-history :global(ol) {
+    margin: 0;
+    padding-left: 1.25rem;
+  }
+  .points-history :global(li) {
+    margin: 0.12rem 0;
+    font-weight: 700;
   }
 </style>

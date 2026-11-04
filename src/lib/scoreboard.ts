@@ -477,6 +477,24 @@ export function cleanName(raw: string): string | null {
   return clean;
 }
 
+/** One line per rally, grouped by game, for the commentary point list. */
+export function pointLines(state: ScoreState, names: { a: string; b: string }): { title: string; lines: string[] }[] {
+  return state.games
+    .filter((game) => game.length > 0)
+    .map((game, index) => ({
+      title: `Game ${index + 1}`,
+      lines: game.map((rally) => {
+        const score = `${rally.a}–${rally.b}`;
+        if (rally.winner === 'let') return `Let, ${score}`;
+        const who = rally.winner === 'a' ? names.a : names.b;
+        const notes = [who];
+        if (rally.stroke) notes.push('stroke');
+        if (rally.handOut) notes.push('hand out');
+        return `${score} ${notes.join(', ')}`;
+      }),
+    }));
+}
+
 export function restoreMatch(raw: unknown): ScoreState | null {
   if (!raw || typeof raw !== 'object') return null;
   const value = raw as Partial<ScoreState>;

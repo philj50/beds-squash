@@ -19,6 +19,7 @@ import {
   scoreLine,
   spokenMark,
   packLiveScore,
+  pointLines,
   spokenPublicLine,
   spokenScoreLine,
   unpackLiveScore,
@@ -266,6 +267,18 @@ test('deuce needs two clear points and the match stops at three games', () => {
     { a: 11, b: 0 },
     { a: 11, b: 0 },
   ]), 'a');
+});
+
+test('the point list follows each rally', () => {
+  const names = { a: 'Phil Jenkins', b: 'Sam Cole' };
+  let state = freshMatch();
+  state = addPoint(state, 'a');
+  state = addLet(state);
+  state = addStroke(state, 'b');
+  const games = pointLines(state, names);
+  assert.equal(games.length, 1);
+  assert.equal(games[0].title, 'Game 1');
+  assert.deepEqual(games[0].lines, ['1–0 Phil Jenkins', 'Let, 1–0', '1–1 Sam Cole, stroke, hand out']);
 });
 
 test('a saved match can be opened again with its serve history', () => {
