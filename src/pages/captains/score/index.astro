@@ -110,6 +110,7 @@ const names = [
           <div class="foot-copy">
             <p class="clock" data-clock>00:00</p>
             <p data-serve-who></p>
+            <p class="live-note" data-live-note></p>
           </div>
           <button class="serve-pip" type="button" data-box-toggle aria-label="Service box R">R</button>
         </div>
@@ -259,6 +260,7 @@ const names = [
   const board = root.querySelector<HTMLElement>('[data-board]')!;
   const callEl = root.querySelector<HTMLElement>('[data-call]')!;
   const lineEl = root.querySelector<HTMLElement>('[data-line]')!;
+  const liveNote = root.querySelector<HTMLElement>('[data-live-note]')!;
   const undoBtn = root.querySelector<HTMLButtonElement>('[data-undo]')!;
   const saveBtn = root.querySelector<HTMLButtonElement>('[data-save]')!;
   const handBtn = root.querySelector<HTMLButtonElement>('[data-hand]')!;
@@ -307,6 +309,10 @@ const names = [
   let strokeArmed = false;
   let nameChoices: string[] = [];
   let shareLive = true;
+  let liveShared = false;
+  let liveProblem = '';
+  let sendingLive = false;
+  const sessionReady = supabase.auth.getSession();
   let sayAloud = localStorage.getItem('beds-say-mark') === '1';
   let sayHeard = '';
   let sayQuiet = false;
@@ -716,6 +722,7 @@ const names = [
     paintPrior();
     paintTape();
     queueLive();
+    paintLiveNote();
     syncResult();
     paintResult();
     saveSession();
@@ -935,8 +942,38 @@ const names = [
     });
   }
 
+  function paintLiveNote() {
+    if (watching || board.hidden) {
+      liveNote.replaceChildren();
+      liveNote.dataset.mode = '';
+      return;
+    }
+    const mode = !shareLive ? 'local' : !signedIn ? 'signin' : liveProblem ? 'error' : liveShared ? 'on' : 'wait';
+    if (liveNote.dataset.mode === mode && liveNote.dataset.detail === liveProblem) return;
+    liveNote.dataset.mode = mode;
+    liveNote.dataset.detail = liveProblem;
+    liveNote.replaceChildren();
+    if (mode === 'local') {
+      liveNote.textContent = 'Only this phone can see this match.';
+      return;
+    }
+    if (mode === 'signin') {
+      const link = document.createElement('a');
+      link.href = loginLink.href;
+      link.textContent = 'Sign in';
+      liveNote.append(link, ' to show this match on Match commentary.');
+      return;
+    }
+    if (mode === 'error') {
+      liveNote.textContent = liveProblem;
+      return;
+    }
+    liveNote.textContent = mode === 'on' ? 'On Match commentary.' : 'Showing this match…';
+  }
+
   async function sendLive() {
-    if (!shareLive || !signedIn || watching || !liveReady || board.hidden) return;
+    if (!shareLive || !signedIn || watching || !liveReady || board.hidden || sendingLive) return;
+    sendingLive = true;
     const call = spokenMark(state, names, phase === 'done' ? 'play' : phase);
     const { error } = await supabase.rpc('publish_live_match', {
       p_a: names.a,
@@ -950,15 +987,25 @@ const names = [
       ),
       p_history: state,
     });
+    sendingLive = false;
     if (error && missingFunction(error)) {
       liveReady = false;
-      show('Live matches are not on the database yet. The score stays on this browser.');
+      liveShared = false;
+      liveProblem = 'Live matches are not on the database yet. The score stays on this browser.';
+      show(liveProblem);
+      paintLiveNote();
       return;
     }
     if (error) {
-      show(error.message);
+      liveShared = false;
+      liveProblem = error.message;
+      show(liveProblem);
+      paintLiveNote();
       return;
     }
+    liveProblem = '';
+    liveShared = true;
+    paintLiveNote();
     notifyMatchOn();
     void loadCrowd();
   }
@@ -1007,6 +1054,9 @@ const names = [
   }
 
   async function clearLive() {
+    liveShared = false;
+    liveProblem = '';
+    paintLiveNote();
     if (!signedIn || !liveReady) return;
     const { error } = await supabase.rpc('clear_live_match');
     if (error && missingFunction(error)) liveReady = false;
@@ -1387,8 +1437,11 @@ const names = [
     syncPar();
   });
 
-  setup.addEventListener('submit', (event) => {
+  setup.addEventListener('submit', async (event) => {
     event.preventDefault();
+    const { data } = await sessionReady;
+    signedIn = Boolean(data.session);
+    signinEl.hidden = signedIn;
     const a = cleanName(inputA.value);
     const b = cleanName(inputB.value);
     if (!a || !b) {
@@ -1407,6 +1460,8 @@ const names = [
     armSession();
     shareLive = root.querySelector<HTMLInputElement>('[data-share]')!.checked;
     watching = false;
+    liveShared = false;
+    liveProblem = '';
     root.classList.remove('is-watching');
     if (!shareLive) void clearLive();
     if (shareLive && !signedIn) show('Sign in to show this match on Match commentary. This mark stays on this browser.');
@@ -1630,6 +1685,7 @@ const names = [
   }, 30_000);
 
   window.setInterval(() => void loadCrowd(), 5000);
+  window.setInterval(() => void sendLive(), 10000);
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') saveSession(false);
@@ -1720,7 +1776,7 @@ const names = [
   backBtn.addEventListener('click', () => leaveWatch());
   root.querySelector<HTMLButtonElement>('[data-public-back]')!.addEventListener('click', () => leaveWatch());
 
-  const { data } = await supabase.auth.getSession();
+  const { data } = await sessionReady;
   signedIn = Boolean(data.session);
   signinEl.hidden = signedIn;
   if (!signedIn) {
@@ -2312,6 +2368,14 @@ const names = [
     margin: 0.15rem 0 0;
     font-weight: 800;
     font-size: clamp(1.05rem, 2.6vw, 1.35rem);
+  }
+  .live-note {
+    margin: 0.2rem 0 0;
+    font-weight: 800;
+    font-size: 0.95rem;
+  }
+  .live-note:empty {
+    display: none;
   }
   .serve-pip {
     grid-column: 3;
