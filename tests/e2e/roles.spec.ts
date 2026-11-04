@@ -67,6 +67,24 @@ test.describe('Signed out', () => {
   }
 });
 
+test('Beds Closed notes stay folded until they are opened', async ({ page }) => {
+  await signIn(page, 'club_captain');
+  await page.goto('captains/admin/', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('heading', { level: 1, name: 'Administration' })).toBeVisible();
+  const notes = page.locator('[data-tab="beds-closed"] details.notes');
+  const sentence = notes.getByText('Entered is the payment date on that list.');
+  await expect(notes).toHaveCount(1);
+  await expect(notes).not.toHaveAttribute('open');
+  await expect(sentence).toBeHidden();
+  await notes.evaluate((element) => {
+    const section = element.closest('section');
+    if (section) section.hidden = false;
+  });
+  await notes.locator('summary').click();
+  await expect(notes).toHaveAttribute('open', '');
+  await expect(sentence).toBeVisible();
+});
+
 test.describe('Club captain, team captain, and player', () => {
   test('club captain edits the squad and their name, and cannot open admin tools', async ({ page }) => {
     const world = await signIn(page, 'club_captain');
@@ -923,6 +941,7 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(juniorDraw.locator('.junior-half', { hasText: 'Top half' })).toContainText('Robin New');
     await page.getByRole('button', { name: 'Players', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Beds Closed', exact: true })).toBeVisible();
+    await page.locator('[data-tab="beds-closed"] details.notes summary').click();
     await expect(page.getByText('Entered is the payment date on that list.')).toBeVisible();
     const closedList = page.locator('[data-beds-rows]');
     const patClosed = closedList.locator('tr', { hasText: 'Pat Player' });
