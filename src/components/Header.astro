@@ -19,7 +19,7 @@ const moreNav = NAV.filter((item) => item.more);
 <header class="site-header" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} data-login={loginHref} data-profile={profileHref}>
   <div class="container bar">
     <a class="brand" href={url('/')} aria-label={`${SITE.name} home`}>
-      <img src={url('/brand/logo-coral.png')} alt="" width="168" height="99" />
+      <img src={url('/brand/logo-coral.png')} alt="" width="312" height="215" />
     </a>
 
     <div class="bar-end">
@@ -190,6 +190,7 @@ const moreNav = NAV.filter((item) => item.more);
 
 <style>
   .site-header {
+    --header-height: 110px;
     position: sticky;
     top: 0;
     z-index: 100;
@@ -209,7 +210,7 @@ const moreNav = NAV.filter((item) => item.more);
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    min-height: 88px;
+    min-height: var(--header-height);
   }
   .bar-end {
     display: flex;
@@ -221,14 +222,17 @@ const moreNav = NAV.filter((item) => item.more);
   .brand {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    flex: 0 0 auto;
     text-decoration: none;
     color: var(--text);
   }
   .brand img {
-    width: auto;
-    height: 68px;
-    border-radius: 6px;
+    display: block;
+    width: 176px;
+    height: 94px;
+    /* Crop only the empty footer of the source image so the artwork centres with the menu. */
+    object-fit: cover;
+    object-position: center top;
     flex-shrink: 0;
   }
 
@@ -491,6 +495,13 @@ const moreNav = NAV.filter((item) => item.more);
   }
 
   @media (max-width: 1240px) {
+    .site-header {
+      --header-height: 100px;
+    }
+    .brand img {
+      width: 156px;
+      height: 84px;
+    }
     .menu-btn {
       display: inline-flex;
     }
@@ -504,7 +515,7 @@ const moreNav = NAV.filter((item) => item.more);
       border-bottom: 1px solid var(--border);
       box-shadow: var(--shadow);
       padding: 0.75rem var(--gutter) 1.25rem;
-      max-height: calc(100dvh - 88px);
+      max-height: calc(100dvh - var(--header-height) - 1px);
       overflow: auto;
     }
     .nav.is-open {
