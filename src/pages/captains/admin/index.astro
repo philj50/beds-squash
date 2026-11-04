@@ -20,15 +20,18 @@ const scoresHref = url('/captains/admin/minigame/');
   <section class="section section--tight">
     <div class="container setup" id="setup-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
       <h1>Administration</h1>
-      <p class="lede">
-        <strong>League Master</strong> lists club captains, team captains, and players. Those lists are read only. An email, name, or ES number saved on this website stays. A difference with League Master is listed under Differences. Phone stays on this website.
-        <strong>Juniors</strong> lists the Junior County Closed entries submitted on this website. <strong>Beds Closed</strong> lists the County Closed entry list. Each person is tagged with the year, blue for 2026 and orange for 2027, and email and mobile come from Sport Manager.
-        <strong>SquashLevels</strong> shows each player’s level.
-        <strong>Permissions</strong> is Users, Groups, and Roles, and only an admin sees it. Users is every League Master player. Update the email, ES number, and phone there, and change the password, turn the account off, or delete it when a login exists. A group gives one role. League Master fills the club, team, and player groups. Someone in those groups who is on SquashLevels also receives SL Player.
-        <strong>Links</strong> joins a League Master player to their SquashLevels name when the names differ.
-        <strong>Config</strong> shows each database table, how many rows it holds, how much space it uses, and a weekly graph of new rows. It also lists each outside service, the account name, where the password is kept, and how many rows that service has stored. Only an admin sees it.
-        A club captain sees their club. A team captain sees their team. A player sees their own row. Nothing is emailed.
-      </p>
+      <details class="page-notes">
+        <summary>About this page</summary>
+        <p class="lede">
+          <strong>League Master</strong> lists club captains, team captains, and players. Those lists are read only. An email, name, or ES number saved on this website stays. A difference with League Master is listed under Differences. Phone stays on this website.
+          <strong>Juniors</strong> lists the Junior County Closed entries submitted on this website. <strong>Beds Closed</strong> lists the County Closed entry list. Each person is tagged with the year, blue for 2026 and orange for 2027, and email and mobile come from Sport Manager.
+          <strong>SquashLevels</strong> shows each player’s level.
+          <strong>Permissions</strong> is Users, Groups, and Roles, and only an admin sees it. Users is every League Master player. Update the email, ES number, and phone there, and change the password, turn the account off, or delete it when a login exists. A group gives one role. League Master fills the club, team, and player groups. Someone in those groups who is on SquashLevels also receives SL Player.
+          <strong>Links</strong> joins a League Master player to their SquashLevels name when the names differ.
+          <strong>Config</strong> shows each database table, how many rows it holds, how much space it uses, and a weekly graph of new rows. It also lists each outside service, the account name, where the password is kept, and how many rows that service has stored. Only an admin sees it.
+          A club captain sees their club. A team captain sees their team. A player sees their own row. Nothing is emailed.
+        </p>
+      </details>
       <p class="status" data-status role="status"></p>
 
       <div data-panel="signed-in" hidden>
@@ -120,7 +123,10 @@ const scoresHref = url('/captains/admin/minigame/');
 
           <section class="admin-panel" data-tab="juniors" hidden>
             <h2>Juniors</h2>
-            <p class="muted small">Junior County Closed entries submitted on this website. An admin can correct every field, and add an entry after the public form has closed. Saving sends a short note to the Junior organisers. It does not send an email. An admin or a junior organiser places each entrant in the draw, in the order the names come out of the hat, then publishes that draw on the Juniors page.</p>
+            <details class="notes">
+              <summary>Notes</summary>
+              <p class="muted small">Junior County Closed entries submitted on this website. An admin can correct every field, and add an entry after the public form has closed. Saving sends a short note to the Junior organisers. It does not send an email. An admin or a junior organiser places each entrant in the draw, in the order the names come out of the hat, then publishes that draw on the Juniors page.</p>
+            </details>
             <p class="actions"><button class="btn btn--primary btn--sm" type="button" data-add-junior hidden>Add an entry</button><span data-junior-draw-publish></span></p>
             <div data-new-junior hidden></div>
             <div class="overview-box juniors-box">
@@ -143,7 +149,10 @@ const scoresHref = url('/captains/admin/minigame/');
             </div>
             <div class="junior-draw" data-junior-draw hidden>
               <h3>The draw</h3>
-              <p class="muted small">Press a name as it comes out of the hat. A draw can be one category, or several categories played together. Knockout fills the top half, then the bottom half. Round robin keeps one list, and each player plays every other player. Add the court and the time at Towers. Publish the draw when it is ready. The Juniors page then shows each placed player as a first name and surname initial.</p>
+              <details class="notes">
+                <summary>Notes</summary>
+                <p class="muted small">Press a name as it comes out of the hat. A draw can be one category, or several categories played together. Knockout fills the top half, then the bottom half. Round robin keeps one list, and each player plays every other player. Add the court and the time at Towers. Publish the draw when it is ready. The Juniors page then shows each placed player as a first name and surname initial.</p>
+              </details>
               <ul class="tag-list" data-junior-draw-pills aria-label="Draw"></ul>
               <div data-junior-draw-sheet></div>
             </div>
@@ -152,7 +161,10 @@ const scoresHref = url('/captains/admin/minigame/');
           <script id="beds-closed-2027" type="application/json" set:html={JSON.stringify(closed2027.entries)} />
           <section class="admin-panel" data-tab="beds-closed" hidden>
             <h2>Beds Closed</h2>
-            <p class="muted small">The entry list is copied from Sport Manager every half hour. Entered is the day a name first appeared on that list. Names already there have no earlier date. 2026 is blue and 2027 is orange.</p>
+            <details class="notes">
+              <summary>Notes</summary>
+              <p class="muted small">The entry list is copied from Sport Manager every half hour. Entered is the day a name first appeared on that list. Names already there have no earlier date. 2026 is blue and 2027 is orange. Paid uses the 2027 entries only.</p>
+            </details>
             <p class="muted small" data-beds-status hidden role="status"></p>
             <div data-beds-list hidden>
               <ul class="tag-list" data-beds-years aria-label="Years"></ul>
@@ -171,7 +183,7 @@ const scoresHref = url('/captains/admin/minigame/');
                       <th>Grade</th>
                       <th>Email</th>
                       <th>Mobile</th>
-                      <th>Paid</th>
+                      <th>Paid 2027</th>
                       <th>Login</th>
                     </tr>
                   </thead>
@@ -183,9 +195,15 @@ const scoresHref = url('/captains/admin/minigame/');
 
           <section class="admin-panel" data-tab="scores" hidden>
             <h2>Marking</h2>
-            <p class="muted small">Matches marked on the website. PAR to 11, or PAR to 15 for the second division, best of five. The serve starts on the right. The same player moves to the other box. Hand out is a change of server, and that serve starts on the right again. A let is played again. A stroke gives the point. Edit a name here, or open Marking to change the points. Delete removes the match. Sport Manager is not updated from here.</p>
+            <details class="notes">
+              <summary>Notes</summary>
+              <p class="muted small">Matches marked on the website. PAR to 11, or PAR to 15 for the second division, best of five. The serve starts on the right. The same player moves to the other box. Hand out is a change of server, and that serve starts on the right again. A let is played again. A stroke gives the point. Edit a name here, or open Marking to change the points. Delete removes the match. Sport Manager is not updated from here.</p>
+            </details>
             <h3>In play</h3>
-            <p class="muted small">Every match on Match commentary is listed here. Clear takes that one off the list. Clear stale matches takes off every match with no score for an hour.</p>
+            <details class="notes">
+              <summary>Notes</summary>
+              <p class="muted small">Every match on Match commentary is listed here. Clear takes that one off the list. Clear stale matches takes off every match with no score for an hour.</p>
+            </details>
             <p class="muted small" data-live-status role="status"></p>
             <p class="actions">
               <button class="btn btn--ghost btn--sm" type="button" data-live-clear hidden>Clear stale matches</button>
@@ -205,7 +223,10 @@ const scoresHref = url('/captains/admin/minigame/');
               </table>
             </div>
             <h3>Saved</h3>
-            <p class="muted small">Every match saved from Marking. Tick Visible to show it under Earlier matches on Match commentary. Leave it unticked and it stays in this list only.</p>
+            <details class="notes">
+              <summary>Notes</summary>
+              <p class="muted small">Every match saved from Marking. Tick Visible to show it under Earlier matches on Match commentary. Leave it unticked and it stays in this list only.</p>
+            </details>
             <p class="muted small" data-scores-status role="status"></p>
             <div class="overview-box">
               <table class="overview">
@@ -223,7 +244,10 @@ const scoresHref = url('/captains/admin/minigame/');
               </table>
             </div>
             <h3>Commentary history</h3>
-            <p class="muted small">Every match that has been on Match commentary, including the points. Untick Visible to hide that match from end users. It stays here.</p>
+            <details class="notes">
+              <summary>Notes</summary>
+              <p class="muted small">Every match that has been on Match commentary, including the points. Untick Visible to hide that match from end users. It stays here.</p>
+            </details>
             <p class="muted small" data-history-status role="status"></p>
             <div class="overview-box">
               <table class="overview">
@@ -271,13 +295,19 @@ const scoresHref = url('/captains/admin/minigame/');
 
           <section class="admin-panel" data-tab="members" data-lm-only hidden>
             <h2>Users</h2>
-            <p class="muted small">
-              League Master players are listed, and so is anyone with an admin or organiser login. A junior entry adds the player as a JC Player and the parent as a JC Parent. The entry email and phone stay on the parent. The coloured letters show where an email or phone came from. Press a coloured address or number to use the Beds Closed one, or the League Master one. Filter by group or place. LM Club Captain, LM Team Captain, LM Player, JC Player and JC Parent are ticked in Roles and stay as they are. Password opens the login details so you can copy them. Nothing is emailed.
-            </p>
+            <details class="notes">
+              <summary>Notes</summary>
+              <p class="muted small">
+                League Master players are listed, and so is anyone with an admin or organiser login. A junior entry adds the player as a JC Player and the parent as a JC Parent. The entry email and phone stay on the parent. The coloured letters show where an email or phone came from. Press a coloured address or number to use the Beds Closed one, or the League Master one. Filter by group or place. LM Club Captain, LM Team Captain, LM Player, JC Player and JC Parent are ticked in Roles and stay as they are. Password opens the login details so you can copy them. Nothing is emailed.
+              </p>
+            </details>
             <p class="muted small" data-group-note>Filled from League Master. Each LM Player is listed. Junior entries add a JC Player and a JC Parent.</p>
             <div data-differences hidden>
               <h3>Differences</h3>
-              <p class="muted small">League Master has a different email, name, or ES number. The value on this website stays until you choose.</p>
+              <details class="notes">
+                <summary>Notes</summary>
+                <p class="muted small">League Master has a different email, name, or ES number. The value on this website stays until you choose.</p>
+              </details>
               <div class="overview-box">
                 <table class="overview">
                   <thead>
@@ -430,9 +460,12 @@ const scoresHref = url('/captains/admin/minigame/');
 
           <section class="admin-panel" data-tab="permissions-groups" data-lm-only hidden>
             <h2>Groups</h2>
-            <p class="muted small">
-              Each group gives one role. The number of people opens the list. Choose a person to update the email, ES number, and phone, and to use the account actions.
-            </p>
+            <details class="notes">
+              <summary>Notes</summary>
+              <p class="muted small">
+                Each group gives one role. The number of people opens the list. Choose a person to update the email, ES number, and phone, and to use the account actions.
+              </p>
+            </details>
             <div class="overview-box">
               <table class="overview">
                 <thead>
@@ -464,7 +497,10 @@ const scoresHref = url('/captains/admin/minigame/');
 
           <section class="admin-panel" data-tab="permissions-roles" data-lm-only hidden>
             <h2>Roles</h2>
-            <p class="muted small">A role is the permission its group gives. There is no separate list of people on a role.</p>
+            <details class="notes">
+              <summary>Notes</summary>
+              <p class="muted small">A role is the permission its group gives. There is no separate list of people on a role.</p>
+            </details>
             <div class="overview-box">
               <table class="overview">
                 <thead>
@@ -481,9 +517,12 @@ const scoresHref = url('/captains/admin/minigame/');
 
           <section class="admin-panel" data-tab="links" data-lm-only hidden>
             <h2>Links</h2>
-            <p class="muted small">
-              Steve Davies is first. Under him are names already linked where the SquashLevels name is not an exact match. Everyone else has no exact SquashLevels name. Type the name exactly as it appears on SquashLevels. A stored record is used when that name is already here. Otherwise the player is fetched from SquashLevels. Remove a link when it is wrong.
-            </p>
+            <details class="notes">
+              <summary>Notes</summary>
+              <p class="muted small">
+                Steve Davies is first. Under him are names already linked where the SquashLevels name is not an exact match. Everyone else has no exact SquashLevels name. Type the name exactly as it appears on SquashLevels. A stored record is used when that name is already here. Otherwise the player is fetched from SquashLevels. Remove a link when it is wrong.
+              </p>
+            </details>
             <div class="overview-box">
               <table class="overview">
                 <thead>
@@ -500,9 +539,12 @@ const scoresHref = url('/captains/admin/minigame/');
 
           <section class="admin-panel" data-tab="database" data-lm-only hidden>
             <h2>Database</h2>
-            <p class="muted small">
-              Every public table, with its rows, the space it uses (indexes included), and the newest time stored on it. On disk is the whole database. Each graph is new rows per week for the last six months. A quiet week is a flat line. Only an admin can see this.
-            </p>
+            <details class="notes">
+              <summary>Notes</summary>
+              <p class="muted small">
+                Every public table, with its rows, the space it uses (indexes included), and the newest time stored on it. On disk is the whole database. Each graph is new rows per week for the last six months. A quiet week is a flat line. Only an admin can see this.
+              </p>
+            </details>
             <p class="muted small" data-database-status hidden role="status"></p>
             <div data-database hidden>
               <dl class="traffic-kpis">
@@ -539,9 +581,12 @@ const scoresHref = url('/captains/admin/minigame/');
 
           <section class="admin-panel" data-tab="integrations" data-lm-only hidden>
             <h2>Integrations</h2>
-            <p class="muted small">
-              Each outside service, the account it signs in with, and how much it has stored here. Passwords stay in GitHub. Each ntfy topic is public. League Master, SquashLevels, other job notes, failures, juniors, County Closed scores and match commentary each have their own.
-            </p>
+            <details class="notes">
+              <summary>Notes</summary>
+              <p class="muted small">
+                Each outside service, the account it signs in with, and how much it has stored here. Passwords stay in GitHub. Each ntfy topic is public. League Master, SquashLevels, other job notes, failures, juniors, County Closed scores and match commentary each have their own.
+              </p>
+            </details>
             <p class="muted small" data-integrations-status hidden role="status"></p>
             <div class="overview-box" data-integrations hidden>
               <table class="overview db-table">
@@ -562,9 +607,12 @@ const scoresHref = url('/captains/admin/minigame/');
 
           <section class="admin-panel" data-tab="traffic" data-lm-only hidden>
             <h2>Site traffic</h2>
-            <p class="muted small">
-              Each page keeps its own hit count. A hit stores the page, the time, the IP address, the browser, the language, where they came from, and the person when that browser is signed in. Visitors today is one line per IP address. A hit with no IP stays on its own line. Only an admin can see this. A signed-in name opens that person on Users.
-            </p>
+            <details class="notes">
+              <summary>Notes</summary>
+              <p class="muted small">
+                Each page keeps its own hit count. A hit stores the page, the time, the IP address, the browser, the language, where they came from, and the person when that browser is signed in. Visitors today is one line per IP address. A hit with no IP stays on its own line. Only an admin can see this. A signed-in name opens that person on Users.
+              </p>
+            </details>
             <p class="muted small" data-traffic-status hidden role="status"></p>
             <div class="traffic-stats" data-traffic-stats hidden>
               <dl class="traffic-kpis">
@@ -1395,6 +1443,22 @@ const scoresHref = url('/captains/admin/minigame/');
       ),
     ].join('');
     const chosen = bedsYear ? bedsEntries.filter((entry) => entry.year === bedsYear) : bedsEntries;
+    const entryKey = (entry: ClosedEntry) => {
+      const email = entry.email.trim().toLowerCase();
+      const name = `${entry.forename} ${entry.surname}`.replace(/\s+/g, ' ').trim();
+      return email || name.toLowerCase();
+    };
+    const paid2027 = new Map<string, { paid: number; known: number; rows: number }>();
+    for (const entry of bedsEntries) {
+      if (entry.year !== 2027) continue;
+      const key = entryKey(entry);
+      if (!key) continue;
+      const stat = paid2027.get(key) ?? { paid: 0, known: 0, rows: 0 };
+      stat.rows += 1;
+      if (entry.payment_status.trim()) stat.known += 1;
+      if (entry.payment_status.trim().toLowerCase() === 'succeeded') stat.paid += 1;
+      paid2027.set(key, stat);
+    }
     type ClosedPerson = {
       name: string;
       email: string;
@@ -1402,15 +1466,12 @@ const scoresHref = url('/captains/admin/minigame/');
       years: number[];
       entered: string[];
       grades: string[];
-      paid: number;
-      known: number;
-      rows: number;
+      key: string;
     };
     const people = new Map<string, ClosedPerson>();
     for (const entry of chosen) {
-      const email = entry.email.trim().toLowerCase();
       const name = `${entry.forename} ${entry.surname}`.replace(/\s+/g, ' ').trim();
-      const key = email || name.toLowerCase();
+      const key = entryKey(entry);
       if (!key) continue;
       const person: ClosedPerson = people.get(key) ?? {
         name,
@@ -1419,9 +1480,7 @@ const scoresHref = url('/captains/admin/minigame/');
         years: [],
         entered: [],
         grades: [],
-        paid: 0,
-        known: 0,
-        rows: 0,
+        key,
       };
       if (!person.name && name) person.name = name;
       if (!person.telephone && entry.telephone.trim()) person.telephone = entry.telephone.trim();
@@ -1430,9 +1489,6 @@ const scoresHref = url('/captains/admin/minigame/');
       if (/^\d{4}-\d{2}-\d{2}$/.test(entered) && !person.entered.includes(entered)) person.entered.push(entered);
       const grade = entry.grade.trim();
       if (grade && !person.grades.includes(grade)) person.grades.push(grade);
-      person.rows += 1;
-      if (entry.payment_status.trim()) person.known += 1;
-      if (entry.payment_status.trim().toLowerCase() === 'succeeded') person.paid += 1;
       people.set(key, person);
     }
     const loginFor = (email: string) => {
@@ -1465,7 +1521,8 @@ const scoresHref = url('/captains/admin/minigame/');
             const enteredLabel = entered
               ? new Date(`${entered}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
               : '—';
-            return `<tr><td>${escapeHtml(person.name || '—')}</td><td>${tags}</td><td>${escapeHtml(enteredLabel)}</td><td>${escapeHtml(person.grades.join(', ') || '—')}</td><td>${escapeHtml(person.email || '—')}</td><td>${escapeHtml(person.telephone || '—')}</td><td>${paidLabel(person)}</td><td>${loginFor(person.email)}</td></tr>`;
+            const paid = paid2027.get(person.key) ?? { paid: 0, known: 0, rows: 0 };
+            return `<tr><td>${escapeHtml(person.name || '—')}</td><td>${tags}</td><td>${escapeHtml(enteredLabel)}</td><td>${escapeHtml(person.grades.join(', ') || '—')}</td><td>${escapeHtml(person.email || '—')}</td><td>${escapeHtml(person.telephone || '—')}</td><td>${paidLabel(paid)}</td><td>${loginFor(person.email)}</td></tr>`;
           })
           .join('')
       : `<tr><td colspan="8">${people.size ? 'No entries match that search.' : 'No entries yet.'}</td></tr>`;
@@ -4933,6 +4990,23 @@ const scoresHref = url('/captains/admin/minigame/');
   }
   #setup-app .lede {
     color: var(--ink-200);
+  }
+  #setup-app .page-notes,
+  #setup-app .notes {
+    margin: 0 0 0.85rem;
+  }
+  #setup-app .page-notes summary,
+  #setup-app .notes summary {
+    cursor: pointer;
+    font-weight: 800;
+    width: fit-content;
+  }
+  #setup-app .page-notes summary {
+    color: var(--ink-200);
+  }
+  #setup-app .notes p,
+  #setup-app .page-notes .lede {
+    margin: 0.45rem 0 0;
   }
   #setup-app .status:empty {
     display: none;
