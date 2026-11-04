@@ -109,6 +109,17 @@ test('a zipped spreadsheet is read without unpacking it on disk', () => {
   assert.equal(entries[0].forename, 'Ada');
   assert.equal(entries[0].surname, 'Lovelace');
   assert.equal(entries[0].email, 'ada@example.test');
+  assert.equal(entries[0].entered, '');
+});
+
+test('a Sport Manager payment serial becomes the day the entry was paid', () => {
+  const entries = entriesFromTable([
+    ['Grade', 'Forename', 'Surname', 'Email', 'PaymentStatus', 'PaymentDate'],
+    ['A Grade', 'Ada', 'Lovelace', 'ada@example.test', 'Succeeded', '46329.73619212963'],
+    ['B Grade', 'Pat', 'Later', 'pat@example.test', 'Succeeded', '2026-11-04'],
+  ]);
+  assert.equal(entries[0].entered, '2026-11-03');
+  assert.equal(entries[1].entered, '2026-11-04');
 });
 
 test('the welcome message names the player and keeps the password in the body', () => {

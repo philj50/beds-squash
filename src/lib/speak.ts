@@ -16,9 +16,42 @@ function onPhone() {
   return /iPad|iPhone|iPod/.test(agent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
+const voiceKey = 'beds-say-voice';
+
+export function savedVoiceName() {
+  try {
+    return localStorage.getItem(voiceKey) || '';
+  } catch {
+    return '';
+  }
+}
+
+export function saveVoiceName(name: string) {
+  try {
+    if (name) localStorage.setItem(voiceKey, name);
+    else localStorage.removeItem(voiceKey);
+  } catch {
+    /* The browser is keeping the page private. */
+  }
+}
+
 function englishVoice(synth: SpeechSynthesis) {
   const voices = synth.getVoices();
+  const wanted = savedVoiceName().trim().toLowerCase();
+  if (wanted) {
+    const picked = voices.find((voice) => voice.name.toLowerCase() === wanted || voice.voiceURI.toLowerCase() === wanted);
+    if (picked) return picked;
+  }
   return voices.find((voice) => voice.lang === 'en-GB') ?? voices.find((voice) => voice.lang.toLowerCase().startsWith('en')) ?? null;
+}
+
+function useVoice(line: SpeechSynthesisUtterance, voice: SpeechSynthesisVoice | null) {
+  if (!voice) {
+    line.lang = 'en-GB';
+    return;
+  }
+  line.voice = voice;
+  line.lang = voice.lang || 'en-GB';
 }
 
 function startNudge(synth: SpeechSynthesis) {
@@ -44,13 +77,10 @@ function speakChained(text: string, silent: boolean) {
   if (!synth || stopped || depth > 6) return;
   depth += 1;
   const line = new SpeechSynthesisUtterance(silent ? ' ' : text);
-  line.lang = 'en-GB';
   line.rate = silent ? 0.1 : 0.95;
   line.volume = silent ? 0 : 1;
-  if (!silent) {
-    const voice = englishVoice(synth);
-    if (voice) line.voice = voice;
-  }
+  if (silent) line.lang = 'en-GB';
+  else useVoice(line, englishVoice(synth));
   const finish = () => {
     if (held !== line) return;
     held = null;
@@ -80,10 +110,9 @@ export function speakScore(text: string) {
   stopped = false;
   queued = null;
   const line = new SpeechSynthesisUtterance(text);
-  line.lang = 'en-GB';
   line.rate = 0.95;
   const voice = englishVoice(synth);
-  if (voice) line.voice = voice;
+  useVoice(line, voice);
   const finish = () => {
     if (held !== line) return;
     held = null;
@@ -102,8 +131,7 @@ export function speakScore(text: string) {
   held = line;
   const say = () => {
     if (held !== line || stopped) return;
-    const chosen = englishVoice(synth);
-    if (chosen) line.voice = chosen;
+    useVoice(line, englishVoice(synth));
     synth.resume();
     synth.speak(line);
     if (onPhone()) chain = true;

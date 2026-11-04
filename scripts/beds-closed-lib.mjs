@@ -128,6 +128,7 @@ export function entriesFromTable(table) {
   const email = column('email');
   const telephone = column('telephone');
   const payment = column('paymentstatus');
+  const entered = column('paymentdate');
   return table.slice(headerIndex + 1).map((row) => ({
     grade: cell(row, grade),
     forename: cell(row, forename),
@@ -135,6 +136,7 @@ export function entriesFromTable(table) {
     email: cell(row, email),
     telephone: cell(row, telephone),
     payment: cell(row, payment),
+    entered: entryDate(cell(row, entered)),
   }));
 }
 
@@ -359,6 +361,15 @@ function cleanPhone(value) {
 
 function cell(row, index) {
   return index < 0 ? '' : String(row[index] || '');
+}
+
+/** Sport Manager stores the payment date as an Excel serial, or sometimes as text. */
+function entryDate(value) {
+  const text = String(value || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
+  const serial = Number(text);
+  if (!Number.isFinite(serial) || serial < 20000 || serial > 80000) return '';
+  return new Date(Date.UTC(1899, 11, 30) + Math.floor(serial) * 86400000).toISOString().slice(0, 10);
 }
 
 function inputValue(html, name) {

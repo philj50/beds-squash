@@ -923,7 +923,7 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(juniorDraw.locator('.junior-half', { hasText: 'Top half' })).toContainText('Robin New');
     await page.getByRole('button', { name: 'Players', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Beds Closed', exact: true })).toBeVisible();
-    await expect(page.getByText('The entry list is copied from Sport Manager. Each person is tagged with the year, so they can be picked out and linked.')).toBeVisible();
+    await expect(page.getByText('Entered is the payment date on that list.')).toBeVisible();
     const closedList = page.locator('[data-beds-rows]');
     const patClosed = closedList.locator('tr', { hasText: 'Pat Player' });
     await expect(patClosed).toHaveCount(1);

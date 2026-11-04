@@ -15,7 +15,7 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { closedAccountEmails, contactFromPlayerPage, nameKey, organiserPlayers, phoneFromEntrantPage, planClosedEntries, startingPassword, summary, welcomeText } from './beds-closed-lib.mjs';
+import { closedAccountEmails, nameKey, planClosedEntries, readEntryList, startingPassword, summary, welcomeText } from './beds-closed-lib.mjs';
 import { OUTBOUND_TO, sendOutbound } from './outbound-mail.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -217,30 +217,9 @@ async function downloadLists(eventList) {
       throw new Error('Sport Manager did not accept the organiser login.');
     }
     for (const event of eventList) {
-      const response = await page.request.get(`https://sportmgr.co.uk/Tournament/Players/${event.sportmgr}`);
-      if (!response.ok()) throw new Error(`Sport Manager did not return the player page for ${event.title}.`);
-      const listed = organiserPlayers(await response.text());
-      const rows = [];
-      for (const player of listed) {
-        const [edit, entrant] = await Promise.all([
-          page.request.get(`https://sportmgr.co.uk/Player/Edit/${player.id}`),
-          page.request.get(`https://sportmgr.co.uk/t/${event.sportmgr}/entrant/${player.id}`),
-        ]);
-        if (!edit.ok()) throw new Error(`Sport Manager did not return the player page for ${player.name}.`);
-        const contact = contactFromPlayerPage(await edit.text());
-        const entryPhone = entrant.ok() ? phoneFromEntrantPage(await entrant.text()) : '';
-        const parts = player.name.split(/\s+/).filter(Boolean);
-        const surname = contact.surname || parts.pop() || '';
-        rows.push({
-          grade: player.grade,
-          forename: contact.forename || parts.join(' '),
-          surname,
-          email: contact.email,
-          telephone: entryPhone || contact.telephone,
-          payment: player.payment,
-        });
-      }
-      lists.set(event.sportmgr, rows);
+      const response = await page.request.get(`https://sportmgr.co.uk/Tournament/ExportEntryList?tournamentId=${event.sportmgr}`);
+      if (!response.ok()) throw new Error(`Sport Manager did not return the entry list for ${event.title}.`);
+      lists.set(event.sportmgr, readEntryList(Buffer.from(await response.body())));
     }
   } finally {
     await browser.close();
