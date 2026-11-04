@@ -114,6 +114,11 @@ const names = [
           <button class="serve-pip" type="button" data-box-toggle aria-label="Service box R">R</button>
         </div>
         <p class="line" data-line></p>
+        <details class="crowd" data-crowd hidden>
+          <summary>Watching</summary>
+          <p class="crowd-people" data-crowd-people></p>
+          <p class="crowd-emojis" data-crowd-emojis></p>
+        </details>
         <p class="actions">
           <label class="share share--board">
             <input type="checkbox" data-share checked />
@@ -267,6 +272,9 @@ const names = [
   const publicWatch = root.querySelector<HTMLElement>('[data-public-watch]')!;
   const publicMarker = root.querySelector<HTMLElement>('[data-public-marker]')!;
   const watchMarkerEl = root.querySelector<HTMLElement>('[data-watch-marker]')!;
+  const crowdEl = root.querySelector<HTMLDetailsElement>('[data-crowd]')!;
+  const crowdPeople = root.querySelector<HTMLElement>('[data-crowd-people]')!;
+  const crowdEmojis = root.querySelector<HTMLElement>('[data-crowd-emojis]')!;
   const resultEl = root.querySelector<HTMLElement>('[data-result]')!;
   const resultSheet = root.querySelector<HTMLElement>('[data-result-sheet]')!;
   const resultLinkRow = root.querySelector<HTMLElement>('[data-result-link-row]')!;
@@ -952,6 +960,50 @@ const names = [
       return;
     }
     notifyMatchOn();
+    void loadCrowd();
+  }
+
+  const crowdEmoji: Record<string, string> = {
+    strong: '💪',
+    love: '❤️',
+    happy: '😄',
+    sad: '😢',
+    comeon: '🙌',
+    getin: '🎯',
+    celebrate: '🎉',
+  };
+
+  function crowdNames(names: string[], guests: number) {
+    const shown = names.map((name) => name.trim()).filter(Boolean);
+    if (guests === 1) shown.push('1 other');
+    else if (guests > 1) shown.push(`${guests} others`);
+    return shown.join(', ');
+  }
+
+  function paintCrowd(data: { watching?: string[]; looked?: string[]; guests?: number; guestsEarlier?: number; emojis?: { kind: string; n: number }[] } | null) {
+    const watching = crowdNames(Array.isArray(data?.watching) ? data.watching : [], Number(data?.guests) || 0);
+    const looked = crowdNames(Array.isArray(data?.looked) ? data.looked : [], Number(data?.guestsEarlier) || 0);
+    const parts = [];
+    if (watching) parts.push(`Watching: ${watching}`);
+    if (looked) parts.push(`Looked in: ${looked}`);
+    crowdPeople.textContent = parts.join('. ') || 'Nobody is watching.';
+    const counts = new Map((Array.isArray(data?.emojis) ? data.emojis : []).map((row) => [row.kind, Number(row.n) || 0]));
+    const bits = Object.entries(crowdEmoji)
+      .filter(([kind]) => (counts.get(kind) || 0) > 0)
+      .map(([kind, emoji]) => `${emoji} ${counts.get(kind)}`);
+    crowdEmojis.textContent = bits.join('   ') || 'No reactions yet.';
+  }
+
+  async function loadCrowd() {
+    const showCrowd = shareLive && signedIn && !watching && !board.hidden && !resultMode;
+    crowdEl.hidden = !showCrowd;
+    if (!showCrowd) return;
+    const { data, error } = await supabase.rpc('marker_crowd');
+    if (error) {
+      if (missingFunction(error)) crowdEl.hidden = true;
+      return;
+    }
+    paintCrowd(data as { watching?: string[]; looked?: string[]; guests?: number; guestsEarlier?: number; emojis?: { kind: string; n: number }[] });
   }
 
   async function clearLive() {
@@ -1577,6 +1629,8 @@ const names = [
     endCourt('This match timed out after an hour with no score.');
   }, 30_000);
 
+  window.setInterval(() => void loadCrowd(), 5000);
+
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') saveSession(false);
   });
@@ -1635,6 +1689,7 @@ const names = [
       for (const other of root.querySelectorAll<HTMLInputElement>('[data-share]')) other.checked = shareLive;
       if (!shareLive) {
         void clearLive();
+        crowdEl.hidden = true;
         return;
       }
       if (!signedIn) {
@@ -2289,6 +2344,22 @@ const names = [
     display: flex;
     flex-wrap: wrap;
     gap: 0.6rem;
+  }
+  .crowd {
+    margin: 0.85rem 0 0;
+  }
+  .crowd summary {
+    cursor: pointer;
+    font-weight: 800;
+    width: fit-content;
+  }
+  .crowd-people,
+  .crowd-emojis {
+    margin: 0.45rem 0 0;
+    font-weight: 700;
+  }
+  .crowd-emojis {
+    font-size: 1.2rem;
   }
   .reset-dialog {
     max-width: 26rem;

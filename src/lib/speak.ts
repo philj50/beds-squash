@@ -17,6 +17,12 @@ function onPhone() {
 }
 
 const voiceKey = 'beds-say-voice';
+let savedVoiceOn = true;
+
+/** Match commentary turns this off until someone is signed in. */
+export function useSavedVoice(on: boolean) {
+  savedVoiceOn = on;
+}
 
 export function savedVoiceName() {
   try {
@@ -37,7 +43,7 @@ export function saveVoiceName(name: string) {
 
 function englishVoice(synth: SpeechSynthesis) {
   const voices = synth.getVoices();
-  const wanted = savedVoiceName().trim().toLowerCase();
+  const wanted = savedVoiceOn ? savedVoiceName().trim().toLowerCase() : '';
   if (wanted) {
     const picked = voices.find((voice) => voice.name.toLowerCase() === wanted || voice.voiceURI.toLowerCase() === wanted);
     if (picked) return picked;

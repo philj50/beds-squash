@@ -14,16 +14,28 @@ import { url } from '@/lib/site';
   <section class="section">
     <div class="container watch" id="watch-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} data-login={url('/login/')}>
       <h1>Match commentary</h1>
-      <p class="lede">Choose a match that is being marked. Tick Say it out loud to hear the score. Earlier matches stay in the list below.</p>
+      <p class="lede" data-lede>Choose a match that is being marked. Tick Say it out loud to hear the score.</p>
       <label class="say">
         <input type="checkbox" data-say />
         Say it out loud
       </label>
-      <label class="say-voice">
+      <label class="say-voice" data-voice-row hidden>
         Voice
         <select data-voice></select>
       </label>
       <p class="say-note">Take the phone off silent to hear the voice, Come on, Get in, and the ping.</p>
+      <details class="login-more" data-login-more hidden>
+        <summary>What you get if you log in</summary>
+        <ul>
+          <li>Full names, and who is marking</li>
+          <li>Every point, as it is marked</li>
+          <li>A voice you choose</li>
+          <li>Earlier matches</li>
+          <li>Who else is watching</li>
+          <li>Send a reaction, and hear Come on and Get in spoken back</li>
+        </ul>
+        <p><a href={url('/login/')}>Log in</a></p>
+      </details>
       {COMMENTARY_NOTES && (
         <p class="ntfy">
           <a href="https://ntfy.sh/beds_commentary_1234" target="_blank" rel="noopener noreferrer">Subscribe on ntfy</a>
@@ -54,14 +66,15 @@ import { url } from '@/lib/site';
         <p class="shout-banner" data-shout-banner></p>
         <p class="watchers" data-watchers hidden></p>
         <div class="shout-bar" data-shout-bar hidden>
-          <button type="button" data-shout="strong">Strong</button>
-          <button type="button" data-shout="love">Love</button>
-          <button type="button" data-shout="happy">Happy</button>
-          <button type="button" data-shout="sad">Sad</button>
-          <button type="button" data-shout="comeon">Come on</button>
-          <button type="button" data-shout="getin">Get in</button>
+          <button type="button" data-shout="strong" aria-label="Strong">💪</button>
+          <button type="button" data-shout="love" aria-label="Love">❤️</button>
+          <button type="button" data-shout="happy" aria-label="Happy">😄</button>
+          <button type="button" data-shout="sad" aria-label="Sad">😢</button>
+          <button type="button" data-shout="comeon" aria-label="Come on">🙌</button>
+          <button type="button" data-shout="getin" aria-label="Get in">🎯</button>
+          <button type="button" data-shout="celebrate" aria-label="Celebrate">🎉</button>
         </div>
-        <details class="points-history">
+        <details class="points-history" data-history>
           <summary>Points</summary>
           <div data-history-body></div>
         </details>
@@ -88,7 +101,7 @@ import { url } from '@/lib/site';
     spokenPublicLine,
     unpackLiveScore,
   } from '@/lib/scoreboard';
-  import { followScore, saveVoiceName, savedVoiceName, speakScore, speechUnlocked, stopScore } from '@/lib/speak';
+  import { followScore, saveVoiceName, savedVoiceName, speakScore, speechUnlocked, stopScore, useSavedVoice } from '@/lib/speak';
 
   type LiveRow = {
     id: number;
@@ -120,7 +133,11 @@ import { url } from '@/lib/site';
   const live = root.querySelector<HTMLElement>('[data-live]')!;
   const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
   const sayBox = root.querySelector<HTMLInputElement>('[data-say]')!;
+  const voiceRow = root.querySelector<HTMLElement>('[data-voice-row]')!;
   const voiceBox = root.querySelector<HTMLSelectElement>('[data-voice]')!;
+  const loginMore = root.querySelector<HTMLElement>('[data-login-more]')!;
+  const lede = root.querySelector<HTMLElement>('[data-lede]')!;
+  const historyPanel = root.querySelector<HTMLElement>('[data-history]')!;
   const archiveList = root.querySelector<HTMLElement>('[data-archive]')!;
   const archiveTitle = root.querySelector<HTMLElement>('[data-archive-title]')!;
   const shoutBar = root.querySelector<HTMLElement>('[data-shout-bar]')!;
@@ -146,12 +163,13 @@ import { url } from '@/lib/site';
   let shoutsHeard = false;
   const seenShouts = new Set<number>();
   const shoutWords: Record<string, string> = {
-    strong: 'Strong',
-    love: 'Love',
-    happy: 'Happy',
-    sad: 'Sad',
-    comeon: 'Come on',
-    getin: 'Get in',
+    strong: '💪',
+    love: '❤️',
+    happy: '😄',
+    sad: '😢',
+    comeon: '🙌',
+    getin: '🎯',
+    celebrate: '🎉',
   };
   const spokenShouts: Record<string, string> = {
     comeon: 'Come on',
@@ -159,6 +177,7 @@ import { url } from '@/lib/site';
   };
   let bannerTimer = 0;
   sayBox.checked = sayScore;
+  useSavedVoice(false);
 
   function fillVoices() {
     const voices = window.speechSynthesis?.getVoices() ?? [];
@@ -370,7 +389,7 @@ import { url } from '@/lib/site';
     const ctx = shoutAudio();
     if (!ctx) return;
     const now = ctx.currentTime;
-    const start = kind === 'sad' ? 294 : kind === 'getin' ? 494 : kind === 'strong' ? 523 : kind === 'love' ? 698 : kind === 'happy' ? 880 : 659;
+    const start = kind === 'sad' ? 294 : kind === 'getin' ? 494 : kind === 'strong' ? 523 : kind === 'love' ? 698 : kind === 'happy' ? 784 : kind === 'celebrate' ? 988 : 659;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'sine';
@@ -451,6 +470,7 @@ import { url } from '@/lib/site';
     }
     picker.hidden = true;
     live.hidden = false;
+    historyPanel.hidden = !signedIn;
     shoutBar.hidden = quiet || !roomReady || !signedIn;
     root.querySelector<HTMLElement>('[data-a]')!.textContent = names.a;
     root.querySelector<HTMLElement>('[data-b]')!.textContent = names.b;
@@ -483,7 +503,7 @@ import { url } from '@/lib/site';
         const link = document.createElement('a');
         link.href = root.dataset.login || '/login/';
         link.textContent = 'Sign in';
-        note.append(link, ' to see the full names.');
+        note.append(link, ' to see the full names and every point.');
       }
       const score = currentGame(restored);
       points.textContent = `${score.a} – ${score.b}`;
@@ -527,6 +547,11 @@ import { url } from '@/lib/site';
   }
 
   function paintArchiveList() {
+    if (!signedIn) {
+      archiveTitle.hidden = true;
+      archiveList.replaceChildren();
+      return;
+    }
     archiveTitle.hidden = !roomReady || archiveRows.length === 0;
     archiveList.replaceChildren();
     if (!roomReady) return;
@@ -677,6 +702,7 @@ import { url } from '@/lib/site';
   }
 
   async function loadArchive() {
+    if (!signedIn) return;
     const { data, error } = await supabase.rpc('commentary_archive');
     if (error) {
       roomMissing(error);
@@ -687,6 +713,7 @@ import { url } from '@/lib/site';
   }
 
   async function openArchive(id: number) {
+    if (!signedIn) return;
     const { data, error } = await supabase.rpc('commentary_match', { p_id: id });
     if (error) {
       if (!roomMissing(error)) show('That match could not be opened.');
@@ -756,20 +783,31 @@ import { url } from '@/lib/site';
 
   const { data } = await supabase.auth.getSession();
   signedIn = Boolean(data.session);
+  useSavedVoice(signedIn);
+  voiceRow.hidden = !signedIn;
+  loginMore.hidden = signedIn;
   const params = new URLSearchParams(location.search);
   const requested = Number(params.get('match'));
   const archived = Number(params.get('archive'));
+  if (signedIn) {
+    lede.textContent = 'Choose a match that is being marked. Tick Say it out loud to hear the score. Earlier matches stay in the list below.';
+    fillVoices();
+  } else if (archived) {
+    const clean = new URL(location.href);
+    clean.searchParams.delete('archive');
+    history.replaceState(null, '', `${clean.pathname}${clean.search}`);
+  }
   if (requested) matchId = requested;
   await loadRows();
-  await loadArchive();
-  if (!requested && archived) await openArchive(archived);
+  if (signedIn) await loadArchive();
+  if (signedIn && !requested && archived) await openArchive(archived);
   window.setInterval(() => void loadRows(), 2000);
   window.setInterval(() => {
     if (matchId) void loadShouts();
   }, 1000);
   window.setInterval(() => {
     if (matchId) void touchRoom();
-    void loadArchive();
+    if (signedIn) void loadArchive();
   }, 15000);
   window.setInterval(paintClock, 1000);
 </script>
@@ -777,6 +815,9 @@ import { url } from '@/lib/site';
 <style>
   .watch {
     max-width: 52rem;
+  }
+  .watch [hidden] {
+    display: none;
   }
   .lede,
   .note,
@@ -947,6 +988,26 @@ import { url } from '@/lib/site';
     color: var(--text-muted);
     font-weight: 700;
   }
+  .login-more {
+    margin: 0.85rem 0 0;
+  }
+  .login-more summary {
+    cursor: pointer;
+    font-weight: 800;
+    width: fit-content;
+  }
+  .login-more ul {
+    margin: 0.45rem 0 0;
+    padding-left: 1.2rem;
+    font-weight: 700;
+  }
+  .login-more li + li {
+    margin-top: 0.25rem;
+  }
+  .login-more p {
+    margin: 0.55rem 0 0;
+    font-weight: 800;
+  }
   .archive-title {
     margin: 1.5rem 0 0;
     font-size: 1.35rem;
@@ -968,16 +1029,17 @@ import { url } from '@/lib/site';
     font-weight: 700;
   }
   .shout-bar {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
+    display: flex;
+    gap: 0.35rem;
     margin-top: 0.85rem;
   }
   .shout-bar button {
+    flex: 1 1 0;
+    min-width: 0;
     font: inherit;
-    font-weight: 800;
-    font-size: 1.05rem;
-    padding: 0.75rem 0.4rem;
+    font-size: 1.45rem;
+    line-height: 1;
+    padding: 0.55rem 0.1rem;
     border: 1px solid var(--border-strong);
     border-radius: 12px;
     background: #fff;
@@ -1017,6 +1079,14 @@ import { url } from '@/lib/site';
     align-items: center;
     min-height: 2rem;
   }
+  .points-history :global(.stem-row > span:first-child) {
+    justify-self: end;
+    margin-right: 0.2rem;
+  }
+  .points-history :global(.stem-row > span:last-child) {
+    justify-self: start;
+    margin-left: 0.2rem;
+  }
   .points-history :global(.stem-rail) {
     background: #e0a800;
     align-self: stretch;
@@ -1025,14 +1095,6 @@ import { url } from '@/lib/site';
     display: inline-flex;
     align-items: center;
     gap: 0.2rem;
-  }
-  .points-history :global(.cluster--a) {
-    justify-self: end;
-    margin-right: 0.2rem;
-  }
-  .points-history :global(.cluster--b) {
-    justify-self: start;
-    margin-left: 0.2rem;
   }
   .points-history :global(.pip) {
     width: 1.7rem;
