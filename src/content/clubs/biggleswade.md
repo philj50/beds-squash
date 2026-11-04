@@ -12,7 +12,7 @@ teams:
   - Biggleswade 1 (Division 1)
   - Biggleswade 2 (Division 2)
   - Biggleswade 3 (Division 2)
-tags: [squash, racketball, members-club]
+tags: [squash, racketball, juniors, members-club]
 order: 30
 ---
 
