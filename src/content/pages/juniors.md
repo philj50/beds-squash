@@ -1,7 +1,7 @@
 ---
 title: Juniors
 intro: Junior squash in Bedfordshire — county squads, coaching and a path towards junior county teams.
-updated: 2026-10-07
+updated: 2026-11-04
 ---
 
 ## County squad programme
@@ -24,7 +24,7 @@ A typical session usually has an attendance of approximately 10–15 players.
 
 ## Where to start
 
-Most clubs run junior coaching — see [Club Towers](/clubs/club-towers/), [Bedford Bulls](/clubs/bedford-bulls/) and [Luton & Dunstable](/clubs/luton-and-dunstable/) to begin with, or [find your nearest courts](/clubs/).
+Most clubs run junior coaching — see [Club Towers](/clubs/club-towers/), [Bedford Bulls](/clubs/bedford-bulls/), [Biggleswade Squash Club](/clubs/biggleswade/) and [Luton & Dunstable](/clubs/luton-and-dunstable/) to begin with, or [find your nearest courts](/clubs/).
 
 ## Safeguarding
 
