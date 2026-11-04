@@ -162,6 +162,14 @@ if (mailFailed) process.exit(1);
 
 async function storeEntries(event, rows) {
   const year = Number(String(event.place).match(/20\d{2}/)?.[0] || 0);
+  const already = await restAll(`beds_closed_entries?tournament_id=eq.${event.sportmgr}&select=grade,forename,surname,email,entered_on`);
+  const known = new Map(
+    already.map((row) => [
+      [row.grade, row.forename, row.surname, row.email].join('|').toLowerCase(),
+      String(row.entered_on || '').slice(0, 10),
+    ]),
+  );
+  const today = new Date().toISOString().slice(0, 10);
   const seen = new Set();
   const people = [];
   for (const row of rows) {
@@ -182,6 +190,7 @@ async function storeEntries(event, rows) {
       email,
       telephone: String(row.telephone || '').replace(/\s+/g, ' ').trim(),
       payment_status: String(row.payment || '').trim(),
+      entered_on: String(row.entered || '').slice(0, 10) || known.get(key) || (known.has(key) ? null : today),
     });
   }
   await restWrite(`beds_closed_entries?tournament_id=eq.${event.sportmgr}`, 'DELETE');

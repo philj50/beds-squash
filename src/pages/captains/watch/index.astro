@@ -19,7 +19,7 @@ import { url } from '@/lib/site';
         <input type="checkbox" data-say />
         Say it out loud
       </label>
-      <p class="say-note">Take the phone off silent to hear the voice.</p>
+      <p class="say-note">Take the phone off silent to hear the voice and the Come on ping.</p>
       {COMMENTARY_NOTES && (
         <p class="ntfy">
           <a href="https://ntfy.sh/beds_commentary_1234" target="_blank" rel="noopener noreferrer">Subscribe on ntfy</a>
@@ -138,6 +138,7 @@ import { url } from '@/lib/site';
   let archiveRows: LiveRow[] = [];
   let roomReady = true;
   let lastShoutId = 0;
+  let shoutsHeard = false;
   const seenShouts = new Set<number>();
   let liveNames = { a: '', b: '' };
   let bannerTimer = 0;
@@ -329,10 +330,52 @@ import { url } from '@/lib/site';
     return `${who}: Come on ${firstWord(player)}`;
   }
 
-  function showShout(shout: Shout) {
+  let audioCtx: AudioContext | null = null;
+  const ownPings = new Map<string, number>();
+
+  function shoutAudio() {
+    const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return null;
+    if (!audioCtx) audioCtx = new Ctx();
+    if (audioCtx.state === 'suspended') void audioCtx.resume();
+    return audioCtx;
+  }
+
+  function noteOwnPing(kind: string) {
+    ownPings.set(kind, (ownPings.get(kind) || 0) + 1);
+  }
+
+  function takeOwnPing(kind: string) {
+    const waiting = ownPings.get(kind) || 0;
+    if (waiting <= 1) ownPings.delete(kind);
+    else ownPings.set(kind, waiting - 1);
+    return waiting > 0;
+  }
+
+  function pingShout(kind: string) {
+    const ctx = shoutAudio();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const start = kind === 'b' ? 494 : kind === 'yes' ? 784 : kind === 'clap' ? 392 : 659;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(start, now);
+    if (kind === 'a' || kind === 'b') osc.frequency.exponentialRampToValueAtTime(start * 1.5, now + 0.09);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.18, now + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.26);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.28);
+  }
+
+  function showShout(shout: Shout, sound = false) {
     if (!shout.id || seenShouts.has(shout.id)) return;
     seenShouts.add(shout.id);
     if (shout.id > lastShoutId) lastShoutId = shout.id;
+    if (sound && !takeOwnPing(shout.kind)) pingShout(shout.kind);
     const text = shoutText(shout);
     shoutBanner.textContent = text;
     window.clearTimeout(bannerTimer);
@@ -347,6 +390,8 @@ import { url } from '@/lib/site';
 
   function clearShouts() {
     lastShoutId = 0;
+    shoutsHeard = false;
+    ownPings.clear();
     seenShouts.clear();
     shoutLog.replaceChildren();
     shoutBanner.textContent = '';
@@ -585,18 +630,27 @@ import { url } from '@/lib/site';
       return;
     }
     const shouts = (Array.isArray(data) ? (data as Shout[]) : []).slice().sort((a, b) => a.id - b.id);
-    for (const shout of shouts) showShout(shout);
+    const sound = shoutsHeard;
+    shoutsHeard = true;
+    for (const shout of shouts) showShout(shout, sound);
   }
 
   async function sendShout(kind: string) {
-    if (!matchId || !roomReady) return;
+    if (!matchId || !roomReady || !kind) return;
+    shoutAudio();
+    pingShout(kind);
+    noteOwnPing(kind);
     const { data, error } = await supabase.rpc('commentary_shout', { p_live: matchId, p_kind: kind, p_guest: guestToken() });
+    if (error || !(data as { ok?: boolean; id?: number } | null)?.ok) takeOwnPing(kind);
     if (error) {
       roomMissing(error);
       return;
     }
     const shout = data as (Shout & { ok?: boolean }) | null;
-    if (shout?.ok && shout.id) showShout(shout);
+    if (shout?.ok && shout.id) {
+      showShout(shout);
+      takeOwnPing(kind);
+    }
   }
 
   async function loadArchive() {
@@ -639,6 +693,7 @@ import { url } from '@/lib/site';
   }
 
   root.addEventListener('pointerdown', () => {
+    shoutAudio();
     if (!sayScore || speechUnlocked()) return;
     const text = currentCall();
     if (!text) return;
@@ -683,7 +738,7 @@ import { url } from '@/lib/site';
   window.setInterval(() => void loadRows(), 2000);
   window.setInterval(() => {
     if (matchId) void loadShouts();
-  }, 2000);
+  }, 1000);
   window.setInterval(() => {
     if (matchId) void touchRoom();
     void loadArchive();

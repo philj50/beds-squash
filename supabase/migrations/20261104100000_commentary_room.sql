@@ -584,3 +584,26 @@ from public.marked_matches m
 where not exists (select 1 from public.commentary_matches)
 order by m.created_at desc
 limit 40;
+
+insert into public.commentary_matches (live_id, marker_id, player_a, player_b, score, history, updated_at)
+select
+  m.id,
+  m.marker_id,
+  m.player_a,
+  m.player_b,
+  m.score,
+  case
+    when jsonb_typeof(m.history) = 'object' then m.history
+    else '{"games":[[]]}'::jsonb
+  end,
+  m.updated_at
+from public.live_matches m
+where m.updated_at > now() - interval '1 hour'
+  and not exists (
+    select 1
+    from public.commentary_matches c
+    where c.live_id = m.id
+      and c.ended_at is null
+  );
+
+notify pgrst, 'reload schema';

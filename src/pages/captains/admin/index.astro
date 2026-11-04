@@ -22,7 +22,7 @@ const scoresHref = url('/captains/admin/minigame/');
       <h1>Administration</h1>
       <p class="lede">
         <strong>League Master</strong> lists club captains, team captains, and players. Those lists are read only. An email, name, or ES number saved on this website stays. A difference with League Master is listed under Differences. Phone stays on this website.
-        <strong>Juniors</strong> lists the Junior County Closed entries submitted on this website. <strong>Beds Closed</strong> lists the County Closed entry list. Each person is tagged with the year, and email and mobile come from Sport Manager.
+        <strong>Juniors</strong> lists the Junior County Closed entries submitted on this website. <strong>Beds Closed</strong> lists the County Closed entry list. Each person is tagged with the year, blue for 2026 and orange for 2027, and email and mobile come from Sport Manager.
         <strong>SquashLevels</strong> shows each player’s level.
         <strong>Permissions</strong> is Users, Groups, and Roles, and only an admin sees it. Users is every League Master player. Update the email, ES number, and phone there, and change the password, turn the account off, or delete it when a login exists. A group gives one role. League Master fills the club, team, and player groups. Someone in those groups who is on SquashLevels also receives SL Player.
         <strong>Links</strong> joins a League Master player to their SquashLevels name when the names differ.
@@ -152,7 +152,7 @@ const scoresHref = url('/captains/admin/minigame/');
           <script id="beds-closed-2027" type="application/json" set:html={JSON.stringify(closed2027.entries)} />
           <section class="admin-panel" data-tab="beds-closed" hidden>
             <h2>Beds Closed</h2>
-            <p class="muted small">The entry list is copied from Sport Manager. Each person is tagged with the year, so they can be picked out and linked.</p>
+            <p class="muted small">The entry list is copied from Sport Manager every half hour. Entered is the day a name first appeared on that list. Names already there have no earlier date. 2026 is blue and 2027 is orange.</p>
             <p class="muted small" data-beds-status hidden role="status"></p>
             <div data-beds-list hidden>
               <ul class="tag-list" data-beds-years aria-label="Years"></ul>
@@ -167,6 +167,7 @@ const scoresHref = url('/captains/admin/minigame/');
                     <tr>
                       <th>Name</th>
                       <th>Years</th>
+                      <th>Entered</th>
                       <th>Grade</th>
                       <th>Email</th>
                       <th>Mobile</th>
@@ -204,6 +205,7 @@ const scoresHref = url('/captains/admin/minigame/');
               </table>
             </div>
             <h3>Saved</h3>
+            <p class="muted small">Every match saved from Marking. Tick Visible to show it under Earlier matches on Match commentary. Leave it unticked and it stays in this list only.</p>
             <p class="muted small" data-scores-status role="status"></p>
             <div class="overview-box">
               <table class="overview">
@@ -213,11 +215,34 @@ const scoresHref = url('/captains/admin/minigame/');
                     <th>Match</th>
                     <th>Score</th>
                     <th>Marker</th>
+                    <th>Visible</th>
                     <th></th>
                   </tr>
                 </thead>
                 <tbody data-score-rows></tbody>
               </table>
+            </div>
+            <h3>Commentary history</h3>
+            <p class="muted small">Every match that has been on Match commentary, including the points. Untick Visible to hide that match from end users. It stays here.</p>
+            <p class="muted small" data-history-status role="status"></p>
+            <div class="overview-box">
+              <table class="overview">
+                <thead>
+                  <tr>
+                    <th>When</th>
+                    <th>Match</th>
+                    <th>Score</th>
+                    <th>Marker</th>
+                    <th>Visible</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody data-history-rows></tbody>
+              </table>
+            </div>
+            <div class="score-edit" data-history-view hidden>
+              <h3 data-history-title>Points</h3>
+              <div class="score-tape" data-history-tape></div>
             </div>
             <form class="score-edit" data-score-edit hidden>
               <h3>Edit match</h3>
@@ -229,7 +254,7 @@ const scoresHref = url('/captains/admin/minigame/');
                 Player B
                 <input data-score-b required />
               </label>
-              <div data-score-tape></div>
+              <div class="score-tape" data-score-tape></div>
               <p class="actions">
                 <button class="btn btn--primary btn--sm" type="submit">Save names</button>
                 <a class="btn btn--ghost btn--sm" data-score-open href={url('/captains/score/')}>Change the points</a>
@@ -1348,6 +1373,7 @@ const scoresHref = url('/captains/admin/minigame/');
     email: string;
     telephone: string;
     payment_status: string;
+    entered_on?: string | null;
   };
   type ClosedProfile = { id: string; display_name: string | null; email: string | null };
   let bedsEntries: ClosedEntry[] = [];
@@ -1374,6 +1400,7 @@ const scoresHref = url('/captains/admin/minigame/');
       email: string;
       telephone: string;
       years: number[];
+      entered: string[];
       grades: string[];
       paid: number;
       known: number;
@@ -1390,6 +1417,7 @@ const scoresHref = url('/captains/admin/minigame/');
         email: entry.email.trim(),
         telephone: '',
         years: [],
+        entered: [],
         grades: [],
         paid: 0,
         known: 0,
@@ -1398,6 +1426,8 @@ const scoresHref = url('/captains/admin/minigame/');
       if (!person.name && name) person.name = name;
       if (!person.telephone && entry.telephone.trim()) person.telephone = entry.telephone.trim();
       if (entry.year && !person.years.includes(entry.year)) person.years.push(entry.year);
+      const entered = String(entry.entered_on || '').slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(entered) && !person.entered.includes(entered)) person.entered.push(entered);
       const grade = entry.grade.trim();
       if (grade && !person.grades.includes(grade)) person.grades.push(grade);
       person.rows += 1;
@@ -1428,13 +1458,17 @@ const scoresHref = url('/captains/admin/minigame/');
               ? `<ul class="tag-list">${person.years
                   .slice()
                   .sort((a, b) => b - a)
-                  .map((year) => `<li>${year}</li>`)
+                  .map((year) => `<li class="year-${year}">${year}</li>`)
                   .join('')}</ul>`
               : '—';
-            return `<tr><td>${escapeHtml(person.name || '—')}</td><td>${tags}</td><td>${escapeHtml(person.grades.join(', ') || '—')}</td><td>${escapeHtml(person.email || '—')}</td><td>${escapeHtml(person.telephone || '—')}</td><td>${paidLabel(person)}</td><td>${loginFor(person.email)}</td></tr>`;
+            const entered = person.entered.slice().sort()[0];
+            const enteredLabel = entered
+              ? new Date(`${entered}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+              : '—';
+            return `<tr><td>${escapeHtml(person.name || '—')}</td><td>${tags}</td><td>${escapeHtml(enteredLabel)}</td><td>${escapeHtml(person.grades.join(', ') || '—')}</td><td>${escapeHtml(person.email || '—')}</td><td>${escapeHtml(person.telephone || '—')}</td><td>${paidLabel(person)}</td><td>${loginFor(person.email)}</td></tr>`;
           })
           .join('')
-      : `<tr><td colspan="7">${people.size ? 'No entries match that search.' : 'No entries yet.'}</td></tr>`;
+      : `<tr><td colspan="8">${people.size ? 'No entries match that search.' : 'No entries yet.'}</td></tr>`;
     const noun = (total: number) => (total === 1 ? 'person' : 'people');
     const yearLabel = bedsYear ? String(bedsYear) : years.length ? years.join(' and ') : 'This';
     count.textContent = query ? `${shown.length} of ${people.size} ${noun(people.size)}` : `${yearLabel}: ${people.size} ${noun(people.size)}`;
@@ -1454,7 +1488,7 @@ const scoresHref = url('/captains/admin/minigame/');
     const [{ data, error }, profiles] = await Promise.all([
       supabase
         .from('beds_closed_entries')
-        .select('year,grade,forename,surname,email,telephone,payment_status')
+        .select('year,grade,forename,surname,email,telephone,payment_status,entered_on')
         .order('year', { ascending: false })
         .order('surname')
         .order('forename')
@@ -1508,9 +1542,21 @@ const scoresHref = url('/captains/admin/minigame/');
     score: string;
     marker: string;
     createdAt: string;
+    visible?: boolean;
     history?: { games?: { winner: 'a' | 'b' | 'let'; server: 'a' | 'b'; box: 'R' | 'L'; choosing?: boolean; a: number; b: number; handOut?: boolean; stroke?: boolean }[][] };
   };
+  type HistoryRow = {
+    id: number;
+    playerA: string;
+    playerB: string;
+    score: string;
+    marker: string;
+    visible: boolean;
+    endedAt: string;
+    history?: MarkedRow['history'];
+  };
   let markedRows: MarkedRow[] = [];
+  let historyRows: HistoryRow[] = [];
   let editingMatch: MarkedRow | null = null;
   const scoreStatus = root.querySelector<HTMLElement>('[data-scores-status]')!;
   const scoreBody = root.querySelector<HTMLElement>('[data-score-rows]')!;
@@ -1519,6 +1565,11 @@ const scoresHref = url('/captains/admin/minigame/');
   const scoreOpen = root.querySelector<HTMLAnchorElement>('[data-score-open]')!;
   const scoreNameA = scoreEdit.querySelector<HTMLInputElement>('[data-score-a]')!;
   const scoreNameB = scoreEdit.querySelector<HTMLInputElement>('[data-score-b]')!;
+  const historyStatus = root.querySelector<HTMLElement>('[data-history-status]')!;
+  const historyBody = root.querySelector<HTMLElement>('[data-history-rows]')!;
+  const historyView = root.querySelector<HTMLElement>('[data-history-view]')!;
+  const historyTitle = root.querySelector<HTMLElement>('[data-history-title]')!;
+  const historyTape = root.querySelector<HTMLElement>('[data-history-tape]')!;
   const liveStatus = root.querySelector<HTMLElement>('[data-live-status]')!;
   const liveBody = root.querySelector<HTMLElement>('[data-live-rows]')!;
   const liveClear = root.querySelector<HTMLButtonElement>('[data-live-clear]')!;
@@ -1618,14 +1669,14 @@ const scoresHref = url('/captains/admin/minigame/');
     return games;
   }
 
-  function paintScoreTape(row: MarkedRow) {
-    scoreTape.replaceChildren();
+  function paintScoreTape(row: Pick<MarkedRow, 'playerA' | 'playerB' | 'history'>, host: HTMLElement = scoreTape) {
+    host.replaceChildren();
     const games = row.history?.games ?? [];
     const played = games.filter((rallies) => rallies.length);
     if (!played.length) {
       const empty = document.createElement('p');
       empty.textContent = 'This match has no rally list yet. Open Marking to mark the points.';
-      scoreTape.append(empty);
+      host.append(empty);
       return;
     }
     games.forEach((rallies, index) => {
@@ -1664,8 +1715,17 @@ const scoresHref = url('/captains/admin/minigame/');
         body.append(line);
       }
       game.append(heading, total, body);
-      scoreTape.append(game);
+      host.append(game);
     });
+  }
+
+  function visibleBox(on: boolean, label: string, onChange: (checked: boolean, box: HTMLInputElement) => void) {
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = on;
+    box.setAttribute('aria-label', label);
+    box.addEventListener('change', () => onChange(box.checked, box));
+    return box;
   }
 
   function paintMarkedMatches() {
@@ -1673,7 +1733,7 @@ const scoresHref = url('/captains/admin/minigame/');
     if (!markedRows.length) {
       const row = document.createElement('tr');
       const cell = document.createElement('td');
-      cell.colSpan = 5;
+      cell.colSpan = 6;
       cell.textContent = 'No marked matches yet.';
       row.append(cell);
       scoreBody.append(row);
@@ -1691,6 +1751,10 @@ const scoresHref = url('/captains/admin/minigame/');
       score.textContent = match.score;
       const marker = document.createElement('td');
       marker.textContent = match.marker;
+      const shown = document.createElement('td');
+      shown.append(visibleBox(Boolean(match.visible), `Show ${match.playerA} v ${match.playerB} to end users`, (checked, box) => {
+        void setMarkedVisible(match.id, checked, box);
+      }));
       const action = document.createElement('td');
       const button = document.createElement('button');
       button.type = 'button';
@@ -1703,7 +1767,7 @@ const scoresHref = url('/captains/admin/minigame/');
       remove.textContent = 'Delete';
       remove.addEventListener('click', () => void deleteMarkedMatch(match.id));
       action.append(button, remove);
-      row.append(when, players, score, marker, action);
+      row.append(when, players, score, marker, shown, action);
       scoreBody.append(row);
     }
   }
@@ -1737,6 +1801,98 @@ const scoresHref = url('/captains/admin/minigame/');
     paintMarkedMatches();
     scoreStatus.textContent = markedRows.length ? '' : 'No marked matches yet.';
     scoresLoaded = true;
+  }
+
+  function paintCommentaryHistory() {
+    historyBody.replaceChildren();
+    if (!historyRows.length) {
+      const row = document.createElement('tr');
+      const cell = document.createElement('td');
+      cell.colSpan = 6;
+      cell.textContent = 'No commentary matches yet.';
+      row.append(cell);
+      historyBody.append(row);
+      return;
+    }
+    for (const match of historyRows) {
+      const row = document.createElement('tr');
+      const when = document.createElement('td');
+      when.textContent = scoreWhen(match.endedAt);
+      const players = document.createElement('td');
+      players.textContent = `${match.playerA} v ${match.playerB}`;
+      const score = document.createElement('td');
+      score.textContent = match.score;
+      const marker = document.createElement('td');
+      marker.textContent = match.marker;
+      const shown = document.createElement('td');
+      shown.append(visibleBox(Boolean(match.visible), `Show ${match.playerA} v ${match.playerB} to end users`, (checked, box) => {
+        void setCommentaryVisible(match.id, checked, box);
+      }));
+      const action = document.createElement('td');
+      const points = document.createElement('button');
+      points.type = 'button';
+      points.className = 'btn btn--ghost btn--sm';
+      points.textContent = 'Points';
+      points.addEventListener('click', () => void openCommentaryMatch(match.id));
+      action.append(points);
+      row.append(when, players, score, marker, shown, action);
+      historyBody.append(row);
+    }
+  }
+
+  async function loadCommentaryHistory() {
+    historyStatus.textContent = 'Loading commentary history…';
+    const { data, error } = await supabase.rpc('admin_commentary_history');
+    if (error) {
+      const message = error.message ?? '';
+      historyStatus.textContent = error.code === 'PGRST202' || /could not find the function/i.test(message) ? 'Commentary history is not on the database yet.' : message;
+      return;
+    }
+    historyRows = (data ?? []) as HistoryRow[];
+    paintCommentaryHistory();
+    historyStatus.textContent = historyRows.length ? '' : 'No commentary matches yet.';
+  }
+
+  async function setMarkedVisible(id: number, visible: boolean, box: HTMLInputElement) {
+    scoreStatus.textContent = visible ? 'Showing this match to end users…' : 'Hiding this match from end users…';
+    const { error } = await supabase.rpc('admin_set_marked_visible', { p_id: id, p_visible: visible });
+    if (error) {
+      box.checked = !visible;
+      scoreStatus.textContent = error.message;
+      return;
+    }
+    scoreStatus.textContent = visible ? 'Visible on Match commentary.' : 'Hidden from Match commentary.';
+    await loadCommentaryHistory();
+  }
+
+  async function setCommentaryVisible(id: number, visible: boolean, box: HTMLInputElement) {
+    historyStatus.textContent = visible ? 'Showing this match to end users…' : 'Hiding this match from end users…';
+    const { error } = await supabase.rpc('admin_set_commentary_visible', { p_id: id, p_visible: visible });
+    if (error) {
+      box.checked = !visible;
+      historyStatus.textContent = error.message;
+      return;
+    }
+    historyStatus.textContent = visible ? 'Visible on Match commentary.' : 'Hidden from Match commentary.';
+    scoresLoaded = false;
+    await loadMarkedMatches();
+  }
+
+  async function openCommentaryMatch(id: number) {
+    historyStatus.textContent = 'Opening the points…';
+    const { data, error } = await supabase.rpc('admin_commentary_match', { p_id: id });
+    if (error || !data) {
+      historyStatus.textContent = error?.message || 'That match could not be opened.';
+      return;
+    }
+    const match = data as HistoryRow;
+    historyTitle.textContent = `${match.playerA} v ${match.playerB}`;
+    paintScoreTape(
+      { playerA: match.playerA, playerB: match.playerB, history: match.history },
+      historyTape,
+    );
+    historyView.hidden = false;
+    historyStatus.textContent = '';
   }
 
   scoreEdit.addEventListener('submit', async (event) => {
@@ -1804,6 +1960,7 @@ const scoresHref = url('/captains/admin/minigame/');
     if (next === 'beds-closed' && !bedsClosedLoaded) void loadBedsClosed();
     if (next === 'scores' && !scoresLoaded) {
       void loadMarkedMatches();
+      void loadCommentaryHistory();
       void loadStaleMatches();
     }
   };
@@ -4985,39 +5142,39 @@ const scoresHref = url('/captains/admin/minigame/');
     padding: 0.55rem 0.7rem;
     font: inherit;
   }
-  #setup-app [data-score-tape] {
+  #setup-app .score-tape {
     display: flex;
     gap: 0.75rem;
     overflow-x: auto;
   }
-  #setup-app [data-score-tape] :global(.stem) {
+  #setup-app .score-tape :global(.stem) {
     flex: 1 0 10.5rem;
     min-width: 10.5rem;
   }
-  #setup-app [data-score-tape] :global(.stem-head),
-  #setup-app [data-score-tape] :global(.stem-score) {
+  #setup-app .score-tape :global(.stem-head),
+  #setup-app .score-tape :global(.stem-score) {
     margin: 0;
     text-align: center;
     font-weight: 700;
   }
-  #setup-app [data-score-tape] :global(.stem-row) {
+  #setup-app .score-tape :global(.stem-row) {
     display: grid;
     grid-template-columns: 1fr 2px 1fr;
     align-items: center;
     min-height: 2.2rem;
   }
-  #setup-app [data-score-tape] :global(.stem-rail) {
+  #setup-app .score-tape :global(.stem-rail) {
     background: #e0a800;
     align-self: stretch;
   }
-  #setup-app [data-score-tape] :global(.cluster) {
+  #setup-app .score-tape :global(.cluster) {
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
   }
-  #setup-app [data-score-tape] :global(.cluster--a) { justify-self: end; margin-right: 0.3rem; }
-  #setup-app [data-score-tape] :global(.cluster--b) { justify-self: start; margin-left: 0.3rem; }
-  #setup-app [data-score-tape] :global(.pip) {
+  #setup-app .score-tape :global(.cluster--a) { justify-self: end; margin-right: 0.3rem; }
+  #setup-app .score-tape :global(.cluster--b) { justify-self: start; margin-left: 0.3rem; }
+  #setup-app .score-tape :global(.pip) {
     width: 2rem;
     height: 2rem;
     border-radius: 50%;
@@ -5030,8 +5187,8 @@ const scoresHref = url('/captains/admin/minigame/');
     font-size: 0.78rem;
     font-weight: 700;
   }
-  #setup-app [data-score-tape] :global(.pip.is-stroke) { border-width: 3px; border-color: #0e2744; }
-  #setup-app [data-score-tape] :global(.box-mark) { font-size: 0.75rem; font-weight: 700; }
+  #setup-app .score-tape :global(.pip.is-stroke) { border-width: 3px; border-color: #0e2744; }
+  #setup-app .score-tape :global(.box-mark) { font-size: 0.75rem; font-weight: 700; }
   #setup-app [data-score-rows] .btn + .btn { margin-left: 0.35rem; }
   #setup-app .beds-search {
     display: flex;
@@ -5074,6 +5231,28 @@ const scoresHref = url('/captains/admin/minigame/');
     padding: 0 0.5rem;
     font-size: 0.8rem;
     background: #fff;
+  }
+  #setup-app .tag-list button[data-beds-year='2026'],
+  #setup-app td .tag-list li.year-2026 {
+    background: #e7eef8;
+    color: #0e2744;
+    border-color: #1d4e89;
+  }
+  #setup-app .tag-list button[data-beds-year='2026'][aria-pressed='true'] {
+    background: #0e2744;
+    color: #fff;
+    border-color: #0e2744;
+  }
+  #setup-app .tag-list button[data-beds-year='2027'],
+  #setup-app td .tag-list li.year-2027 {
+    background: #fff1e8;
+    color: #9a3412;
+    border-color: #f15a22;
+  }
+  #setup-app .tag-list button[data-beds-year='2027'][aria-pressed='true'] {
+    background: #f15a22;
+    color: #fff;
+    border-color: #f15a22;
   }
   #setup-app .db-charts {
     display: grid;
@@ -5652,6 +5831,14 @@ const scoresHref = url('/captains/admin/minigame/');
     padding: 0.3rem 0.45rem;
     font: inherit;
     font-size: 0.82rem;
+  }
+  #setup-app .overview td input[type='checkbox'] {
+    width: 1.15rem;
+    min-width: 1.15rem;
+    height: 1.15rem;
+    margin: 0;
+    padding: 0;
+    accent-color: #f15a22;
   }
   #setup-app .overview td input::placeholder {
     color: #5c6d80;
