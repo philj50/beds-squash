@@ -24,6 +24,18 @@
       "grade": "A Grade"
     },
     {
+      "name": "Charlie Jenkins",
+      "club": "",
+      "seed": "",
+      "grade": "A Grade"
+    },
+    {
+      "name": "Daniel Evans",
+      "club": "",
+      "seed": "",
+      "grade": "A Grade"
+    },
+    {
       "name": "Max Lloyd",
       "club": "",
       "seed": "",
@@ -31,6 +43,12 @@
     },
     {
       "name": "Michael Sturgeon",
+      "club": "",
+      "seed": "",
+      "grade": "A Grade"
+    },
+    {
+      "name": "Michael Turner",
       "club": "",
       "seed": "",
       "grade": "A Grade"
@@ -48,13 +66,37 @@
       "grade": "A Grade"
     },
     {
+      "name": "Lindsey Ransley",
+      "club": "",
+      "seed": "",
+      "grade": "Ladies B Grade"
+    },
+    {
+      "name": "Alex Buckhurst",
+      "club": "",
+      "seed": "",
+      "grade": "B Grade"
+    },
+    {
       "name": "Arif Khanzada",
       "club": "",
       "seed": "",
       "grade": "B Grade"
     },
     {
+      "name": "Brook Harris",
+      "club": "",
+      "seed": "",
+      "grade": "B Grade"
+    },
+    {
       "name": "Danny Hall",
+      "club": "",
+      "seed": "",
+      "grade": "B Grade"
+    },
+    {
+      "name": "George Collins",
       "club": "",
       "seed": "",
       "grade": "B Grade"
@@ -102,11 +144,41 @@
       "grade": "C Grade"
     },
     {
+      "name": "Joe Wille",
+      "club": "",
+      "seed": "",
+      "grade": "C Grade"
+    },
+    {
+      "name": "Paul Kyndt",
+      "club": "",
+      "seed": "",
+      "grade": "C Grade"
+    },
+    {
+      "name": "Sam Swann",
+      "club": "",
+      "seed": "",
+      "grade": "C Grade"
+    },
+    {
+      "name": "Lee Robinson",
+      "club": "",
+      "seed": "",
+      "grade": "Over 55s"
+    },
+    {
+      "name": "MICHAEL BOWMAN",
+      "club": "",
+      "seed": "",
+      "grade": "Over 55s"
+    },
+    {
       "name": "Tony Rumbold",
       "club": "",
       "seed": "",
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-10-30T10:22:09.511Z"
+  "syncedAt": "2026-11-04T00:28:35.989Z"
 }

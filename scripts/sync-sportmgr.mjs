@@ -5,7 +5,7 @@
  *   node --use-system-ca scripts/sync-sportmgr.mjs
  *
  * --snapshot writes src/data/sportmgr/<id>.json and does not touch the database.
- * Without it, rows are upserted when SUPABASE_SERVICE_ROLE_KEY is set.
+ * Without it, snapshots are also refreshed and rows are upserted in the database.
  * The key is read from the environment or .env and is never printed.
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -39,12 +39,11 @@ if (!snapshotOnly && !key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set
 for (const event of events) {
   const tournament = await fetchTournament(event.sportmgr);
   console.log(`${tournament.title}: ${tournament.entries.length} entries, ${tournament.matches.length} matches`);
-  if (snapshotOnly) {
-    const dir = join(ROOT, 'src', 'data', 'sportmgr');
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, `${tournament.id}.json`), `${JSON.stringify(tournament, null, 2)}\n`);
-    continue;
-  }
+  // The public page uses this snapshot when live database tables are unavailable.
+  const dir = join(ROOT, 'src', 'data', 'sportmgr');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, `${tournament.id}.json`), `${JSON.stringify(tournament, null, 2)}\n`);
+  if (snapshotOnly) continue;
   try {
     await rest('sportmgr_tournaments?on_conflict=id', {
       method: 'POST',
@@ -54,8 +53,8 @@ for (const event of events) {
   } catch (error) {
     const message = String(error);
     if (message.includes('PGRST205') || message.includes('Could not find the table')) {
-      console.log('The Sport Manager tables are not in the database yet, so nothing was stored.');
-      process.exit(0);
+      console.warn(`Database tables unavailable for ${tournament.id}; the public JSON snapshot was refreshed instead.`);
+      continue;
     }
     throw error;
   }
