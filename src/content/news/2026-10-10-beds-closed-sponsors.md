@@ -58,8 +58,8 @@ A first look at the confirmed sponsors — at least so far — for the [Bedfords
   <a href="https://www.openhousebedford.co.uk/" target="_blank" rel="noopener noreferrer"><img src="/uploads/news/open-house-v2.png" alt="Open House" loading="lazy" decoding="async" /></a>
 </div>
 <div class="sponsor-card">
-  <p><a href="https://www.instagram.com/samo.sports/">samo sports</a></p>
-  <a href="https://www.instagram.com/samo.sports/"><img src="/uploads/news/samo-sports.png" alt="samo sports" loading="lazy" decoding="async" /></a>
+  <p><a href="https://www.samosports.com/" target="_blank" rel="noopener noreferrer">samo sports</a></p>
+  <a href="https://www.samosports.com/" target="_blank" rel="noopener noreferrer"><img src="/uploads/news/samo-sports.png" alt="samo sports" loading="lazy" decoding="async" /></a>
 </div>
 <div class="sponsor-card">
   <p><a href="https://www.specsavers.co.uk/stores/bedford" target="_blank" rel="noopener noreferrer">Specsavers</a></p>
