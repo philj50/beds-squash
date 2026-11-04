@@ -1,6 +1,7 @@
 ---
 import Base from '@/layouts/Base.astro';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
+import { COMMENTARY_NOTES } from '@/lib/commentary-notes';
 import { url } from '@/lib/site';
 ---
 
@@ -18,10 +19,12 @@ import { url } from '@/lib/site';
         <input type="checkbox" data-say />
         Say it out loud
       </label>
-      <p class="ntfy">
-        <a href="https://ntfy.sh/beds_commentary_1234" target="_blank" rel="noopener noreferrer">Subscribe on ntfy</a>
-        for a note when a match goes on. The topic is beds_commentary_1234.
-      </p>
+      {COMMENTARY_NOTES && (
+        <p class="ntfy">
+          <a href="https://ntfy.sh/beds_commentary_1234" target="_blank" rel="noopener noreferrer">Subscribe on ntfy</a>
+          for a note when a match goes on. The topic is beds_commentary_1234.
+        </p>
+      )}
       <p class="status" data-status role="status"></p>
 
       <div data-picker>
