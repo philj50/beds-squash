@@ -23,7 +23,7 @@ import { url } from '@/lib/site';
         Voice
         <select data-voice></select>
       </label>
-      <p class="say-note">Take the phone off silent to hear the voice and the Come on ping.</p>
+      <p class="say-note">Take the phone off silent to hear the voice, Come on, Get in, and the ping.</p>
       {COMMENTARY_NOTES && (
         <p class="ntfy">
           <a href="https://ntfy.sh/beds_commentary_1234" target="_blank" rel="noopener noreferrer">Subscribe on ntfy</a>
@@ -52,13 +52,14 @@ import { url } from '@/lib/site';
         <ul class="game-times" data-times></ul>
         <p class="call" data-call></p>
         <p class="shout-banner" data-shout-banner></p>
-        <p class="watchers" data-watchers></p>
-        <ul class="shout-log" data-shout-log></ul>
-        <div class="shout-bar" data-shout-bar>
-          <button type="button" data-shout="a">Come on</button>
-          <button type="button" data-shout="b">Come on</button>
-          <button type="button" data-shout="yes">Yes!</button>
-          <button type="button" data-shout="clap" aria-label="Clap">👏</button>
+        <p class="watchers" data-watchers hidden></p>
+        <div class="shout-bar" data-shout-bar hidden>
+          <button type="button" data-shout="strong">Strong</button>
+          <button type="button" data-shout="love">Love</button>
+          <button type="button" data-shout="happy">Happy</button>
+          <button type="button" data-shout="sad">Sad</button>
+          <button type="button" data-shout="comeon">Come on</button>
+          <button type="button" data-shout="getin">Get in</button>
         </div>
         <details class="points-history">
           <summary>Points</summary>
@@ -123,7 +124,6 @@ import { url } from '@/lib/site';
   const archiveList = root.querySelector<HTMLElement>('[data-archive]')!;
   const archiveTitle = root.querySelector<HTMLElement>('[data-archive-title]')!;
   const shoutBar = root.querySelector<HTMLElement>('[data-shout-bar]')!;
-  const shoutLog = root.querySelector<HTMLElement>('[data-shout-log]')!;
   const shoutBanner = root.querySelector<HTMLElement>('[data-shout-banner]')!;
   const watchersEl = root.querySelector<HTMLElement>('[data-watchers]')!;
   const historyBody = root.querySelector<HTMLElement>('[data-history-body]')!;
@@ -145,7 +145,18 @@ import { url } from '@/lib/site';
   let lastShoutId = 0;
   let shoutsHeard = false;
   const seenShouts = new Set<number>();
-  let liveNames = { a: '', b: '' };
+  const shoutWords: Record<string, string> = {
+    strong: 'Strong',
+    love: 'Love',
+    happy: 'Happy',
+    sad: 'Sad',
+    comeon: 'Come on',
+    getin: 'Get in',
+  };
+  const spokenShouts: Record<string, string> = {
+    comeon: 'Come on',
+    getin: 'Get in',
+  };
   let bannerTimer = 0;
   sayBox.checked = sayScore;
 
@@ -269,10 +280,6 @@ import { url } from '@/lib/site';
     }
   }
 
-  function firstWord(name: string) {
-    return name.trim().split(/\s+/)[0] || name;
-  }
-
   function paintHistory(restored: ReturnType<typeof restoreMatch>) {
     historyBody.replaceChildren();
     if (!restored) {
@@ -330,20 +337,11 @@ import { url } from '@/lib/site';
     historyBody.append(sheet);
   }
 
-  function paintComeOn(names: { a: string; b: string }) {
-    liveNames = names;
-    const comeA = root.querySelector<HTMLButtonElement>('[data-shout="a"]');
-    const comeB = root.querySelector<HTMLButtonElement>('[data-shout="b"]');
-    if (comeA) comeA.textContent = `Come on ${firstWord(names.a)}`;
-    if (comeB) comeB.textContent = `Come on ${firstWord(names.b)}`;
-  }
-
   function shoutText(shout: Shout) {
+    const words = shoutWords[shout.kind];
+    if (!words) return '';
     const who = signedIn ? shout.name : shout.name === 'Someone' ? 'Someone' : publicPlayerName(shout.name);
-    if (shout.kind === 'clap') return `${who} 👏`;
-    if (shout.kind === 'yes') return `${who}: Yes!`;
-    const player = shout.kind === 'b' ? liveNames.b : liveNames.a;
-    return `${who}: Come on ${firstWord(player)}`;
+    return `${who}: ${words}`;
   }
 
   let audioCtx: AudioContext | null = null;
@@ -372,12 +370,12 @@ import { url } from '@/lib/site';
     const ctx = shoutAudio();
     if (!ctx) return;
     const now = ctx.currentTime;
-    const start = kind === 'b' ? 494 : kind === 'yes' ? 784 : kind === 'clap' ? 392 : 659;
+    const start = kind === 'sad' ? 294 : kind === 'getin' ? 494 : kind === 'strong' ? 523 : kind === 'love' ? 698 : kind === 'happy' ? 880 : 659;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(start, now);
-    if (kind === 'a' || kind === 'b') osc.frequency.exponentialRampToValueAtTime(start * 1.5, now + 0.09);
+    if (kind === 'comeon' || kind === 'getin') osc.frequency.exponentialRampToValueAtTime(start * 1.5, now + 0.09);
     gain.gain.setValueAtTime(0.0001, now);
     gain.gain.exponentialRampToValueAtTime(0.18, now + 0.015);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.26);
@@ -391,17 +389,16 @@ import { url } from '@/lib/site';
     if (!shout.id || seenShouts.has(shout.id)) return;
     seenShouts.add(shout.id);
     if (shout.id > lastShoutId) lastShoutId = shout.id;
-    if (sound && !takeOwnPing(shout.kind)) pingShout(shout.kind);
+    const own = sound ? takeOwnPing(shout.kind) : false;
+    if (sound && !own) pingShout(shout.kind);
     const text = shoutText(shout);
+    if (!text) return;
+    if (sound && !own && spokenShouts[shout.kind] && sayScore && speechUnlocked()) followScore(spokenShouts[shout.kind]);
     shoutBanner.textContent = text;
     window.clearTimeout(bannerTimer);
     bannerTimer = window.setTimeout(() => {
       shoutBanner.textContent = '';
-    }, 4000);
-    const item = document.createElement('li');
-    item.textContent = text;
-    shoutLog.prepend(item);
-    while (shoutLog.children.length > 6) shoutLog.lastElementChild?.remove();
+    }, 2500);
   }
 
   function clearShouts() {
@@ -409,9 +406,9 @@ import { url } from '@/lib/site';
     shoutsHeard = false;
     ownPings.clear();
     seenShouts.clear();
-    shoutLog.replaceChildren();
     shoutBanner.textContent = '';
     watchersEl.textContent = '';
+    watchersEl.hidden = true;
   }
 
   function peopleLine(names: string[], guests: number) {
@@ -422,10 +419,12 @@ import { url } from '@/lib/site';
   }
 
   function paintRoom(room: Room | null, ended: boolean) {
-    if (!room) {
+    if (!signedIn || !room) {
       watchersEl.textContent = '';
+      watchersEl.hidden = true;
       return;
     }
+    watchersEl.hidden = false;
     const now = peopleLine(Array.isArray(room.now) ? room.now : [], Number(room.guestsNow) || 0);
     const looked = peopleLine(Array.isArray(room.looked) ? room.looked : [], Number(room.guestsEarlier) || 0);
     const parts = [];
@@ -452,7 +451,7 @@ import { url } from '@/lib/site';
     }
     picker.hidden = true;
     live.hidden = false;
-    shoutBar.hidden = quiet || !roomReady;
+    shoutBar.hidden = quiet || !roomReady || !signedIn;
     root.querySelector<HTMLElement>('[data-a]')!.textContent = names.a;
     root.querySelector<HTMLElement>('[data-b]')!.textContent = names.b;
     root.querySelector<HTMLElement>('[data-updated]')!.textContent = quiet && row.endedAt ? endedLabel(row.endedAt) : updatedAgo(row.updatedAt);
@@ -461,7 +460,6 @@ import { url } from '@/lib/site';
     clockLive = !quiet && Boolean(shared.clock);
     paintClock();
     paintTimes(shared.line, shared.times);
-    paintComeOn(names);
     const marker = root.querySelector<HTMLElement>('[data-marker]')!;
     const note = root.querySelector<HTMLElement>('[data-note]')!;
     const call = root.querySelector<HTMLElement>('[data-call]')!;
@@ -648,14 +646,23 @@ import { url } from '@/lib/site';
     const shouts = (Array.isArray(data) ? (data as Shout[]) : []).slice().sort((a, b) => a.id - b.id);
     const sound = shoutsHeard;
     shoutsHeard = true;
-    for (const shout of shouts) showShout(shout, sound);
+    if (!sound) {
+      for (const shout of shouts) if (shout.id > lastShoutId) lastShoutId = shout.id;
+      return;
+    }
+    for (const shout of shouts) showShout(shout, true);
   }
 
   async function sendShout(kind: string) {
-    if (!matchId || !roomReady || !kind) return;
+    if (!signedIn || !matchId || !roomReady || !kind) return;
     shoutAudio();
     pingShout(kind);
     noteOwnPing(kind);
+    const spoken = spokenShouts[kind];
+    if (spoken && sayScore) {
+      voiceArmed = true;
+      speakScore(spoken);
+    }
     const { data, error } = await supabase.rpc('commentary_shout', { p_live: matchId, p_kind: kind, p_guest: guestToken() });
     if (error || !(data as { ok?: boolean; id?: number } | null)?.ok) takeOwnPing(kind);
     if (error) {
@@ -700,8 +707,6 @@ import { url } from '@/lib/site';
     history.replaceState(null, '', `${url.pathname}${url.search}`);
     paintLive(row, false, true);
     paintRoom(row.room ?? null, true);
-    const shouts = (Array.isArray(row.shouts) ? row.shouts : []).slice().sort((a, b) => a.id - b.id);
-    for (const shout of shouts) showShout(shout);
   }
 
   function currentCall() {
@@ -955,19 +960,11 @@ import { url } from '@/lib/site';
     line-height: 1.15;
   }
   .shout-banner:empty,
-  .watchers:empty,
-  .shout-log:empty {
+  .watchers:empty {
     display: none;
   }
   .watchers {
     margin: 0.75rem 0 0;
-    font-weight: 700;
-  }
-  .shout-log {
-    list-style: none;
-    margin: 0.35rem 0 0;
-    padding: 0;
-    text-align: center;
     font-weight: 700;
   }
   .shout-bar {
@@ -985,9 +982,6 @@ import { url } from '@/lib/site';
     border-radius: 12px;
     background: #fff;
     cursor: pointer;
-  }
-  .shout-bar button:nth-child(n + 3) {
-    font-size: 1.35rem;
   }
   .points-history {
     margin-top: 0.9rem;
