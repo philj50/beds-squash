@@ -246,7 +246,7 @@ const scoresHref = url('/captains/admin/minigame/');
             <h3>Commentary history</h3>
             <details class="notes">
               <summary>Notes</summary>
-              <p class="muted small">Every match that has been on Match commentary, including the points. Untick Visible to hide that match from end users. It stays here.</p>
+              <p class="muted small">Every match that has been on Match commentary, including the points. Untick Visible to hide that match from end users. It stays here. Delete removes it from this list and from Earlier matches. A saved score under Saved stays, and its Visible tick is cleared.</p>
             </details>
             <p class="muted small" data-history-status role="status"></p>
             <div class="overview-box">
@@ -1614,6 +1614,7 @@ const scoresHref = url('/captains/admin/minigame/');
   };
   let markedRows: MarkedRow[] = [];
   let historyRows: HistoryRow[] = [];
+  let historyOpenId: number | null = null;
   let editingMatch: MarkedRow | null = null;
   const scoreStatus = root.querySelector<HTMLElement>('[data-scores-status]')!;
   const scoreBody = root.querySelector<HTMLElement>('[data-score-rows]')!;
@@ -1891,7 +1892,12 @@ const scoresHref = url('/captains/admin/minigame/');
       points.className = 'btn btn--ghost btn--sm';
       points.textContent = 'Points';
       points.addEventListener('click', () => void openCommentaryMatch(match.id));
-      action.append(points);
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn btn--ghost btn--sm';
+      remove.textContent = 'Delete';
+      remove.addEventListener('click', () => void deleteCommentaryMatch(match.id));
+      action.append(points, remove);
       row.append(when, players, score, marker, shown, action);
       historyBody.append(row);
     }
@@ -1943,6 +1949,7 @@ const scoresHref = url('/captains/admin/minigame/');
       return;
     }
     const match = data as HistoryRow;
+    historyOpenId = match.id;
     historyTitle.textContent = `${match.playerA} v ${match.playerB}`;
     paintScoreTape(
       { playerA: match.playerA, playerB: match.playerB, history: match.history },
@@ -1972,6 +1979,25 @@ const scoresHref = url('/captains/admin/minigame/');
     scoresLoaded = false;
     await loadMarkedMatches();
   });
+
+  async function deleteCommentaryMatch(id: number) {
+    if (!confirm('Remove this match from commentary history?')) return;
+    historyStatus.textContent = 'Removing this match…';
+    const { error } = await supabase.rpc('admin_delete_commentary_match', { p_id: id });
+    if (error) {
+      historyStatus.textContent = error.message;
+      return;
+    }
+    if (historyOpenId === id) {
+      historyOpenId = null;
+      historyView.hidden = true;
+      historyTape.replaceChildren();
+    }
+    scoresLoaded = false;
+    await loadCommentaryHistory();
+    await loadMarkedMatches();
+    if (!historyRows.some((row) => row.id === id)) historyStatus.textContent = 'Removed from commentary history.';
+  }
 
   async function deleteMarkedMatch(id: number) {
     if (!confirm('Remove this marked match?')) return;
@@ -5203,6 +5229,9 @@ const scoresHref = url('/captains/admin/minigame/');
     gap: 0.75rem;
     max-width: 36rem;
     margin-top: 1rem;
+  }
+  #setup-app [data-history-rows] .btn + .btn {
+    margin-left: 0.4rem;
   }
   #setup-app .score-edit label {
     display: grid;
