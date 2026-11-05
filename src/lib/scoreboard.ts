@@ -514,6 +514,17 @@ export function hasProfanity(raw: string, extra: Iterable<string> = []): boolean
   return stopped(tight);
 }
 
+/** The same referee lines the minigame uses when a name is not fit for the court. */
+const STOPPED_NAME_LINES = [
+  'Let. That name hit the tin. Try one you would put on a trophy.',
+  'Conduct stroke. That name is off court.',
+  'No let. The referee will not read that one out. Have another go.',
+];
+
+export function stoppedNameLine() {
+  return STOPPED_NAME_LINES[Math.floor(Math.random() * STOPPED_NAME_LINES.length)]!;
+}
+
 export function cleanName(raw: string): string | null {
   const clean = raw.trim().replace(/\s+/g, ' ');
   if (clean.length < 2 || clean.length > 80) return null;

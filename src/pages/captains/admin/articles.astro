@@ -201,7 +201,7 @@ const siteArticlesJson = JSON.stringify(siteArticles).replaceAll('<', '\\u003c')
     if (button) {
       statusEl.textContent = 'Approving…';
       const { error } = await supabase.rpc('approve_match_article', { p_id: Number(button.dataset.approve) });
-      statusEl.textContent = error ? error.message : 'Approved. It will be published on the next daily run.';
+      statusEl.textContent = error ? error.message : 'Approved. It will be published on the next SquashLevels run.';
       if (!error) await showSession();
       return;
     }

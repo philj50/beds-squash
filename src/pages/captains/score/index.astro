@@ -37,8 +37,8 @@ const names = [
                 <input name="player-a" autocomplete="off" autocapitalize="words" required placeholder="First player" />
                 <div class="picks" data-picks="a" hidden></div>
               </span>
-              <span class="sl-note" data-sl="a" hidden></span>
               <span class="name-warn" data-warn="a" hidden></span>
+              <span class="sl-note" data-sl="a" hidden></span>
             </label>
             <label>
               Player B
@@ -46,8 +46,8 @@ const names = [
                 <input name="player-b" autocomplete="off" autocapitalize="words" required placeholder="Second player" />
                 <div class="picks" data-picks="b" hidden></div>
               </span>
-              <span class="sl-note" data-sl="b" hidden></span>
               <span class="name-warn" data-warn="b" hidden></span>
+              <span class="sl-note" data-sl="b" hidden></span>
             </label>
           </div>
           <div class="par" role="group" aria-label="Game length">
@@ -209,6 +209,7 @@ const names = [
     canChooseServer,
     cleanName,
     hasProfanity,
+    stoppedNameLine,
     currentGame,
     currentRallies,
     finishedGames,
@@ -432,13 +433,20 @@ const names = [
   }
 
   let blockedWords: string[] = [];
+  const warnLine = { a: '', b: '' };
 
   function paintNameWarn(side: 'a' | 'b') {
     const input = side === 'a' ? inputA : inputB;
     const note = root.querySelector<HTMLElement>(`[data-warn="${side}"]`)!;
     const bad = hasProfanity(input.value, blockedWords);
+    if (!bad) warnLine[side] = '';
+    else if (!warnLine[side]) warnLine[side] = stoppedNameLine();
+    const line = warnLine[side];
     note.hidden = !bad;
-    note.textContent = bad ? 'Choose a name without swear words.' : '';
+    note.textContent = bad ? line : '';
+    input.classList.toggle('is-stopped', bad);
+    input.setAttribute('aria-invalid', bad ? 'true' : 'false');
+    input.setCustomValidity(bad ? line : '');
     return bad;
   }
 
@@ -532,6 +540,7 @@ const names = [
           event.preventDefault();
           input.value = name;
           box.hidden = true;
+          paintNameWarn(which);
           paintLevels();
         });
         box.append(button);
@@ -1492,7 +1501,7 @@ const names = [
     const rudeA = paintNameWarn('a');
     const rudeB = paintNameWarn('b');
     if (rudeA || rudeB) {
-      show('Choose names without swear words.');
+      show(warnLine.a || warnLine.b);
       return;
     }
     if (!a || !b) {
@@ -2161,6 +2170,10 @@ const names = [
     padding: 0.7rem 0.75rem;
     font: inherit;
     font-size: 16px;
+  }
+  input.is-stopped {
+    border-color: #b42318;
+    box-shadow: 0 0 0 1px #b42318;
   }
   .board {
     display: grid;

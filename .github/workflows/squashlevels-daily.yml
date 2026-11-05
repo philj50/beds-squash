@@ -2,8 +2,8 @@ name: SquashLevels and match article
 
 on:
   schedule:
-    # After the 06:00 League Master import. 07:30 UTC.
-    - cron: '30 7 * * *'
+    # After each League Master import. 07:30 and 19:30 UTC.
+    - cron: '30 7,19 * * *'
   workflow_dispatch:
     inputs:
       date:

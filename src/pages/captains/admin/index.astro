@@ -286,10 +286,12 @@ const scoresHref = url('/captains/admin/minigame/');
               <label>
                 Player A
                 <input data-score-a required />
+                <span class="name-warn" data-score-warn="a" hidden></span>
               </label>
               <label>
                 Player B
                 <input data-score-b required />
+                <span class="name-warn" data-score-warn="b" hidden></span>
               </label>
               <div class="score-tape" data-score-tape></div>
               <p class="actions">
@@ -785,7 +787,7 @@ const scoresHref = url('/captains/admin/minigame/');
   import { loadAccount, noteActivity, privateStop, sendToLogin, stopMessage, type Account } from '@/lib/account';
   import { ENTRY_GROUPS } from '@/lib/junior-age';
   import { compareCellText, sortMarkupRows, watchSortableTables } from '@/lib/table-sort';
-  import { gameStem, hasProfanity, unpackLiveScore } from '@/lib/scoreboard';
+  import { gameStem, hasProfanity, stoppedNameLine, unpackLiveScore } from '@/lib/scoreboard';
 
   type Person = { id: string; display_name: string; email: string | null; is_admin: boolean };
   type Club = { slug: string; name: string; contact_name: string | null; contact_email: string | null; leaguemaster_club_id?: string | null };
@@ -1258,7 +1260,7 @@ const scoresHref = url('/captains/admin/minigame/');
       accountSecret: 'SQUASHLEVELS_EMAIL',
       passwordSecret: 'SQUASHLEVELS_PASSWORD',
       tables: ['squashlevels_players', 'squashlevels_matches', 'squashlevels_ratings', 'squashlevels_names'],
-      when: 'Daily at 07:30 UTC',
+      when: 'Morning and evening, 07:30 and 19:30 UTC',
     },
     {
       slug: 'leaguemaster',
@@ -1266,7 +1268,7 @@ const scoresHref = url('/captains/admin/minigame/');
       accountSecret: 'LEAGUEMASTER_USERNAME',
       passwordSecret: 'LEAGUEMASTER_PASSWORD',
       tables: ['fixtures', 'league_teams', 'league_seasons', 'divisions'],
-      when: 'Daily at 06:00 UTC',
+      when: 'Morning and evening, 06:00 and 18:00 UTC',
     },
     {
       slug: 'sportmanager',
@@ -1274,7 +1276,7 @@ const scoresHref = url('/captains/admin/minigame/');
       accountSecret: 'SPORTS_MANAGER_USERNAME',
       passwordSecret: 'SPORTS_MANAGER_PASSWORD',
       tables: ['sportmgr_tournaments', 'sportmgr_entries', 'sportmgr_matches'],
-      when: 'Every half hour, and every five minutes on the County Closed weekend',
+      when: 'Morning and evening, 07:00 and 19:00 UTC, and every five minutes on the County Closed weekend',
     },
     {
       slug: 'beds-closed',
@@ -1325,7 +1327,7 @@ const scoresHref = url('/captains/admin/minigame/');
       accountSecret: '',
       passwordSecret: '',
       tables: [],
-      when: 'After the SquashLevels daily run',
+      when: 'After each SquashLevels run',
       fixedAccount: 'beds_sl_1234',
     },
     {
@@ -2042,11 +2044,38 @@ const scoresHref = url('/captains/admin/minigame/');
     historyStatus.textContent = '';
   }
 
+  function paintScoreNameWarn() {
+    const extra = blockedWords.map((row) => row.word);
+    const lines = { a: scoreNameA.dataset.warnLine || '', b: scoreNameB.dataset.warnLine || '' };
+    let bad = false;
+    for (const [input, side] of [
+      [scoreNameA, 'a'],
+      [scoreNameB, 'b'],
+    ] as const) {
+      const note = scoreEdit.querySelector<HTMLElement>(`[data-score-warn="${side}"]`);
+      const stopped = hasProfanity(input.value, extra);
+      if (!stopped) lines[side] = '';
+      else if (!lines[side]) lines[side] = stoppedNameLine();
+      input.dataset.warnLine = lines[side];
+      if (note) {
+        note.hidden = !stopped;
+        note.textContent = stopped ? lines[side] : '';
+      }
+      input.classList.toggle('is-stopped', stopped);
+      input.setAttribute('aria-invalid', stopped ? 'true' : 'false');
+      if (stopped) bad = true;
+    }
+    return lines.a || lines.b;
+  }
+
+  scoreNameA.addEventListener('input', () => paintScoreNameWarn());
+  scoreNameB.addEventListener('input', () => paintScoreNameWarn());
+
   scoreEdit.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!editingMatch) return;
-    if (hasProfanity(scoreNameA.value, blockedWords.map((row) => row.word)) || hasProfanity(scoreNameB.value, blockedWords.map((row) => row.word))) {
-      scoreStatus.textContent = 'Choose names without swear words.';
+    if (paintScoreNameWarn()) {
+      scoreStatus.textContent = scoreNameA.dataset.warnLine || scoreNameB.dataset.warnLine || '';
       return;
     }
     const games = gamesFromHistory(editingMatch);
@@ -5384,6 +5413,15 @@ const scoresHref = url('/captains/admin/minigame/');
     border-radius: var(--radius-sm);
     padding: 0.55rem 0.7rem;
     font: inherit;
+  }
+  #setup-app .score-edit input.is-stopped {
+    border-color: #b42318;
+    box-shadow: 0 0 0 1px #b42318;
+  }
+  #setup-app .name-warn {
+    color: #b42318;
+    font-size: 0.85rem;
+    font-weight: 700;
   }
   #setup-app .word-stop {
     display: flex;

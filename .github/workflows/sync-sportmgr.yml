@@ -2,8 +2,8 @@ name: Sync Sport Manager
 
 on:
   schedule:
-    # Every half hour while entries are open and the draw is being filled in.
-    - cron: '*/30 * * * *'
+    # Morning and evening. 07:00 and 19:00 UTC.
+    - cron: '0 7,19 * * *'
     # Every five minutes on 7–10 January, the County Closed weekend.
     - cron: '*/5 * 7-10 1 *'
   workflow_dispatch:

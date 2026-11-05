@@ -2,8 +2,8 @@ name: Sync League Master
 
 on:
   schedule:
-    # 06:00 UTC every day (07:00 UK in summer, 06:00 in winter)
-    - cron: '0 6 * * *'
+    # Morning and evening. 06:00 and 18:00 UTC.
+    - cron: '0 6,18 * * *'
   workflow_dispatch:
     inputs:
       season:

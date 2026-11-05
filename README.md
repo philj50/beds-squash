@@ -162,7 +162,7 @@ Install the **ntfy** app ([ntfy.sh](https://ntfy.sh)) and subscribe to the topic
 | Topic | When a note is sent |
 | --- | --- |
 | `beds_lm_1234` | After the League Master import, and when a Monday or Thursday check finds drift and the import puts it back |
-| `beds_sl_1234` | After the SquashLevels daily run |
+| `beds_sl_1234` | After each SquashLevels run |
 | `beds_config_1234` | When the PSA tour list changes |
 | `beds_errors_1234` | When a GitHub job fails |
 | `beds_juniors_1234` | When a junior entry is added, changed or removed |
