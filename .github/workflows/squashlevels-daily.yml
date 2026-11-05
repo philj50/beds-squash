@@ -2,7 +2,7 @@ name: SquashLevels and match article
 
 on:
   schedule:
-    # After each League Master import. 07:30 and 19:30 UTC.
+    # Player pages every run. 07:30 and 19:30 UTC, after League Master, so a league article can use that day's results.
     - cron: '30 7,19 * * *'
   workflow_dispatch:
     inputs:

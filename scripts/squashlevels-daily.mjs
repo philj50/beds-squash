@@ -3,7 +3,7 @@
  * prepare one league match article for each division that played.
  *
  * Usage:
- *   node scripts/squashlevels-daily.mjs            # yesterday in London
+ *   node scripts/squashlevels-daily.mjs            # read every known player page, then yesterday's league article
  *   node scripts/squashlevels-daily.mjs --latest   # most recent day with a result
  *   node scripts/squashlevels-daily.mjs --date 2026-08-11
  *   node scripts/squashlevels-daily.mjs --backfill    # county and club lists, then a name search
@@ -1461,27 +1461,16 @@ async function main() {
   } catch (error) {
     console.error(`minigame lead skipped: ${error instanceof Error ? error.message : error}`);
   }
-  const days = await leagueDays();
-  if (!days.length) {
-    console.error('No scored rubbers to read.');
-    console.log(JSON.stringify({ note: 'No scored rubbers.' }));
-    if (canWrite) {
-      await rest('import_runs', { method: 'POST', write: true, body: [{ source: 'squashlevels', summary: { note: 'No scored rubbers.' } }] });
-    }
-    return;
+  let days = [];
+  try {
+    days = await leagueDays();
+  } catch (error) {
+    console.error(`league days skipped: ${error instanceof Error ? error.message : error}`);
   }
   const yesterday = londonDate(new Date(Date.now() - 24 * 60 * 60 * 1000));
-  const playedOn = wantDate ?? (wantLatest ? days[0][0] : yesterday);
+  const playedOn = wantDate ?? (wantLatest ? days[0]?.[0] ?? yesterday : yesterday);
   const rubbers = days.find(([date]) => date === playedOn)?.[1] ?? [];
-  if (!rubbers.length) {
-    console.error(`No player matches on ${playedOn}. No article.`);
-    const summary = { playedOn, players: 0, matches: 0, ratings: 0, articles: [], note: 'No player matches.' };
-    console.log(JSON.stringify(summary));
-    if (canWrite) {
-      await rest('import_runs', { method: 'POST', write: true, body: [{ source: 'squashlevels', summary }] });
-    }
-    return;
-  }
+  if (!rubbers.length) console.error(`No league matches on ${playedOn}. Player pages are still read.`);
 
   await signIn();
   const names = new Map();
@@ -1579,8 +1568,8 @@ async function main() {
     mode = settings?.[0]?.publication_mode ?? 'auto';
   }
   const articles = [];
-  const choices = choicesByDivision(rubbers, names, [...matches.values()]);
-  if (!choices.length) {
+  const choices = rubbers.length ? choicesByDivision(rubbers, names, [...matches.values()]) : [];
+  if (rubbers.length && !choices.length) {
     console.error(`No close match with ratings on ${playedOn}. No article.`);
   }
   for (const choice of choices) {
@@ -1623,6 +1612,7 @@ async function main() {
       ratings: ratings.length,
       articles: articles.map((article) => article.slug),
       mode,
+      ...(rubbers.length ? {} : { note: 'No league matches. Player pages were read.' }),
     },
   };
   const chunks = await save(payload);
