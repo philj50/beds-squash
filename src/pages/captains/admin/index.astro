@@ -268,6 +268,19 @@ const scoresHref = url('/captains/admin/minigame/');
               <h3 data-history-title>Points</h3>
               <div class="score-tape" data-history-tape></div>
             </div>
+            <h3>Disallowed words</h3>
+            <p class="muted small">
+              A set of swear words is already stopped on both player names. Add any other word that should stay off a marked match.
+            </p>
+            <p class="muted small" data-word-status role="status"></p>
+            <form class="word-stop" data-word-form>
+              <label>
+                Word
+                <input name="word" required minlength="2" maxlength="40" autocomplete="off" />
+              </label>
+              <button class="btn btn--primary btn--sm" type="submit">Stop this word</button>
+            </form>
+            <ul class="word-stop-list" data-word-list></ul>
             <form class="score-edit" data-score-edit hidden>
               <h3>Edit match</h3>
               <label>
@@ -772,7 +785,7 @@ const scoresHref = url('/captains/admin/minigame/');
   import { loadAccount, noteActivity, privateStop, sendToLogin, stopMessage, type Account } from '@/lib/account';
   import { ENTRY_GROUPS } from '@/lib/junior-age';
   import { compareCellText, sortMarkupRows, watchSortableTables } from '@/lib/table-sort';
-  import { gameStem, unpackLiveScore } from '@/lib/scoreboard';
+  import { gameStem, hasProfanity, unpackLiveScore } from '@/lib/scoreboard';
 
   type Person = { id: string; display_name: string; email: string | null; is_admin: boolean };
   type Club = { slug: string; name: string; contact_name: string | null; contact_email: string | null; leaguemaster_club_id?: string | null };
@@ -1696,6 +1709,11 @@ const scoresHref = url('/captains/admin/minigame/');
   const liveStatus = root.querySelector<HTMLElement>('[data-live-status]')!;
   const liveBody = root.querySelector<HTMLElement>('[data-live-rows]')!;
   const liveClear = root.querySelector<HTMLButtonElement>('[data-live-clear]')!;
+  const wordStatus = root.querySelector<HTMLElement>('[data-word-status]')!;
+  const wordForm = root.querySelector<HTMLFormElement>('[data-word-form]')!;
+  const wordList = root.querySelector<HTMLElement>('[data-word-list]')!;
+  type BlockedWord = { id: number; word: string };
+  let blockedWords: BlockedWord[] = [];
   type LiveStale = { id: number; playerA: string; playerB: string; score: string; marker: string; updatedAt: string };
   let staleRows: LiveStale[] = [];
 
@@ -2027,6 +2045,10 @@ const scoresHref = url('/captains/admin/minigame/');
   scoreEdit.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!editingMatch) return;
+    if (hasProfanity(scoreNameA.value, blockedWords.map((row) => row.word)) || hasProfanity(scoreNameB.value, blockedWords.map((row) => row.word))) {
+      scoreStatus.textContent = 'Choose names without swear words.';
+      return;
+    }
     const games = gamesFromHistory(editingMatch);
     scoreStatus.textContent = 'Saving…';
     const { error } = await supabase.rpc('admin_save_marked_match', {
@@ -2043,6 +2065,58 @@ const scoresHref = url('/captains/admin/minigame/');
     scoreStatus.textContent = 'Saved.';
     scoresLoaded = false;
     await loadMarkedMatches();
+  });
+
+  function drawBlockedWords() {
+    if (!blockedWords.length) {
+      wordList.innerHTML = '<li class="empty">No extra words are stopped.</li>';
+      return;
+    }
+    wordList.innerHTML = blockedWords
+      .map(
+        (row) =>
+          `<li><span>${escapeHtml(row.word)}</span><button class="btn btn--ghost btn--sm" type="button" data-allow-word="${row.id}">Allow</button></li>`,
+      )
+      .join('');
+  }
+
+  async function loadBlockedWords() {
+    const { data, error } = await supabase.from('marking_blocked_words').select('id, word').order('word', { ascending: true });
+    if (error) {
+      wordStatus.textContent = error.message;
+      return;
+    }
+    blockedWords = (data ?? []) as BlockedWord[];
+    drawBlockedWords();
+  }
+
+  wordForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const word = String(new FormData(wordForm).get('word') ?? '').trim().replace(/\s+/g, ' ');
+    if (word.length < 2) {
+      wordStatus.textContent = 'Use a word of at least two letters.';
+      return;
+    }
+    if (hasProfanity(word)) {
+      wordStatus.textContent = 'That word is already stopped.';
+      return;
+    }
+    wordStatus.textContent = 'Stopping…';
+    const { error } = await supabase.rpc('block_marking_word', { p_word: word });
+    wordStatus.textContent = error ? error.message : `${word} is stopped.`;
+    if (!error) {
+      wordForm.reset();
+      await loadBlockedWords();
+    }
+  });
+
+  wordList.addEventListener('click', async (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-allow-word]');
+    if (!button?.dataset.allowWord) return;
+    wordStatus.textContent = 'Allowing…';
+    const { error } = await supabase.rpc('unblock_marking_word', { p_id: Number(button.dataset.allowWord) });
+    wordStatus.textContent = error ? error.message : 'That word can be used.';
+    if (!error) await loadBlockedWords();
   });
 
   async function deleteCommentaryMatch(id: number) {
@@ -2110,6 +2184,7 @@ const scoresHref = url('/captains/admin/minigame/');
       void loadMarkedMatches();
       void loadCommentaryHistory();
       void loadStaleMatches();
+      void loadBlockedWords();
     }
   };
 
@@ -5309,6 +5384,45 @@ const scoresHref = url('/captains/admin/minigame/');
     border-radius: var(--radius-sm);
     padding: 0.55rem 0.7rem;
     font: inherit;
+  }
+  #setup-app .word-stop {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: end;
+    margin: 0.8rem 0;
+  }
+  #setup-app .word-stop label {
+    display: grid;
+    gap: 0.3rem;
+    font-size: 0.9rem;
+  }
+  #setup-app .word-stop input {
+    background: var(--ink-900);
+    color: #fff;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 0.55rem 0.7rem;
+    font: inherit;
+  }
+  #setup-app .word-stop-list {
+    list-style: none;
+    margin: 0 0 1.2rem;
+    padding: 0;
+    max-width: 28rem;
+  }
+  #setup-app .word-stop-list :global(li) {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  #setup-app .word-stop-list :global(li.empty) {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    border-bottom: 0;
   }
   #setup-app .score-tape {
     display: flex;

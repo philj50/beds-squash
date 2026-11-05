@@ -32,7 +32,7 @@ import { url } from '@/lib/site';
           <li>A voice you choose</li>
           <li>Earlier matches</li>
           <li>Who else is watching</li>
-          <li>Send a reaction, and hear Come on and Get in spoken back</li>
+          <li>Send a reaction, or Come on a player, and hear it spoken back</li>
         </ul>
         <p><a href={url('/login/')}>Log in</a></p>
       </details>
@@ -73,6 +73,10 @@ import { url } from '@/lib/site';
           <button type="button" data-shout="comeon" aria-label="Come on">🙌</button>
           <button type="button" data-shout="getin" aria-label="Get in">🎯</button>
           <button type="button" data-shout="celebrate" aria-label="Celebrate">🎉</button>
+        </div>
+        <div class="shout-calls" data-shout-calls hidden>
+          <button type="button" data-shout="comeona">Come on</button>
+          <button type="button" data-shout="comeonb">Come on</button>
         </div>
         <details class="points-history" data-history>
           <summary>Points</summary>
@@ -141,6 +145,7 @@ import { url } from '@/lib/site';
   const archiveList = root.querySelector<HTMLElement>('[data-archive]')!;
   const archiveTitle = root.querySelector<HTMLElement>('[data-archive-title]')!;
   const shoutBar = root.querySelector<HTMLElement>('[data-shout-bar]')!;
+  const shoutCalls = root.querySelector<HTMLElement>('[data-shout-calls]')!;
   const shoutBanner = root.querySelector<HTMLElement>('[data-shout-banner]')!;
   const watchersEl = root.querySelector<HTMLElement>('[data-watchers]')!;
   const historyBody = root.querySelector<HTMLElement>('[data-history-body]')!;
@@ -162,6 +167,7 @@ import { url } from '@/lib/site';
   let lastShoutId = 0;
   let shoutsHeard = false;
   const seenShouts = new Set<number>();
+  let cheerNames = { a: 'Player A', b: 'Player B' };
   const shoutWords: Record<string, string> = {
     strong: '💪',
     love: '❤️',
@@ -356,8 +362,23 @@ import { url } from '@/lib/site';
     historyBody.append(sheet);
   }
 
+  function firstWord(name: string) {
+    return name.trim().split(/\s+/)[0] || 'player';
+  }
+
+  function cheerLine(kind: string) {
+    if (kind === 'comeona') return `Come on ${firstWord(cheerNames.a)}`;
+    if (kind === 'comeonb') return `Come on ${firstWord(cheerNames.b)}`;
+    return spokenShouts[kind] || '';
+  }
+
+  function shoutLabel(kind: string) {
+    if (kind === 'comeona' || kind === 'comeonb') return `🙌 ${cheerLine(kind)}`;
+    return shoutWords[kind] || '';
+  }
+
   function shoutText(shout: Shout) {
-    const words = shoutWords[shout.kind];
+    const words = shoutLabel(shout.kind);
     if (!words) return '';
     const who = signedIn ? shout.name : shout.name === 'Someone' ? 'Someone' : publicPlayerName(shout.name);
     return `${who}: ${words}`;
@@ -394,7 +415,7 @@ import { url } from '@/lib/site';
     const gain = ctx.createGain();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(start, now);
-    if (kind === 'comeon' || kind === 'getin') osc.frequency.exponentialRampToValueAtTime(start * 1.5, now + 0.09);
+    if (kind === 'comeon' || kind === 'comeona' || kind === 'comeonb' || kind === 'getin') osc.frequency.exponentialRampToValueAtTime(start * 1.5, now + 0.09);
     gain.gain.setValueAtTime(0.0001, now);
     gain.gain.exponentialRampToValueAtTime(0.18, now + 0.015);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.26);
@@ -412,7 +433,7 @@ import { url } from '@/lib/site';
     if (sound && !own) pingShout(shout.kind);
     const text = shoutText(shout);
     if (!text) return;
-    if (sound && !own && spokenShouts[shout.kind] && sayScore && speechUnlocked()) followScore(spokenShouts[shout.kind]);
+    if (sound && !own && cheerLine(shout.kind) && sayScore && speechUnlocked()) followScore(cheerLine(shout.kind));
     shoutBanner.textContent = text;
     window.clearTimeout(bannerTimer);
     bannerTimer = window.setTimeout(() => {
@@ -472,6 +493,12 @@ import { url } from '@/lib/site';
     live.hidden = false;
     historyPanel.hidden = !signedIn;
     shoutBar.hidden = quiet || !roomReady || !signedIn;
+    shoutCalls.hidden = shoutBar.hidden;
+    cheerNames = names;
+    const comeA = root.querySelector<HTMLButtonElement>('[data-shout="comeona"]');
+    const comeB = root.querySelector<HTMLButtonElement>('[data-shout="comeonb"]');
+    if (comeA) comeA.textContent = `Come on ${firstWord(names.a)}`;
+    if (comeB) comeB.textContent = `Come on ${firstWord(names.b)}`;
     root.querySelector<HTMLElement>('[data-a]')!.textContent = names.a;
     root.querySelector<HTMLElement>('[data-b]')!.textContent = names.b;
     root.querySelector<HTMLElement>('[data-updated]')!.textContent = quiet && row.endedAt ? endedLabel(row.endedAt) : updatedAgo(row.updatedAt);
@@ -647,6 +674,7 @@ import { url } from '@/lib/site';
     if (!missingFunction(error)) return false;
     roomReady = false;
     shoutBar.hidden = true;
+    shoutCalls.hidden = true;
     paintArchiveList();
     return true;
   }
@@ -683,7 +711,7 @@ import { url } from '@/lib/site';
     shoutAudio();
     pingShout(kind);
     noteOwnPing(kind);
-    const spoken = spokenShouts[kind];
+    const spoken = cheerLine(kind);
     if (spoken && sayScore) {
       voiceArmed = true;
       speakScore(spoken);
@@ -1040,6 +1068,23 @@ import { url } from '@/lib/site';
     font-size: 1.45rem;
     line-height: 1;
     padding: 0.55rem 0.1rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    background: #fff;
+    cursor: pointer;
+  }
+  .shout-calls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.35rem;
+    margin-top: 0.35rem;
+  }
+  .shout-calls button {
+    font: inherit;
+    font-size: 0.95rem;
+    font-weight: 800;
+    line-height: 1.2;
+    padding: 0.55rem 0.4rem;
     border: 1px solid var(--border-strong);
     border-radius: 12px;
     background: #fff;

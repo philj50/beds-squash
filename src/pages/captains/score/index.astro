@@ -38,6 +38,7 @@ const names = [
                 <div class="picks" data-picks="a" hidden></div>
               </span>
               <span class="sl-note" data-sl="a" hidden></span>
+              <span class="name-warn" data-warn="a" hidden></span>
             </label>
             <label>
               Player B
@@ -46,6 +47,7 @@ const names = [
                 <div class="picks" data-picks="b" hidden></div>
               </span>
               <span class="sl-note" data-sl="b" hidden></span>
+              <span class="name-warn" data-warn="b" hidden></span>
             </label>
           </div>
           <div class="par" role="group" aria-label="Game length">
@@ -206,6 +208,7 @@ const names = [
     addStroke,
     canChooseServer,
     cleanName,
+    hasProfanity,
     currentGame,
     currentRallies,
     finishedGames,
@@ -428,6 +431,17 @@ const names = [
     }
   }
 
+  let blockedWords: string[] = [];
+
+  function paintNameWarn(side: 'a' | 'b') {
+    const input = side === 'a' ? inputA : inputB;
+    const note = root.querySelector<HTMLElement>(`[data-warn="${side}"]`)!;
+    const bad = hasProfanity(input.value, blockedWords);
+    note.hidden = !bad;
+    note.textContent = bad ? 'Choose a name without swear words.' : '';
+    return bad;
+  }
+
   function show(message: string) {
     statusEl.textContent = message;
   }
@@ -523,6 +537,14 @@ const names = [
         box.append(button);
       }
     }
+  }
+
+  async function loadBlockedWords() {
+    const { data, error } = await supabase.from('marking_blocked_words').select('word');
+    if (error || !Array.isArray(data)) return;
+    blockedWords = data.map((row) => String((row as { word?: string }).word || '')).filter(Boolean);
+    paintNameWarn('a');
+    paintNameWarn('b');
   }
 
   async function loadLevels() {
@@ -1462,10 +1484,17 @@ const names = [
   setup.addEventListener('submit', async (event) => {
     event.preventDefault();
     const { data } = await sessionReady;
+    await loadBlockedWords();
     signedIn = Boolean(data.session);
     signinEl.hidden = signedIn;
     const a = cleanName(inputA.value);
     const b = cleanName(inputB.value);
+    const rudeA = paintNameWarn('a');
+    const rudeB = paintNameWarn('b');
+    if (rudeA || rudeB) {
+      show('Choose names without swear words.');
+      return;
+    }
     if (!a || !b) {
       show('Enter both names, using letters.');
       return;
@@ -1742,6 +1771,7 @@ const names = [
   for (const [input, side] of [[inputA, 'a'], [inputB, 'b']] as const) {
     input.addEventListener('focus', () => paintPicks(side));
     input.addEventListener('input', () => {
+      paintNameWarn(side);
       paintLevels();
       paintPicks(side);
     });
@@ -1754,6 +1784,7 @@ const names = [
   fillNames([]);
   paintRecent();
   void loadLevels();
+  void loadBlockedWords();
 
   refreshBox.checked = refreshOn;
   refreshBox.addEventListener('change', () => {
@@ -2104,6 +2135,11 @@ const names = [
   .sl-note {
     color: var(--text-muted);
     font-size: 0.85rem;
+  }
+  .name-warn {
+    color: #b42318;
+    font-size: 0.85rem;
+    font-weight: 700;
   }
   .level {
     min-height: 1.1rem;

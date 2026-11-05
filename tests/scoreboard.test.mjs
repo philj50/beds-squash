@@ -5,6 +5,7 @@ import {
   addPoint,
   addStroke,
   cleanName,
+  hasProfanity,
   currentGame,
   freshMatch,
   gameStem,
@@ -293,4 +294,10 @@ test('names keep an apostrophe and reject a blank', () => {
   assert.equal(cleanName("  James   O'Connor "), "James O'Connor");
   assert.equal(cleanName('A'), null);
   assert.equal(cleanName('Max2'), null);
+  assert.equal(hasProfanity('Ada Marker'), false);
+  assert.equal(hasProfanity('Cockburn'), false);
+  assert.equal(hasProfanity('oh shit'), true);
+  assert.equal(hasProfanity('f.u.c.k'), true);
+  assert.equal(hasProfanity('Ada Marker', ['nope']), false);
+  assert.equal(hasProfanity('Nope Person', ['nope']), true);
 });

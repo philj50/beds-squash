@@ -470,6 +470,50 @@ export function publicPlayerName(fullName: string): string {
   return `${parts[0]} ${parts[parts.length - 1].charAt(0).toUpperCase()}`;
 }
 
+const PROFANITY = new Set([
+  'fuck', 'fuk', 'fck', 'fucker', 'fucking', 'motherfucker',
+  'shit', 'shite', 'bullshit',
+  'cunt', 'bitch', 'bastard', 'wanker', 'wank', 'twat',
+  'bollocks', 'bollock', 'arsehole', 'asshole',
+  'whore', 'slag', 'prick', 'cock', 'tits', 'tit',
+  'piss', 'pisser',
+]);
+
+function foldedLetters(raw: string) {
+  return raw
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[@4]/g, 'a')
+    .replace(/[$5]/g, 's')
+    .replace(/0/g, 'o')
+    .replace(/[1!|]/g, 'i')
+    .replace(/3/g, 'e')
+    .replace(/7/g, 't')
+    .replace(/[^a-z]+/g, '');
+}
+
+/** True when a typed player name is a swear word, or one of the extra words an admin has stopped. */
+export function hasProfanity(raw: string, extra: Iterable<string> = []): boolean {
+  const normalized = raw
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[@4]/g, 'a')
+    .replace(/[$5]/g, 's')
+    .replace(/0/g, 'o')
+    .replace(/[1!|]/g, 'i')
+    .replace(/3/g, 'e')
+    .replace(/7/g, 't');
+  const words = normalized.split(/[^a-z]+/).filter(Boolean).map((word) => word.replace(/(.)\1{2,}/g, '$1'));
+  const tight = words.join('').replace(/(.)\1{2,}/g, '$1');
+  const extras = [...extra].map((item) => foldedLetters(item).replace(/(.)\1{2,}/g, '$1')).filter((word) => word.length >= 2);
+  const stopped = (word: string) =>
+    PROFANITY.has(word) || extras.some((extraWord) => extraWord === word || (extraWord.length >= 5 && word.includes(extraWord)));
+  if (words.some(stopped)) return true;
+  return stopped(tight);
+}
+
 export function cleanName(raw: string): string | null {
   const clean = raw.trim().replace(/\s+/g, ' ');
   if (clean.length < 2 || clean.length > 80) return null;
