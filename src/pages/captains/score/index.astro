@@ -201,7 +201,7 @@ const names = [
 
 <script>
   import { createClient } from '@supabase/supabase-js';
-  import { COMMENTARY_NOTES } from '@/lib/commentary-notes';
+  import { commentaryNotesOn } from '@/lib/commentary-notes';
   import {
     addLet,
     addPoint,
@@ -954,8 +954,8 @@ const names = [
 
   const commentaryNoteKey = 'beds-commentary-noted';
 
-  function notifyMatchOn() {
-    if (!COMMENTARY_NOTES) return;
+  async function notifyMatchOn() {
+    if (!(await commentaryNotesOn(supabase))) return;
     const key = `${names.a}|${names.b}`;
     if (!names.a || !names.b || sessionStorage.getItem(commentaryNoteKey) === key) return;
     sessionStorage.setItem(commentaryNoteKey, key);
@@ -1036,7 +1036,7 @@ const names = [
     liveProblem = '';
     liveShared = true;
     paintLiveNote();
-    notifyMatchOn();
+    void notifyMatchOn();
     void loadCrowd();
   }
 

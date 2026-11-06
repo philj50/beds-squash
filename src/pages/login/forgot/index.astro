@@ -1,0 +1,57 @@
+---
+import Base from '@/layouts/Base.astro';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
+import { url } from '@/lib/site';
+---
+
+<Base title="Forgot password" description="Ask for a link to choose a new Bedfordshire Squash password." noindex>
+  <section class="section">
+    <div class="container login" id="forgot-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
+      <h1>Forgot password</h1>
+      <p class="lede">Enter the email on the login. If we know it, a message arrives with a link to choose a new password. The link works once and lasts about an hour.</p>
+      <p class="status" data-status role="status"></p>
+      <form id="forgot" class="card" method="post" action={url('/login/forgot/')} data-form="forgot" onsubmit="event.preventDefault()">
+        <div class="card__body stack">
+          <div class="field">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" autocomplete="username" required autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Email" />
+          </div>
+          <button class="btn btn--primary" type="submit">Send reset link</button>
+          <p class="muted small"><a href={url('/login/')}>Back to log in</a></p>
+        </div>
+      </form>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+
+  const root = document.getElementById('forgot-app');
+  const form = document.querySelector<HTMLFormElement>('[data-form="forgot"]');
+  const statusEl = document.querySelector<HTMLElement>('[data-status]');
+  if (!root || !form || !statusEl) throw new Error('forgot password form missing');
+
+  const supabase = createClient(root.dataset.url!, root.dataset.key!);
+  const sent = 'If that login has an email, a message is on its way. The link works once and lasts about an hour.';
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const email = String(new FormData(form).get('email') || '').trim();
+    const button = form.querySelector('button');
+    if (button) button.disabled = true;
+    statusEl.textContent = 'Sending…';
+    const redirectTo = new URL('../reset/', location.href).href;
+    const { data, error } = await supabase.functions.invoke('request-password-reset', {
+      body: { email, redirectTo },
+    });
+    if (button) button.disabled = false;
+    const payload = data as { ok?: boolean; error?: string } | null;
+    if (error || payload?.error) {
+      statusEl.textContent = payload?.error || 'The reset message could not be sent. Try again in a minute.';
+      return;
+    }
+    statusEl.textContent = sent;
+    form.reset();
+  });
+</script>

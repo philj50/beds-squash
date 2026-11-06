@@ -599,7 +599,7 @@ const scoresHref = url('/captains/admin/minigame/');
             <details class="notes">
               <summary>Notes</summary>
               <p class="muted small">
-                Each outside service, the account it signs in with, and how much it has stored here. Last run is the newest stored job, in UK time. Updates is what that job changed. Passwords stay in GitHub. Each ntfy topic is public. League Master, SquashLevels, other job notes, failures, juniors, County Closed scores and match commentary each have their own.
+                Each outside service, the account it signs in with, and how much it has stored here. Last run is the newest stored job, in UK time. Updates is what that job changed. Passwords stay in GitHub. Each ntfy topic is public. Tick Send to turn that note on or off. League Master, SquashLevels, other job notes, failures, juniors, County Closed scores and match commentary each have their own.
               </p>
             </details>
             <p class="muted small" data-integrations-status hidden role="status"></p>
@@ -613,6 +613,7 @@ const scoresHref = url('/captains/admin/minigame/');
                     <th>Rows</th>
                     <th>Size</th>
                     <th>When</th>
+                    <th>Send</th>
                     <th>Last run</th>
                     <th>Updates</th>
                   </tr>
@@ -1301,7 +1302,7 @@ const scoresHref = url('/captains/admin/minigame/');
       accountSecret: 'GMAIL_USERNAME',
       passwordSecret: 'GMAIL_PASSWORD',
       tables: [],
-      when: 'Paused until a new mailbox is ready',
+      when: 'Password resets. Other messages stay on the test inbox.',
     },
     {
       slug: 'ntfy-config',
@@ -1400,10 +1401,11 @@ const scoresHref = url('/captains/admin/minigame/');
     status.hidden = false;
     status.textContent = 'Loading integrations…';
     table.hidden = true;
-    const [reportResult, accountResult, runResult] = await Promise.all([
+    const [reportResult, accountResult, runResult, rulesResult] = await Promise.all([
       supabase.rpc('admin_database_report'),
       supabase.rpc('admin_integration_accounts'),
       supabase.rpc('admin_integration_runs'),
+      supabase.from('ntfy_rules').select('slug, enabled'),
     ]);
     const report = reportResult.data as { tables?: { name: string; rows: number; bytes: number; newest?: string | null }[] } | null;
     const tables = Array.isArray(report?.tables) ? report.tables : [];
@@ -1430,6 +1432,13 @@ const scoresHref = url('/captains/admin/minigame/');
       const list = runsBySource.get(row.source) ?? [];
       list.push(row);
       runsBySource.set(row.source, list);
+    }
+    const rules = new Map<string, boolean>();
+    const ruleRows = rulesResult.data as { slug?: string; enabled?: boolean }[] | null;
+    if (Array.isArray(ruleRows)) {
+      for (const row of ruleRows) {
+        if (row.slug) rules.set(row.slug, row.enabled === true);
+      }
     }
     const runSources: Record<string, string> = {
       squashlevels: 'squashlevels',
@@ -1485,12 +1494,32 @@ const scoresHref = url('/captains/admin/minigame/');
           .sort()
           .at(-1);
         const detail = described.detail || (newest ? `Newest stored row ${formatWhen(newest)}.` : '—');
-        return `<tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(account)}</td><td>${escapeHtml(password)}</td><td>${escapeHtml(volume)}</td><td>${escapeHtml(size)}</td><td>${escapeHtml(item.when)}</td><td>${escapeHtml(described.when)}</td><td class="run-detail">${escapeHtml(detail)}</td></tr>`;
+        const send = item.slug.startsWith('ntfy-')
+          ? `<input type="checkbox" data-ntfy-rule="${escapeHtml(item.slug)}" ${(rules.has(item.slug) ? rules.get(item.slug) : true) ? 'checked' : ''} aria-label="Send ${escapeHtml(item.name)}" />`
+          : '—';
+        return `<tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(account)}</td><td>${escapeHtml(password)}</td><td>${escapeHtml(volume)}</td><td>${escapeHtml(size)}</td><td>${escapeHtml(item.when)}</td><td>${send}</td><td>${escapeHtml(described.when)}</td><td class="run-detail">${escapeHtml(detail)}</td></tr>`;
       })
       .join('');
     status.hidden = true;
     table.hidden = false;
     integrationsLoaded = true;
+    if (body.dataset.ntfyBound !== 'true') {
+      body.dataset.ntfyBound = 'true';
+      body.addEventListener('change', async (event) => {
+        const box = event.target;
+        if (!(box instanceof HTMLInputElement) || !box.matches('[data-ntfy-rule]')) return;
+        const slug = box.dataset.ntfyRule || '';
+        const enabled = box.checked;
+        const { error } = await supabase.rpc('set_ntfy_rule', { p_slug: slug, p_enabled: enabled });
+        status.hidden = false;
+        if (error) {
+          box.checked = !enabled;
+          status.textContent = 'That note could not be changed.';
+          return;
+        }
+        status.textContent = enabled ? 'That note is on.' : 'That note is off.';
+      });
+    }
   };
 
   type ClosedEntry = {

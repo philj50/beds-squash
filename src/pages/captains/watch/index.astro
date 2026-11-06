@@ -1,7 +1,6 @@
 ---
 import Base from '@/layouts/Base.astro';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
-import { COMMENTARY_NOTES } from '@/lib/commentary-notes';
 import { url } from '@/lib/site';
 ---
 
@@ -36,12 +35,10 @@ import { url } from '@/lib/site';
         </ul>
         <p><a href={url('/login/')}>Log in</a></p>
       </details>
-      {COMMENTARY_NOTES && (
-        <p class="ntfy">
-          <a href="https://ntfy.sh/beds_commentary_1234" target="_blank" rel="noopener noreferrer">Subscribe on ntfy</a>
-          for a note when a match goes on. The topic is beds_commentary_1234.
-        </p>
-      )}
+      <p class="ntfy" data-commentary-note hidden>
+        <a href="https://ntfy.sh/beds_commentary_1234" target="_blank" rel="noopener noreferrer">Subscribe on ntfy</a>
+        for a note when a match goes on. The topic is beds_commentary_1234.
+      </p>
       <p class="status" data-status role="status"></p>
 
       <div data-picker>
@@ -105,6 +102,7 @@ import { url } from '@/lib/site';
     spokenPublicLine,
     unpackLiveScore,
   } from '@/lib/scoreboard';
+  import { commentaryNotesOn } from '@/lib/commentary-notes';
   import { followScore, saveVoiceName, savedVoiceName, speakScore, speechUnlocked, stopScore, useSavedVoice } from '@/lib/speak';
 
   type LiveRow = {
@@ -131,6 +129,10 @@ import { url } from '@/lib/site';
   if (!watchRoot) throw new Error('watch app missing');
   const root: HTMLElement = watchRoot;
   const supabase = createClient(root.dataset.url!, root.dataset.key!);
+  void commentaryNotesOn(supabase).then((on) => {
+    const note = root.querySelector<HTMLElement>('[data-commentary-note]');
+    if (note) note.hidden = !on;
+  });
   const picker = root.querySelector<HTMLElement>('[data-picker]')!;
   const list = root.querySelector<HTMLElement>('[data-matches]')!;
   const empty = root.querySelector<HTMLElement>('[data-empty]')!;

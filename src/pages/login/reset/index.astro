@@ -1,0 +1,113 @@
+---
+import Base from '@/layouts/Base.astro';
+import PasswordRules from '@/components/PasswordRules.astro';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
+import { url } from '@/lib/site';
+---
+
+<Base title="Choose a new password" description="Choose a new password for a Bedfordshire Squash login." noindex>
+  <section class="section">
+    <div class="container login" id="reset-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} data-profile={url('/captains/profile/')}>
+      <h1>Choose a new password</h1>
+      <p class="lede" data-lede>Checking the link…</p>
+      <p class="status" data-status role="status"></p>
+      <form id="reset" class="card" method="post" action={url('/login/reset/')} data-form="reset" hidden onsubmit="event.preventDefault()">
+        <div class="card__body stack">
+          <p class="muted small">This page is open because the email link checked out. It is a short sign-in just for choosing the password. The link works once.</p>
+          <div class="field">
+            <label for="password">New password</label>
+            <input id="password" name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="72" placeholder="New password" />
+          </div>
+          <PasswordRules />
+          <div class="field">
+            <label for="confirm">Type it again</label>
+            <input id="confirm" name="confirm" type="password" autocomplete="new-password" required minlength="8" maxlength="72" placeholder="New password again" />
+          </div>
+          <button class="btn btn--primary" type="submit">Save password</button>
+        </div>
+      </form>
+      <p data-next hidden><a href={url('/captains/profile/')}>Go to your profile</a></p>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+  import { bindPasswordRules, passwordIssue } from '@/lib/passwords';
+
+  const root = document.getElementById('reset-app');
+  const form = document.querySelector<HTMLFormElement>('[data-form="reset"]');
+  const statusEl = document.querySelector<HTMLElement>('[data-status]');
+  const lede = document.querySelector<HTMLElement>('[data-lede]');
+  const next = document.querySelector<HTMLElement>('[data-next]');
+  if (!root || !form || !statusEl || !lede || !next) throw new Error('reset form missing');
+
+  const supabase = createClient(root.dataset.url!, root.dataset.key!, {
+    auth: { flowType: 'implicit', detectSessionInUrl: true },
+  });
+  bindPasswordRules(form);
+  const expired = 'This link has expired or has already been used. Ask for a new one from the log in page.';
+  const hash = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const query = new URLSearchParams(location.search);
+  const linkFailed = hash.has('error') || query.has('error') || query.has('error_code');
+  let ready = false;
+
+  function showForm() {
+    if (ready) return;
+    ready = true;
+    history.replaceState(null, '', location.pathname + location.search);
+    lede.textContent = 'Choose a new password. You are signed in only for this step.';
+    form.hidden = false;
+  }
+
+  function showExpired() {
+    if (ready) return;
+    lede.textContent = expired;
+    form.hidden = true;
+  }
+
+  if (linkFailed) showExpired();
+
+  supabase.auth.onAuthStateChange((event) => {
+    if (event === 'PASSWORD_RECOVERY') showForm();
+  });
+
+  void supabase.auth.getSession().then(({ data }) => {
+    if (ready || linkFailed) return;
+    const recovery = hash.get('type') === 'recovery' && data.session;
+    if (recovery) showForm();
+    else window.setTimeout(() => {
+      if (!ready) showExpired();
+    }, 1500);
+  });
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!ready) return;
+    const password = String(new FormData(form).get('password') || '');
+    const confirm = String(new FormData(form).get('confirm') || '');
+    const issue = passwordIssue(password);
+    if (issue) {
+      statusEl.textContent = issue;
+      return;
+    }
+    if (password !== confirm) {
+      statusEl.textContent = 'Type the same password in both boxes.';
+      return;
+    }
+    const button = form.querySelector('button');
+    if (button) button.disabled = true;
+    statusEl.textContent = 'Saving…';
+    const { error } = await supabase.auth.updateUser({ password, data: { must_change_password: false } });
+    if (button) button.disabled = false;
+    if (error) {
+      statusEl.textContent = 'That password could not be saved. Ask for a new link and try again.';
+      return;
+    }
+    history.replaceState(null, '', location.pathname + location.search);
+    form.hidden = true;
+    lede.textContent = 'Password saved. You are signed in.';
+    statusEl.textContent = '';
+    next.hidden = false;
+  });
+</script>

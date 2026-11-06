@@ -96,11 +96,14 @@ for (const event of events) {
   const ids = tournament.matches.map((match) => match.id);
   const stale = ids.length ? `&id=not.in.(${ids.join(',')})` : '';
   await rest(`sportmgr_matches?tournament_id=eq.${tournament.id}${stale}`, { method: 'DELETE' });
+  const notesOn = await closedNotesOn();
   let sent = 0;
-  for (const match of arrived) {
-    if (await publishScore(match)) sent += 1;
+  if (notesOn) {
+    for (const match of arrived) {
+      if (await publishScore(match)) sent += 1;
+    }
   }
-  if (arrived.length) console.log(`Sent ${sent} of ${arrived.length} score notes to ${CLOSED_SCORE_TOPIC}.`);
+  if (arrived.length) console.log(notesOn ? `Sent ${sent} of ${arrived.length} score notes to ${CLOSED_SCORE_TOPIC}.` : `Score notes for ${CLOSED_SCORE_TOPIC} are switched off.`);
   savedEvents.push({ title: tournament.title, entries: tournament.entries.length, matches: tournament.matches.length });
 }
 if (!snapshotOnly && savedEvents.length) {
@@ -121,6 +124,20 @@ function loadEnv() {
     const index = line.indexOf('=');
     const name = line.slice(0, index).trim();
     if (!process.env[name]) process.env[name] = line.slice(index + 1).trim();
+  }
+}
+
+async function closedNotesOn() {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/ntfy_rules?slug=eq.ntfy-closed&select=enabled`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    });
+    if (!response.ok) return true;
+    const rows = await response.json();
+    if (!Array.isArray(rows) || !rows.length) return true;
+    return rows[0].enabled !== false;
+  } catch {
+    return true;
   }
 }
 

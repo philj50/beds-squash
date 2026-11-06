@@ -8,6 +8,22 @@ import tls from 'node:tls';
 
 export const OUTBOUND_TO = 'dulltown@gmail.com';
 
+/** The only person whose password-reset mail may leave the test inbox, and only when live is on. */
+export const RESET_LIVE_NAME = 'Alex Buckhurst';
+
+/**
+ * Where a password reset is delivered.
+ * Live stays off until the reset has been tried on the test inbox.
+ * Keep this in step with supabase/functions/request-password-reset/index.ts.
+ */
+export function resetRecipient(email, { live = false, name = '' } = {}) {
+  const real = String(email || '').trim().toLowerCase();
+  const person = String(name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const looksReal = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(real) && !real.endsWith('@players.invalid');
+  if (live && person === RESET_LIVE_NAME.toLowerCase() && looksReal) return real;
+  return OUTBOUND_TO;
+}
+
 const SMTP_HOST = 'smtp.gmail.com';
 const SMTP_PORT = 587;
 
