@@ -120,6 +120,12 @@
       "grade": "B Grade"
     },
     {
+      "name": "Oliver Elphick",
+      "club": "",
+      "seed": "",
+      "grade": "B Grade"
+    },
+    {
       "name": "Thomas Garlich",
       "club": "",
       "seed": "",
@@ -210,5 +216,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-06T14:45:52.463Z"
+  "syncedAt": "2026-11-06T23:37:05.883Z"
 }
