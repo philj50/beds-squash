@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-11-05T16:29:26.623Z",
+  "checkedAt": "2026-11-06T15:56:12.966Z",
   "events": [
     {
       "title": "London Open 2026",
@@ -18,6 +18,15 @@
       "level": "",
       "prize": "$1,426",
       "url": "https://www.psasquashtour.com/tournament/gms-accountants-sports-academy-open-2026/"
+    },
+    {
+      "title": "Olliers Solicitors Northern Open 2027",
+      "start": "2027-02-17",
+      "end": "2027-02-21",
+      "venue": "Manchester",
+      "level": "",
+      "prize": "$15,000",
+      "url": "https://www.psasquashtour.com/tournament/olliers-solicitors-northern-open-2027/"
     },
     {
       "title": "PSA World Championships 2026-2027",
@@ -40,28 +49,28 @@
   ],
   "videos": [
     {
-      "id": "OweL5ftO9-Q",
-      "title": "COURTSIDE: SQUASHTV analyse Nouran Gohar's INCREDIBLE win streak in Philly 🇺🇸 🏆",
-      "published": "2026-11-05T15:33:35+00:00",
-      "url": "https://www.youtube.com/watch?v=OweL5ftO9-Q"
+      "id": "7vHt4iee9ew",
+      "title": "On the Edge 😬 Silicon Valley Open 2026 🇺🇸 #FGF",
+      "published": "2026-11-06T12:00:37+00:00",
+      "url": "https://www.youtube.com/watch?v=7vHt4iee9ew"
     },
     {
-      "id": "Yokc-Pkohkc",
-      "title": "MAGIC! ✨",
-      "published": "2026-11-05T15:03:57+00:00",
-      "url": "https://www.youtube.com/watch?v=Yokc-Pkohkc"
+      "id": "d_FvxgWyOkE",
+      "title": "🇪🇬 El Hammamy v Aboelkheir 🇪🇬 | U.S. Open 2026 | QAURTER FINAL HIGHLIGHTS",
+      "published": "2026-11-06T11:36:03+00:00",
+      "url": "https://www.youtube.com/watch?v=d_FvxgWyOkE"
     },
     {
-      "id": "sUq0SC9Ga74",
-      "title": "\"She just showed why she is the World No.1\" | SQUASHTV analyse Amina Orfi's EPIC form",
-      "published": "2026-11-05T14:00:29+00:00",
-      "url": "https://www.youtube.com/watch?v=sUq0SC9Ga74"
+      "id": "2qAKPj6u9T8",
+      "title": "🇪🇬 Gawad v Eleinen 🇪🇬 | U.S. Open 2026 | QUARTER FINAL HIGHLIGHTS",
+      "published": "2026-11-06T11:36:00+00:00",
+      "url": "https://www.youtube.com/watch?v=2qAKPj6u9T8"
     },
     {
-      "id": "J2atLTIdNA8",
-      "title": "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Kennedy v ElSherbini 🇪🇬 | U.S. Open 2026 | QUARTER FINAL HIGHLIGHTS",
-      "published": "2026-11-05T10:32:36+00:00",
-      "url": "https://www.youtube.com/watch?v=J2atLTIdNA8"
+      "id": "MgeVysUEKBQ",
+      "title": "🇪🇬 Gohar v Ibrahim 🇪🇬 | U.S. Open 2026 | QUARTER FINAL HIGHLIGHTS",
+      "published": "2026-11-06T11:35:55+00:00",
+      "url": "https://www.youtube.com/watch?v=MgeVysUEKBQ"
     }
   ]
 }
