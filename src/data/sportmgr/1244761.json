@@ -36,6 +36,12 @@
       "grade": "A Grade"
     },
     {
+      "name": "Jonathan Towers",
+      "club": "",
+      "seed": "",
+      "grade": "A Grade"
+    },
+    {
       "name": "Max Lloyd",
       "club": "",
       "seed": "",
@@ -204,5 +210,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-05T23:55:46.140Z"
+  "syncedAt": "2026-11-06T14:45:52.463Z"
 }
