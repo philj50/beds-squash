@@ -11,7 +11,7 @@ import { url } from '@/lib/site';
       <p class="lede">
         People send photos, videos, links and articles from the <a href={url('/share/')}>Share</a> page.
         Nothing goes on the site until you publish it. Open Edit to change the sender, subject and content, then save.
-        Publish is a separate button.
+        Publish is a separate button. Tick On the main site to put a photo on the front page. Click a photo to see it larger. The newest published photo starts ticked.
       </p>
       <p class="status" data-status role="status"></p>
       <div data-panel="signed-in" hidden>
@@ -27,6 +27,13 @@ import { url } from '@/lib/site';
           <div data-pending></div>
           <h2>On the site</h2>
           <div data-live></div>
+          <dialog class="photo-view" data-photo-view>
+            <button class="photo-view__close" type="button" aria-label="Close" data-photo-close>×</button>
+            <figure>
+              <img alt="" data-photo-img />
+              <figcaption data-photo-cap></figcaption>
+            </figure>
+          </dialog>
           <h2>Add to the site</h2>
           <p class="hint">This goes on the site now, because you are publishing it. Videos can be up to 10 MB. Photos can be up to 8 MB.</p>
           <form class="card" data-form="add" novalidate>
@@ -88,6 +95,8 @@ import { url } from '@/lib/site';
     url: string | null;
     status: 'pending' | 'published';
     created_at: string;
+    published_at?: string | null;
+    on_front?: boolean;
   };
 
   const root = document.getElementById('share-admin');
@@ -123,7 +132,8 @@ import { url } from '@/lib/site';
 
   function preview(item: Item, signed: Map<string, string>) {
     if (item.kind === 'photo' && item.storage_path && signed.get(item.storage_path)) {
-      return `<img src="${escapeHtml(signed.get(item.storage_path)!)}" alt="" />`;
+      const alt = escapeHtml(item.caption?.trim() || 'Photo');
+      return `<button class="thumb" type="button" data-enlarge aria-label="Larger view of ${alt}"><img src="${escapeHtml(signed.get(item.storage_path)!)}" alt="${alt}" /></button>`;
     }
     if (item.kind === 'video' && item.storage_path && signed.get(item.storage_path)) {
       return `<video src="${escapeHtml(signed.get(item.storage_path)!)}" controls preload="metadata"></video>`;
@@ -186,7 +196,10 @@ import { url } from '@/lib/site';
         const heading = item.title || item.caption || item.kind;
         const publish = item.status === 'pending' ? `<button class="btn btn--primary btn--sm" type="button" data-publish="${item.id}">Publish</button>` : '';
         const edit = `<button class="btn btn--ghost btn--sm" type="button" data-edit="${item.id}">Edit</button>`;
-        return `<article class="item" data-item="${item.id}"><div class="item__media">${preview(item, signed)}</div><div><p class="pill">${escapeHtml(item.kind)}</p><h3>${escapeHtml(heading)}</h3><p class="hint">${escapeHtml(item.credit)} · ${when}</p><p class="actions">${edit}${publish}<button class="btn btn--ghost btn--sm" type="button" data-delete="${item.id}">Delete</button></p>${editor(item)}</div></article>`;
+        const front = item.kind === 'photo'
+          ? `<label class="front-tick"><input type="checkbox" data-front-photo="${item.id}" aria-label="On the main site: ${escapeHtml(heading)}"${item.on_front ? ' checked' : ''} /> On the main site</label>`
+          : '';
+        return `<article class="item" data-item="${item.id}"><div class="item__media">${preview(item, signed)}</div><div><p class="pill">${escapeHtml(item.kind)}</p><h3>${escapeHtml(heading)}</h3><p class="hint">${escapeHtml(item.credit)} · ${when}</p>${front ? `<p class="front-line">${front}</p>` : ''}<p class="actions">${edit}${publish}<button class="btn btn--ghost btn--sm" type="button" data-delete="${item.id}">Delete</button></p>${editor(item)}</div></article>`;
       })
       .join('');
   }
@@ -207,16 +220,31 @@ import { url } from '@/lib/site';
   }
 
   async function loadItems() {
-    const { data, error } = await supabase
+    const columns = 'id, kind, credit, title, caption, body, storage_path, url, status, created_at, published_at, on_front';
+    let { data, error } = await supabase
       .from('contributions')
-      .select('id, kind, credit, title, caption, body, storage_path, url, status, created_at')
+      .select(columns)
       .order('created_at', { ascending: false })
       .limit(100);
+    if (error) {
+      const retry = await supabase
+        .from('contributions')
+        .select('id, kind, credit, title, caption, body, storage_path, url, status, created_at, published_at')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      data = retry.data;
+      error = retry.error;
+    }
     if (error) {
       statusEl.textContent = error.message;
       return;
     }
     const items = (data ?? []) as Item[];
+    const publishedPhotos = items.filter((item) => item.kind === 'photo' && item.status === 'published');
+    if (publishedPhotos.length && publishedPhotos.every((item) => !item.on_front)) {
+      const newest = [...publishedPhotos].sort((a, b) => (b.published_at ?? b.created_at).localeCompare(a.published_at ?? a.created_at))[0];
+      if (newest) newest.on_front = true;
+    }
     const signed = await signedUrls(items);
     const waiting = items.filter((item) => item.status === 'pending');
     const live = items.filter((item) => item.status === 'published');
@@ -224,8 +252,40 @@ import { url } from '@/lib/site';
     liveEl.innerHTML = cards(live, signed);
   }
 
+  admin.addEventListener('change', async (event) => {
+    const box = (event.target as HTMLElement).closest<HTMLInputElement>('[data-front-photo]');
+    if (!box?.dataset.frontPhoto) return;
+    const on = box.checked;
+    statusEl.textContent = 'Saving…';
+    const { error } = await supabase.rpc('set_photo_on_front', { p_id: box.dataset.frontPhoto, p_on: on });
+    if (error) {
+      box.checked = !on;
+      statusEl.textContent = error.message;
+      return;
+    }
+    statusEl.textContent = on ? 'On the main site.' : 'Off the main site.';
+  });
+
+  const photoView = root.querySelector<HTMLDialogElement>('[data-photo-view]');
+  const photoImg = photoView?.querySelector<HTMLImageElement>('[data-photo-img]');
+  const photoCap = photoView?.querySelector<HTMLElement>('[data-photo-cap]');
+  photoView?.querySelector('[data-photo-close]')?.addEventListener('click', () => photoView.close());
+  photoView?.addEventListener('click', (event) => {
+    if (event.target === photoView) photoView.close();
+  });
+
   admin.addEventListener('click', async (event) => {
     const target = event.target as HTMLElement;
+    const enlarge = target.closest<HTMLButtonElement>('[data-enlarge]');
+    if (enlarge && photoView && photoImg && photoCap) {
+      const image = enlarge.querySelector('img');
+      if (!image) return;
+      photoImg.src = image.src;
+      photoImg.alt = image.alt;
+      photoCap.textContent = image.alt === 'Photo' ? '' : image.alt;
+      if (!photoView.open) photoView.showModal();
+      return;
+    }
     const edit = target.closest<HTMLButtonElement>('[data-edit]');
     const cancel = target.closest<HTMLButtonElement>('[data-cancel]');
     if (edit?.dataset.edit) {
@@ -589,6 +649,23 @@ import { url } from '@/lib/site';
   .status:empty {
     display: none;
   }
+  .front-line {
+    margin: 0.15rem 0 0.35rem;
+  }
+  .front-tick {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  .front-tick input {
+    width: 1.05rem;
+    height: 1.05rem;
+    padding: 0;
+    border: 0;
+    accent-color: var(--accent);
+  }
   .actions {
     display: flex;
     flex-wrap: wrap;
@@ -605,18 +682,67 @@ import { url } from '@/lib/site';
   }
   @media (min-width: 700px) {
     .item {
-      grid-template-columns: 12rem 1fr;
+      grid-template-columns: 6.2rem 1fr;
       align-items: start;
     }
   }
   .item h3 {
     margin: 0.25rem 0;
   }
-  .item img,
-  .item video {
-    width: 100%;
+  .thumb {
+    display: block;
+    width: 5.5rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: zoom-in;
+  }
+  .item img {
+    display: block;
+    width: 5.5rem;
+    height: 4.2rem;
+    object-fit: cover;
     border-radius: var(--radius-sm);
     background: var(--ink-700);
+  }
+  .item video {
+    width: min(100%, 16rem);
+    border-radius: var(--radius-sm);
+    background: var(--ink-700);
+  }
+  .photo-view {
+    position: relative;
+    border: 0;
+    padding: 0.75rem;
+    background: #0e2744;
+    color: #fff;
+    max-width: min(52rem, 94vw);
+  }
+  .photo-view::backdrop {
+    background: rgba(5, 6, 8, 0.78);
+  }
+  .photo-view img {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: min(50rem, 90vw);
+    max-height: 78vh;
+    object-fit: contain;
+    background: #08111c;
+  }
+  .photo-view figcaption:empty {
+    display: none;
+  }
+  .photo-view__close {
+    position: absolute;
+    top: 0.35rem;
+    right: 0.45rem;
+    border: 0;
+    background: transparent;
+    color: #fff;
+    font-size: 1.6rem;
+    line-height: 1;
+    cursor: pointer;
   }
   .item a {
     overflow-wrap: anywhere;

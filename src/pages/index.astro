@@ -370,6 +370,11 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
   #home-photos[hidden] {
     display: none;
   }
+  .home-photo {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.7rem;
+  }
   #home-photos :global(.photo-open) {
     display: block;
     width: min(100%, 28rem);
@@ -501,13 +506,23 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
     const host = photos.querySelector<HTMLElement>('[data-home-photos]')!;
     const escapeHtml = (value: string) =>
       value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
-    const { data } = await supabase
+    const chosen = await supabase
       .from('contributions')
       .select('caption, storage_path')
       .eq('kind', 'photo')
       .eq('status', 'published')
-      .order('published_at', { ascending: false })
-      .limit(1);
+      .eq('on_front', true)
+      .order('published_at', { ascending: false });
+    const fallback = chosen.error
+      ? await supabase
+          .from('contributions')
+          .select('caption, storage_path')
+          .eq('kind', 'photo')
+          .eq('status', 'published')
+          .order('published_at', { ascending: false })
+          .limit(1)
+      : null;
+    const data = chosen.error ? fallback?.data : chosen.data;
     const items = ((data ?? []) as HomePhoto[]).filter((item) => item.storage_path);
     if (items.length) {
       const { data: signed } = await supabase.storage.from('contributions').createSignedUrls(
