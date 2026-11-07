@@ -60,6 +60,18 @@
       "grade": "A Grade"
     },
     {
+      "name": "Nick Cartwright",
+      "club": "",
+      "seed": "",
+      "grade": "A Grade"
+    },
+    {
+      "name": "Sam Gelder",
+      "club": "",
+      "seed": "",
+      "grade": "A Grade"
+    },
+    {
       "name": "Samuel Morris",
       "club": "",
       "seed": "",
@@ -168,6 +180,12 @@
       "grade": "C Grade"
     },
     {
+      "name": "Lee Moore",
+      "club": "",
+      "seed": "",
+      "grade": "C Grade"
+    },
+    {
       "name": "Paul Kyndt",
       "club": "",
       "seed": "",
@@ -216,5 +234,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-07T13:42:58.528Z"
+  "syncedAt": "2026-11-07T22:28:07.169Z"
 }
