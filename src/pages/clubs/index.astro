@@ -110,9 +110,26 @@ const venues = clubs.filter((c) => !c.data.leagueClub && !c.data.associate);
     )
   }
 
+  <section class="section">
+    <div class="container cta">
+      <div>
+        <span class="eyebrow">Get involved</span>
+        <h2>New to squash? Returning after a break?</h2>
+        <p>
+          Every club in the county welcomes new players, and most teams are looking for members. Pay-and-play courts
+          are available across Bedford, Luton, Biggleswade, Flitwick and Leighton Buzzard.
+        </p>
+      </div>
+      <div class="cta__actions">
+        <a class="btn btn--primary" href="#new">Find your nearest court</a>
+        <a class="btn btn--ghost" href={url('/contact/')}>Contact the committee</a>
+      </div>
+    </div>
+  </section>
+
   {
     venues.length > 0 && (
-      <section class="section" style="border-top:1px solid var(--border)">
+      <section class="section" id="new" style="border-top:1px solid var(--border)">
         <div class="container">
           <div class="section-head">
             <h2>Pay &amp; play courts</h2>
@@ -169,5 +186,36 @@ const venues = clubs.filter((c) => !c.data.leagueClub && !c.data.associate);
     font-size: 0.95rem;
     margin: 0 0 0.75rem;
     line-height: 1.45;
+  }
+  .cta {
+    display: grid;
+    grid-template-columns: 1.4fr auto;
+    gap: 1rem;
+    align-items: center;
+    padding: 1.1rem 1.15rem;
+    border-radius: var(--radius);
+    background:
+      linear-gradient(135deg, rgba(241, 90, 34, 0.1), rgba(14, 39, 68, 0.04)),
+      #fff;
+    border: 1px solid var(--border-strong);
+  }
+  .cta h2,
+  .cta p {
+    margin: 0;
+  }
+  .cta p {
+    margin-top: 0.35rem;
+    color: var(--text-muted);
+    max-width: 62ch;
+  }
+  .cta__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.7rem;
+  }
+  @media (max-width: 800px) {
+    .cta {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

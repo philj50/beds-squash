@@ -30,14 +30,14 @@ test.describe('Public pages', () => {
     await open(page);
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Squash in Bedfordshire');
     await expect(page.locator('.news-card--large').getByRole('link', { name: 'Confirmed sponsors for the Beds County Closed' })).toBeVisible();
-    const latestCards = page.locator('.grid--3 .news-card');
-    await expect(latestCards).toHaveCount(3);
-    for (const card of await latestCards.all()) {
-      await expect(card.locator('h3 a')).not.toBeEmpty();
-    }
-    await expect(page.locator('.event').getByRole('link', { name: 'Winter League 2026/27 begins' })).toBeVisible();
-    await expect(page.locator('[data-now]')).toBeVisible();
-    await expect(page.locator('[data-now] [data-now-item]:not([hidden])')).toHaveCount(2);
+    await expect(page.locator('[data-home-news] [data-home-card]:not([hidden])')).toHaveCount(1);
+    await expect(page.getByRole('link', { name: 'Simon Bloomfield beat David Gibson in Division 2' })).toBeHidden();
+    await expect(page.locator('[data-home-events]').getByRole('link', { name: 'Junior County Closed' })).toBeVisible();
+    await expect(page.locator('[data-home-events]').getByRole('link', { name: 'Bedfordshire County Closed Championships 2027' })).toBeVisible();
+    await expect(page.locator('[data-home-events]').getByRole('link', { name: 'Winter League 2026/27 begins' })).toHaveCount(0);
+    await expect(page.locator('[data-now]')).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Clubs & courts' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Match commentary', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Find a club near you' })).toBeVisible();
     const rule = page.locator('[data-rule]');
     await expect(page.getByRole('heading', { name: 'Rule of the day' })).toBeVisible();

@@ -54,6 +54,7 @@ test.describe('Signed out', () => {
     'captains/you/',
     'captains/admin/',
     'captains/admin/articles/',
+    'captains/admin/events/',
     'captains/admin/share/',
     'captains/admin/minigame/',
     'juniors/closed/entries/',

@@ -5,7 +5,7 @@ summary: 140 matches, 100+ players and two Ladies grades for the first time as C
 image: /uploads/news/county-closed-2026.jpg
 imageAlt: Two players shake hands beside a trophy, with a crowd watching an indoor squash final.
 category: tournaments
-featured: true
+featured: false
 ---
 
 After 140 matches involving over 100 players across four days, Bedfordshire's latest squash champions have been crowned at Club Towers.

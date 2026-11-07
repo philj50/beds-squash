@@ -1,0 +1,215 @@
+---
+import Base from '@/layouts/Base.astro';
+import { eventDay, getEvents, todayKey } from '@/lib/content';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
+import { formatRange, url } from '@/lib/site';
+
+const today = todayKey();
+const siteEvents = (await getEvents())
+  .map((event) => ({
+    slug: event.id,
+    title: event.data.title,
+    start: eventDay(event),
+    when: formatRange(event.data.start, event.data.end),
+    passed: eventDay(event) < today,
+  }))
+  .sort((a, b) => {
+    if (a.passed !== b.passed) return a.passed ? 1 : -1;
+    return a.passed ? b.start.localeCompare(a.start) : a.start.localeCompare(b.start);
+  });
+const siteEventsJson = JSON.stringify(siteEvents).replaceAll('<', '\\u003c');
+---
+
+<Base title="Events" description="Choose which events appear on the front page. A passed date leaves the front page on its own." noindex>
+  <section class="section">
+    <div class="container events" id="events-app" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
+      <h1>Events</h1>
+      <p class="lede">
+        Tick Front page for the events that should appear under Coming up. Future events start ticked.
+        Once the date has passed, the tick switches off and the event leaves the front page. It stays on the events calendar.
+      </p>
+      <p class="status" data-status role="status"></p>
+      <div data-panel="signed-in" hidden>
+        <p class="who" data-who></p>
+        <p class="actions">
+          <a class="btn btn--ghost btn--sm" href={url('/captains/admin/')}>Admin</a>
+          <a class="btn btn--ghost btn--sm" href={url('/events/')}>Events calendar</a>
+          <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
+        </p>
+        <p data-denied hidden>This account cannot change events.</p>
+        <div data-admin hidden>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Event</th>
+                  <th>Front page</th>
+                </tr>
+              </thead>
+              <tbody data-rows></tbody>
+            </table>
+          </div>
+          <script type="application/json" id="site-events" is:inline set:html={siteEventsJson}></script>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+  import { loadAccount, noteActivity, privateStop, sendToLogin, stopMessage } from '@/lib/account';
+
+  type SiteEvent = {
+    slug: string;
+    title: string;
+    start: string;
+    when: string;
+    passed: boolean;
+  };
+
+  const root = document.getElementById('events-app');
+  if (!root) throw new Error('events app missing');
+  const supabase = createClient(root.dataset.url!, root.dataset.key!);
+  const statusEl = root.querySelector<HTMLElement>('[data-status]')!;
+  const signedIn = root.querySelector<HTMLElement>('[data-panel="signed-in"]')!;
+  const denied = root.querySelector<HTMLElement>('[data-denied]')!;
+  const admin = root.querySelector<HTMLElement>('[data-admin]')!;
+  const rows = root.querySelector<HTMLElement>('[data-rows]')!;
+  const whoEl = root.querySelector<HTMLElement>('[data-who]')!;
+  const siteEvents = JSON.parse(document.getElementById('site-events')?.textContent || '[]') as SiteEvent[];
+
+  const escapeHtml = (value: string) =>
+    value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
+
+  root.querySelector('[data-sign-out]')!.addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    await showSession();
+  });
+
+  function paint(onFront: Map<string, boolean>) {
+    rows.innerHTML = siteEvents.map((event) => {
+      const stored = onFront.get(event.slug);
+      const on = event.passed ? false : stored === undefined ? true : stored;
+      const box = `<label class="front-tick"><input type="checkbox" data-front="${escapeHtml(event.slug)}" aria-label="Front page: ${escapeHtml(event.title)}"${on ? ' checked' : ''}${event.passed ? ' disabled' : ''} /></label>`;
+      const when = event.passed ? `${event.when} · date passed` : event.when;
+      return `<tr><td>${escapeHtml(when)}</td><td>${escapeHtml(event.title)}</td><td class="front">${box}</td></tr>`;
+    }).join('') || '<tr><td colspan="3">No events yet.</td></tr>';
+  }
+
+  root.addEventListener('change', async (event) => {
+    const box = (event.target as HTMLElement).closest<HTMLInputElement>('[data-front]');
+    if (!box?.dataset.front || box.disabled) return;
+    const on = box.checked;
+    statusEl.textContent = 'Saving…';
+    const { error } = await supabase.rpc('set_event_on_front', { p_slug: box.dataset.front, p_on: on });
+    if (error) {
+      box.checked = !on;
+      statusEl.textContent = error.message;
+      return;
+    }
+    statusEl.textContent = on ? 'On the front page.' : 'Off the front page.';
+  });
+
+  async function showSession() {
+    const { data } = await supabase.auth.getSession();
+    const session = data.session;
+    signedIn.hidden = !session;
+    admin.hidden = true;
+    denied.hidden = true;
+    if (!session) {
+      sendToLogin();
+      return;
+    }
+    whoEl.textContent = session.user.email ?? 'Signed in';
+    const account = await loadAccount(supabase);
+    if (account) {
+      const stop = await privateStop(supabase, account);
+      if (stop) {
+        denied.hidden = false;
+        denied.textContent = stopMessage(stop);
+        return;
+      }
+    }
+    if (!account?.isAdmin) {
+      denied.hidden = false;
+      denied.textContent = 'This account cannot change events.';
+      return;
+    }
+    void noteActivity(supabase);
+    admin.hidden = false;
+    paint(new Map());
+    const { data: frontRows, error } = await supabase.rpc('event_front_page');
+    if (error) {
+      statusEl.textContent = error.message;
+      return;
+    }
+    const onFront = new Map(
+      (Array.isArray(frontRows) ? (frontRows as { slug: string; on_front: boolean }[]) : [])
+        .filter((row) => row.slug)
+        .map((row) => [row.slug, Boolean(row.on_front)] as const),
+    );
+    for (const event of siteEvents) {
+      if (event.passed && onFront.get(event.slug) === true) {
+        const { error: clearError } = await supabase.rpc('set_event_on_front', { p_slug: event.slug, p_on: false });
+        if (!clearError) onFront.set(event.slug, false);
+      }
+    }
+    paint(onFront);
+  }
+
+  showSession();
+</script>
+
+<style is:global>
+  #events-app {
+    max-width: 52rem;
+  }
+  #events-app .lede,
+  #events-app .who {
+    color: var(--ink-200);
+  }
+  #events-app .status:empty {
+    display: none;
+  }
+  #events-app .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  #events-app .table-wrap {
+    overflow-x: auto;
+  }
+  #events-app table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  #events-app th,
+  #events-app td {
+    text-align: left;
+    vertical-align: middle;
+    padding: 0.35rem 0.4rem;
+    border-bottom: 1px solid var(--border);
+  }
+  #events-app td:first-child {
+    white-space: nowrap;
+  }
+  #events-app .front {
+    text-align: center;
+    width: 1%;
+  }
+  #events-app .front-tick {
+    display: inline-flex;
+    justify-content: center;
+  }
+  #events-app .front-tick input {
+    width: 1.05rem;
+    height: 1.05rem;
+    accent-color: var(--accent);
+  }
+  #events-app [hidden] {
+    display: none !important;
+  }
+</style>

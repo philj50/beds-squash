@@ -8,6 +8,7 @@ import closed2027 from '@/data/sportmgr/1244761.json';
 const captainsHref = url('/captains/');
 const juniorEntriesHref = url('/juniors/closed/entries/');
 const articlesHref = url('/captains/admin/articles/');
+const eventsHref = url('/captains/admin/events/');
 const shareHref = url('/captains/admin/share/');
 const scoresHref = url('/captains/admin/minigame/');
 ---
@@ -40,6 +41,7 @@ const scoresHref = url('/captains/admin/minigame/');
           <a class="btn btn--ghost btn--sm" href={`${captainsHref}matches/`}>Matches</a>
           <a class="btn btn--ghost btn--sm" data-junior-link hidden href={juniorEntriesHref}>Junior entries</a>
           <a class="btn btn--ghost btn--sm" href={articlesHref}>Articles</a>
+          <a class="btn btn--ghost btn--sm" href={eventsHref}>Events</a>
           <a class="btn btn--ghost btn--sm" data-share-link hidden href={shareHref}>Shared content</a>
           <a class="btn btn--ghost btn--sm" data-scores-link hidden href={scoresHref}>Minigame mk4 results</a>
           <button class="btn btn--ghost btn--sm" type="button" data-lm-only data-tab-button="traffic" hidden>Traffic</button>

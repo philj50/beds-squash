@@ -2,42 +2,15 @@
 import Base from '@/layouts/Base.astro';
 import NewsCard from '@/components/NewsCard.astro';
 import EventCard from '@/components/EventCard.astro';
-import ClubMap from '@/components/ClubMap.astro';
-import PsaTour from '@/components/PsaTour.astro';
-import { getNews, getUpcomingEvents, getClubs, onMainNewsList } from '@/lib/content';
-import { toMapClubs } from '@/lib/geo';
-import { CATEGORY_LABEL, SITE, formatShort, url } from '@/lib/site';
+import { eventDay, getNews, getUpcomingEvents, getClubs, todayKey } from '@/lib/content';
+import { SITE, url } from '@/lib/site';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase-public';
 import { ruleFor, SINGLES_RULES_EDITION, SINGLES_RULES_URL } from '@/lib/squash-rules';
 
-const news = (await getNews()).filter(onMainNewsList);
-const featured = news.find((p) => p.data.featured) ?? news[0];
-const latest = news.filter((p) => p.id !== featured?.id).slice(0, 3);
-const upcoming = (await getUpcomingEvents()).slice(0, 4);
-const stories = news.slice(0, 6).map((post) => ({
-  kicker: CATEGORY_LABEL[post.data.category] ?? 'News',
-  title: post.data.title,
-  href: url(`/news/${post.id}/`),
-  when: formatShort(post.data.date),
-}));
-const nextOn = upcoming[0];
-const hooks = [
-  ...(stories[0] ? [stories[0]] : []),
-  ...(nextOn
-    ? [
-        {
-          kicker: 'Coming up',
-          title: nextOn.data.title,
-          href: url(`/events/${nextOn.id}/`),
-          when: formatShort(nextOn.data.start),
-        },
-      ]
-    : []),
-  ...stories.slice(1),
-];
+const news = await getNews();
+const upcoming = (await getUpcomingEvents()).filter((event) => eventDay(event) >= todayKey()).slice(0, 4);
 const rule = ruleFor(new Date());
 const clubs = await getClubs();
-const mapClubs = await toMapClubs(clubs);
 const leagueClubs = clubs.filter((c) => c.data.leagueClub && !c.data.associate);
 const totalCourts = clubs.reduce((n, c) => n + (c.data.courts ?? 0), 0);
 const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
@@ -57,35 +30,6 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
           The county home of squash and racketball — leagues, tournaments, juniors, county teams and every club and
           court from Luton to Bedford.
         </p>
-        {
-          hooks.length > 0 && (
-            <div class="now" data-now>
-              <div class="now__bar">
-                <p class="now__label">Just in</p>
-                <div class="now__nav">
-                  <button class="now__btn" type="button" data-now-prev>
-                    Back
-                  </button>
-                  <button class="now__btn" type="button" data-now-next>
-                    Next
-                  </button>
-                </div>
-              </div>
-              <div class="now__links">
-                {hooks.map((item, index) => (
-                  <a class="now__link" href={item.href} data-now-item hidden={index > 1}>
-                    <span class="now__kicker">{item.kicker}</span>
-                    <span class="now__when">{item.when}</span>
-                    <span class="now__title">{item.title}</span>
-                  </a>
-                ))}
-              </div>
-              <div class="now__meter" aria-hidden="true">
-                <span data-now-meter />
-              </div>
-            </div>
-          )
-        }
         <div class="hero__cta">
           <a class="btn btn--primary" href={url('/captains/watch/')}>Match commentary</a>
           <a class="btn btn--ghost" href={url('/clubs/')}>Find a club near you</a>
@@ -157,22 +101,19 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
 
   <!-- NEWS -->
   {
-    featured && (
-      <section class="section" data-home-news>
+    news.length > 0 && (
+      <section class="section" data-home-news data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
         <div class="container">
           <div class="section-head">
             <h2>Latest news</h2>
             <a href={url('/news/')}>All news →</a>
           </div>
-          <div class="stack" style="--stack: 1.25rem">
-            <NewsCard post={featured} large />
-            {latest.length > 0 && (
-              <div class="grid grid--3">
-                {latest.map((p) => (
-                  <NewsCard post={p} />
-                ))}
+          <div class="home-news" data-home-list>
+            {news.map((post) => (
+              <div data-home-card data-slug={post.id} data-front={post.data.featured ? 'yes' : 'no'} hidden={!post.data.featured}>
+                <NewsCard post={post} large={post.data.featured} />
               </div>
-            )}
+            ))}
           </div>
         </div>
       </section>
@@ -185,7 +126,7 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
         <h2>Photos</h2>
         <a href={url('/gallery/')}>All photos →</a>
       </div>
-      <div class="grid grid--4" data-home-photos></div>
+      <div class="home-photo" data-home-photos></div>
     </div>
     <dialog class="photo-view" data-photo-view>
       <button class="photo-view__close" type="button" aria-label="Close" data-photo-close>×</button>
@@ -197,23 +138,22 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
   </section>
 
   <!-- EVENTS -->
-  <section class="section events-band">
+  <section class="section events-band" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY}>
     <div class="container">
       <div class="section-head">
         <h2>Coming up</h2>
         <a href={url('/events/')}>Full calendar →</a>
       </div>
-      {
-        upcoming.length > 0 ? (
-          <div class="grid grid--2">
-            {upcoming.map((e) => (
-              <EventCard event={e} />
-            ))}
+      <div class="grid grid--2" data-home-events hidden={upcoming.length === 0}>
+        {upcoming.map((event) => (
+          <div data-home-event data-slug={event.id} data-start={eventDay(event)}>
+            <EventCard event={event} />
           </div>
-        ) : (
-          <p class="notice">No upcoming events listed yet. Check back soon or see the England Squash calendar.</p>
-        )
-      }
+        ))}
+      </div>
+      <p class="notice" data-home-events-empty hidden={upcoming.length > 0}>
+        No upcoming events listed yet. Check back soon or see the England Squash calendar.
+      </p>
       <p class="muted small">
         Includes county events, club tournaments and key <a href={SITE.englandSquashEvents} target="_blank" rel="noopener">England Squash</a> dates.
         <a href={url('/events.ics')}>Subscribe to the calendar</a>.
@@ -221,46 +161,6 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
     </div>
   </section>
 
-  <PsaTour compact />
-
-  <!-- MAP -->
-  <section class="section">
-    <div class="container">
-      <div class="section-head">
-        <h2>Clubs &amp; courts</h2>
-        <a href={url('/clubs/')}>All clubs →</a>
-      </div>
-      <ClubMap clubs={mapClubs} height="320px" />
-      <div class="club-chips">
-        {
-          leagueClubs.map((c) => (
-            <a class="chip" href={url(`/clubs/${c.id}/`)}>
-              {c.data.name}
-              {c.data.town && <small>{c.data.town}</small>}
-            </a>
-          ))
-        }
-      </div>
-    </div>
-  </section>
-
-  <!-- CTA -->
-  <section class="section">
-    <div class="container cta">
-      <div>
-        <span class="eyebrow">Get involved</span>
-        <h2>New to squash? Returning after a break?</h2>
-        <p>
-          Every club in the county welcomes new players, and most teams are looking for members. Pay-and-play courts
-          are available across Bedford, Luton, Biggleswade, Flitwick and Leighton Buzzard.
-        </p>
-      </div>
-      <div class="cta__actions">
-        <a class="btn btn--primary" href={url('/clubs/')}>Find your nearest court</a>
-        <a class="btn btn--ghost" href={url('/contact/')}>Contact the committee</a>
-      </div>
-    </div>
-  </section>
 </Base>
 
 <style>
@@ -450,201 +350,6 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
     margin: 1.25rem 0 0;
   }
 
-  .club-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 1rem;
-  }
-  .chip {
-    display: inline-flex;
-    flex-direction: column;
-    padding: 0.25rem 0.55rem;
-    border: 1px solid var(--border-strong);
-    border-radius: 10px;
-    color: var(--text);
-    text-decoration: none;
-    font-weight: 600;
-    font-size: 0.95rem;
-    line-height: 1.2;
-  }
-  .chip small {
-    color: var(--text-muted);
-    font-weight: 400;
-    font-size: 0.75rem;
-  }
-  .chip:hover {
-    border-color: var(--accent);
-  }
-
-  .cta {
-    display: grid;
-    grid-template-columns: 1.4fr 1fr;
-    gap: 1rem;
-    align-items: center;
-    padding: 0.85rem 1rem;
-    border-radius: var(--radius);
-    background:
-      linear-gradient(135deg, rgba(241, 90, 34, 0.1), rgba(14, 39, 68, 0.04)),
-      #fff;
-    border: 1px solid var(--border-strong);
-  }
-  .cta p {
-    color: var(--text-muted);
-    margin: 0;
-  }
-  .cta__actions {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    align-items: flex-start;
-  }
-
-  .now {
-    margin: 0.85rem 0 0.15rem;
-    background: #fff;
-    border: 1px solid var(--border-strong);
-    border-left: 4px solid var(--accent);
-    border-radius: var(--radius);
-    padding: 0.45rem 0.7rem 0.4rem;
-  }
-  .now__bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-  }
-  .now__label {
-    margin: 0;
-    font-family: var(--font-display);
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    font-size: 0.8rem;
-    color: var(--accent);
-  }
-  .now__nav {
-    display: none;
-    gap: 0.35rem;
-  }
-  .now--live .now__nav {
-    display: flex;
-  }
-  .now__btn {
-    font: inherit;
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: #0e2744;
-    background: #fff;
-    border: 1px solid rgba(14, 39, 68, 0.28);
-    border-radius: 999px;
-    padding: 0.15rem 0.6rem;
-    cursor: pointer;
-  }
-  .now__btn:hover {
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-  .now__links {
-    display: grid;
-    gap: 0.15rem;
-  }
-  @media (min-width: 720px) {
-    .now__links {
-      grid-template-columns: 1fr 1fr;
-      gap: 0.65rem;
-    }
-  }
-  .now__link[hidden] {
-    display: none;
-  }
-  .now__link {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    grid-template-areas:
-      'kicker when'
-      'title title';
-    column-gap: 0.6rem;
-    row-gap: 0.1rem;
-    padding: 0.4rem 0 0.25rem;
-    color: #0e2744;
-    text-decoration: none;
-    border-top: 1px solid rgba(14, 39, 68, 0.12);
-  }
-  @media (min-width: 720px) {
-    .now__link {
-      border-top: 0;
-      padding-top: 0.35rem;
-    }
-  }
-  .now__link.is-fresh {
-    animation: now-in 0.35s ease;
-  }
-  .now__kicker {
-    grid-area: kicker;
-    color: var(--accent);
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-  .now__when {
-    grid-area: when;
-    justify-self: end;
-    color: #3d4d5f;
-    font-size: 0.75rem;
-  }
-  .now__title {
-    grid-area: title;
-    font-family: var(--font-display);
-    font-weight: 700;
-    font-size: 1.08rem;
-    line-height: 1.15;
-    letter-spacing: 0.01em;
-    text-transform: uppercase;
-  }
-  .now__link:hover .now__title {
-    color: var(--accent);
-  }
-  .now__meter {
-    display: none;
-    height: 2px;
-    margin-top: 0.2rem;
-    border-radius: 2px;
-    background: rgba(14, 39, 68, 0.08);
-    overflow: hidden;
-  }
-  .now--live .now__meter {
-    display: block;
-  }
-  .now__meter span {
-    display: block;
-    height: 100%;
-    width: 0;
-    background: var(--accent);
-  }
-  .now__meter span.is-on {
-    animation: now-meter var(--now-hold, 600s) linear;
-  }
-  @keyframes now-in {
-    from {
-      opacity: 0;
-      transform: translateY(4px);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-    }
-  }
-  @keyframes now-meter {
-    from {
-      width: 0;
-    }
-    to {
-      width: 100%;
-    }
-  }
-
   @media (max-width: 900px) {
     .hero__inner {
       grid-template-columns: 1fr;
@@ -661,16 +366,13 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
       font-size: 0.68rem;
       letter-spacing: 0.04em;
     }
-    .cta {
-      grid-template-columns: 1fr;
-    }
   }
   #home-photos[hidden] {
     display: none;
   }
   #home-photos :global(.photo-open) {
     display: block;
-    width: 100%;
+    width: min(100%, 28rem);
     padding: 0;
     border: 0;
     background: none;
@@ -678,6 +380,22 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
   }
   #home-photos :global(.photo-open img) {
     display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+  }
+  .home-news--many {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+  .home-news--many .is-lead {
+    grid-column: 1 / -1;
+  }
+  @media (max-width: 720px) {
+    .home-news--many {
+      grid-template-columns: 1fr;
+    }
   }
   .photo-view {
     border: 0;
@@ -789,7 +507,7 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
       .eq('kind', 'photo')
       .eq('status', 'published')
       .order('published_at', { ascending: false })
-      .limit(4);
+      .limit(1);
     const items = ((data ?? []) as HomePhoto[]).filter((item) => item.storage_path);
     if (items.length) {
       const { data: signed } = await supabase.storage.from('contributions').createSignedUrls(
@@ -827,6 +545,81 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
 </script>
 
 <script>
+  import { createClient } from '@supabase/supabase-js';
+
+  const homeNews = document.querySelector<HTMLElement>('[data-home-news]');
+  const homeList = homeNews?.querySelector<HTMLElement>('[data-home-list]');
+  if (homeNews && homeList && homeNews.dataset.url && homeNews.dataset.key) {
+    const frontClient = createClient(homeNews.dataset.url, homeNews.dataset.key);
+    const layoutHomeNews = () => {
+      const cards = [...homeList.querySelectorAll<HTMLElement>('[data-home-card]')];
+      const shown = cards.filter((card) => !card.hidden && card.isConnected);
+      homeList.classList.toggle('home-news--many', shown.length > 1);
+      cards.forEach((card) => card.classList.remove('is-lead', 'is-rest'));
+      shown.forEach((card, index) => {
+        card.classList.add(shown.length > 1 && index > 0 ? 'is-rest' : 'is-lead');
+        card.querySelector('.news-card')?.classList.toggle('news-card--large', shown.length === 1 || index === 0);
+      });
+      homeNews.hidden = shown.length === 0;
+    };
+    const applyFrontPage = async () => {
+      const { data, error } = await frontClient.rpc('news_front_page');
+      if (error || !Array.isArray(data) || data.length === 0) {
+        layoutHomeNews();
+        return;
+      }
+      const chosen = new Map(
+        (data as { slug: string; on_front: boolean }[])
+          .filter((row) => row.slug)
+          .map((row) => [row.slug, Boolean(row.on_front)]),
+      );
+      homeList.querySelectorAll<HTMLElement>('[data-home-card]').forEach((card) => {
+        const slug = card.dataset.slug ?? '';
+        card.hidden = chosen.has(slug) ? !chosen.get(slug) : true;
+      });
+      layoutHomeNews();
+    };
+    document.addEventListener('beds-match-places', layoutHomeNews);
+    void applyFrontPage();
+  }
+
+  const homeEvents = document.querySelector<HTMLElement>('[data-home-events]');
+  if (homeEvents) {
+    const today = new Date();
+    const todayStamp = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const empty = document.querySelector<HTMLElement>('[data-home-events-empty]');
+    const showEvents = () => {
+      const shown = [...homeEvents.querySelectorAll<HTMLElement>('[data-home-event]')].filter((card) => !card.hidden);
+      homeEvents.hidden = shown.length === 0;
+      if (empty) empty.hidden = shown.length > 0;
+    };
+    homeEvents.querySelectorAll<HTMLElement>('[data-home-event]').forEach((card) => {
+      if ((card.dataset.start ?? '') < todayStamp) card.hidden = true;
+    });
+    showEvents();
+    const eventRoot = homeEvents.closest<HTMLElement>('[data-url]');
+    if (eventRoot?.dataset.url && eventRoot.dataset.key) {
+      const eventClient = createClient(eventRoot.dataset.url, eventRoot.dataset.key);
+      const { data, error } = await eventClient.rpc('event_front_page');
+      if (!error && Array.isArray(data) && data.length > 0) {
+        const chosen = new Map(
+          (data as { slug: string; on_front: boolean }[])
+            .filter((row) => row.slug)
+            .map((row) => [row.slug, Boolean(row.on_front)]),
+        );
+        homeEvents.querySelectorAll<HTMLElement>('[data-home-event]').forEach((card) => {
+          const slug = card.dataset.slug ?? '';
+          const passed = (card.dataset.start ?? '') < todayStamp;
+          if (passed) card.hidden = true;
+          else if (chosen.has(slug)) card.hidden = !chosen.get(slug);
+        });
+        showEvents();
+      }
+    }
+  }
+</script>
+
+<script>
   import { ruleFor } from '@/lib/squash-rules';
 
   const ruleCard = document.querySelector('[data-rule]');
@@ -842,127 +635,6 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
       if (title) title.textContent = today.title;
       if (text) text.textContent = today.text;
       if (ref) ref.textContent = today.rule;
-    }
-  }
-
-  const root = document.querySelector('[data-now]');
-  if (root instanceof HTMLElement) {
-    let items = [...root.querySelectorAll<HTMLElement>('[data-now-item]')];
-    const meter = root.querySelector<HTMLElement>('[data-now-meter]');
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (items.length > 2) {
-      const hold = 10 * 60 * 1000;
-      root.style.setProperty('--now-hold', `${hold}ms`);
-      let pages = Math.ceil(items.length / 2);
-      let page = 0;
-      let timer = 0;
-      let paused = false;
-      let swiped = false;
-
-      const show = (nextPage: number) => {
-        page = ((nextPage % pages) + pages) % pages;
-        const start = page * 2;
-        items.forEach((item, index) => {
-          const on = index === start || index === start + 1;
-          item.hidden = !on;
-          item.classList.toggle('is-fresh', on && !reduce);
-        });
-        if (meter && !reduce && !paused) {
-          meter.classList.remove('is-on');
-          void meter.offsetWidth;
-          meter.classList.add('is-on');
-        }
-      };
-
-      const stop = () => {
-        window.clearInterval(timer);
-        timer = 0;
-        meter?.classList.remove('is-on');
-      };
-
-      const play = () => {
-        stop();
-        if (reduce || paused) return;
-        timer = window.setInterval(() => show(page + 1), hold);
-        if (meter) {
-          meter.classList.remove('is-on');
-          void meter.offsetWidth;
-          meter.classList.add('is-on');
-        }
-      };
-
-      root.querySelector('[data-now-prev]')?.addEventListener('click', () => {
-        show(page - 1);
-        play();
-      });
-      root.querySelector('[data-now-next]')?.addEventListener('click', () => {
-        show(page + 1);
-        play();
-      });
-      if (!window.matchMedia('(pointer: coarse)').matches) {
-        root.addEventListener('pointerenter', () => {
-          paused = true;
-          stop();
-        });
-        root.addEventListener('pointerleave', () => {
-          paused = false;
-          play();
-        });
-      }
-      root.addEventListener('focusin', () => {
-        paused = true;
-        stop();
-      });
-      root.addEventListener('focusout', (event) => {
-        if (event.relatedTarget instanceof Node && root.contains(event.relatedTarget)) return;
-        paused = false;
-        play();
-      });
-
-      let touchX = 0;
-      root.addEventListener(
-        'touchstart',
-        (event) => {
-          touchX = event.changedTouches[0]?.clientX ?? 0;
-          swiped = false;
-        },
-        { passive: true },
-      );
-      root.addEventListener(
-        'touchend',
-        (event) => {
-          const delta = (event.changedTouches[0]?.clientX ?? touchX) - touchX;
-          if (Math.abs(delta) < 36) return;
-          swiped = true;
-          show(delta < 0 ? page + 1 : page - 1);
-          play();
-        },
-        { passive: true },
-      );
-      root.addEventListener(
-        'click',
-        (event) => {
-          if (!swiped) return;
-          event.preventDefault();
-          swiped = false;
-        },
-        true,
-      );
-
-      document.addEventListener('beds-match-places', () => {
-        items = items.filter((item) => item.isConnected);
-        pages = Math.ceil(items.length / 2);
-        if (pages < 1) {
-          root.hidden = true;
-          stop();
-          return;
-        }
-        show(Math.min(page, pages - 1));
-      });
-
-      root.classList.add('now--live');
-      show(0);
-      play();
     }
   }
 </script>

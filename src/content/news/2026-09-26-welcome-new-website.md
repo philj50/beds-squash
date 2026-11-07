@@ -5,7 +5,7 @@ summary: A fresh home for squash and racketball in Bedfordshire — clubs map, e
 image: /uploads/news/welcome-website.jpg
 imageAlt: A laptop showing a map of clubs and a calendar, with a squash ball and racket on the desk beside it.
 category: website
-featured: true
+featured: false
 ---
 
 Welcome to the new home of squash and racketball in Bedfordshire.

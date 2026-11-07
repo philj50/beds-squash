@@ -27,7 +27,8 @@ const siteArticlesJson = JSON.stringify(siteArticles).replaceAll('<', '\\u003c')
       <p class="lede">
         Match reports are one article for each division that played. Automatic publishing is on to start with.
         Switch to manual and a match waits here until you approve it.
-        Other news is listed underneath. Edit changes the subject, summary and text.
+        Other news is listed underneath. Tick Front page for the articles that should appear on the front page.
+        Edit changes the subject, summary and text.
         Archive files a match under Match history. Delete takes an article off the site. Nothing is emailed.
       </p>
       <p class="status" data-status role="status"></p>
@@ -61,6 +62,7 @@ const siteArticlesJson = JSON.stringify(siteArticles).replaceAll('<', '\\u003c')
                   <th>Date</th>
                   <th>Article</th>
                   <th>Status</th>
+                  <th>Front page</th>
                   <th></th>
                 </tr>
               </thead>
@@ -77,6 +79,7 @@ const siteArticlesJson = JSON.stringify(siteArticles).replaceAll('<', '\\u003c')
                   <th>Article</th>
                   <th>Section</th>
                   <th>Status</th>
+                  <th>Front page</th>
                   <th></th>
                 </tr>
               </thead>
@@ -151,6 +154,20 @@ const siteArticlesJson = JSON.stringify(siteArticles).replaceAll('<', '\\u003c')
     await showSession();
   });
 
+  root.addEventListener('change', async (event) => {
+    const box = (event.target as HTMLElement).closest<HTMLInputElement>('[data-front]');
+    if (!box?.dataset.front) return;
+    const on = box.checked;
+    statusEl.textContent = 'Saving…';
+    const { error } = await supabase.rpc('set_news_on_front', { p_slug: box.dataset.front, p_on: on });
+    if (error) {
+      box.checked = !on;
+      statusEl.textContent = error.message;
+      return;
+    }
+    statusEl.textContent = on ? 'On the front page.' : 'Off the front page.';
+  });
+
   root.querySelector<HTMLFormElement>('[data-form="mode"]')!.addEventListener('submit', async (event) => {
     event.preventDefault();
     statusEl.textContent = 'Saving…';
@@ -174,7 +191,7 @@ const siteArticlesJson = JSON.stringify(siteArticles).replaceAll('<', '\\u003c')
     const lead = article.status === 'published' || article.status === 'archived'
       ? 'Change the subject, summary and text in the boxes below. Save changes updates this article on the site.'
       : 'Change the subject, summary and text in the boxes below. Save changes keeps them. Approve publishes the article.';
-    return `<tr data-editor-row="${article.id}" hidden><td colspan="4"><form class="stack editor" data-editor="${article.id}" data-picture="${escapeHtml(pictureNote(article.body))}">
+    return `<tr data-editor-row="${article.id}" hidden><td colspan="5"><form class="stack editor" data-editor="${article.id}" data-picture="${escapeHtml(pictureNote(article.body))}">
       <p class="editor__lead">${lead}</p>
       ${editField('Subject', 'The heading on the news page.', `<input name="title" maxlength="180" value="${escapeHtml(article.title)}" />`)}
       ${editField('Summary', 'The short line under the heading.', `<input name="summary" maxlength="400" value="${escapeHtml(article.summary ?? '')}" />`, 'Optional')}
@@ -217,16 +234,20 @@ const siteArticlesJson = JSON.stringify(siteArticles).replaceAll('<', '\\u003c')
         ? 'It is back on the home page.'
         : 'Deleted. It is off the site.';
     statusEl.textContent = waiting;
+    const frontSlug = placeButton.closest('tr')?.querySelector<HTMLInputElement>('[data-front]')?.dataset.front;
     const { error } = await supabase.rpc('set_match_article_place', {
       p_id: Number(placeButton.dataset.id),
       p_place: place,
     });
+    if (!error && place === 'delete' && frontSlug) {
+      await supabase.rpc('set_news_on_front', { p_slug: frontSlug, p_on: false });
+    }
     statusEl.textContent = error ? error.message : done;
     if (!error) await showSession();
   });
 
   function siteEditor(article: SiteArticle) {
-    return `<tr data-editor-row="${escapeHtml(article.slug)}" hidden><td colspan="5"><form class="stack editor" data-site-editor="${escapeHtml(article.slug)}">
+    return `<tr data-editor-row="${escapeHtml(article.slug)}" hidden><td colspan="6"><form class="stack editor" data-site-editor="${escapeHtml(article.slug)}">
       <p class="editor__lead">Change the subject, summary and text in the boxes below. Save changes updates this article on the site.</p>
       ${editField('Subject', 'The heading on the news page.', `<input name="title" maxlength="180" value="${escapeHtml(article.title)}" />`)}
       ${editField('Summary', 'The short line under the heading.', `<input name="summary" maxlength="400" value="${escapeHtml(article.summary)}" />`, 'Optional')}
@@ -235,7 +256,11 @@ const siteArticlesJson = JSON.stringify(siteArticles).replaceAll('<', '\\u003c')
     </form></td></tr>`;
   }
 
-  function paintSite(edits: SiteEdit[], matchSlugs: Set<string>) {
+  function frontTick(slug: string, title: string, on: boolean) {
+    return `<td class="front"><label class="front-tick"><input type="checkbox" data-front="${escapeHtml(slug)}" aria-label="Front page: ${escapeHtml(title)}"${on ? ' checked' : ''} /></label></td>`;
+  }
+
+  function paintSite(edits: SiteEdit[], matchSlugs: Set<string>, onFront: Set<string>) {
     const bySlug = new Map(edits.map((row) => [row.slug, row]));
     const list = siteArticles.filter((article) => !matchSlugs.has(article.slug));
     siteRows.innerHTML = list.map((article) => {
@@ -251,8 +276,9 @@ const siteArticlesJson = JSON.stringify(siteArticles).replaceAll('<', '\\u003c')
       const buttons = removed
         ? ''
         : `<button class="btn btn--ghost btn--sm" type="button" data-site-edit="${escapeHtml(article.slug)}">Edit</button><button class="btn btn--ghost btn--sm" type="button" data-site-delete="${escapeHtml(article.slug)}" data-title="${escapeHtml(current.title)}">Delete</button>`;
-      return `<tr><td>${escapeHtml(article.date)}</td><td data-site-title="${escapeHtml(article.slug)}">${escapeHtml(current.title)}</td><td>${escapeHtml(sectionLabel[article.category] ?? article.category)}</td><td>${status}</td><td class="actions">${buttons}</td></tr>${removed ? '' : siteEditor(current)}`;
-    }).join('') || '<tr><td colspan="5">No other articles.</td></tr>';
+      const front = removed ? '<td></td>' : frontTick(article.slug, current.title, onFront.has(article.slug));
+      return `<tr><td>${escapeHtml(article.date)}</td><td data-site-title="${escapeHtml(article.slug)}">${escapeHtml(current.title)}</td><td>${escapeHtml(sectionLabel[article.category] ?? article.category)}</td><td>${status}</td>${front}<td class="actions">${buttons}</td></tr>${removed ? '' : siteEditor(current)}`;
+    }).join('') || '<tr><td colspan="6">No other articles.</td></tr>';
   }
 
   siteRows.addEventListener('click', async (event) => {
@@ -275,6 +301,7 @@ const siteArticlesJson = JSON.stringify(siteArticles).replaceAll('<', '\\u003c')
     if (!window.confirm(`Remove “${title}” from the site? It leaves the news list.`)) return;
     statusEl.textContent = 'Deleting…';
     const { error } = await supabase.rpc('delete_news_article', { p_slug: remove.dataset.siteDelete });
+    if (!error) await supabase.rpc('set_news_on_front', { p_slug: remove.dataset.siteDelete, p_on: false });
     statusEl.textContent = error ? error.message : 'Deleted. It is off the site.';
     if (!error) await showSession();
   });
@@ -404,6 +431,12 @@ const siteArticlesJson = JSON.stringify(siteArticles).replaceAll('<', '\\u003c')
       deleted: 'Removed',
     };
     const matchSlugs = new Set((articles as Article[]).map((article) => article.slug));
+    const { data: frontRows } = await supabase.rpc('news_front_page');
+    const onFront = new Set(
+      (Array.isArray(frontRows) ? (frontRows as { slug: string; on_front: boolean }[]) : [])
+        .filter((row) => row.on_front && row.slug)
+        .map((row) => row.slug),
+    );
     rows.innerHTML = (articles as Article[]).map((article) => {
       const approve = article.status === 'held'
         ? `<button class="btn btn--ghost btn--sm" type="button" data-approve="${article.id}">Approve</button>`
@@ -420,11 +453,12 @@ const siteArticlesJson = JSON.stringify(siteArticles).replaceAll('<', '\\u003c')
       const edit = article.status === 'deleted'
         ? ''
         : `<button class="btn btn--ghost btn--sm" type="button" data-edit="${article.id}">Edit</button>`;
-      return `<tr><td>${escapeHtml(article.article_on)}</td><td data-title-for="${article.id}">${escapeHtml(article.title)}</td><td>${escapeHtml(placeLabel[article.status])}</td><td class="actions">${edit}${approve}${archive}${restore}${remove}</td></tr>${article.status === 'deleted' ? '' : editor(article)}`;
-    }).join('') || '<tr><td colspan="4">No articles yet.</td></tr>';
+      const front = article.status === 'deleted' ? '<td></td>' : frontTick(article.slug, article.title, onFront.has(article.slug));
+      return `<tr><td>${escapeHtml(article.article_on)}</td><td data-title-for="${article.id}">${escapeHtml(article.title)}</td><td>${escapeHtml(placeLabel[article.status])}</td>${front}<td class="actions">${edit}${approve}${archive}${restore}${remove}</td></tr>${article.status === 'deleted' ? '' : editor(article)}`;
+    }).join('') || '<tr><td colspan="5">No articles yet.</td></tr>';
     const { data: edits, error: editsError } = await supabase.rpc('news_article_edits');
     if (editsError && !statusEl.textContent) statusEl.textContent = editsError.message;
-    paintSite((Array.isArray(edits) ? edits : []) as SiteEdit[], matchSlugs);
+    paintSite((Array.isArray(edits) ? edits : []) as SiteEdit[], matchSlugs, onFront);
   }
 
   showSession();
@@ -541,6 +575,20 @@ const siteArticlesJson = JSON.stringify(siteArticles).replaceAll('<', '\\u003c')
   }
   #articles-app td.actions {
     gap: 0.2rem;
+  }
+  #articles-app .front {
+    text-align: center;
+    width: 1%;
+  }
+  #articles-app .front-tick {
+    display: inline-flex;
+    justify-content: center;
+    width: auto;
+  }
+  #articles-app .front-tick input {
+    width: 1.05rem;
+    height: 1.05rem;
+    accent-color: var(--accent);
   }
   #articles-app td.actions .btn {
     padding: 0.16rem 0.48rem;

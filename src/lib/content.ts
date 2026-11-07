@@ -21,6 +21,20 @@ export async function getEvents() {
   return events.sort((a, b) => a.data.start.getTime() - b.data.start.getTime());
 }
 
+/** Calendar day of an event start, as YYYY-MM-DD. */
+export function eventDay(event: CollectionEntry<'events'>) {
+  const date = event.data.start;
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${date.getUTCFullYear()}-${month}-${day}`;
+}
+
+export function todayKey(date = new Date()) {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
 /** Events that haven't finished yet (end date, or start date if no end). */
 export async function getUpcomingEvents() {
   const today = startOfToday();
