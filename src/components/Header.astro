@@ -14,6 +14,19 @@ const shareHref = url('/share/');
 const profileHref = url('/captains/profile/');
 const primaryNav = NAV.filter((item) => !item.more);
 const moreNav = NAV.filter((item) => item.more);
+type PrimaryRow =
+  | { kind: 'link'; item: (typeof NAV)[number] }
+  | { kind: 'menu'; label: string; items: (typeof NAV)[number][] };
+const primaryRows: PrimaryRow[] = [];
+for (const item of primaryNav) {
+  if (!item.menu) {
+    primaryRows.push({ kind: 'link', item });
+    continue;
+  }
+  const last = primaryRows.at(-1);
+  if (last?.kind === 'menu' && last.label === item.menu) last.items.push(item);
+  else primaryRows.push({ kind: 'menu', label: item.menu, items: [item] });
+}
 ---
 
 <header class="site-header" data-url={SUPABASE_URL} data-key={SUPABASE_PUBLISHABLE_KEY} data-login={loginHref} data-profile={profileHref}>
@@ -26,27 +39,49 @@ const moreNav = NAV.filter((item) => item.more);
       <nav id="site-nav" class="nav" aria-label="Primary">
         <ul>
           {
-            primaryNav.map((item) =>
-              item.signedIn ? (
+            primaryRows.map((row) =>
+              row.kind === 'menu' ? (
+                <li class="more" data-nav-menu>
+                  <button
+                    class="more-toggle"
+                    type="button"
+                    data-nav-toggle
+                    aria-expanded="false"
+                    aria-haspopup="menu"
+                    aria-current={row.items.some((item) => isActive(item)) ? 'page' : undefined}
+                  >
+                    {row.label}
+                  </button>
+                  <div class="more-menu" data-nav-panel hidden role="menu">
+                    {
+                      row.items.map((item) => (
+                        <a role="menuitem" href={url(item.href)} aria-current={isActive(item) ? 'page' : undefined}>
+                          {item.label}
+                        </a>
+                      ))
+                    }
+                  </div>
+                </li>
+              ) : row.item.signedIn ? (
                 <li data-your-squash hidden>
-                  <a href={url(item.href)} aria-current={isActive(item) ? 'page' : undefined}>
-                    {item.label}
+                  <a href={url(row.item.href)} aria-current={isActive(row.item) ? 'page' : undefined}>
+                    {row.item.label}
                   </a>
                 </li>
               ) : (
                 <li>
-                  <a href={url(item.href)} aria-current={isActive(item) ? 'page' : undefined}>
-                    {item.label}
+                  <a href={url(row.item.href)} aria-current={isActive(row.item) ? 'page' : undefined}>
+                    {row.item.label}
                   </a>
                 </li>
               ),
             )
           }
-          <li class="more" data-more-item>
-            <button class="more-toggle" type="button" data-more-toggle aria-expanded="false" aria-controls="more-menu">
+          <li class="more" data-nav-menu>
+            <button class="more-toggle" type="button" data-nav-toggle aria-expanded="false" aria-haspopup="menu" aria-controls="more-menu">
               More
             </button>
-            <div id="more-menu" class="more-menu" data-more-menu hidden>
+            <div id="more-menu" class="more-menu" data-nav-panel hidden>
               {
                 moreNav.map((item) => (
                   <a href={url(item.href)} aria-current={isActive(item) ? 'page' : undefined}>
@@ -85,18 +120,24 @@ const moreNav = NAV.filter((item) => item.more);
 
   const btn = document.querySelector<HTMLButtonElement>('[data-menu-toggle]');
   const nav = document.getElementById('site-nav');
-  const moreItem = headerQuery('[data-more-item]');
-  const moreToggle = headerQuery('[data-more-toggle]') as HTMLButtonElement | null;
-  const moreMenu = headerQuery('[data-more-menu]');
+  const navMenus = [...document.querySelectorAll<HTMLElement>('[data-nav-menu]')];
 
-  function headerQuery(selector: string) {
-    return document.querySelector<HTMLElement>(selector);
+  function setNavMenu(item: HTMLElement, open: boolean) {
+    const toggle = item.querySelector<HTMLButtonElement>('[data-nav-toggle]');
+    const panel = item.querySelector<HTMLElement>('[data-nav-panel]');
+    if (!toggle || !panel) return;
+    toggle.setAttribute('aria-expanded', String(open));
+    panel.hidden = !open;
   }
 
-  function setMoreOpen(open: boolean) {
-    if (!moreToggle || !moreMenu) return;
-    moreToggle.setAttribute('aria-expanded', String(open));
-    moreMenu.hidden = !open;
+  function closeNavMenus() {
+    for (const item of navMenus) setNavMenu(item, false);
+  }
+
+  function closeAccountMenu() {
+    document.querySelector<HTMLButtonElement>('[data-account-toggle]')?.setAttribute('aria-expanded', 'false');
+    const accountMenu = document.querySelector<HTMLElement>('[data-account-menu]');
+    if (accountMenu) accountMenu.hidden = true;
   }
 
   btn?.addEventListener('click', () => {
@@ -104,23 +145,23 @@ const moreNav = NAV.filter((item) => item.more);
     btn.setAttribute('aria-expanded', String(!open));
     nav?.classList.toggle('is-open', !open);
     document.body.classList.toggle('nav-open', !open);
-    if (open) setMoreOpen(false);
+    if (open) closeNavMenus();
   });
-  moreToggle?.addEventListener('click', (event) => {
-    event.stopPropagation();
-    const open = moreToggle.getAttribute('aria-expanded') !== 'true';
-    setMoreOpen(open);
-    if (open) {
-      document.querySelector<HTMLButtonElement>('[data-account-toggle]')?.setAttribute('aria-expanded', 'false');
-      const accountMenu = document.querySelector<HTMLElement>('[data-account-menu]');
-      if (accountMenu) accountMenu.hidden = true;
-    }
-  });
+  for (const item of navMenus) {
+    item.querySelector('[data-nav-toggle]')?.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const toggle = item.querySelector('[data-nav-toggle]');
+      const open = toggle?.getAttribute('aria-expanded') !== 'true';
+      closeNavMenus();
+      setNavMenu(item, open);
+      if (open) closeAccountMenu();
+    });
+  }
   document.addEventListener('click', (event) => {
-    if (moreItem && !moreItem.contains(event.target as Node)) setMoreOpen(false);
+    if (!navMenus.some((item) => item.contains(event.target as Node))) closeNavMenus();
   });
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') setMoreOpen(false);
+    if (event.key === 'Escape') closeNavMenus();
   });
 
   const header = document.querySelector<HTMLElement>('.site-header');
@@ -144,7 +185,7 @@ const moreNav = NAV.filter((item) => item.more);
       event.stopPropagation();
       const open = toggle.getAttribute('aria-expanded') !== 'true';
       setMenuOpen(open);
-      if (open) setMoreOpen(false);
+      if (open) closeNavMenus();
     });
     document.addEventListener('click', (event) => {
       if (!accountItem.contains(event.target as Node)) setMenuOpen(false);
@@ -358,7 +399,10 @@ const moreNav = NAV.filter((item) => item.more);
     color: var(--accent);
     background: rgba(241, 90, 34, 0.08);
   }
-  .nav > ul > li > a[aria-current='page'] {
+  .nav > ul > li > a[aria-current='page'],
+  .more-toggle[aria-current='page'],
+  :global(html[data-theme='navy']) .more-toggle[aria-current='page'],
+  :global(html[data-theme='light']) .more-toggle[aria-current='page'] {
     color: var(--accent);
   }
   .nav > ul > li > a[aria-current='page']::after {

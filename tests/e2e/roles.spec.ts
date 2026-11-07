@@ -1125,7 +1125,7 @@ test.describe('Club captain, team captain, and player', () => {
     await expect(nav.getByRole('link', { name: 'My Squash', exact: true })).toBeVisible();
     const labels = (await nav.getByRole('link').allTextContents()).map((label) => label.trim());
     expect(labels[labels.indexOf('News') + 1]).toBe('My Squash');
-    expect(labels[labels.indexOf('My Squash') + 1]).toBe('Clubs');
+    expect(labels[labels.indexOf('My Squash') + 1]).toBe('Juniors');
     await expect(nav.getByRole('link', { name: 'My Squash', exact: true })).toHaveAttribute('href', /\/captains\/you\/$/);
     await expect(page.getByRole('heading', { level: 1, name: 'My squash' })).toBeVisible();
     await expect(page.locator('[data-who]')).toHaveText('Signed in as Pat Player');
