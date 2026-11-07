@@ -197,7 +197,7 @@ const scoresHref = url('/captains/admin/minigame/');
             <h2>Marking</h2>
             <details class="notes">
               <summary>Notes</summary>
-              <p class="muted small">Matches marked on the website. PAR to 11, or PAR to 15 for the second division, best of five. The serve starts on the right. The same player moves to the other box. Hand out is a change of server, and that serve starts on the right again. A let is played again. A stroke gives the point. Edit a name here, or open Marking to change the points. Delete removes the match. Sport Manager is not updated from here.</p>
+              <p class="muted small">Matches marked on the website. PAR to 11, or PAR to 15 for the second division, best of five. The serve starts on the right, unless the marker chooses the left. The same player moves to the other box after each point. Hand out starts on that chosen side, and it stays there until the marker chooses the other side. A let is played again. A stroke gives the point. Edit a name here, or open Marking to change the points. Delete removes the match. Sport Manager is not updated from here.</p>
             </details>
             <h3>In play</h3>
             <details class="notes">
@@ -1709,7 +1709,7 @@ const scoresHref = url('/captains/admin/minigame/');
     marker: string;
     createdAt: string;
     visible?: boolean;
-    history?: { games?: { winner: 'a' | 'b' | 'let'; server: 'a' | 'b'; box: 'R' | 'L'; choosing?: boolean; a: number; b: number; handOut?: boolean; stroke?: boolean }[][] };
+    history?: { box?: 'R' | 'L'; games?: { winner: 'a' | 'b' | 'let'; server: 'a' | 'b'; box: 'R' | 'L'; choosing?: boolean; a: number; b: number; handOut?: boolean; stroke?: boolean }[][] };
   };
   type HistoryRow = {
     id: number;
@@ -1853,7 +1853,9 @@ const scoresHref = url('/captains/admin/minigame/');
     }
     games.forEach((rallies, index) => {
       if (!rallies.length) return;
-      const stem = gameStem(rallies.map((rally) => ({ ...rally, choosing: Boolean(rally.choosing), handOut: Boolean(rally.handOut) })));
+      const mapped = rallies.map((rally) => ({ ...rally, choosing: Boolean(rally.choosing), handOut: Boolean(rally.handOut) }));
+      const following = games[index + 1]?.find((rally) => rally.box)?.box ?? (index === games.length - 1 ? row.history?.box : undefined);
+      const stem = gameStem(mapped, following);
       const game = document.createElement('section');
       game.className = 'stem';
       const heading = document.createElement('p');

@@ -5,11 +5,12 @@
  * and from 10-all a player must lead by two (rule 2.2). Second-division matches
  * use the same rule to 15. A match is the best of five.
  *
- * The first server is the one who won the spin (rule 5.1). At the start of each
- * game, and after hand-out, that server chooses the service box. This board
- * starts them on the right. While the same player keeps the serve, the box
- * changes side (rule 5.2). A let is served again from the same box (rule 5.3).
- * Hand-out is a change of server.
+ * The first server is the one who won the spin (rule 5.1). The marker chooses
+ * the opening box. This board starts on the right. While the same player keeps
+ * the serve, the box changes side after each point (rule 5.2). A let is served
+ * again from the same box (rule 5.3). Hand-out is a change of server, and that
+ * new hand starts on the box last chosen. It stays on that side until the
+ * marker chooses the other one.
  */
 
 export const GAME_TARGET = 11;
@@ -42,13 +43,23 @@ export type ScoreState = {
   games: Rally[][];
   server: Player;
   box: Box;
+  /** The side a new hand starts on. It stays until the marker chooses the other side. */
+  handOutBox?: Box;
   choosing: boolean;
   /** 11 is the usual game. 15 is the second-division game. Missing means 11. */
   target?: GameTarget;
 };
 
 export function freshMatch(server: Player = 'a', target: GameTarget = 11): ScoreState {
-  return { games: [[]], server, box: 'R', choosing: true, target };
+  return { games: [[]], server, box: 'R', handOutBox: 'R', choosing: true, target };
+}
+
+function handSide(state: ScoreState): Box {
+  return state.handOutBox === 'L' ? 'L' : 'R';
+}
+
+function carried(state: ScoreState, games: Rally[][], server: Player, box: Box, choosing: boolean): ScoreState {
+  return { games, server, box, choosing, handOutBox: handSide(state), target: gameTarget(state) };
 }
 
 export function otherBox(box: Box): Box {
@@ -127,7 +138,7 @@ function cloneGames(games: Rally[][]): Rally[][] {
 
 export function setBox(state: ScoreState, box: Box): ScoreState {
   if (matchWinner(state) || (box !== 'R' && box !== 'L') || state.box === box) return state;
-  return { ...state, box };
+  return { ...state, box, handOutBox: box };
 }
 
 export function setServer(state: ScoreState, server: Player): ScoreState {
@@ -151,7 +162,7 @@ export function addLet(state: ScoreState): ScoreState {
     b: score.b,
     handOut: false,
   });
-  return { games, server: state.server, box: state.box, choosing: false, target: gameTarget(state) };
+  return carried(state, games, state.server, state.box, false);
 }
 
 export function addPoint(state: ScoreState, winner: Player): ScoreState {
@@ -177,18 +188,16 @@ export function addPoint(state: ScoreState, winner: Player): ScoreState {
     handOut,
   });
   if (gameWon(next, target)) {
-    const carried: ScoreState = { games, server: state.server, box: state.box, choosing: false, target };
-    const won = gamesWon(carried);
+    const soFar = carried(state, games, state.server, state.box, false);
+    const won = gamesWon(soFar);
     const leader = next.a > next.b ? 'a' : 'b';
     const taken = leader === 'a' ? won.a : won.b;
-    if (taken >= GAMES_TO_WIN) {
-      return { games, server: leader, box: state.box, choosing: false, target };
-    }
+    if (taken >= GAMES_TO_WIN) return carried(state, games, leader, state.box, false);
     games.push([]);
-    return { games, server: leader, box: 'R', choosing: true, target };
+    return carried(state, games, leader, handSide(state), true);
   }
-  if (handOut) return { games, server: winner, box: 'R', choosing: true, target };
-  return { games, server: state.server, box: otherBox(state.box), choosing: false, target };
+  if (handOut) return carried(state, games, winner, handSide(state), true);
+  return carried(state, games, state.server, otherBox(state.box), false);
 }
 
 /** A stroke is a point, awarded to the player named, and it is marked as a stroke. */
@@ -214,7 +223,7 @@ export function undoPoint(state: ScoreState): ScoreState {
   const rally = last.pop()!;
   if (!last.length && games.length > 1) games.pop();
   if (!games.length) games.push([]);
-  return { games, server: rally.server, box: rally.box, choosing: rally.choosing, target: gameTarget(state) };
+  return { games, server: rally.server, box: rally.box, choosing: rally.choosing, handOutBox: handSide(state), target: gameTarget(state) };
 }
 
 export function hasRallies(state: ScoreState): boolean {
@@ -268,18 +277,27 @@ export type StemMark = {
   kind: 'point' | 'let' | 'stroke';
 };
 
+/** The side the next serve comes from, so the sheet letter matches the R/L button. */
+function boxAfter(rally: Rally, next?: Box): Box {
+  if (next === 'R' || next === 'L') return next;
+  if (rally.winner === 'let' || rally.handOut) return rally.box;
+  return otherBox(rally.box);
+}
+
 /** One game as a vertical score sheet: each player's points sit on their own side of the line. */
-export function gameStem(rallies: Rally[]): { score: Game; rows: StemMark[] } {
+export function gameStem(rallies: Rally[], nextBox?: Box): { score: Game; rows: StemMark[] } {
   const rows: StemMark[] = [];
-  for (const rally of rallies) {
+  for (let i = 0; i < rallies.length; i += 1) {
+    const rally = rallies[i];
+    const moved = boxAfter(rally, rallies[i + 1]?.box ?? (i === rallies.length - 1 ? nextBox : undefined));
     if (rally.winner === 'let') {
-      rows.push({ side: rally.server, text: 'YL', box: rally.box, kind: 'let' });
+      rows.push({ side: rally.server, text: 'YL', box: moved, kind: 'let' });
       continue;
     }
     rows.push({
       side: rally.winner,
       text: String(rally.winner === 'a' ? rally.a : rally.b),
-      box: rally.box,
+      box: moved,
       kind: rally.stroke ? 'stroke' : 'point',
     });
   }
@@ -581,11 +599,14 @@ export function restoreMatch(raw: unknown): ScoreState | null {
     games.push(rallies);
   }
   if (!games.length) games.push([]);
+  const choosing = Boolean(value.choosing);
+  const handOutBox = value.handOutBox === 'L' || value.handOutBox === 'R' ? value.handOutBox : choosing ? value.box : 'R';
   return {
     games,
     server: value.server,
     box: value.box,
-    choosing: Boolean(value.choosing),
+    choosing,
+    handOutBox,
     target: value.target === 15 ? 15 : 11,
   };
 }

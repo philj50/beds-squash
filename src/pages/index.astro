@@ -355,6 +355,9 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
   .watch-list a:hover {
     border-color: var(--accent);
   }
+  .watch-list a span:first-child {
+    min-width: 0;
+  }
   .watch-list span {
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
@@ -756,7 +759,7 @@ const totalTeams = leagueClubs.reduce((n, c) => n + c.data.teams.length, 0);
         players.textContent = `${name(row.playerA)} v ${name(row.playerB)}`;
         players.style.color = 'inherit';
         const score = document.createElement('span');
-        score.textContent = pretty(row.score);
+        score.textContent = `\u2002${pretty(row.score)}`;
         link.append(players, score);
         item.append(link);
         homeList.append(item);

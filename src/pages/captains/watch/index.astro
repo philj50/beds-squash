@@ -297,9 +297,11 @@ import { url } from '@/lib/site';
       const button = document.createElement('button');
       button.type = 'button';
       const players = document.createElement('span');
+      const scoreText = pretty(unpackLiveScore(row.score).line);
       players.textContent = `${shown(row.playerA)} v ${shown(row.playerB)}`;
       const score = document.createElement('span');
-      score.textContent = pretty(unpackLiveScore(row.score).line);
+      score.textContent = `\u2002${scoreText}`;
+      button.setAttribute('aria-label', `${shown(row.playerA)} v ${shown(row.playerB)} ${scoreText}`);
       button.append(players, score);
       button.addEventListener('click', () => openMatch(row.id));
       item.append(button);
@@ -323,7 +325,8 @@ import { url } from '@/lib/site';
     const sheet = document.createElement('div');
     sheet.className = 'result-sheet';
     played.forEach((rallies, index) => {
-      const stem = gameStem(rallies);
+      const following = played[index + 1]?.[0]?.box ?? (index === played.length - 1 ? restored.box : undefined);
+      const stem = gameStem(rallies, following);
       const game = document.createElement('section');
       game.className = 'stem';
       const heading = document.createElement('p');
@@ -355,7 +358,7 @@ import { url } from '@/lib/site';
         else right.append(cluster);
         row.append(left, rail, right);
         const kind = mark.kind === 'let' ? 'Yes let' : mark.kind === 'stroke' ? 'Stroke' : 'Point';
-        row.setAttribute('aria-label', `${kind}, ${mark.text}, from ${mark.box}`);
+        row.setAttribute('aria-label', `${kind}, ${mark.text}, side ${mark.box}`);
         body.append(row);
       }
       game.append(heading, total, body);
@@ -590,9 +593,11 @@ import { url } from '@/lib/site';
       button.type = 'button';
       const players = document.createElement('span');
       const when = row.endedAt ? dayLabel(row.endedAt) : '';
+      const scoreText = pretty(unpackLiveScore(row.score).line);
       players.textContent = `${shown(row.playerA)} v ${shown(row.playerB)}${when ? ` · ${when}` : ''}`;
       const score = document.createElement('span');
-      score.textContent = pretty(unpackLiveScore(row.score).line);
+      score.textContent = `\u2002${scoreText}`;
+      button.setAttribute('aria-label', `${shown(row.playerA)} v ${shown(row.playerB)} ${scoreText}`);
       button.append(players, score);
       button.addEventListener('click', () => void openArchive(row.id));
       item.append(button);
@@ -899,6 +904,9 @@ import { url } from '@/lib/site';
   }
   .matches :global(button:hover) {
     border-color: #f15a22;
+  }
+  .matches :global(button span:first-child) {
+    min-width: 0;
   }
   .matches :global(span:last-child) {
     color: #e0a800;

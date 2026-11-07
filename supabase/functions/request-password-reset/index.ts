@@ -43,11 +43,12 @@ function secretKey() {
 }
 
 /** Keep in step with resetRecipient in scripts/outbound-mail.mjs. */
-function resetRecipient(email: string, live: boolean, name: string) {
+function resetRecipient(email: string, live: boolean, name: string, direct = false) {
   const real = email.trim().toLowerCase();
   const person = name.trim().replace(/\s+/g, ' ').toLowerCase();
   const looksReal = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(real) && !real.endsWith('@players.invalid');
-  if (live && person === RESET_LIVE_NAME && looksReal) return real;
+  const named = person === RESET_LIVE_NAME;
+  if (live && looksReal && (named || direct)) return real;
   return OUTBOUND_TO;
 }
 
@@ -188,7 +189,8 @@ Deno.serve(async (req) => {
     .maybeSingle();
   const name = String(profile?.display_name || 'this login').trim() || 'this login';
   const { data: delivery } = await admin.from('password_reset_delivery').select('live').eq('id', 1).maybeSingle();
-  const recipient = resetRecipient(email, delivery?.live === true, name);
+  const direct = linkData.user.user_metadata?.password_reset_direct === true;
+  const recipient = resetRecipient(email, delivery?.live === true, name, direct);
   const text = [
     `Someone asked to reset the password for ${name} on Bedfordshire Squash.`,
     '',

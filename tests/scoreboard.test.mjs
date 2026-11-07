@@ -161,6 +161,37 @@ test('the opening box can be the left, and that choice is what the rally records
   assert.equal(state.box, 'R');
 });
 
+test('a chosen left side stays the hand-out side until it is changed', () => {
+  let state = setBox(freshMatch(), 'L');
+  state = addPoint(state, 'a');
+  assert.equal(state.box, 'R');
+  state = addPoint(state, 'a');
+  assert.equal(state.box, 'L');
+  state = addPoint(state, 'b');
+  assert.equal(state.server, 'b');
+  assert.equal(state.box, 'L');
+  state = addPoint(state, 'a');
+  assert.equal(state.box, 'L');
+  state = setBox(state, 'R');
+  state = addPoint(state, 'b');
+  assert.equal(state.server, 'b');
+  assert.equal(state.box, 'R');
+  state = addPoint(state, 'a');
+  assert.equal(state.box, 'R');
+  assert.equal(gameStem(state.games[0], state.box).rows.at(-1).box, 'R');
+});
+
+test('the next game starts on the chosen hand-out side', () => {
+  let state = setBox(freshMatch(), 'L');
+  state = play(state, 'a', 11);
+  assert.equal(state.server, 'a');
+  assert.equal(state.box, 'L');
+  assert.equal(state.choosing, true);
+  const restored = restoreMatch(state);
+  assert.equal(restored.handOutBox, 'L');
+  assert.equal(restored.box, 'L');
+});
+
 test('hand out gives the serve to the other player, from the right', () => {
   let state = addPoint(freshMatch(), 'a');
   state = addPoint(state, 'b');

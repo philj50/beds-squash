@@ -8,4 +8,6 @@ test('password reset mail stays on the test inbox except one live account', () =
   assert.equal(resetRecipient('alex@example.test', { live: true, name: 'Ada Player' }), OUTBOUND_TO);
   assert.equal(resetRecipient('p-abc@players.invalid', { live: true, name: 'Alex Buckhurst' }), OUTBOUND_TO);
   assert.equal(resetRecipient('alex@example.test', { live: true, name: '  Alex   Buckhurst ' }), 'alex@example.test');
+  assert.equal(resetRecipient('friend@example.test', { live: true, name: 'Ada Player', direct: true }), 'friend@example.test');
+  assert.equal(resetRecipient('friend@example.test', { live: false, name: 'Ada Player', direct: true }), OUTBOUND_TO);
 });

@@ -651,7 +651,7 @@ const names = [
     tapeEl.replaceChildren();
     const rallies = currentRallies(state);
     if (!rallies.length) return;
-    const stem = gameStem(rallies);
+    const stem = gameStem(rallies, state.box);
     const body = document.createElement('div');
     body.className = 'stem-body';
     for (const mark of stem.rows) {
@@ -675,7 +675,7 @@ const names = [
       else right.append(cluster);
       row.append(left, rail, right);
       const kind = mark.kind === 'let' ? 'Yes let' : mark.kind === 'stroke' ? 'Stroke' : 'Point';
-      row.setAttribute('aria-label', `${kind}, ${mark.text}, from ${mark.box}`);
+      row.setAttribute('aria-label', `${kind}, ${mark.text}, side ${mark.box}`);
       body.append(row);
     }
     tapeEl.append(body);
@@ -1220,8 +1220,8 @@ const names = [
     return cardMarker || markerName;
   }
 
-  function appendGameStem(parent: HTMLElement, rallies: ScoreState['games'][number], index: number) {
-    const stem = gameStem(rallies);
+  function appendGameStem(parent: HTMLElement, rallies: ScoreState['games'][number], index: number, nextBox?: 'R' | 'L') {
+    const stem = gameStem(rallies, nextBox);
     const game = document.createElement('section');
     game.className = 'stem';
     const heading = document.createElement('p');
@@ -1271,7 +1271,9 @@ const names = [
     root.querySelector<HTMLElement>('[data-result-score]')!.textContent = winnerName ? `${winnerName} wins ${score}` : score;
     resultSheet.replaceChildren();
     state.games.forEach((rallies, index) => {
-      if (rallies.length) appendGameStem(resultSheet, rallies, index);
+      if (!rallies.length) return;
+      const next = state.games[index + 1]?.find((rally) => rally.box);
+      appendGameStem(resultSheet, rallies, index, next?.box ?? state.box);
     });
     const who = markerLabel();
     root.querySelector<HTMLElement>('[data-result-marker]')!.textContent = who ? `Marked by ${who}` : 'Marked on Beds Squash';
@@ -1339,7 +1341,7 @@ const names = [
 
   function drawResultCard() {
     const games = state.games.filter((game) => game.length);
-    const stems = games.map((game) => gameStem(game));
+    const stems = games.map((game, index) => gameStem(game, games[index + 1]?.[0]?.box ?? (index === games.length - 1 ? state.box : undefined)));
     const maxRows = Math.max(1, ...stems.map((stem) => stem.rows.length));
     const colW = 210;
     const rowH = 34;

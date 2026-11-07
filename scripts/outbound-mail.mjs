@@ -14,13 +14,15 @@ export const RESET_LIVE_NAME = 'Alex Buckhurst';
 /**
  * Where a password reset is delivered.
  * Live stays off until the reset has been tried on the test inbox.
+ * direct is set on the few logins asked to try it before everyone else.
  * Keep this in step with supabase/functions/request-password-reset/index.ts.
  */
-export function resetRecipient(email, { live = false, name = '' } = {}) {
+export function resetRecipient(email, { live = false, name = '', direct = false } = {}) {
   const real = String(email || '').trim().toLowerCase();
   const person = String(name || '').trim().replace(/\s+/g, ' ').toLowerCase();
   const looksReal = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(real) && !real.endsWith('@players.invalid');
-  if (live && person === RESET_LIVE_NAME.toLowerCase() && looksReal) return real;
+  const named = person === RESET_LIVE_NAME.toLowerCase();
+  if (live && looksReal && (named || direct)) return real;
   return OUTBOUND_TO;
 }
 
