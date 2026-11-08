@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-11-07T14:54:37.809Z",
+  "checkedAt": "2026-11-08T15:14:05.075Z",
   "events": [
     {
       "title": "London Open 2026",
@@ -49,9 +49,21 @@
   ],
   "videos": [
     {
+      "id": "7fwHHDWlmvw",
+      "title": "🇪🇬 Orfi v Gohar 🇪🇬 | U.S. Open 2026 | FINAL HIGHLIGHTS",
+      "published": "2026-11-08T10:05:00+00:00",
+      "url": "https://www.youtube.com/watch?v=7fwHHDWlmvw"
+    },
+    {
+      "id": "ZY9ImH141jo",
+      "title": "🇵🇪 Elias v Coll 🇳🇿 | U.S. Open 2026 | FINAL HIGHLIGHTS",
+      "published": "2026-11-08T10:04:58+00:00",
+      "url": "https://www.youtube.com/watch?v=ZY9ImH141jo"
+    },
+    {
       "id": "cjjYoEWrlEc",
       "title": "COURTSIDE: It's FINALS night in Philadelphia 🏆🇺🇸",
-      "published": "2026-11-07T14:18:04+00:00",
+      "published": "2026-11-07T23:03:46+00:00",
       "url": "https://www.youtube.com/watch?v=cjjYoEWrlEc"
     },
     {
@@ -59,18 +71,6 @@
       "title": "\"A lack of ability to problem solve and dig in until the end\" | SQUASHTV analyse Asal defeat",
       "published": "2026-11-07T14:00:03+00:00",
       "url": "https://www.youtube.com/watch?v=35lR9Nzbo2o"
-    },
-    {
-      "id": "2KP8TzGwgW0",
-      "title": "🇪🇬 ElSherbini v Orfi 🇪🇬 | U.S. Open 2026 | SEMI-FINAL HIGHLIGHTS",
-      "published": "2026-11-07T11:33:59+00:00",
-      "url": "https://www.youtube.com/watch?v=2KP8TzGwgW0"
-    },
-    {
-      "id": "V3EiBDWLe2Y",
-      "title": "🇵🇪 Elias v Asal 🇪🇬 | U.S. Open 2026 | SEMI-FINAL HIGHLIGHTS",
-      "published": "2026-11-07T11:33:55+00:00",
-      "url": "https://www.youtube.com/watch?v=V3EiBDWLe2Y"
     }
   ]
 }
