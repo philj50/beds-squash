@@ -144,6 +144,12 @@
       "grade": "B Grade"
     },
     {
+      "name": "Alex Duncan",
+      "club": "",
+      "seed": "",
+      "grade": "C Grade"
+    },
+    {
       "name": "Andrew McCulloch",
       "club": "",
       "seed": "",
@@ -240,5 +246,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-08T14:01:58.861Z"
+  "syncedAt": "2026-11-08T22:38:08.522Z"
 }
