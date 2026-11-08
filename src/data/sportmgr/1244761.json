@@ -180,6 +180,12 @@
       "grade": "C Grade"
     },
     {
+      "name": "Karl Culver",
+      "club": "",
+      "seed": "",
+      "grade": "C Grade"
+    },
+    {
       "name": "Lee Moore",
       "club": "",
       "seed": "",
@@ -234,5 +240,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-07T22:28:07.169Z"
+  "syncedAt": "2026-11-08T14:01:58.861Z"
 }
