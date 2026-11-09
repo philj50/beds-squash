@@ -1,24 +1,6 @@
 {
-  "checkedAt": "2026-11-08T15:14:05.075Z",
+  "checkedAt": "2026-11-09T18:50:12.877Z",
   "events": [
-    {
-      "title": "London Open 2026",
-      "start": "2026-11-04",
-      "end": "2026-11-08",
-      "venue": "London",
-      "level": "",
-      "prize": "$18,000",
-      "url": "https://www.psasquashtour.com/tournament/london-open-2026/"
-    },
-    {
-      "title": "GMS Accountants Sports Academy Open 2026",
-      "start": "2026-11-06",
-      "end": "2026-11-08",
-      "venue": "Cambridgeshire",
-      "level": "",
-      "prize": "$1,426",
-      "url": "https://www.psasquashtour.com/tournament/gms-accountants-sports-academy-open-2026/"
-    },
     {
       "title": "Olliers Solicitors Northern Open 2027",
       "start": "2027-02-17",
@@ -49,6 +31,18 @@
   ],
   "videos": [
     {
+      "id": "degF8FNojzw",
+      "title": "SQUASHTV team react after Gohar's US Open final run 7 months after giving birth",
+      "published": "2026-11-09T14:00:21+00:00",
+      "url": "https://www.youtube.com/watch?v=degF8FNojzw"
+    },
+    {
+      "id": "4u5JID8FkaA",
+      "title": "“She’s going to be one of the best ever” | Reaction to Amina Orfi’s Record-Breaking US Open Win",
+      "published": "2026-11-08T16:24:24+00:00",
+      "url": "https://www.youtube.com/watch?v=4u5JID8FkaA"
+    },
+    {
       "id": "7fwHHDWlmvw",
       "title": "🇪🇬 Orfi v Gohar 🇪🇬 | U.S. Open 2026 | FINAL HIGHLIGHTS",
       "published": "2026-11-08T10:05:00+00:00",
@@ -59,18 +53,6 @@
       "title": "🇵🇪 Elias v Coll 🇳🇿 | U.S. Open 2026 | FINAL HIGHLIGHTS",
       "published": "2026-11-08T10:04:58+00:00",
       "url": "https://www.youtube.com/watch?v=ZY9ImH141jo"
-    },
-    {
-      "id": "cjjYoEWrlEc",
-      "title": "COURTSIDE: It's FINALS night in Philadelphia 🏆🇺🇸",
-      "published": "2026-11-07T23:03:46+00:00",
-      "url": "https://www.youtube.com/watch?v=cjjYoEWrlEc"
-    },
-    {
-      "id": "35lR9Nzbo2o",
-      "title": "\"A lack of ability to problem solve and dig in until the end\" | SQUASHTV analyse Asal defeat",
-      "published": "2026-11-07T14:00:03+00:00",
-      "url": "https://www.youtube.com/watch?v=35lR9Nzbo2o"
     }
   ]
 }
