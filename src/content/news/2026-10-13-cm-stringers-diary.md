@@ -1,32 +1,31 @@
 ---
 title: Graded tournaments on the CM Stringers diary
-date: 2026-11-06
-summary: Most graded events on the CM Stringers diary now show Enter Online, including Harrow on 8 November and Radlett on 21 November. Canterbury, Wimbledon, Hazelwood and Amsterdam still say entry is not open.
+date: 2026-11-09
+summary: The CM Stringers diary now lists the Southgate Junior Graded, a London junior event on 29 November. Enter Online is showing, and the diary closing date does not match the event page.
 image: /uploads/news/cm-stringers-tournament-entry.png
 imageAlt: CM Stringers tournament entry banner showing squash players and spectators.
 category: tournaments
 featured: false
 ---
 
-[CM Stringers](https://www.cmstringers.com/entry/) last updated its tournament diary on Monday 2 November 2026, at 11:08 am. The visible button on most events is Enter Online, and those links open a page with an entry form. The Canterbury Xmas Doubles, the Wimbledon Junior Graded, the Hazelwood Xmas Open and the Amsterdam Classic IV show Entry Not Open. Where an event page disagrees with the diary, both wordings are below. Check the diary before trying to enter.
+[CM Stringers](https://www.cmstringers.com/entry/) last updated its tournament diary on Sunday 8 November 2026, at 12:49 pm. The new listing is the CM Southgate Junior Graded, a London junior event on 29 November 2026. Enter Online is showing, and the event page has an entry form. The diary closing date does not match that page. The Canterbury Xmas Doubles, the Wimbledon Junior Graded, the Hazelwood Xmas Open and the Amsterdam Classic IV still show Entry Not Open. Where an event page disagrees with the diary, both wordings are below. Check the diary before trying to enter.
 
-The nearest events for Bedfordshire players are Harrow and Radlett.
+Radlett, on 21 November, is the next graded event on the diary in Hertfordshire. Harrow, dated 8 November, is still listed.
 
 - **Sunday 8 November** — The Harrow Open, Harrow Leisure Centre, Christchurch Avenue, Harrow, HA3 5BD. The diary says entries close on Sunday 1 November. The fee is £22.50. Enter Online is showing, and the Harrow page has an entry form. A refund line on that page prints the closing date as "Sunday, 1sth November 2026".
 - **Saturday 21 November** — The Radlett Classic, Radlett Lawn Tennis & Squash Club, 425 Watling Street, Radlett, Hertfordshire, WD7 7JG. The diary says entries close on Sunday 15 November. Enter Online is showing, and the Radlett page has an entry form.
 
 ## No longer listed
 
-The Purley Open, the CM Coolhurst Junior Graded and the Cumberland Classic are no longer on the diary.
+The Purley Open, the CM Coolhurst Junior Graded and the Cumberland Classic are no longer on the diary. The Ali Quealy Squash Open and the Titan Squash Series, both dated 7 November, are no longer listed.
 
 ## November and December
 
-- **Saturday 7 November** — Ali Quealy Squash Open, Rodmersham Squash & Fitness Club, Kent. This one adds an F grade. The diary says entries close on Sunday 1 November. Enter Online is showing, and the page has an entry form.
-- **Saturday 7 November** — Titan Squash Series, The Weald Racquets Club, Hassocks. The diary says entries close on Sunday 1 November. Enter Online is showing, and the page has an entry form.
 - **Saturday 14 to Sunday 15 November** — The Wroclaw Classic, a graded squash and racketball weekend in Wrocław. The diary says entries close on Sunday 1 November. Enter Online is showing, and the page has an entry form.
 - **Saturday 21 November** — The Chichester Graded, Chichester Racquets & Fitness Club. The diary says entries close on Sunday 15 November. Enter Online is showing.
 - **Saturday 28 November** — The Dulwich Classic, Dulwich Sports Club. The diary says entries close on Sunday 22 November. The fee is £32.50. Enter Online is showing.
 - **Sunday 29 November** — The Bromley LTC Open, Bromley Lawn Tennis & Squash Club. The diary says entries close on Sunday 22 November. The fee is £32.50. Enter Online is showing.
+- **Sunday 29 November** — The CM Southgate Junior Graded, a one-day junior event for grades A to E, SquashLevels 0–2,000, at Southgate Squash & Racketball club, The Walker Ground, Waterfall Road, Southgate N14 7JZ. The diary fee is £0 for Middlesex Junior Squash (MJS) members and £20 for non-members. The diary says entries close on Sunday 14th March 2026. 14 March 2026 was a Saturday, and that date has passed. The event page gives the closing date as Sunday 22nd November 2026, and says the event is on Sunday the 29th of November 2026. That page says entry is free for Middlesex Junior Squash members and £20.00 for non-members. The form lists £20.00 as "Cash On The Day (Non MJS Members)". The visible form heading is "The CM Southgate Junior Graded 2026 - Entry Form". The form legend reads "The CM Southgate Junior Graded 2027 Entry Form (#294)". The page lists B Grade as SquashLevels 500–999, and the form lists B Grade as 500–9999. Enter Online is showing, and the page has an entry form. The diary gives the club website as www.southgatesquashclub.co.uk.
 - **Saturday 5 December** — The Connaught Open, The Connaught Club, Chingford. The diary says entries close on Sunday 29 November. The closing-date line on the event page says Sunday 29th November 2026. A refund line on that page says "Sunday, 30th November 2026". The page also shows 5th December 2025, while the diary and the event date on the page say 5 December 2026. Enter Online is showing.
 - **Kent County Closed** — The diary lists 4th - 5th December 2026 at Bexley Lawn Tennis, Squash & Rball Club, Parkhurst Rd, Bexley DA5 1AX, and says entries close on Sunday 29 November. The diary fee is £30, including an event shirt. The event page lists 5th - 6th December 2026, and says "Saturday the 5th and Sunday the 6th of December 2026". That page says £30 for one category and £45 for two. The form heading is printed as "The Kent County Closed Championships 2026 2026 - Entry Form". Enter Online is showing.
 - **Saturday 12 December** — The Canterbury Xmas Doubles, Canterbury Squash Rackets Club. The diary says entries close on Sunday 5th December 2026. 5 December 2026 is a Saturday. The diary shows Entry Not Open.
