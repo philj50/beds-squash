@@ -66,6 +66,12 @@
       "grade": "A Grade"
     },
     {
+      "name": "Ryan Pescod",
+      "club": "",
+      "seed": "",
+      "grade": "A Grade"
+    },
+    {
       "name": "Sam Gelder",
       "club": "",
       "seed": "",
@@ -264,5 +270,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-10T15:23:26.773Z"
+  "syncedAt": "2026-11-10T23:52:23.582Z"
 }
