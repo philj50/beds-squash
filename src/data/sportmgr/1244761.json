@@ -90,6 +90,12 @@
       "grade": "Ladies B Grade"
     },
     {
+      "name": "Sophie Horsfall",
+      "club": "",
+      "seed": "",
+      "grade": "Ladies B Grade"
+    },
+    {
       "name": "Alex Buckhurst",
       "club": "",
       "seed": "",
@@ -121,6 +127,12 @@
     },
     {
       "name": "James O'Connor",
+      "club": "",
+      "seed": "",
+      "grade": "B Grade"
+    },
+    {
+      "name": "Michael Collins",
       "club": "",
       "seed": "",
       "grade": "B Grade"
@@ -246,5 +258,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-09T17:05:42.339Z"
+  "syncedAt": "2026-11-10T01:50:50.990Z"
 }
