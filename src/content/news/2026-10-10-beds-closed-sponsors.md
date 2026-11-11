@@ -30,8 +30,8 @@ A first look at the confirmed sponsors — at least so far — for the [Bedfords
   <a href="https://www.brookharris.co.uk/" target="_blank" rel="noopener noreferrer"><img src="/uploads/news/brook-harris-v2.png" alt="Brook Harris" loading="lazy" decoding="async" /></a>
 </div>
 <div class="sponsor-card">
-  <p><a href="https://davidbirch.co.uk">David Birch Soft Tissue Therapy</a></p>
-  <a href="https://davidbirch.co.uk"><img src="/uploads/news/david-birch-soft-tissue-therapy.jpg" alt="David Birch Soft Tissue Therapy" loading="lazy" decoding="async" /></a>
+  <p><a href="https://davidbirch.co.uk" target="_blank" rel="noopener noreferrer">David Birch Soft Tissue Therapy</a></p>
+  <a href="https://davidbirch.co.uk" target="_blank" rel="noopener noreferrer"><img src="/uploads/news/david-birch-soft-tissue-therapy.jpg" alt="David Birch Soft Tissue Therapy" loading="lazy" decoding="async" /></a>
 </div>
 <div class="sponsor-card">
   <p><a href="https://decantbar.co.uk/" target="_blank" rel="noopener noreferrer">Decant Wine &amp; Cheese Bar</a></p>
@@ -42,8 +42,8 @@ A first look at the confirmed sponsors — at least so far — for the [Bedfords
   <a href="https://www.epictechmedia.co.uk/" target="_blank" rel="noopener noreferrer"><img src="/uploads/news/epictech-media-v2.png" alt="EpicTech Media" loading="lazy" decoding="async" /></a>
 </div>
 <div class="sponsor-card">
-  <p><a href="https://www.instagram.com/j.a.jelectricalservices/">J.A.J Electrical Services</a></p>
-  <a href="https://www.instagram.com/j.a.jelectricalservices/"><img src="/uploads/news/jaj-electrical-v2.png" alt="J.A.J Electrical Services" loading="lazy" decoding="async" /></a>
+  <p><a href="https://www.instagram.com/j.a.jelectricalservices/" target="_blank" rel="noopener noreferrer">J.A.J Electrical Services</a></p>
+  <a href="https://www.instagram.com/j.a.jelectricalservices/" target="_blank" rel="noopener noreferrer"><img src="/uploads/news/jaj-electrical-v2.png" alt="J.A.J Electrical Services" loading="lazy" decoding="async" /></a>
 </div>
 <div class="sponsor-card">
   <p><a href="https://jrbuilders-ltd.co.uk/" target="_blank" rel="noopener noreferrer">JR Builders Ltd</a></p>
