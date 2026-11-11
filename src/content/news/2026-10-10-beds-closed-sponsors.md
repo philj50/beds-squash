@@ -30,8 +30,8 @@ A first look at the confirmed sponsors — at least so far — for the [Bedfords
   <a href="https://www.brookharris.co.uk/" target="_blank" rel="noopener noreferrer"><img src="/uploads/news/brook-harris-v2.png" alt="Brook Harris" loading="lazy" decoding="async" /></a>
 </div>
 <div class="sponsor-card">
-  <p><a href="https://www.instagram.com/db.softtissuetherapist/">David Birch Soft Tissue Therapy</a></p>
-  <a href="https://www.instagram.com/db.softtissuetherapist/"><img src="/uploads/news/david-birch-soft-tissue-therapy.jpg" alt="David Birch Soft Tissue Therapy" loading="lazy" decoding="async" /></a>
+  <p><a href="https://davidbirch.co.uk">David Birch Soft Tissue Therapy</a></p>
+  <a href="https://davidbirch.co.uk"><img src="/uploads/news/david-birch-soft-tissue-therapy.jpg" alt="David Birch Soft Tissue Therapy" loading="lazy" decoding="async" /></a>
 </div>
 <div class="sponsor-card">
   <p><a href="https://decantbar.co.uk/" target="_blank" rel="noopener noreferrer">Decant Wine &amp; Cheese Bar</a></p>
