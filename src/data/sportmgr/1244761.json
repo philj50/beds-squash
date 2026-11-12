@@ -30,6 +30,12 @@
       "grade": "A Grade"
     },
     {
+      "name": "Christopher Plummer",
+      "club": "",
+      "seed": "",
+      "grade": "A Grade"
+    },
+    {
       "name": "Daniel Evans",
       "club": "",
       "seed": "",
@@ -270,5 +276,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-11T14:53:23.535Z"
+  "syncedAt": "2026-11-12T01:15:58.250Z"
 }
