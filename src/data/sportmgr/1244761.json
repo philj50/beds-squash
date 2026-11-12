@@ -96,6 +96,12 @@
       "grade": "A Grade"
     },
     {
+      "name": "Thomas Parker",
+      "club": "",
+      "seed": "",
+      "grade": "A Grade"
+    },
+    {
       "name": "Lindsey Ransley",
       "club": "",
       "seed": "",
@@ -276,5 +282,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-12T15:44:02.733Z"
+  "syncedAt": "2026-11-12T23:57:25.557Z"
 }
