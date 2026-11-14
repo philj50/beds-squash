@@ -72,6 +72,12 @@
       "grade": "A Grade"
     },
     {
+      "name": "Patryk Konopacki",
+      "club": "",
+      "seed": "",
+      "grade": "A Grade"
+    },
+    {
       "name": "Ryan Pescod",
       "club": "",
       "seed": "",
@@ -112,6 +118,12 @@
       "club": "",
       "seed": "",
       "grade": "Ladies B Grade"
+    },
+    {
+      "name": "Adam Routh",
+      "club": "",
+      "seed": "",
+      "grade": "B Grade"
     },
     {
       "name": "Alex Buckhurst",
@@ -282,5 +294,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-13T15:03:54.649Z"
+  "syncedAt": "2026-11-14T00:07:11.483Z"
 }
