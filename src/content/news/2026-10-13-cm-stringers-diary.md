@@ -1,14 +1,14 @@
 ---
 title: Graded tournaments on the CM Stringers diary
-date: 2026-11-11
-summary: The Finchley Manor Junior Graded is not on the visible CM Stringers diary. Its section is hidden. The diary is still the 9 November update. Canterbury Xmas Doubles shows Enter Online.
+date: 2026-11-16
+summary: The Amsterdam Classic IV now shows Enter Online on the CM Stringers diary. The diary was updated on 13 November. Its closing date still says Sunday 25 April 2026. The event page says Sunday 25 April 2027.
 image: /uploads/news/cm-stringers-tournament-entry.png
 imageAlt: CM Stringers tournament entry banner showing squash players and spectators.
 category: tournaments
 featured: false
 ---
 
-[CM Stringers](https://www.cmstringers.com/entry/) last updated its tournament diary on Monday 9 November 2026, at 9:29 pm. Checked on Wednesday 11 November 2026, that diary update is unchanged. The CM Finchley Manor Junior Graded is not on the visible diary. Its section is hidden on desktop, tablet and mobile, and the hidden section still says entries close on Sunday 14th March 2026. 14 March 2026 was a Saturday, and that date has passed. The Canterbury Xmas Doubles shows Enter Online. The Wimbledon Junior Graded, the Hazelwood Xmas Open and the Amsterdam Classic IV still show Entry Not Open. Where an event page disagrees with the diary, both wordings are below. Check the diary before trying to enter.
+[CM Stringers](https://www.cmstringers.com/entry/) last updated its tournament diary on Friday 13 November 2026, at 2:18 pm. Checked on Monday 16 November 2026. The Amsterdam Classic IV now shows Enter Online. The Wimbledon Junior Graded and the Hazelwood Xmas Open still show Entry Not Open. The CM Finchley Manor Junior Graded is not on the visible diary. Its section is hidden on desktop, tablet and mobile, and the hidden section still says entries close on Sunday 14th March 2026. 14 March 2026 was a Saturday, and that date has passed. The Canterbury Xmas Doubles shows Enter Online. Where an event page disagrees with the diary, both wordings are below. Check the diary before trying to enter.
 
 Radlett, on 21 November, is the next graded event on the diary in Hertfordshire.
 
@@ -39,7 +39,7 @@ The page source still has a section for the CM Finchley Manor Junior Graded, a o
 
 ## May 2027
 
-**Saturday 8 to Sunday 9 May** — The Amsterdam Classic IV, a graded squash and racketball weekend. The diary gives Sunday 25 April 2026 as the closing date. 25 April 2026 was a Saturday, and that date has passed. The diary shows Entry Not Open. The venue is printed as Centrum Sportowe Hasta La Vista, ijsbaanoad 43, 1076 CV Amsterdam, the same club name as the Wrocław event, and the website is given as www.fransottenstadion.nl.
+**Saturday 8 to Sunday 9 May** — The Amsterdam Classic IV, a graded squash and racketball weekend. The diary gives Sunday 25 April 2026 as the closing date. 25 April 2026 was a Saturday, and that date has passed. The diary now shows Enter Online. The event page gives the closing date as Sunday 25th April 2027. 25 April 2027 is a Sunday. A refund line on that page says "Sun 2nd May 2026". 2 May 2026 was a Saturday. Another refund line says "before Sun 2nd May 2027". 2 May 2027 is a Sunday. The page header says 8th - 9th May 2026. The page also says the event is on Saturday the 8th and Sunday 9th May 2027. The diary venue is printed as Centrum Sportowe Hasta La Vista, ijsbaanoad 43, 1076 CV Amsterdam, the same club name as the Wrocław event, and the website is given as www.fransottenstadion.nl. The event page names Frans Otten Stadion at the same address. The diary fee is £70/€70 for one category and £99/€99 for two. The event page states the same £70/€70 and £99/€99 fees. The form lists one category as £68.00 / €68.00, and two categories as £99.00 / €99.00. A payment button on the page says "Click here to pay your entry fee for The Amsterdam Classic III". The visible form heading is "The Amsterdam Classic IV - Entry Form". The diary names Joe Magor, Josh Cutting and Meike Van Dalen. The event page names Joe Magor. Enter Online is showing, and the page has an entry form.
 
 Unless a fee is given above, the diary lists the one-day events at £30, including an event shirt. Most are grades A to E, for SquashLevels 0–15,000. Organisers and entry forms are on the [CM Stringers entry page](https://www.cmstringers.com/entry/).
 
