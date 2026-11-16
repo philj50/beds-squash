@@ -78,6 +78,12 @@
       "grade": "A Grade"
     },
     {
+      "name": "Ryan Harper",
+      "club": "",
+      "seed": "",
+      "grade": "A Grade"
+    },
+    {
       "name": "Ryan Pescod",
       "club": "",
       "seed": "",
@@ -294,5 +300,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-15T23:18:20.979Z"
+  "syncedAt": "2026-11-16T16:42:50.210Z"
 }
