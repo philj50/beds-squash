@@ -18,6 +18,12 @@
   "matches": [],
   "entries": [
     {
+      "name": "Asad Masroor",
+      "club": "",
+      "seed": "",
+      "grade": "A Grade"
+    },
+    {
       "name": "Benjamin Mann",
       "club": "",
       "seed": "",
@@ -300,5 +306,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-17T02:15:33.045Z"
+  "syncedAt": "2026-11-17T16:39:12.998Z"
 }
