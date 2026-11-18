@@ -210,6 +210,12 @@
       "grade": "C Grade"
     },
     {
+      "name": "Andrew Shirley",
+      "club": "",
+      "seed": "",
+      "grade": "C Grade"
+    },
+    {
       "name": "Barry Ephgrave",
       "club": "",
       "seed": "",
@@ -276,6 +282,12 @@
       "grade": "Over 55s"
     },
     {
+      "name": "David Brister",
+      "club": "",
+      "seed": "",
+      "grade": "Over 55s"
+    },
+    {
       "name": "Ian Thomas",
       "club": "",
       "seed": "",
@@ -306,5 +318,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-18T01:28:17.998Z"
+  "syncedAt": "2026-11-18T16:07:56.524Z"
 }
