@@ -54,6 +54,12 @@
       "grade": "A Grade"
     },
     {
+      "name": "Marcus Gray",
+      "club": "",
+      "seed": "",
+      "grade": "A Grade"
+    },
+    {
       "name": "Max Lloyd",
       "club": "",
       "seed": "",
@@ -120,6 +126,18 @@
       "grade": "A Grade"
     },
     {
+      "name": "Flo Smith",
+      "club": "",
+      "seed": "",
+      "grade": "Ladies B Grade"
+    },
+    {
+      "name": "Izzy Smith",
+      "club": "",
+      "seed": "",
+      "grade": "Ladies B Grade"
+    },
+    {
       "name": "Lindsey Ransley",
       "club": "",
       "seed": "",
@@ -174,6 +192,12 @@
       "grade": "B Grade"
     },
     {
+      "name": "Joseph Masih",
+      "club": "",
+      "seed": "",
+      "grade": "B Grade"
+    },
+    {
       "name": "Michael Collins",
       "club": "",
       "seed": "",
@@ -187,6 +211,12 @@
     },
     {
       "name": "Oliver Elphick",
+      "club": "",
+      "seed": "",
+      "grade": "B Grade"
+    },
+    {
+      "name": "Thomas Benson",
       "club": "",
       "seed": "",
       "grade": "B Grade"
@@ -318,5 +348,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-18T16:07:56.524Z"
+  "syncedAt": "2026-11-19T00:56:31.733Z"
 }
