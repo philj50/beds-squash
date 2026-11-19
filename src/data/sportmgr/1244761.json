@@ -300,6 +300,12 @@
       "grade": "C Grade"
     },
     {
+      "name": "Richard Fryer",
+      "club": "",
+      "seed": "",
+      "grade": "C Grade"
+    },
+    {
       "name": "Sam Swann",
       "club": "",
       "seed": "",
@@ -348,5 +354,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-19T00:56:31.733Z"
+  "syncedAt": "2026-11-19T16:15:24.616Z"
 }
