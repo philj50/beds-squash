@@ -258,6 +258,12 @@
       "grade": "C Grade"
     },
     {
+      "name": "Duncan Welch",
+      "club": "",
+      "seed": "",
+      "grade": "C Grade"
+    },
+    {
       "name": "Erhan Fuchedzhiev",
       "club": "",
       "seed": "",
@@ -265,6 +271,12 @@
     },
     {
       "name": "Hasan Anwar",
+      "club": "",
+      "seed": "",
+      "grade": "C Grade"
+    },
+    {
+      "name": "Ian Frost",
       "club": "",
       "seed": "",
       "grade": "C Grade"
@@ -324,6 +336,12 @@
       "grade": "C Grade"
     },
     {
+      "name": "Yomi Obisesan",
+      "club": "",
+      "seed": "",
+      "grade": "C Grade"
+    },
+    {
       "name": "Chris Moss",
       "club": "",
       "seed": "",
@@ -372,5 +390,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-20T00:59:46.851Z"
+  "syncedAt": "2026-11-20T15:53:27.101Z"
 }
