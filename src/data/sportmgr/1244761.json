@@ -126,6 +126,12 @@
       "grade": "A Grade"
     },
     {
+      "name": "Emily Maclean",
+      "club": "",
+      "seed": "",
+      "grade": "Ladies B Grade"
+    },
+    {
       "name": "Flo Smith",
       "club": "",
       "seed": "",
@@ -306,6 +312,12 @@
       "grade": "C Grade"
     },
     {
+      "name": "Rohan Ubhi",
+      "club": "",
+      "seed": "",
+      "grade": "C Grade"
+    },
+    {
       "name": "Sam Swann",
       "club": "",
       "seed": "",
@@ -348,11 +360,17 @@
       "grade": "Over 55s"
     },
     {
+      "name": "Simon Joyce",
+      "club": "",
+      "seed": "",
+      "grade": "Over 55s"
+    },
+    {
       "name": "Tony Rumbold",
       "club": "",
       "seed": "",
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-19T16:15:24.616Z"
+  "syncedAt": "2026-11-20T00:59:46.851Z"
 }
