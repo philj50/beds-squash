@@ -126,6 +126,12 @@
       "grade": "A Grade"
     },
     {
+      "name": "Ashleigh Kemp",
+      "club": "",
+      "seed": "",
+      "grade": "Ladies A Grade"
+    },
+    {
       "name": "Emily Maclean",
       "club": "",
       "seed": "",
@@ -390,5 +396,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-21T00:34:12.220Z"
+  "syncedAt": "2026-11-21T15:03:30.166Z"
 }
