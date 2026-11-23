@@ -192,6 +192,12 @@
       "grade": "B Grade"
     },
     {
+      "name": "Calum Ogilvie",
+      "club": "",
+      "seed": "",
+      "grade": "B Grade"
+    },
+    {
       "name": "Danny Hall",
       "club": "",
       "seed": "",
@@ -216,6 +222,12 @@
       "grade": "B Grade"
     },
     {
+      "name": "Manjit Ubhi",
+      "club": "",
+      "seed": "",
+      "grade": "B Grade"
+    },
+    {
       "name": "Michael Collins",
       "club": "",
       "seed": "",
@@ -229,6 +241,24 @@
     },
     {
       "name": "Oliver Elphick",
+      "club": "",
+      "seed": "",
+      "grade": "B Grade"
+    },
+    {
+      "name": "Oliver Lloyd",
+      "club": "",
+      "seed": "",
+      "grade": "B Grade"
+    },
+    {
+      "name": "Simon Bloomfield",
+      "club": "",
+      "seed": "",
+      "grade": "B Grade"
+    },
+    {
+      "name": "Stephen Mullens",
       "club": "",
       "seed": "",
       "grade": "B Grade"
@@ -402,5 +432,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-22T23:57:57.822Z"
+  "syncedAt": "2026-11-23T18:56:44.578Z"
 }
