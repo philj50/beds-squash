@@ -18,6 +18,12 @@
   "matches": [],
   "entries": [
     {
+      "name": "Andrew Monteith",
+      "club": "",
+      "seed": "",
+      "grade": "A Grade"
+    },
+    {
       "name": "Asad Masroor",
       "club": "",
       "seed": "",
@@ -193,6 +199,12 @@
     },
     {
       "name": "Calum Ogilvie",
+      "club": "",
+      "seed": "",
+      "grade": "B Grade"
+    },
+    {
+      "name": "Charlie Jessop",
       "club": "",
       "seed": "",
       "grade": "B Grade"
@@ -426,11 +438,17 @@
       "grade": "Over 55s"
     },
     {
+      "name": "Simon Marshall",
+      "club": "",
+      "seed": "",
+      "grade": "Over 55s"
+    },
+    {
       "name": "Tony Rumbold",
       "club": "",
       "seed": "",
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-23T18:56:44.578Z"
+  "syncedAt": "2026-11-24T04:11:40.115Z"
 }
