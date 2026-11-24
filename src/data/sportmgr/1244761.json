@@ -186,6 +186,12 @@
       "grade": "B Grade"
     },
     {
+      "name": "Alex Platts",
+      "club": "",
+      "seed": "",
+      "grade": "B Grade"
+    },
+    {
       "name": "Arif Khanzada",
       "club": "",
       "seed": "",
@@ -223,6 +229,12 @@
     },
     {
       "name": "James O'Connor",
+      "club": "",
+      "seed": "",
+      "grade": "B Grade"
+    },
+    {
+      "name": "Jonny Richens",
       "club": "",
       "seed": "",
       "grade": "B Grade"
@@ -307,6 +319,12 @@
     },
     {
       "name": "Barry Ephgrave",
+      "club": "",
+      "seed": "",
+      "grade": "C Grade"
+    },
+    {
+      "name": "Ben Robinson",
       "club": "",
       "seed": "",
       "grade": "C Grade"
@@ -450,5 +468,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-24T04:11:40.115Z"
+  "syncedAt": "2026-11-24T18:35:44.474Z"
 }
