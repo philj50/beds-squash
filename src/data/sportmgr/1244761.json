@@ -36,6 +36,12 @@
       "grade": "A Grade"
     },
     {
+      "name": "Cameron Mackay",
+      "club": "",
+      "seed": "",
+      "grade": "A Grade"
+    },
+    {
       "name": "Charlie Jenkins",
       "club": "",
       "seed": "",
@@ -144,7 +150,19 @@
       "grade": "A Grade"
     },
     {
+      "name": "Will Montgomery",
+      "club": "",
+      "seed": "",
+      "grade": "A Grade"
+    },
+    {
       "name": "Ashleigh Kemp",
+      "club": "",
+      "seed": "",
+      "grade": "Ladies A Grade"
+    },
+    {
+      "name": "Rachael Hamp",
       "club": "",
       "seed": "",
       "grade": "Ladies A Grade"
@@ -264,6 +282,12 @@
       "grade": "B Grade"
     },
     {
+      "name": "Lewis Noble",
+      "club": "",
+      "seed": "",
+      "grade": "B Grade"
+    },
+    {
       "name": "Manjit Ubhi",
       "club": "",
       "seed": "",
@@ -325,6 +349,12 @@
     },
     {
       "name": "Aayush Regmi",
+      "club": "",
+      "seed": "",
+      "grade": "C Grade"
+    },
+    {
+      "name": "Aden Chiesa",
       "club": "",
       "seed": "",
       "grade": "C Grade"
@@ -426,6 +456,12 @@
       "grade": "C Grade"
     },
     {
+      "name": "richard Dell",
+      "club": "",
+      "seed": "",
+      "grade": "C Grade"
+    },
+    {
       "name": "Richard Fryer",
       "club": "",
       "seed": "",
@@ -454,6 +490,12 @@
       "club": "",
       "seed": "",
       "grade": "C Grade"
+    },
+    {
+      "name": "Bruce St Leger",
+      "club": "",
+      "seed": "",
+      "grade": "Over 55s"
     },
     {
       "name": "Chris Moss",
@@ -516,5 +558,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-25T02:54:45.085Z"
+  "syncedAt": "2026-11-25T17:45:31.063Z"
 }
