@@ -66,6 +66,12 @@
       "grade": "A Grade"
     },
     {
+      "name": "Matthew Nankivell",
+      "club": "",
+      "seed": "",
+      "grade": "A Grade"
+    },
+    {
       "name": "Max Lloyd",
       "club": "",
       "seed": "",
@@ -162,6 +168,18 @@
       "grade": "Ladies B Grade"
     },
     {
+      "name": "Katharine Harley",
+      "club": "",
+      "seed": "",
+      "grade": "Ladies B Grade"
+    },
+    {
+      "name": "Laura Bradley",
+      "club": "",
+      "seed": "",
+      "grade": "Ladies B Grade"
+    },
+    {
       "name": "Lindsey Ransley",
       "club": "",
       "seed": "",
@@ -252,6 +270,12 @@
       "grade": "B Grade"
     },
     {
+      "name": "Matthew Bradley",
+      "club": "",
+      "seed": "",
+      "grade": "B Grade"
+    },
+    {
       "name": "Michael Collins",
       "club": "",
       "seed": "",
@@ -298,6 +322,12 @@
       "club": "",
       "seed": "",
       "grade": "B Grade"
+    },
+    {
+      "name": "Aayush Regmi",
+      "club": "",
+      "seed": "",
+      "grade": "C Grade"
     },
     {
       "name": "Alex Duncan",
@@ -354,6 +384,12 @@
       "grade": "C Grade"
     },
     {
+      "name": "James Harley",
+      "club": "",
+      "seed": "",
+      "grade": "C Grade"
+    },
+    {
       "name": "James Neal",
       "club": "",
       "seed": "",
@@ -396,6 +432,12 @@
       "grade": "C Grade"
     },
     {
+      "name": "Rohan Regmi",
+      "club": "",
+      "seed": "",
+      "grade": "C Grade"
+    },
+    {
       "name": "Rohan Ubhi",
       "club": "",
       "seed": "",
@@ -427,6 +469,12 @@
     },
     {
       "name": "Ian Thomas",
+      "club": "",
+      "seed": "",
+      "grade": "Over 55s"
+    },
+    {
+      "name": "Ian Wright",
       "club": "",
       "seed": "",
       "grade": "Over 55s"
@@ -468,5 +516,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-24T18:35:44.474Z"
+  "syncedAt": "2026-11-25T02:54:45.085Z"
 }
