@@ -66,6 +66,12 @@
       "grade": "A Grade"
     },
     {
+      "name": "Karan Dhokia",
+      "club": "",
+      "seed": "",
+      "grade": "A Grade"
+    },
+    {
       "name": "Marcus Gray",
       "club": "",
       "seed": "",
@@ -264,7 +270,19 @@
       "grade": "B Grade"
     },
     {
+      "name": "James Evans",
+      "club": "",
+      "seed": "",
+      "grade": "B Grade"
+    },
+    {
       "name": "James O'Connor",
+      "club": "",
+      "seed": "",
+      "grade": "B Grade"
+    },
+    {
+      "name": "Jonathan Kefford",
       "club": "",
       "seed": "",
       "grade": "B Grade"
@@ -588,5 +606,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-26T02:00:37.350Z"
+  "syncedAt": "2026-11-26T17:29:30.805Z"
 }
