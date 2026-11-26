@@ -32,7 +32,7 @@ test.describe('Public pages', () => {
     await expect(page.locator('.news-card--large').getByRole('link', { name: 'Confirmed sponsors for the Beds County Closed' })).toBeVisible();
     await expect(page.locator('[data-home-news] [data-home-card]:not([hidden])')).toHaveCount(1);
     await expect(page.getByRole('link', { name: 'Simon Bloomfield beat David Gibson in Division 2' })).toBeHidden();
-    await expect(page.locator('[data-home-events]').getByRole('link', { name: 'Junior County Closed' })).toBeVisible();
+    await expect(page.locator('[data-home-events]').getByRole('link', { name: 'Junior County Closed' })).toHaveCount(0);
     await expect(page.locator('[data-home-events]').getByRole('link', { name: 'Bedfordshire County Closed Championships 2027' })).toBeVisible();
     await expect(page.locator('[data-home-events]').getByRole('link', { name: 'Winter League 2026/27 begins' })).toHaveCount(0);
     await expect(page.locator('[data-now]')).toHaveCount(0);
