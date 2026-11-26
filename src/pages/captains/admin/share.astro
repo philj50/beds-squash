@@ -232,7 +232,7 @@ import { url } from '@/lib/site';
         .select('id, kind, credit, title, caption, body, storage_path, url, status, created_at, published_at')
         .order('created_at', { ascending: false })
         .limit(100);
-      data = retry.data;
+      data = retry.data?.map((row) => ({ ...row, on_front: false })) ?? null;
       error = retry.error;
     }
     if (error) {

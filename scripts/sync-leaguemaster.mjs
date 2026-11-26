@@ -184,13 +184,7 @@ function applyScorecard(fixture) {
   let homeRubbers = 0;
   let awayRubbers = 0;
   for (const rubber of fixture.rubbers) {
-    let home = 0;
-    let away = 0;
-    for (const bit of String(rubber.score ?? '').match(/\d+\s*\/\s*\d+/g) ?? []) {
-      const [left, right] = bit.split('/').map((part) => Number(part.trim()));
-      if (left > right) home += 1;
-      else if (right > left) away += 1;
-    }
+    const [home, away] = gamesIn(rubber);
     homeGames += home;
     awayGames += away;
     const winner = home === away ? rubber.winner : home > away ? 'home' : 'away';
@@ -211,6 +205,25 @@ function applyScorecard(fixture) {
   fixture.away_games = awayGames;
   fixture.home_points = homeGames + (decided && homeRubbers > awayRubbers ? 5 : 0);
   fixture.away_points = awayGames + (decided && awayRubbers > homeRubbers ? 5 : 0);
+}
+
+/** Games from the score line. A walkover has no score line, so use the games League Master already counted. */
+function gamesIn(rubber) {
+  const bits = String(rubber.score ?? '').match(/\d+\s*\/\s*\d+/g) ?? [];
+  if (bits.length) {
+    let home = 0;
+    let away = 0;
+    for (const bit of bits) {
+      const [left, right] = bit.split('/').map((part) => Number(part.trim()));
+      if (left > right) home += 1;
+      else if (right > left) away += 1;
+    }
+    return [home, away];
+  }
+  const home = Number(rubber.home_games);
+  const away = Number(rubber.away_games);
+  if ((Number.isFinite(home) || Number.isFinite(away)) && (home || 0) + (away || 0) > 0) return [home || 0, away || 0];
+  return [0, 0];
 }
 
 /** Convert a Europe/London wall-clock time to an ISO string in UTC. */
@@ -244,7 +257,15 @@ function parseMatch(html) {
     if (Number.isFinite(homeGames) && Number.isFinite(awayGames) && (homeGames || awayGames)) {
       winner = homeGames > awayGames ? 'home' : 'away';
     }
-    rubbers.push({ position: pos, home_player: c[1] || null, away_player: c[3] || null, score: c[6] || null, winner });
+    rubbers.push({
+      position: pos,
+      home_player: c[1] || null,
+      away_player: c[3] || null,
+      score: c[6] || null,
+      winner,
+      home_games: Number.isFinite(homeGames) ? homeGames : null,
+      away_games: Number.isFinite(awayGames) ? awayGames : null,
+    });
   }
   return rubbers;
 }
@@ -292,6 +313,10 @@ async function buildPayload(season) {
       if (fx.needsCard) {
         fx.rubbers = parseMatch(await request(`/cgi-county/icounty.exe/showmatch?fixtureid=${fx.lm_id}&divid=${division.lmId}`));
         applyScorecard(fx);
+        for (const rubber of fx.rubbers) {
+          delete rubber.home_games;
+          delete rubber.away_games;
+        }
         await pause(40);
       }
       delete fx.needsCard;
@@ -399,6 +424,20 @@ function assertScorecard() {
   applyScorecard(fixture);
   if (fixture.home_games !== 7 || fixture.away_games !== 11 || fixture.home_points !== 7 || fixture.away_points !== 16) {
     throw new Error(`scorecard points were ${fixture.home_points}-${fixture.away_points} from ${fixture.home_games}-${fixture.away_games} games`);
+  }
+  const walkover = {
+    status: 'scheduled',
+    rubbers: [
+      { score: '11/15 12/15 16/14 10/15', winner: 'away' },
+      { score: '9/15 15/11 16/14 10/15 14/16', winner: 'away' },
+      { score: '15/13 12/15 13/15 15/11 14/16', winner: 'away' },
+      { score: '15/10 15/7 15/7', winner: 'home' },
+      { score: null, winner: 'away', home_games: 0, away_games: 3 },
+    ],
+  };
+  applyScorecard(walkover);
+  if (walkover.home_points !== 8 || walkover.away_points !== 17 || walkover.away_games !== 12) {
+    throw new Error(`walkover points were ${walkover.home_points}-${walkover.away_points} from ${walkover.away_games} away games`);
   }
 }
 

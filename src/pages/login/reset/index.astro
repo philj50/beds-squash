@@ -41,6 +41,8 @@ import { url } from '@/lib/site';
   const lede = document.querySelector<HTMLElement>('[data-lede]');
   const next = document.querySelector<HTMLElement>('[data-next]');
   if (!root || !form || !statusEl || !lede || !next) throw new Error('reset form missing');
+  const resetForm = form;
+  const resetLede = lede;
 
   const supabase = createClient(root.dataset.url!, root.dataset.key!, {
     auth: { flowType: 'implicit', detectSessionInUrl: true },
@@ -56,14 +58,14 @@ import { url } from '@/lib/site';
     if (ready) return;
     ready = true;
     history.replaceState(null, '', location.pathname + location.search);
-    lede.textContent = 'Choose a new password. You are signed in only for this step.';
-    form.hidden = false;
+    resetLede.textContent = 'Choose a new password. You are signed in only for this step.';
+    resetForm.hidden = false;
   }
 
   function showExpired() {
     if (ready) return;
-    lede.textContent = expired;
-    form.hidden = true;
+    resetLede.textContent = expired;
+    resetForm.hidden = true;
   }
 
   if (linkFailed) showExpired();
@@ -81,11 +83,11 @@ import { url } from '@/lib/site';
     }, 1500);
   });
 
-  form.addEventListener('submit', async (event) => {
+  resetForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!ready) return;
-    const password = String(new FormData(form).get('password') || '');
-    const confirm = String(new FormData(form).get('confirm') || '');
+    const password = String(new FormData(resetForm).get('password') || '');
+    const confirm = String(new FormData(resetForm).get('confirm') || '');
     const issue = passwordIssue(password);
     if (issue) {
       statusEl.textContent = issue;
@@ -95,7 +97,7 @@ import { url } from '@/lib/site';
       statusEl.textContent = 'Type the same password in both boxes.';
       return;
     }
-    const button = form.querySelector('button');
+    const button = resetForm.querySelector('button');
     if (button) button.disabled = true;
     statusEl.textContent = 'Saving…';
     const { error } = await supabase.auth.updateUser({ password, data: { must_change_password: false } });
@@ -105,8 +107,8 @@ import { url } from '@/lib/site';
       return;
     }
     history.replaceState(null, '', location.pathname + location.search);
-    form.hidden = true;
-    lede.textContent = 'Password saved. You are signed in.';
+    resetForm.hidden = true;
+    resetLede.textContent = 'Password saved. You are signed in.';
     statusEl.textContent = '';
     next.hidden = false;
   });
