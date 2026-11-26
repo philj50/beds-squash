@@ -360,6 +360,12 @@
       "grade": "C Grade"
     },
     {
+      "name": "Aidan Payne",
+      "club": "",
+      "seed": "",
+      "grade": "C Grade"
+    },
+    {
       "name": "Alex Duncan",
       "club": "",
       "seed": "",
@@ -444,6 +450,18 @@
       "grade": "C Grade"
     },
     {
+      "name": "Milan Gandhi",
+      "club": "",
+      "seed": "",
+      "grade": "C Grade"
+    },
+    {
+      "name": "Nick Spenceley",
+      "club": "",
+      "seed": "",
+      "grade": "C Grade"
+    },
+    {
       "name": "Paul Kyndt",
       "club": "",
       "seed": "",
@@ -463,6 +481,12 @@
     },
     {
       "name": "Richard Fryer",
+      "club": "",
+      "seed": "",
+      "grade": "C Grade"
+    },
+    {
+      "name": "Rob Ayles",
       "club": "",
       "seed": "",
       "grade": "C Grade"
@@ -552,11 +576,17 @@
       "grade": "Over 55s"
     },
     {
+      "name": "Steve Barlow",
+      "club": "",
+      "seed": "",
+      "grade": "Over 55s"
+    },
+    {
       "name": "Tony Rumbold",
       "club": "",
       "seed": "",
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-25T17:45:31.063Z"
+  "syncedAt": "2026-11-26T02:00:37.350Z"
 }
