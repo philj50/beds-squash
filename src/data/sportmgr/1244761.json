@@ -60,6 +60,12 @@
       "grade": "A Grade"
     },
     {
+      "name": "Gbenga Adeyi",
+      "club": "",
+      "seed": "",
+      "grade": "A Grade"
+    },
+    {
       "name": "Jonathan Towers",
       "club": "",
       "seed": "",
@@ -588,6 +594,12 @@
       "grade": "Over 55s"
     },
     {
+      "name": "PARAMJIT DIU",
+      "club": "",
+      "seed": "",
+      "grade": "Over 55s"
+    },
+    {
       "name": "Simon Joyce",
       "club": "",
       "seed": "",
@@ -612,5 +624,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-27T02:00:47.865Z"
+  "syncedAt": "2026-11-27T17:09:36.876Z"
 }
