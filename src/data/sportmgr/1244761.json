@@ -318,6 +318,12 @@
       "grade": "B Grade"
     },
     {
+      "name": "Matthew Iyere",
+      "club": "",
+      "seed": "",
+      "grade": "B Grade"
+    },
+    {
       "name": "Michael Collins",
       "club": "",
       "seed": "",
@@ -606,5 +612,5 @@
       "grade": "Over 55s"
     }
   ],
-  "syncedAt": "2026-11-26T17:29:30.805Z"
+  "syncedAt": "2026-11-27T02:00:47.865Z"
 }
